@@ -85,7 +85,7 @@ abstract contract AdapterBase is
     lastHarvest = block.timestamp;
   }
 
-  function decimals() public view override(IERC20Metadata, ERC20) returns (uint8) {
+  function decimals() public view override returns (uint8) {
     return _decimals;
   }
 

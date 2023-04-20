@@ -136,7 +136,7 @@ contract Vault is
     function decimals()
         public
         view
-        override(IERC20Metadata, ERC20)
+        override
         returns (uint8)
     {
         return _decimals;

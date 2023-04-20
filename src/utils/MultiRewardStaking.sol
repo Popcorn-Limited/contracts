@@ -87,7 +87,7 @@ contract MultiRewardStaking is ERC4626Upgradeable, OwnedUpgradeable {
     function decimals()
         public
         view
-        override(ERC20Upgradeable, IERC20Metadata)
+        override
         returns (uint8)
     {
         return _decimals;

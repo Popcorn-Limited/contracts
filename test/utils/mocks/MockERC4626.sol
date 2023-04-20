@@ -34,7 +34,7 @@ contract MockERC4626 is ERC4626Upgradeable {
                             GENERAL VIEWS
     //////////////////////////////////////////////////////////////*/
 
-  function decimals() public view override(IERC20Metadata, ERC20) returns (uint8) {
+  function decimals() public view override returns (uint8) {
     return _decimals;
   }
 
