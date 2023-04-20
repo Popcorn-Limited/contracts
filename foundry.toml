@@ -1,2 +1,20 @@
-[profile.ci.fuzz]
-runs = 10_000
+[profile.default]
+libs = ['node_modules', "lib"]
+fs_permissions = [{ access = "read-write", path = "./"}]
+verbosity = 2
+fuzz_runs = 256
+fuzz_max_global_rejects = 100000000
+
+remappings = [
+  'ds-test/=lib/forge-std/lib/ds-test/src/',
+  'forge-std/=lib/forge-std/src/',
+  'openzeppelin-contracts/=node_modules/@openzeppelin/contracts/',
+  'openzeppelin-contracts-upgradeable/=node_modules/@openzeppelin/contracts-upgradeable',
+  'solmate/=lib/solmate/src/'
+]
+
+[rpc_endpoints]
+mainnet = "${ETH_RPC_URL}" 
+polygon = "${POLYGON_RPC_URL}" 
+fantom = "${FANTOM_RPC_URL}"
+optimism = "${OPTIMISM_RPC_URL}"
