@@ -3,10 +3,9 @@
 
 pragma solidity ^0.8.15;
 import {StableABase, ERC20} from "./StableABase.sol";
-import {IUniswapRouterV2} from "../../../../../../interfaces/external/uni/IUniswapRouterV2.sol";
-import {IUniswapV2Pair} from "../../../../../../interfaces/external/uni/IUniswapV2Pair.sol";
-import {IRewarder} from "../../../../../../interfaces/external/IRewarder.sol";
-import {IUniswapV2Module} from "../../../../../../interfaces/modules/IUniswapV2Module.sol";
+import {IUniswapRouterV2} from "../../../../interfaces/external/uni/IUniswapRouterV2.sol";
+import {IUniswapV2Pair} from "../../../../interfaces/external/uni/IUniswapV2Pair.sol";
+import {IUniswapV2Module} from "../../../../interfaces/modules/IUniswapV2Module.sol";
 
 contract ConvexUSDCMultiFarm is StableABase {
     constructor(
@@ -16,11 +15,11 @@ contract ConvexUSDCMultiFarm is StableABase {
         address[] memory _routers,
         address _vault,
         address _strategist,
-        address[] memory _protocolAddresses,
-        uint256[] memory _protocolUints,
+        ProtocolAddress[] memory _protocolAddresses,
+        ProtocolUint[] memory _protocolUints,
         address[][] memory _rewardsToNativeRoutes,
         address[] memory _nativeToAssetTokenRoute
-    ) public {
+    ) {
         native = _native;
 
         tradeModules = _tradeModules;
@@ -29,8 +28,13 @@ contract ConvexUSDCMultiFarm is StableABase {
         vault = _vault;
         strategist = _strategist;
 
-        protocolAddresses = _protocolAddresses;
-        protocolUints = _protocolUints;
+        for (uint i; i < _protocolAddresses.length; ++i) {
+            protocolAddresses[i] = _protocolAddresses[i];
+        }
+
+        for (uint i; i < _protocolUints.length; ++i) {
+            protocolUints[i] = _protocolUints[i];
+        }
 
         rewardsToNativeRoutes = _rewardsToNativeRoutes;
         nativeToAssetTokenRoute = _nativeToAssetTokenRoute;
@@ -49,9 +53,9 @@ contract ConvexUSDCMultiFarm is StableABase {
                           COMPOUND LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    // Specify functionality of _deposit after IAdapter(address(this)).strategyDeposit(assets, shares);.
-    // Function will divide _assets by number of underlying staking destinations and deposit evenly into Convex gauges.
-    function _onDeposit(uint256 _assets, uint256 _shares) internal override {}
+    // // Specify functionality of _deposit after IAdapter(address(this)).strategyDeposit(assets, shares);.
+    // // Function will divide _assets by number of underlying staking destinations and deposit evenly into Convex gauges.
+    // function _onDeposit(uint256 _assets, uint256 _shares) internal override {}
 
     // Swap all rewards to native token
     function _swapRewardsToNative(

@@ -27,7 +27,7 @@ contract StrategyBase {
         bytes32 desc;
     }
 
-    // Protocol contracts info (masterchefs, poolIds, etc.)
+    // Protocol contracts info (masterchefs, poolIds, gaugeAddresses, etc.)
     ProtocolAddress[] public protocolAddresses;
     ProtocolUint[] public protocolUints;
 
@@ -67,6 +67,17 @@ contract StrategyBase {
     }
 
     function verifyAdapterCompatibility(bytes memory data) public virtual {}
+
+    /*//////////////////////////////////////////////////////////////
+                          MODIFIERS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Reset vault functionality bool upon changing internal data (contract addressess, routes, pids, etc).
+    modifier vaultCheck() {
+        _;
+
+        if (isVaultFunctional == true) isVaultFunctional = false;
+    }
 
     /*//////////////////////////////////////////////////////////////
                           SETUP
@@ -141,11 +152,11 @@ contract StrategyBase {
 
         IAdapter(address(this)).strategyDeposit(assets, shares);
 
-        _onDeposit(assets, shares);
+        // _onDeposit(assets, shares);
     }
 
-    // Specify functionality of _deposit after IAdapter(address(this)).strategyDeposit(assets, shares);.
-    function _onDeposit(uint256 _assets, uint256 _shares) internal virtual {}
+    // // Specify functionality of _deposit after IAdapter(address(this)).strategyDeposit(assets, shares);.
+    // function _onDeposit(uint256 _assets, uint256 _shares) internal virtual {}
 
     /*//////////////////////////////////////////////////////////////
                           REWARDS AND ROUTES
@@ -199,28 +210,24 @@ contract StrategyBase {
 
     // Set all rewardRoutes.
     function setAllRewardsToNativeRoutes(
-        address[][] calldata _routes
-    ) public virtual {
-        rewardsToNativeRoutes = routes;
-
-        if (isVaultFunctional == true) isVaultFunctional = false;
+        address[][] memory _routes
+    ) public virtual vaultCheck {
+        rewardsToNativeRoutes = _routes;
     }
 
     // Set rewardRoute at index.
     function setRewardsToNativeRoute(
         uint256 _rewardIndex,
-        address[] calldata _route
-    ) public virtual {
-        rewardsToNativeRoutes[rewardIndex] = route;
-
-        if (isVaultFunctional == true) isVaultFunctional = false;
+        address[] memory _route
+    ) public virtual vaultCheck {
+        rewardsToNativeRoutes[_rewardIndex] = _route;
     }
 
     // Get rewardRoute at index.
     function getRewardsToNativeRoute(
         uint256 _rewardIndex
     ) public view virtual returns (address[] memory) {
-        return rewardsToNativeRoutes[rewardIndex];
+        return rewardsToNativeRoutes[_rewardIndex];
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -228,26 +235,36 @@ contract StrategyBase {
     //////////////////////////////////////////////////////////////*/
 
     // Set all protocolAddresses.
-    function setAllProtocolAddresses(ProtocolAddress[] calldata _addresses) {
-        protocolAddresses = _addresses;
-
-        if (isVaultFunctional == true) isVaultFunctional = false;
+    function setAllProtocolAddresses(
+        ProtocolAddress[] memory _protocolAddresses
+    ) public vaultCheck {
+        for (uint i; i < _protocolAddresses.length; ++i) {
+            protocolAddresses[i] = _protocolAddresses[i];
+        }
     }
 
     // Set protocolAddress at index.
-    function setProtocolAddress(ProtocolAddress _address, uint256 _idx) {
+    function setProtocolAddress(
+        ProtocolAddress memory _address,
+        uint256 _idx
+    ) public vaultCheck {
         protocolAddresses[_idx] = _address;
     }
 
     // Set all protocolUints.
-    function setAllProtocolUints(ProtocolUint[] calldata _uints) {
-        protocolUints = _uints;
-
-        if (isVaultFunctional == true) isVaultFunctional = false;
+    function setAllProtocolUints(
+        ProtocolUint[] memory _protocolUints
+    ) public vaultCheck {
+        for (uint i; i < _protocolUints.length; ++i) {
+            protocolUints[i] = _protocolUints[i];
+        }
     }
 
     // Set protocolUints at index.
-    function setProtocolUint(ProtocolUint _uint, uint256 _idx) {
+    function setProtocolUint(
+        ProtocolUint memory _uint,
+        uint256 _idx
+    ) public vaultCheck {
         protocolUints[_idx] = _uint;
     }
 
