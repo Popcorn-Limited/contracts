@@ -15,19 +15,28 @@ contract StrategyBase {
     // Native token on chain
     address public native;
 
-    // Struct for ProtocolAddress. Specifies an address and its description in bytes32 for internal use in vault.
+    // Struct for ProtocolAddress. Specifies an address and its description in bytes for internal use in vault.
     struct ProtocolAddress {
         address addr;
-        bytes32 desc;
+        bytes desc;
     }
 
-    // Struct for ProtocolUint. Specifies a uint256 and its description in bytes32 for internal use in vault.
+    // Struct for ProtocolUint. Specifies a uint256 and its description in bytes for internal use in vault.
     struct ProtocolUint {
         uint256 num;
-        bytes32 desc;
+        bytes desc;
     }
 
     // Protocol contracts info (masterchefs, poolIds, gaugeAddresses, etc.)
+    // These arrays can be used however the strategist would like to store data.
+    //
+    // As an example indexes 0-4 can be used for disparate pieces of information, index 5 can hold
+    // the length of the proceeding values, and indexes 6+ can hold the additional values for which
+    // index 5 holds the total length of (i.e. an indefinite number of gauges, pids, etc).
+    //
+    // While any pertinent values can be stored in protocolAddresses and protocolUints,
+    // it is important for the strategist to devise an organized and extensible system to properly
+    // operate their strategy in a durable manner using the alloted arrays on their own behalf. Be careful.
     ProtocolAddress[] public protocolAddresses;
     ProtocolUint[] public protocolUints;
 
@@ -251,6 +260,13 @@ contract StrategyBase {
         protocolAddresses[_idx] = _address;
     }
 
+    // Get a value on protocolAddress at index.
+    function getProtocolAddress(
+        uint256 _idx
+    ) public view returns (ProtocolAddress memory) {
+        return protocolAddresses[_idx];
+    }
+
     // Set all protocolUints.
     function setAllProtocolUints(
         ProtocolUint[] memory _protocolUints
@@ -266,6 +282,13 @@ contract StrategyBase {
         uint256 _idx
     ) public vaultCheck {
         protocolUints[_idx] = _uint;
+    }
+
+    // Get a value on protocolUint at index.
+    function getProtocolUint(
+        uint256 _idx
+    ) public view returns (ProtocolUint memory) {
+        return protocolUints[_idx];
     }
 
     /*//////////////////////////////////////////////////////////////
