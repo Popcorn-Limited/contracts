@@ -1,4 +1,14 @@
 {
+  "scripts": {
+    "anvil": "./script/anvil.sh",
+    "fund:usdc": "./script/fundUsdc.sh",
+    "fund:eCrv": "./script/fundECrv.sh",
+    "fund:pop": "./script/fundPop.sh",
+    "popStaking:fundOptimism": "./script/fundOpStaking.sh",
+    "demodata:vault": "forge script ./script/VaultDemoData.s.sol --rpc-url http://localhost:8545 --broadcast",
+    "deploy:vaultSystem": "forge script ./script/DeployVaultSystem.s.sol --rpc-url https://optimism.blockpi.network/v1/rpc/public --broadcast",
+    "deploy": "./script/deploy.sh"
+  },
   "dependencies": {
     "@openzeppelin/contracts": "^4.8.3",
     "@openzeppelin/contracts-upgradeable": "^4.8.3"
