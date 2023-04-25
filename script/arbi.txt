@@ -1,14 +1,16 @@
 Deployer=0x22f5413C075Ccd56D575A54763831C4c27A37Bdb
+Pop=
 MultiRewardStaking=
 YearnAdapter=
 BeefyAdapter=
 MockStrategy=
 Vault=
 AdminProxy=
-FeeRecipientProxy=0x74bb390786072ea1329f270CA6C0058b2D1Afe3f
+FeeRecipientProxy=
 PermissionRegistry=
 VaultRegistry=
 MultiRewardEscrow=
+VaultRouter=
 CloneFactory=
 CloneRegistry=
 TemplateRegistry=
