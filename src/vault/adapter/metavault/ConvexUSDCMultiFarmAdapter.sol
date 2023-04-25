@@ -52,8 +52,6 @@ contract ConvexUSDCMultiFarmAdapter is AdapterBase, WithRewards {
 
         metavaultStrategy = IConvexUSDCMultiFarm(address(strategy));
 
-        // uint256 _pid = abi.decode(convexInitData, (uint256));
-
         convexBooster = IConvexBooster(registry);
 
         _name = string.concat(
@@ -250,13 +248,6 @@ contract ConvexUSDCMultiFarmAdapter is AdapterBase, WithRewards {
     // /*//////////////////////////////////////////////////////////////
     //                       UTILITY FUNCTIONS
     // //////////////////////////////////////////////////////////////*/
-    // function uint256ToInt128(uint256 value) public pure returns (int128) {
-    //     uint256 int128Max = uint256(type(int128).max);
-
-    //     require(value <= int128Max, "Value too large for int128");
-
-    //     return int128(value);
-    // }
 
     function int256ToInt128(int256 value) public pure returns (int128) {
         require(
