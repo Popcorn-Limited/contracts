@@ -71,7 +71,7 @@ interface IRewards {
     function rewardToken() external view returns (address);
 }
 
-interface ICurveGauge {
+interface ICurvePool {
     function add_liquidity(
         uint256[] memory _depositAmounts,
         uint256 _min_mint_amount
@@ -86,4 +86,6 @@ interface ICurveGauge {
     function get_balances() external view returns (uint256[] memory _balances);
 
     function coins(uint256 _idx) external view returns (address _coin);
+
+    function approve(address _spender, uint256 _value) external;
 }

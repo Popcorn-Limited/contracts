@@ -5,8 +5,7 @@ pragma solidity ^0.8.15;
 
 import {AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20, Math, IStrategy, IAdapter} from "../abstracts/AdapterBase.sol";
 import {WithRewards, IWithRewards} from "../abstracts/WithRewards.sol";
-import {IConvexUSDCMultiFarm, ICurveGauge} from "./IConvexUSDCMultiFarm.sol";
-import {IConvexBooster, IConvexRewards, IRewards} from "./IConvexUSDCMultiFarm.sol";
+import {IConvexUSDCMultiFarm, ICurvePool, IConvexBooster, IConvexRewards, IRewards} from "./IConvexUSDCMultiFarm.sol";
 
 /**
  * @title   ConvexUSDCMultiFarm Adapter
@@ -61,7 +60,16 @@ contract ConvexUSDCMultiFarmAdapter is AdapterBase, WithRewards {
         );
         _symbol = string.concat("vcCvx-", IERC20Metadata(asset()).symbol());
 
-        IERC20(asset()).approve(address(convexBooster), type(uint256).max);
+        uint256 len = metavaultStrategy.getProtocolUint(5).num;
+        for (uint256 i; i < len; ++i) {
+            address _curvePool = metavaultStrategy
+                .getProtocolAddress(i + 6)
+                .addr;
+            ICurvePool curvePool = ICurvePool(_curvePool);
+
+            IERC20(asset()).approve(address(curvePool), type(uint256).max);
+            curvePool.approve(address(convexBooster), type(uint256).max);
+        }
     }
 
     function name()
@@ -117,26 +125,26 @@ contract ConvexUSDCMultiFarmAdapter is AdapterBase, WithRewards {
         uint256 depositAmount = amount / len;
 
         for (uint256 i; i < len; ++i) {
-            address _curveGauge = metavaultStrategy
+            address _curvePool = metavaultStrategy
                 .getProtocolAddress(i + 6)
                 .addr;
-            ICurveGauge curveGauge = ICurveGauge(_curveGauge);
+            ICurvePool curvePool = ICurvePool(_curvePool);
             uint256 pid = metavaultStrategy.getProtocolUint(i + 6).num;
 
-            uint256[] memory tokens = curveGauge.get_balances();
+            uint256[] memory tokens = curvePool.get_balances();
             uint256 tokensLen = tokens.length;
 
             uint256[] memory depositAmounts = new uint256[](tokensLen);
 
             for (uint256 j; j < tokensLen; ++j) {
-                if (curveGauge.coins(j) == address(asset())) {
+                if (curvePool.coins(j) == address(asset())) {
                     depositAmounts[j] = depositAmount;
                 } else {
                     depositAmounts[j] = 0;
                 }
             }
 
-            curveGauge.add_liquidity(depositAmounts, 0);
+            curvePool.add_liquidity(depositAmounts, 0);
             convexBooster.deposit(pid, depositAmount, true);
         }
     }
@@ -150,27 +158,27 @@ contract ConvexUSDCMultiFarmAdapter is AdapterBase, WithRewards {
         for (uint256 i; i < len; ++i) {
             uint256 _pid = metavaultStrategy.getProtocolUint(i + 5).num;
             (, , , address _convexRewards, , ) = convexBooster.poolInfo(_pid);
-            address _curveGauge = metavaultStrategy
+            address _curvePool = metavaultStrategy
                 .getProtocolAddress(i + 6)
                 .addr;
 
             IConvexRewards convexRewards = IConvexRewards(_convexRewards);
-            ICurveGauge curveGauge = ICurveGauge(_curveGauge);
+            ICurvePool curvePool = ICurvePool(_curvePool);
 
             convexRewards.withdrawAndUnwrap(withdrawAmount, false);
 
-            uint256[] memory tokens = curveGauge.get_balances();
+            uint256[] memory tokens = curvePool.get_balances();
             uint256 tokensLen = tokens.length;
 
             int128 tokenIdx;
 
             for (uint256 j; j < tokensLen; ++j) {
-                if (curveGauge.coins(j) == address(asset())) {
+                if (curvePool.coins(j) == address(asset())) {
                     tokenIdx = int256ToInt128(int256(j));
                 }
             }
 
-            curveGauge.remove_liquidity_one_coin(withdrawAmount, tokenIdx, 0);
+            curvePool.remove_liquidity_one_coin(withdrawAmount, tokenIdx, 0);
         }
     }
 

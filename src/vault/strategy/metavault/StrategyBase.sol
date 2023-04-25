@@ -248,7 +248,7 @@ contract StrategyBase {
     // Set all protocolAddresses.
     function setAllProtocolAddresses(
         ProtocolAddress[] memory _protocolAddresses
-    ) public vaultCheck {
+    ) public virtual vaultCheck {
         for (uint i; i < _protocolAddresses.length; ++i) {
             protocolAddresses[i] = _protocolAddresses[i];
         }
@@ -258,7 +258,7 @@ contract StrategyBase {
     function setProtocolAddress(
         ProtocolAddress memory _address,
         uint256 _idx
-    ) public vaultCheck {
+    ) public virtual vaultCheck {
         protocolAddresses[_idx] = _address;
     }
 
@@ -272,7 +272,7 @@ contract StrategyBase {
     // Set all protocolUints.
     function setAllProtocolUints(
         ProtocolUint[] memory _protocolUints
-    ) public vaultCheck {
+    ) public virtual vaultCheck {
         for (uint i; i < _protocolUints.length; ++i) {
             protocolUints[i] = _protocolUints[i];
         }
@@ -282,7 +282,7 @@ contract StrategyBase {
     function setProtocolUint(
         ProtocolUint memory _uint,
         uint256 _idx
-    ) public vaultCheck {
+    ) public virtual vaultCheck {
         protocolUints[_idx] = _uint;
     }
 
