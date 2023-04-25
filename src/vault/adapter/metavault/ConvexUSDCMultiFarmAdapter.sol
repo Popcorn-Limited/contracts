@@ -96,14 +96,14 @@ contract ConvexUSDCMultiFarmAdapter is AdapterBase, WithRewards {
         uint256 len = metavaultStrategy.getProtocolUint(5).num;
 
         for (uint256 i; i < len; ++i) {
-            address _convexRewards = metavaultStrategy
-                .getProtocolAddress(i + 11)
-                .addr;
+            uint256 _pid = metavaultStrategy.getProtocolUint(i + 5).num;
+            (, , , address _convexRewards, , ) = convexBooster.poolInfo(_pid);
 
             IConvexRewards convexRewards = IConvexRewards(_convexRewards);
 
             total += convexRewards.balanceOf(address(this));
         }
+
         return total;
     }
 
@@ -125,7 +125,20 @@ contract ConvexUSDCMultiFarmAdapter is AdapterBase, WithRewards {
             ICurveGauge curveGauge = ICurveGauge(_curveGauge);
             uint256 pid = metavaultStrategy.getProtocolUint(i + 6).num;
 
-            curveGauge.deposit(depositAmount);
+            uint256[] memory tokens = curveGauge.get_balances();
+            uint256 tokensLen = tokens.length;
+
+            uint256[] memory depositAmounts = new uint256[](tokensLen);
+
+            for (uint256 j; j < tokensLen; ++j) {
+                if (curveGauge.coins(j) == address(asset())) {
+                    depositAmounts[j] = depositAmount;
+                } else {
+                    depositAmounts[j] = 0;
+                }
+            }
+
+            curveGauge.add_liquidity(depositAmounts, 0);
             convexBooster.deposit(pid, depositAmount, true);
         }
     }
@@ -147,7 +160,19 @@ contract ConvexUSDCMultiFarmAdapter is AdapterBase, WithRewards {
             ICurveGauge curveGauge = ICurveGauge(_curveGauge);
 
             convexRewards.withdrawAndUnwrap(withdrawAmount, false);
-            curveGauge.withdraw(withdrawAmount);
+
+            uint256[] memory tokens = curveGauge.get_balances();
+            uint256 tokensLen = tokens.length;
+
+            int128 tokenIdx;
+
+            for (uint256 j; j < tokensLen; ++j) {
+                if (curveGauge.coins(j) == address(asset())) {
+                    tokenIdx = int256ToInt128(int256(j));
+                }
+            }
+
+            curveGauge.remove_liquidity_one_coin(withdrawAmount, tokenIdx, 0);
         }
     }
 
@@ -220,5 +245,25 @@ contract ConvexUSDCMultiFarmAdapter is AdapterBase, WithRewards {
         return
             interfaceId == type(IWithRewards).interfaceId ||
             interfaceId == type(IAdapter).interfaceId;
+    }
+
+    // /*//////////////////////////////////////////////////////////////
+    //                       UTILITY FUNCTIONS
+    // //////////////////////////////////////////////////////////////*/
+    // function uint256ToInt128(uint256 value) public pure returns (int128) {
+    //     uint256 int128Max = uint256(type(int128).max);
+
+    //     require(value <= int128Max, "Value too large for int128");
+
+    //     return int128(value);
+    // }
+
+    function int256ToInt128(int256 value) public pure returns (int128) {
+        require(
+            value <= type(int128).max && value >= type(int128).min,
+            "Value out of range for int128"
+        );
+
+        return int128(value);
     }
 }

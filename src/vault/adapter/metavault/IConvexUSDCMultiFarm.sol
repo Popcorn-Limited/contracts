@@ -72,7 +72,18 @@ interface IRewards {
 }
 
 interface ICurveGauge {
-    function deposit(uint256 _amount) external;
+    function add_liquidity(
+        uint256[] memory _depositAmounts,
+        uint256 _min_mint_amount
+    ) external;
 
-    function withdraw(uint256 _amount) external;
+    function remove_liquidity_one_coin(
+        uint256 _burn_amount,
+        int128 _idx,
+        uint256 _min_received
+    ) external;
+
+    function get_balances() external view returns (uint256[] memory _balances);
+
+    function coins(uint256 _idx) external view returns (address _coin);
 }

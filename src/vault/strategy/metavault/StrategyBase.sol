@@ -30,9 +30,11 @@ contract StrategyBase {
     // Protocol contracts info (masterchefs, poolIds, gaugeAddresses, etc.)
     // These arrays can be used however the strategist would like to store data.
     //
-    // As an example indexes 0-4 can be used for disparate pieces of information, index 5 can hold
-    // the length of the proceeding values, and indexes 6+ can hold the additional values for which
+    // As an example for protocolUints could be: indexes 0-4 used for disparate pieces of information,
+    // index 5 holds the length of the proceeding values, and indexes 6+ can hold the additional values for which
     // index 5 holds the total length of (i.e. an indefinite number of gauges, pids, etc).
+    // If any values are altered, the strategist would have to ensure that the length uint at index 5 has
+    // been properly updated respectively.
     //
     // While any pertinent values can be stored in protocolAddresses and protocolUints,
     // it is important for the strategist to devise an organized and extensible system to properly
