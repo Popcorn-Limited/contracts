@@ -53,10 +53,6 @@ contract ConvexUSDCMultiFarm is StableABase {
                           COMPOUND LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    // // Specify functionality of _deposit after IAdapter(address(this)).strategyDeposit(assets, shares);.
-    // // Function will divide _assets by number of underlying staking destinations and deposit evenly into Convex gauges.
-    // function _onDeposit(uint256 _assets, uint256 _shares) internal override {}
-
     // Swap all rewards to native token
     function _swapRewardsToNative(
         address[] memory _rewardRoute,

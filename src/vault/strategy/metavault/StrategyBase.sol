@@ -162,12 +162,7 @@ contract StrategyBase {
         uint256 shares = 1e18;
 
         IAdapter(address(this)).strategyDeposit(assets, shares);
-
-        // _onDeposit(assets, shares);
     }
-
-    // // Specify functionality of _deposit after IAdapter(address(this)).strategyDeposit(assets, shares);.
-    // function _onDeposit(uint256 _assets, uint256 _shares) internal virtual {}
 
     /*//////////////////////////////////////////////////////////////
                           REWARDS AND ROUTES

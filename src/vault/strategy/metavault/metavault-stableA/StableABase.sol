@@ -54,10 +54,8 @@ contract StableABase is StrategyBase {
     // Set nativeToAssetToken.
     function setNativeToAssetTokenRoute(
         address[] calldata route
-    ) public virtual {
+    ) public virtual vaultCheck {
         nativeToAssetTokenRoute = route;
-
-        if (isVaultFunctional == true) isVaultFunctional = false;
     }
 
     /*//////////////////////////////////////////////////////////////

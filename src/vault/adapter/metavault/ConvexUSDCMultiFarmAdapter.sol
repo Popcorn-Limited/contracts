@@ -39,7 +39,6 @@ contract ConvexUSDCMultiFarmAdapter is AdapterBase, WithRewards {
      * @param adapterInitData Encoded data for the base adapter initialization.
      * @param registry The Convex Booster contract
      * @param convexInitData Encoded data for the convex adapter initialization.
-     * @dev `_pid` - The poolId for lpToken.
      * @dev This function is called by the factory contract when deploying a new vault.
      */
     function initialize(
@@ -117,7 +116,7 @@ contract ConvexUSDCMultiFarmAdapter is AdapterBase, WithRewards {
                           INTERNAL HOOKS LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Deposit into Convex convexBooster contract.
+    /// @notice Add liquidity into Cure pool and then deposit into Convex convexBooster contract.
     function _protocolDeposit(uint256 amount, uint256) internal override {
         IConvexUSDCMultiFarm strategy = IConvexUSDCMultiFarm(address(strategy));
         uint256 len = strategy.getProtocolUint(5).num;
@@ -149,7 +148,7 @@ contract ConvexUSDCMultiFarmAdapter is AdapterBase, WithRewards {
         }
     }
 
-    /// @notice Withdraw from Convex convexRewards contract.
+    /// @notice Withdraw from Convex convexRewards contract and then withdraw liquidity from Curve pool.
     function _protocolWithdraw(uint256 amount, uint256) internal override {
         uint256 len = metavaultStrategy.getProtocolUint(5).num;
 
@@ -185,7 +184,7 @@ contract ConvexUSDCMultiFarmAdapter is AdapterBase, WithRewards {
     /*//////////////////////////////////////////////////////////////
                             STRATEGY LOGIC
     //////////////////////////////////////////////////////////////*/
-    /// @notice Claim liquidity mining rewards given that it's active
+    /// @notice Claim liquidity mining rewards from Convex given that they are active.
     function claim() public override onlyStrategy returns (bool success) {
         uint256 len = metavaultStrategy.getProtocolUint(5).num;
 
@@ -201,7 +200,7 @@ contract ConvexUSDCMultiFarmAdapter is AdapterBase, WithRewards {
         }
     }
 
-    /// @notice The token rewarded from the convex reward contract
+    /// @notice View all reward tokens accumulated by strategy from Convex.
     function rewardTokens()
         external
         view
@@ -257,12 +256,11 @@ contract ConvexUSDCMultiFarmAdapter is AdapterBase, WithRewards {
     //                       UTILITY FUNCTIONS
     // //////////////////////////////////////////////////////////////*/
 
-    function int256ToInt128(int256 value) public pure returns (int128) {
-        require(
-            value <= type(int128).max && value >= type(int128).min,
-            "Value out of range for int128"
-        );
+    error IntOutOfRange(int256 value);
 
-        return int128(value);
+    function int256ToInt128(int256 _value) public pure returns (int128) {
+        if (_value > type(int128).max) revert IntOutOfRange(_value);
+
+        return int128(_value);
     }
 }
