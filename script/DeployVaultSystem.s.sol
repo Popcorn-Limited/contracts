@@ -42,7 +42,7 @@ contract DeployVaultSystem is Script {
     ITemplateRegistry templateRegistry =
         ITemplateRegistry(0xA18735b352a926aD957F94Ff40764E63139ec0a6);
     IPermissionRegistry permissionRegistry =
-        IPermissionRegistry(0xf5862457AA842605f8b675Af13026d3Fd03bFfF0);
+        IPermissionRegistry(0x7a33b5b57C8b235A3519e6C010027c5cebB15CB4);
     ICloneRegistry cloneRegistry =
         ICloneRegistry(0x795d90945e5B9b320410b31e6E544b647d0ea5AA);
     IVaultRegistry vaultRegistry =
@@ -51,7 +51,7 @@ contract DeployVaultSystem is Script {
     ICloneFactory factory =
         ICloneFactory(0x504f828886aB10D09ca1c116d6E1C5b8963cB109);
     IDeploymentController deploymentController =
-        IDeploymentController(0xf64f4f0e6964eb0f94AA79A0f787DdE57Fa4C043);
+        IDeploymentController(0xa8C5815f6Ea5F7A1551541B0d7F970D546126bDB);
     IAdminProxy adminProxy =
         IAdminProxy(0x7D224F9Eaf3855CE3109b205e6fA853d25Bb457f);
 
@@ -60,23 +60,23 @@ contract DeployVaultSystem is Script {
         IMultiRewardEscrow(0x823033d1014F0f4da2Bb5B2cE4bC73D6e7eAe7a8);
 
     VaultController controller =
-        VaultController(0x757D953c53aD28748aCf94AD2d59C13955E09c08);
+        VaultController(0xa199409F99bDBD998Ae1ef4FdaA58b356370837d);
     VaultRouter router;
 
     IERC20 pop = IERC20(0x6F0fecBC276de8fC69257065fE47C5a03d986394);
 
     address stakingImpl = 0x9C45FE2Bf8F76f0de45ea9f56c3aCF6613C87675;
-    address yearnImpl = 0x64Af9C2C2069353Aaa5fa0D2a9942c2A2DC212e6;
-    address beefyImpl = 0xef2D4Ce0BcB8D9d729ae0d0d1A8f6840BfD773A9;
+    address yearnImpl = 0xfc90a1B7e86E20607871A23b0ca560591A5Db30d;
+    address beefyImpl = 0xaa733e18a26C23fBfdAdF9b2bE846F67412d0467;
     address strategyImpl;
     address vaultImpl = 0xA04f549b1eAb2D6669Ba57DA3e528587082ef5b1;
 
     address deployer;
-    address feeRecipient = address(0x74bb390786072ea1329f270CA6C0058b2D1Afe3f);
+    address feeRecipient = address(0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E);
 
     bytes32 templateCategory = "templateCategory";
     bytes32 templateId = "MockAdapter";
-    string metadataCid = "QmbWqxBEKC3P8tqsKc98xmWNzrzDtRLMiMPL8wBuTGsMnR";
+    string metadataCid = "";
     bytes4[8] requiredSigs;
     address[8] swapTokenAddresses;
 
@@ -149,15 +149,15 @@ contract DeployVaultSystem is Script {
         // );
         // addTemplate(
         //     "Adapter",
-        //     "YearnAdapter",
+        //     "YearnAdapter1",
         //     yearnImpl,
-        //     address(0x79286Dd38C9017E5423073bAc11F53357Fc5C128),
+        //     address(0x50c1a2eA0a861A967D9d0FFE2AE4012c2E053804),
         //     true,
         //     true
         // );
         // addTemplate(
         //     "Adapter",
-        //     "BeefyAdapter",
+        //     "BeefyAdapter3",
         //     beefyImpl,
         //     address(permissionRegistry),
         //     true,
@@ -195,21 +195,23 @@ contract DeployVaultSystem is Script {
         //         depositLimit: type(uint256).max,
         //         owner: deployer
         //     }),
-        //     DeploymentArgs({id: "YearnAdapter", data: ""}),
+        //     DeploymentArgs({id: "YearnAdapter", data: abi.encode(uint256(1))}),
         //     DeploymentArgs({id: "", data: ""}),
-        //     true,
-        //     abi.encode(address(pop), 0.0001 ether, 1000 ether, false, 0, 0, 0),
+        //     false,
+        //     "",
         //     VaultMetadata({
         //         vault: address(0),
         //         staking: address(0),
         //         creator: address(this),
         //         metadataCID: metadataCid,
         //         swapTokenAddresses: swapTokenAddresses,
-        //         swapAddress: address(0x5555),
-        //         exchange: uint256(1)
+        //         swapAddress: address(0),
+        //         exchange: uint256(0)
         //     }),
-        //     100e6
+        //     0
         // );
+
+        // emit log_named_address("YearnVault: ", yearn);
 
         // // approve and stake vault
         // VaultMetadata memory yearnMetadata = vaultRegistry.getVault(yearn);
@@ -225,8 +227,6 @@ contract DeployVaultSystem is Script {
 
         // IERC20(yearnMetadata.staking).approve(address(router), 10e15);
         // router.redeemAndWithdraw(IERC4626(yearn), 10e15, deployer, deployer);
-
-        // emit log_named_address("YearnVault: ", yearn);
 
         // // beefyVault stEth/eth = 0xa7739fd3d12ac7F16D8329AF3Ee407e19De10D8D
         // setPermission(0xa7739fd3d12ac7F16D8329AF3Ee407e19De10D8D, true, false);
@@ -251,9 +251,9 @@ contract DeployVaultSystem is Script {
         //             management: 0,
         //             performance: 0
         //         }),
-        //         feeRecipient: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266,
+        //         feeRecipient: feeRecipient,
         //         depositLimit: type(uint256).max,
-        //         owner: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+        //         owner: deployer
         //     }),
         //     DeploymentArgs({
         //         id: "BeefyAdapter",
@@ -263,28 +263,26 @@ contract DeployVaultSystem is Script {
         //         )
         //     }),
         //     DeploymentArgs({id: "", data: ""}),
-        //     true,
-        //     abi.encode(address(pop), 0.0001 ether, 1000 ether, false, 0, 0, 0),
+        //     false,
+        //     "",
         //     VaultMetadata({
         //         vault: address(0),
         //         staking: address(0),
-        //         creator: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266,
-        //         metadataCID: "QmbWqxBEKC3P8tqsKc98xmWNzrzDtRLMiMPL8wBuTGsMnR",
+        //         creator: deployer,
+        //         metadataCID: "",
         //         swapTokenAddresses: swapTokenAddresses,
-        //         swapAddress: address(
-        //             0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48
-        //         ),
-        //         exchange: uint256(1)
+        //         swapAddress: address(0),
+        //         exchange: uint256(0)
         //     }),
         //     10e18
         // );
+
+        // emit log_named_address("BeefyVault: ", beefy);
 
         // // approve and stake vault
         // VaultMetadata memory beefyMetadata = vaultRegistry.getVault(beefy);
         // IERC20(beefy).approve(beefyMetadata.staking, 10e27);
         // IMultiRewardStaking(beefyMetadata.staking).deposit(10e27, deployer);
-
-        // emit log_named_address("BeefyVault: ", beefy);
 
         vm.stopBroadcast();
     }
@@ -321,18 +319,18 @@ contract DeployVaultSystem is Script {
         bool requiresInitData,
         bool endorse
     ) public {
-        deploymentController.addTemplate(
-            templateCategory,
-            templateId,
-            Template({
-                implementation: implementation,
-                endorsed: false,
-                metadataCid: metadataCid,
-                requiresInitData: requiresInitData,
-                registry: registry,
-                requiredSigs: requiredSigs
-            })
-        );
+        // deploymentController.addTemplate(
+        //     templateCategory,
+        //     templateId,
+        //     Template({
+        //         implementation: implementation,
+        //         endorsed: false,
+        //         metadataCid: metadataCid,
+        //         requiresInitData: requiresInitData,
+        //         registry: registry,
+        //         requiredSigs: requiredSigs
+        //     })
+        // );
         bytes32[] memory templateCategories = new bytes32[](1);
         bytes32[] memory templateIds = new bytes32[](1);
         templateCategories[0] = templateCategory;
