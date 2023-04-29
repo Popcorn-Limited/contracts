@@ -5,7 +5,7 @@ pragma solidity ^0.8.15;
 
 import {Test} from "forge-std/Test.sol";
 
-import {RadiantAdapter, SafeERC20, IERC20, IERC20Metadata, Math, ILendingPool, IRadiantMining, IRToken, IProtocolDataProvider, DataTypes, IStrategy, IWithRewards} from "../../../../src/vault/adapter/radiant/RadiantAdapter.sol";
+import {RadiantAdapter, SafeERC20, IERC20, IERC20Metadata, Math, ILendingPool, IRToken, IProtocolDataProvider, IIncentivesController, IRewardMinter, IMiddleFeeDistributor, DataTypes, IStrategy, IWithRewards} from "../../../../src/vault/adapter/radiant/RadiantAdapter.sol";
 import {RadiantTestConfigStorage, RadiantTestConfig} from "./RadiantTestConfigStorage.sol";
 import {AbstractAdapterTest, ITestConfigStorage, IAdapter} from "../abstract/AbstractAdapterTest.sol";
 import {MockStrategyClaimer} from "../../../utils/mocks/MockStrategyClaimer.sol";
@@ -14,8 +14,10 @@ contract RadiantAdapterTest is AbstractAdapterTest {
     using Math for uint256;
 
     ILendingPool lendingPool;
-    IRadiantMining radiantMining;
+    IIncentivesController controller;
     IRToken rToken;
+
+    IRewardMinter minter;
 
     function setUp() public {
         uint256 forkId = vm.createSelectFork(vm.rpcUrl("arbitrum"));
@@ -42,7 +44,9 @@ contract RadiantAdapterTest is AbstractAdapterTest {
 
         rToken = IRToken(_rToken);
         lendingPool = ILendingPool(rToken.POOL());
-        radiantMining = IRadiantMining(rToken.getIncentivesController());
+
+        controller = IIncentivesController(rToken.getIncentivesController());
+        IRewardMinter minter = IRewardMinter(controller.rewardMinter());
 
         setUpBaseTest(
             IERC20(_asset),
@@ -55,7 +59,7 @@ contract RadiantAdapterTest is AbstractAdapterTest {
 
         vm.label(address(rToken), "rToken");
         vm.label(address(lendingPool), "lendingPool");
-        vm.label(address(radiantMining), "radiantMining");
+        vm.label(address(controller), "controller");
         vm.label(address(asset), "asset");
         vm.label(address(this), "test");
 

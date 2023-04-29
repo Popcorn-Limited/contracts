@@ -30,7 +30,10 @@ interface IRToken is IERC20, IScaledBalanceToken {
     /**
      * @dev Returns the address of the incentives controller contract
      **/
-    function getIncentivesController() external view returns (IRadiantMining);
+    function getIncentivesController()
+        external
+        view
+        returns (IIncentivesController);
 
     function POOL() external view returns (address);
 }
@@ -97,4 +100,26 @@ interface IProtocolDataProvider {
             address stableDebtTokenAddress,
             address variableDebtTokenAddress
         );
+}
+
+interface IIncentivesController {
+    function rewardMinter() external view returns (address);
+
+    function claimAll(address _user) external;
+
+    function persistRewardsPerSecond() external view returns (bool);
+}
+
+interface IRewardMinter {
+    function middleFeeDistrubtor() external view returns (address);
+
+    function getMutliFeeDistributionAddress() external view returns (address);
+
+    function rdntToken() external view returns (address);
+}
+
+interface IMiddleFeeDistributor {
+    function getMutliFeeDistributionAddress() external view returns (address);
+
+    function rdntToken() external view returns (address);
 }

@@ -5,7 +5,7 @@ pragma solidity ^0.8.15;
 
 import {AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20, Math, IStrategy, IAdapter} from "../abstracts/AdapterBase.sol";
 import {WithRewards, IWithRewards} from "../abstracts/WithRewards.sol";
-import {ILendingPool, IRadiantMining, IRToken, IProtocolDataProvider} from "./IRadiant.sol";
+import {ILendingPool, IRadiantMining, IRToken, IProtocolDataProvider, IIncentivesController, IRewardMinter, IMiddleFeeDistributor} from "./IRadiant.sol";
 import {DataTypes} from "./lib.sol";
 
 /**
@@ -28,14 +28,17 @@ contract RadiantAdapter is AdapterBase, WithRewards {
     /// @notice The Radiant rToken contract
     IRToken public rToken;
 
-    /// @notice The Radiant liquidity mining contract
-    IRadiantMining public radiantMining;
-
     /// @notice Check to see if Radiant liquidity mining is active
     bool public isActiveMining;
 
     /// @notice The Radiant LendingPool contract
     ILendingPool public lendingPool;
+
+    /// @notice The Radiant Incentives Controller contract
+    IIncentivesController public controller;
+
+    /// @notice Fee managing contract for Radiant rewards
+    IMiddleFeeDistributor public middleFee;
 
     uint256 internal constant RAY = 1e27;
     uint256 internal constant halfRAY = RAY / 2;
@@ -73,7 +76,9 @@ contract RadiantAdapter is AdapterBase, WithRewards {
             revert DifferentAssets(rToken.UNDERLYING_ASSET_ADDRESS(), asset());
 
         lendingPool = ILendingPool(rToken.POOL());
-        radiantMining = IRadiantMining(rToken.getIncentivesController());
+
+        controller = IIncentivesController(rToken.getIncentivesController());
+        IRewardMinter minter = IRewardMinter(controller.rewardMinter());
 
         IERC20(asset()).approve(address(lendingPool), type(uint256).max);
     }
@@ -112,8 +117,8 @@ contract RadiantAdapter is AdapterBase, WithRewards {
         returns (address[] memory _rewardTokens)
     {
         _rewardTokens = new address[](1);
-        if (address(radiantMining) != address(0)) {
-            _rewardTokens[0] = radiantMining.REWARD_TOKEN();
+        if (address(controller) != address(0)) {
+            _rewardTokens[0] = middleFee.rdntToken();
         }
     }
 
@@ -143,14 +148,9 @@ contract RadiantAdapter is AdapterBase, WithRewards {
 
     /// @notice Claim liquidity mining rewards given that it's active
     function claim() public override onlyStrategy returns (bool success) {
-        if (address(radiantMining) == address(0)) return false;
+        if (address(controller) == address(0)) return false;
 
-        address[] memory assets = new address[](1);
-        assets[0] = address(rToken);
-
-        try
-            radiantMining.claimRewards(assets, type(uint256).max, address(this))
-        {
+        try controller.claimAll(address(this)) {
             success = true;
         } catch {}
     }
