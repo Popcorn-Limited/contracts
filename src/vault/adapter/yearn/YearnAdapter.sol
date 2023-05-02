@@ -40,7 +40,7 @@ contract YearnAdapter is AdapterBase {
         bytes memory adapterInitData,
         address externalRegistry,
         bytes memory yearnData
-    ) external initializer {
+    ) external virtual initializer {
         (address _asset, , , , , ) = abi.decode(
             adapterInitData,
             (address, address, address, uint256, bytes4[8], bytes)

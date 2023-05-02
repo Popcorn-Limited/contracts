@@ -36,3 +36,9 @@ interface VaultAPI is IERC20 {
 interface IYearnRegistry {
     function latestVault(address token) external view returns (address);
 }
+
+interface IVaultFactory {
+    function latestStandardVaultFromGauge(
+        address gauge
+    ) external view returns (address);
+}
