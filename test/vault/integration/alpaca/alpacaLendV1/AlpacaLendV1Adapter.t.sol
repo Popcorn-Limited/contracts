@@ -14,7 +14,7 @@ contract AlpacaLendV1AdapterTest is AbstractAdapterTest {
     IAlpacaLendV1Vault public alpacaVault;
 
     function setUp() public {
-        uint256 forkId = vm.createSelectFork(vm.rpcUrl("arbitrum"));
+        uint256 forkId = vm.createSelectFork(vm.rpcUrl("bnb_smart_chain"));
         vm.selectFork(forkId);
 
         testConfigStorage = ITestConfigStorage(

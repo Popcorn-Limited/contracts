@@ -104,10 +104,7 @@ contract AlpacaLendV1Adapter is AdapterBase, WithRewards {
     }
 
     function _protocolWithdraw(uint256 amount, uint256) internal override {
-        uint256 alpacaShares = amount *
-            (alpacaVault.totalSupply() / alpacaVault.totalToken());
-
-        alpacaVault.withdraw(alpacaShares);
+        alpacaVault.withdraw(amount);
     }
 
     /*//////////////////////////////////////////////////////////////
