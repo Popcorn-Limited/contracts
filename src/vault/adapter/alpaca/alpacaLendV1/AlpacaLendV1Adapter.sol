@@ -5,13 +5,13 @@ pragma solidity ^0.8.15;
 
 import {AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20, Math, IStrategy, IAdapter} from "../../abstracts/AdapterBase.sol";
 import {WithRewards, IWithRewards} from "../../abstracts/WithRewards.sol";
-import {IVault} from "./IAlpacaLendV1.sol";
+import {IAlpacaLendV1Vault} from "./IAlpacaLendV1.sol";
 
 /**
  * @title   AlpacaV1 Adapter
  * @notice  ERC4626 wrapper for AlpacaV1 Vaults.
  *
- * An ERC4626 compliant Wrapper for https://github.com/sushiswap/sushiswap/blob/archieve/canary/contracts/MasterChef.sol.
+ * An ERC4626 compliant Wrapper for Alpaca Lend V1.
  * Allows wrapping AlpacaV1 Vaults.
  */
 contract AlpacaLendV1Adapter is AdapterBase, WithRewards {
@@ -22,7 +22,7 @@ contract AlpacaLendV1Adapter is AdapterBase, WithRewards {
     string internal _symbol;
 
     /// @notice The Alpaca Lend V1 Vault contract
-    IVault public vault;
+    IAlpacaLendV1Vault public alpacaVault;
 
     /*//////////////////////////////////////////////////////////////
                             INITIALIZATION
@@ -47,9 +47,9 @@ contract AlpacaLendV1Adapter is AdapterBase, WithRewards {
 
         address _vault = abi.decode(alpacaV1InitData, (address));
 
-        vault = IVault(_vault);
+        alpacaVault = IAlpacaLendV1Vault(_vault);
 
-        if (vault.token() != asset()) revert InvalidAsset();
+        if (alpacaVault.token() != asset()) revert InvalidAsset();
 
         _name = string.concat(
             "VaultCraft AlpacaLendV1 ",
@@ -58,7 +58,10 @@ contract AlpacaLendV1Adapter is AdapterBase, WithRewards {
         );
         _symbol = string.concat("vcAlV1-", IERC20Metadata(asset()).symbol());
 
-        IERC20(vault.token()).approve(address(vault), type(uint256).max);
+        IERC20(alpacaVault.token()).approve(
+            address(alpacaVault),
+            type(uint256).max
+        );
     }
 
     function name()
@@ -88,8 +91,8 @@ contract AlpacaLendV1Adapter is AdapterBase, WithRewards {
 
     function _totalAssets() internal view override returns (uint256) {
         return
-            vault.balanceOf(address(this)) *
-            (vault.totalToken() / vault.totalSupply());
+            alpacaVault.balanceOf(address(this)) *
+            (alpacaVault.totalToken() / alpacaVault.totalSupply());
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -97,14 +100,14 @@ contract AlpacaLendV1Adapter is AdapterBase, WithRewards {
     //////////////////////////////////////////////////////////////*/
 
     function _protocolDeposit(uint256 amount, uint256) internal override {
-        vault.deposit(amount);
+        alpacaVault.deposit(amount);
     }
 
     function _protocolWithdraw(uint256 amount, uint256) internal override {
         uint256 alpacaShares = amount *
-            (vault.totalSupply() / vault.totalToken());
+            (alpacaVault.totalSupply() / alpacaVault.totalToken());
 
-        vault.withdraw(alpacaShares);
+        alpacaVault.withdraw(alpacaShares);
     }
 
     /*//////////////////////////////////////////////////////////////

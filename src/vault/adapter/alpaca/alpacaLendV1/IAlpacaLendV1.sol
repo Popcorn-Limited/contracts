@@ -3,7 +3,7 @@
 
 pragma solidity ^0.8.15;
 
-interface IVault {
+interface IAlpacaLendV1Vault {
     function token() external view returns (address);
 
     function balanceOf(address _user) external view returns (uint256);
