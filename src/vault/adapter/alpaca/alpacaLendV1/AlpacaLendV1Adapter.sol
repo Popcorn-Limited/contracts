@@ -91,8 +91,8 @@ contract AlpacaLendV1Adapter is AdapterBase, WithRewards {
 
     function _totalAssets() internal view override returns (uint256) {
         return
-            alpacaVault.balanceOf(address(this)) *
-            (alpacaVault.totalToken() / alpacaVault.totalSupply());
+            (alpacaVault.balanceOf(address(this)) * alpacaVault.totalToken()) /
+            alpacaVault.totalSupply();
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -103,8 +103,29 @@ contract AlpacaLendV1Adapter is AdapterBase, WithRewards {
         alpacaVault.deposit(amount);
     }
 
-    function _protocolWithdraw(uint256 amount, uint256) internal override {
-        alpacaVault.withdraw(amount);
+    function _protocolWithdraw(
+        uint256 amount,
+        uint256 shares
+    ) internal override {
+        uint256 alpacaShares = convertToUnderlyingShares(0, shares);
+
+        alpacaVault.withdraw(alpacaShares);
+    }
+
+    /// @notice The amount of alapacaV1 shares to withdraw given an mount of adapter shares
+    function convertToUnderlyingShares(
+        uint256 assets,
+        uint256 shares
+    ) public view override returns (uint256) {
+        uint256 supply = totalSupply();
+        return
+            supply == 0
+                ? shares
+                : shares.mulDiv(
+                    alpacaVault.balanceOf(address(this)),
+                    supply,
+                    Math.Rounding.Up
+                );
     }
 
     /*//////////////////////////////////////////////////////////////

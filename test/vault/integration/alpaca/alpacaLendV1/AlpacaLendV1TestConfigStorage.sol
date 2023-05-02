@@ -10,9 +10,9 @@ contract AlpacaLendV1TestConfigStorage is ITestConfigStorage {
     AlpacaLendV1TestConfig[] internal testConfigs;
 
     constructor() {
-        // AlpacaLendV1 USDT - BSC
+        // AlpacaLendV1 BNB - BSC
         testConfigs.push(
-            AlpacaLendV1TestConfig(0x158Da805682BdC8ee32d52833aD41E74bb951E59)
+            AlpacaLendV1TestConfig(0xd7D069493685A581d27824Fc46EdA46B7EfC0063)
         );
     }
 
