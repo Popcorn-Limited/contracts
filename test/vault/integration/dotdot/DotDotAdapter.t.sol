@@ -94,150 +94,27 @@ contract DotDotAdapterTest is AbstractAdapterTest {
     }
 
     /*//////////////////////////////////////////////////////////////
-                    DEPOSIT/MINT/WITHDRAW/REDEEM
+                              CLAIM
     //////////////////////////////////////////////////////////////*/
 
-    // function test__deposit(uint8 fuzzAmount) public override {
-    //     testConfigStorage = ITestConfigStorage(
-    //         address(new DotDotTestConfigStorage())
-    //     );
+    function test__claim() public override {
+        strategy = IStrategy(address(new MockStrategyClaimer()));
+        createAdapter();
+        adapter.initialize(
+            abi.encode(asset, address(this), strategy, 0, sigs, ""),
+            externalRegistry,
+            ""
+        );
 
-    //     uint256 amount = bound(uint256(fuzzAmount), minFuzz, maxAssets);
-    //     uint8 len = uint8(testConfigStorage.getTestConfigLength());
-    //     for (uint8 i; i < len; i++) {
-    //         if (i > 0) overrideSetup(testConfigStorage.getTestConfig(i));
+        _mintAssetAndApproveForAdapter(1000e18, bob);
 
-    //         _mintAssetAndApproveForAdapter(amount, bob);
-    //         prop_deposit(bob, bob, amount, testId);
-
-    //         increasePricePerShare(raise);
-
-    //         _mintAssetAndApproveForAdapter(amount, bob);
-    //         prop_deposit(bob, alice, amount, testId);
-    //     }
-    // }
-
-    // function test__mint(uint8 fuzzAmount) public override {
-    //     testConfigStorage = ITestConfigStorage(
-    //         address(new DotDotTestConfigStorage())
-    //     );
-
-    //     uint256 amount = bound(uint256(fuzzAmount), minFuzz, maxShares);
-    //     uint8 len = uint8(testConfigStorage.getTestConfigLength());
-    //     for (uint8 i; i < len; i++) {
-    //         if (i > 0) overrideSetup(testConfigStorage.getTestConfig(i));
-
-    //         _mintAssetAndApproveForAdapter(adapter.previewMint(amount), bob);
-    //         prop_mint(bob, bob, amount, testId);
-
-    //         increasePricePerShare(raise);
-
-    //         _mintAssetAndApproveForAdapter(adapter.previewMint(amount), bob);
-    //         prop_mint(bob, alice, amount, testId);
-    //     }
-    // }
-
-    // function test__withdraw(uint8 fuzzAmount) public override {
-    //     testConfigStorage = ITestConfigStorage(
-    //         address(new DotDotTestConfigStorage())
-    //     );
-
-    //     uint256 amount = bound(uint256(fuzzAmount), minFuzz, maxAssets);
-    //     uint8 len = uint8(testConfigStorage.getTestConfigLength());
-    //     for (uint8 i; i < len; i++) {
-    //         if (i > 0) overrideSetup(testConfigStorage.getTestConfig(i));
-
-    //         uint256 reqAssets = (adapter.previewMint(
-    //             adapter.previewWithdraw(amount)
-    //         ) * 10) / 8;
-    //         _mintAssetAndApproveForAdapter(reqAssets, bob);
-    //         vm.prank(bob);
-    //         adapter.deposit(reqAssets, bob);
-    //         prop_withdraw(bob, bob, amount, testId);
-
-    //         _mintAssetAndApproveForAdapter(reqAssets, bob);
-    //         vm.prank(bob);
-    //         adapter.deposit(reqAssets, bob);
-
-    //         increasePricePerShare(raise);
-
-    //         vm.prank(bob);
-    //         adapter.approve(alice, type(uint256).max);
-    //         prop_withdraw(alice, bob, amount, testId);
-    //     }
-    // }
-
-    // function test__redeem(uint8 fuzzAmount) public override {
-    //     testConfigStorage = ITestConfigStorage(
-    //         address(new DotDotTestConfigStorage())
-    //     );
-
-    //     uint256 amount = bound(uint256(fuzzAmount), minFuzz, maxShares);
-    //     uint8 len = uint8(testConfigStorage.getTestConfigLength());
-    //     for (uint8 i; i < len; i++) {
-    //         if (i > 0) overrideSetup(testConfigStorage.getTestConfig(i));
-
-    //         uint256 reqAssets = (adapter.previewMint(amount) * 10) / 9;
-    //         _mintAssetAndApproveForAdapter(reqAssets, bob);
-    //         vm.prank(bob);
-    //         adapter.deposit(reqAssets, bob);
-    //         prop_redeem(bob, bob, amount, testId);
-
-    //         _mintAssetAndApproveForAdapter(reqAssets, bob);
-    //         vm.prank(bob);
-    //         adapter.deposit(reqAssets, bob);
-
-    //         increasePricePerShare(raise);
-
-    //         vm.prank(bob);
-    //         adapter.approve(alice, type(uint256).max);
-    //         prop_redeem(alice, bob, amount, testId);
-    //     }
-    // }
-
-    // /*//////////////////////////////////////////////////////////////
-    //                           PAUSE
-    // //////////////////////////////////////////////////////////////*/
-
-    // function test__unpause() public override {
-    //     _mintAssetAndApproveForAdapter(defaultAmount * 3, bob);
-
-    //     vm.prank(bob);
-    //     adapter.deposit(defaultAmount, bob);
-
-    //     uint256 oldTotalAssets = adapter.totalAssets();
-    //     uint256 oldTotalSupply = adapter.totalSupply();
-    //     uint256 oldIouBalance = iouBalance();
-
-    //     adapter.pause();
-    //     adapter.unpause();
-
-    //     // We simply deposit back into the external protocol
-    //     // TotalSupply and Assets dont change
-    //     // @dev overriden _delta_
-    //     assertApproxEqAbs(
-    //         oldTotalAssets,
-    //         adapter.totalAssets(),
-    //         50,
-    //         "totalAssets"
-    //     );
-    //     assertApproxEqAbs(
-    //         oldTotalSupply,
-    //         adapter.totalSupply(),
-    //         50,
-    //         "totalSupply"
-    //     );
-    //     assertApproxEqAbs(
-    //         asset.balanceOf(address(adapter)),
-    //         0,
-    //         50,
-    //         "asset balance"
-    //     );
-    //     assertApproxEqRel(iouBalance(), oldIouBalance, 1, "iou balance");
-
-    //     // Deposit and mint dont revert
-    //     vm.startPrank(bob);
-    //     adapter.deposit(defaultAmount, bob);
-    //     adapter.mint(defaultAmount, bob);
-    // }
+        vm.prank(bob);
+        adapter.deposit(1000e18, bob);
+        vm.warp(block.timestamp + 10 days);
+        vm.prank(bob);
+        adapter.withdraw(1, bob, bob);
+        address[] memory rewardTokens = IWithRewards(address(adapter))
+            .rewardTokens();
+        assertGt(IERC20(rewardTokens[0]).balanceOf(address(adapter)), 0);
+    }
 }
