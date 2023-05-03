@@ -12,14 +12,6 @@ import {IAdapter} from "../../../interfaces/vault/IAdapter.sol";
 import {IWithRewards} from "../../../interfaces/vault/IWithRewards.sol";
 import {StrategyBase} from "../StrategyBase.sol";
 
-interface IRouter {
-    function trade(
-        address[] memory route,
-        uint256 amount,
-        uint256 minAmount
-    ) external returns (uint256);
-}
-
 contract BaseToAssetCompounder is StrategyBase {
     // Events
     event Harvest();
@@ -31,32 +23,20 @@ contract BaseToAssetCompounder is StrategyBase {
     function verifyAdapterCompatibility(bytes memory data) public override {
         (
             address baseAsset,
-            address toBaseAssetRouter,
-            address toAssetRouter,
-            address[4][5] memory toBaseAssetRoutes,
-            address[4] memory toAssetRoute,
-            uint8[5] memory toBaseAssetLen,
-            uint8 toAssetLen,
-            uint256[5] memory minTradeAmounts
+            address router,
+            address[][] memory toBaseAssetRoutes,
+            address[] memory toAssetRoute,
+            uint256[] memory minTradeAmounts,
+            bytes memory optionalData
         ) = abi.decode(
                 IAdapter(address(this)).strategyConfig(),
-                (
-                    address,
-                    address,
-                    address,
-                    address[4][5],
-                    address[4],
-                    uint8[5],
-                    uint8,
-                    uint256[5]
-                )
+                (address, address, address[][], address[], uint256[], bytes)
             );
 
         address asset = IAdapter(address(this)).asset();
 
         address[] memory rewardTokens = IWithRewards(address(this))
             .rewardTokens();
-
         uint256 len = rewardTokens.length;
         for (uint256 i; i < len; i++) {
             if (toBaseAssetRoutes[i][0] != rewardTokens[i])
@@ -72,25 +52,14 @@ contract BaseToAssetCompounder is StrategyBase {
     function setUp(bytes memory data) public override {
         (
             address baseAsset,
-            address toBaseAssetRouter,
-            address toAssetRouter,
-            address[4][5] memory toBaseAssetRoutes,
-            address[4] memory toAssetRoute,
-            uint8[5] memory toBaseAssetLen,
-            uint8 toAssetLen,
-            uint256[5] memory minTradeAmounts
+            address router,
+            address[][] memory toBaseAssetRoutes,
+            address[] memory toAssetRoute,
+            uint256[] memory minTradeAmounts,
+            bytes memory optionalData
         ) = abi.decode(
                 IAdapter(address(this)).strategyConfig(),
-                (
-                    address,
-                    address,
-                    address,
-                    address[4][5],
-                    address[4],
-                    uint8[5],
-                    uint8,
-                    uint256[5]
-                )
+                (address, address, address[][], address[], uint256[], bytes)
             );
 
         // Approve all rewardsToken for trading
@@ -98,12 +67,9 @@ contract BaseToAssetCompounder is StrategyBase {
             .rewardTokens();
         uint256 len = rewardTokens.length;
         for (uint256 i = 0; i < len; i++) {
-            IERC20(rewardTokens[i]).approve(
-                toBaseAssetRouter,
-                type(uint256).max
-            );
+            IERC20(rewardTokens[i]).approve(router, type(uint256).max);
         }
-        IERC20(baseAsset).approve(toAssetRouter, type(uint256).max);
+        IERC20(baseAsset).approve(router, type(uint256).max);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -114,93 +80,49 @@ contract BaseToAssetCompounder is StrategyBase {
     function harvest() public override {
         (
             address baseAsset,
-            address toBaseAssetRouter,
-            address toAssetRouter,
-            address[4][5] memory toBaseAssetRoutes,
-            address[4] memory toAssetRoute,
-            uint8[5] memory toBaseAssetLen,
-            uint8 toAssetLen,
-            uint256[5] memory minTradeAmounts
+            address router,
+            address[][] memory toBaseAssetRoutes,
+            address[] memory toAssetRoute,
+            uint256[] memory minTradeAmounts,
+            bytes memory optionalData
         ) = abi.decode(
                 IAdapter(address(this)).strategyConfig(),
-                (
-                    address,
-                    address,
-                    address,
-                    address[4][5],
-                    address[4],
-                    uint8[5],
-                    uint8,
-                    uint256[5]
-                )
+                (address, address, address[][], address[], uint256[], bytes)
             );
+
         address asset = IAdapter(address(this)).asset();
         uint256 balBefore = IERC20(asset).balanceOf(address(this));
 
         IWithRewards(address(this)).claim();
 
-        _swapRewardsToBase(
-            toBaseAssetRouter,
-            toBaseAssetRoutes,
-            toBaseAssetLen,
-            minTradeAmounts
+        uint256 len = toBaseAssetRoutes.length;
+        for (uint256 i = 0; i < len; i++) {
+            uint256 rewardBal = IERC20(toBaseAssetRoutes[i][0]).balanceOf(
+                address(this)
+            );
+            if (rewardBal >= minTradeAmounts[i])
+                _trade(router, toBaseAssetRoutes[i], rewardBal, optionalData);
+        }
+
+        _trade(
+            router,
+            toAssetRoute,
+            IERC20(baseAsset).balanceOf(address(this)),
+            optionalData
         );
 
-        _swapBaseToAsset(toAssetRouter, baseAsset, toAssetRoute, toAssetLen);
-
-        uint256 balAfter = IERC20(asset).balanceOf(address(this));
-
-        IAdapter(address(this)).strategyDeposit(balAfter - balBefore, 0);
+        IAdapter(address(this)).strategyDeposit(
+            IERC20(asset).balanceOf(address(this)) - balBefore,
+            0
+        );
 
         emit Harvest();
     }
 
-    // Swap all rewards to base asset.
-    function _swapRewardsToBase(
-        address toBaseAssetRouter,
-        address[4][5] memory toBaseAssetRoutes,
-        uint8[5] memory toBaseAssetLen,
-        uint256[5] memory minTradeAmounts
-    ) internal virtual {
-        address[] memory rewardTokens = IWithRewards(address(this))
-            .rewardTokens();
-
-        uint256 len = rewardTokens.length;
-        for (uint256 i = 0; i < len; i++) {
-            uint256 rewardAmount = IERC20(rewardTokens[i]).balanceOf(
-                address(this)
-            );
-
-            if (rewardAmount > minTradeAmounts[i]) {
-                // clean up trade route
-                address[] memory route = new address[](toBaseAssetLen[i]);
-                for (uint256 idx; idx < toBaseAssetLen[i]; idx++) {
-                    route[idx] = toBaseAssetRoutes[i][idx];
-                }
-
-                // route, amount, minOut
-                IRouter(toBaseAssetRouter).trade(route, rewardAmount, 0);
-            }
-        }
-    }
-
-    function _swapBaseToAsset(
-        address toAssetRouter,
-        address baseAsset,
-        address[4] memory toAssetRoute,
-        uint8 toAssetLen
-    ) internal virtual {
-        uint256 amount = IERC20(baseAsset).balanceOf(address(this));
-
-        if (amount > 0) {
-            // clean up trade route
-            address[] memory route = new address[](toAssetLen);
-            for (uint256 i; i < toAssetLen; i++) {
-                route[i] = toAssetRoute[i];
-            }
-
-            // route, amount, minOut
-            IRouter(toAssetRouter).trade(route, amount, 0);
-        }
-    }
-} 
+    function _trade(
+        address router,
+        address[] memory route,
+        uint256 amount,
+        bytes memory optionalData
+    ) internal virtual {}
+}
