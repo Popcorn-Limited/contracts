@@ -545,45 +545,26 @@ contract AbstractAdapterTest is PropertyTest {
         uint256 performanceFee = 1e16;
         uint256 hwm = 1e9;
 
-        emit log("PING0");
         _mintAssetAndApproveForAdapter(defaultAmount, bob);
-
-        emit log("PING1");
 
         vm.prank(bob);
         adapter.deposit(defaultAmount, bob);
-
-        emit log("PING2");
 
         uint256 oldTotalAssets = adapter.totalAssets();
         adapter.setPerformanceFee(performanceFee);
         increasePricePerShare(raise);
 
-        emit log("PING3");
-
-        emit log_named_uint("BLING", adapter.convertToAssets(1e18));
-        emit log_named_uint("BLING1", adapter.highWaterMark());
-        emit log_named_uint("BLING2", adapter.totalSupply());
-
         uint256 gain = ((adapter.convertToAssets(1e18) -
             adapter.highWaterMark()) * adapter.totalSupply()) / 1e18;
-        emit log("DING0");
         uint256 fee = (gain * performanceFee) / 1e18;
-        emit log("DING1");
 
         uint256 expectedFee = adapter.convertToShares(fee);
-        emit log("DING2");
 
         vm.expectEmit(false, false, false, true, address(adapter));
-        emit log("DING3");
 
         emit Harvested();
 
-        emit log("PING4");
-
         adapter.harvest();
-
-        emit log("PING5");
 
         // Multiply with the decimal offset
         assertApproxEqAbs(
