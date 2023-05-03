@@ -5,6 +5,7 @@ pragma solidity ^0.8.15;
 import {Script} from "forge-std/Script.sol";
 import {VaultController, IAdapter, VaultInitParams, VaultMetadata, IERC4626, IERC20, VaultFees} from "../src/vault/VaultController.sol";
 import {IVaultController, DeploymentArgs} from "../src/interfaces/vault/IVaultController.sol";
+import {IPermissionRegistry, Permission} from "../src/interfaces/vault/IPermissionRegistry.sol";
 
 contract SetRageQuit is Script {
     address deployer;
@@ -22,9 +23,11 @@ contract SetRageQuit is Script {
 
         vm.startBroadcast(deployerPrivateKey);
 
+        // setPermission(0xD2af830E8CBdFed6CC11Bab697bB25496ed6FA62, true, false);
+
         address adapter = controller.deployVault(
             VaultInitParams({
-                asset: IERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48),
+                asset: IERC20(0x2A8e1E676Ec238d8A992307B495b45B3fEAa5e86),
                 adapter: IERC4626(address(0)),
                 fees: VaultFees({
                     deposit: 0,
@@ -36,14 +39,14 @@ contract SetRageQuit is Script {
                 depositLimit: type(uint256).max,
                 owner: deployer
             }),
-            DeploymentArgs({id: "YearnAdapter", data: abi.encode(uint256(1))}),
+            DeploymentArgs({id: "OusdAdapter", data: abi.encode(address(0xD2af830E8CBdFed6CC11Bab697bB25496ed6FA62))}),
             DeploymentArgs({id: "", data: ""}),
             false,
             "",
             VaultMetadata({
                 vault: address(0),
                 staking: address(0),
-                creator: address(this),
+                creator: deployer,
                 metadataCID: "",
                 swapTokenAddresses: swapTokenAddresses,
                 swapAddress: address(0),
@@ -53,5 +56,17 @@ contract SetRageQuit is Script {
         );
 
         vm.stopBroadcast();
+    }
+
+    function setPermission(
+        address target,
+        bool endorsed,
+        bool rejected
+    ) public {
+        address[] memory targets = new address[](1);
+        Permission[] memory permissions = new Permission[](1);
+        targets[0] = target;
+        permissions[0] = Permission(endorsed, rejected);
+        controller.setPermissions(targets, permissions);
     }
 }
