@@ -20,21 +20,28 @@ contract UniV3Compounder is StrategyBase {
         (
             address baseAsset,
             address router,
-            bytes[] memory toBaseAssetPath,
+            bytes[] memory toBaseAssetPaths,
             bytes memory toAssetPath,
-            uint256[] memory minTradeAmounts
+            uint256[] memory minTradeAmounts,
+            bytes optionalData
         ) = abi.decode(
-                IAdapter(address(this)).strategyConfig(),
-                (address, address, bytes[], bytes, uint256[])
+                data,
+                (address, address, bytes[], bytes, uint256[], bytes)
             );
 
+        _verifyRewardToken(toBaseAssetPaths);
+
+        _verifyAsset(baseAsset, toAssetPath, optionalData);
+    }
+
+    function _verifyRewardToken(bytes[] memory toBaseAssetPaths) internal {
         // Verify rewardToken + paths
         address[] memory rewardTokens = IWithRewards(address(this))
             .rewardTokens();
         uint256 len = rewardTokens.length;
         for (uint256 i; i < len; i++) {
             address[] memory route = UniswapV3Utils.pathToRoute(
-                toBaseAssetPath[i]
+                toBaseAssetPaths[i]
             );
 
             if (
@@ -42,28 +49,27 @@ contract UniV3Compounder is StrategyBase {
                 route[route.length - 1] != baseAsset
             ) revert InvalidConfig();
         }
-
-        // Verify base asset to asset path
-        address[] memory toAssetRoute = UniswapV3Utils.pathToRoute(toAssetPath);
-        if (toAssetRoute[0] != baseAsset) revert InvalidConfig();
-        if (
-            toAssetRoute[toAssetRoute.length - 1] !=
-            IAdapter(address(this)).asset()
-        ) revert InvalidConfig();
     }
 
     function setUp(bytes memory data) public override {
         (
             address baseAsset,
             address router,
-            bytes[] memory toBaseAssetPath,
+            bytes[] memory toBaseAssetPaths,
             bytes memory toAssetPath,
-            uint256[] memory minTradeAmounts
+            uint256[] memory minTradeAmounts,
+            bytes optionalData
         ) = abi.decode(
-                IAdapter(address(this)).strategyConfig(),
-                (address, address, bytes[], bytes, uint256[])
+                data,
+                (address, address, bytes[], bytes, uint256[], bytes)
             );
 
+        _approveRewards(router);
+
+        _setUpAsset(baseAsset, router, optionalData);
+    }
+
+    function _approveRewards(address router) internal {
         // Approve all rewardsToken for trading
         address[] memory rewardTokens = IWithRewards(address(this))
             .rewardTokens();
@@ -71,8 +77,6 @@ contract UniV3Compounder is StrategyBase {
         for (uint256 i = 0; i < len; i++) {
             IERC20(rewardTokens[i]).approve(router, type(uint256).max);
         }
-
-        IERC20(baseAsset).approve(router, type(uint256).max);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -84,12 +88,13 @@ contract UniV3Compounder is StrategyBase {
         (
             address baseAsset,
             address router,
-            bytes[] memory toBaseAssetPath,
+            bytes[] memory toBaseAssetPaths,
             bytes memory toAssetPath,
-            uint256[] memory minTradeAmounts
+            uint256[] memory minTradeAmounts,
+            bytes optionalData
         ) = abi.decode(
                 IAdapter(address(this)).strategyConfig(),
-                (address, address, bytes[], bytes, uint256[])
+                (address, address, bytes[], bytes, uint256[], bytes)
             );
 
         address asset = IAdapter(address(this)).asset();
@@ -98,6 +103,24 @@ contract UniV3Compounder is StrategyBase {
 
         IWithRewards(address(this)).claim();
 
+        _swapToBaseAsset(router, toBaseAssetPaths, minTradeAmounts);
+
+        _getAsset(baseAsset, router, toAssetPath, optionalData);
+
+        // Deposit new assets into adapter
+        IAdapter(address(this)).strategyDeposit(
+            IERC20(asset).balanceOf(address(this)) - balBefore,
+            0
+        );
+
+        emit Harvest();
+    }
+
+    function _swapToBaseAsset(
+        address router,
+        bytes[] memory toBaseAssetPaths,
+        uint256[] memory minTradeAmounts
+    ) internal {
         // Trade rewards for base asset
         address[] memory rewardTokens = IWithRewards(address(this))
             .rewardTokens();
@@ -107,22 +130,43 @@ contract UniV3Compounder is StrategyBase {
                 address(this)
             );
             if (rewardBal >= minTradeAmounts[i])
-                UniswapV3Utils.swap(router, toBaseAssetPath[i], rewardBal);
+                UniswapV3Utils.swap(router, toBaseAssetPaths[i], rewardBal);
         }
+    }
 
+    function _verifyAsset(
+        address baseAsset,
+        bytes memory toAssetPath,
+        bytes
+    ) internal virtual {
+        // Verify base asset to asset path
+        address[] memory toAssetRoute = UniswapV3Utils.pathToRoute(toAssetPath);
+        if (toAssetRoute[0] != baseAsset) revert InvalidConfig();
+        if (
+            toAssetRoute[toAssetRoute.length - 1] !=
+            IAdapter(address(this)).asset()
+        ) revert InvalidConfig();
+    }
+
+    function _setUpAsset(
+        address baseAsset,
+        address router,
+        bytes
+    ) internal virtual {
+        IERC20(baseAsset).approve(router, type(uint256).max);
+    }
+
+    function _getAsset(
+        address baseAsset,
+        address router,
+        bytes memory toAssetPath,
+        bytes
+    ) internal virtual {
         // Trade base asset for asset
         UniswapV3Utils.swap(
             router,
             toAssetPath,
             IERC20(baseAsset).balanceOf(address(this))
         );
-
-        // Deposit new assets into adapter
-        IAdapter(address(this)).strategyDeposit(
-            IERC20(asset).balanceOf(address(this)) - balBefore,
-            0
-        );
-
-        emit Harvest();
     }
 }
