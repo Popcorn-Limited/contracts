@@ -199,10 +199,6 @@ contract YearnAdapter is AdapterBase {
         uint256 assets,
         uint256 shares
     ) internal virtual override {
-        yVault.withdraw(
-            convertToUnderlyingShares(assets, shares),
-            address(this),
-            maxLoss
-        );
+        yVault.withdraw(assets, address(this), 100);
     }
 }

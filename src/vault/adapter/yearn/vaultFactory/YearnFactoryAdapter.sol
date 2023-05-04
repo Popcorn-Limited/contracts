@@ -3,7 +3,7 @@
 
 pragma solidity ^0.8.15;
 
-import {YearnAdapter, IERC20, IERC20Metadata} from "../YearnAdapter.sol";
+import {YearnAdapter, IERC20, IERC20Metadata, SafeERC20} from "../YearnAdapter.sol";
 import {IVaultFactory, VaultAPI} from "../IYearn.sol";
 
 /**
@@ -15,6 +15,8 @@ import {IVaultFactory, VaultAPI} from "../IYearn.sol";
  * Allows wrapping Yearn Vaults.
  */
 contract YearnFactoryAdapter is YearnAdapter {
+    using SafeERC20 for IERC20;
+
     error InvalidAsset();
 
     /**
@@ -55,5 +57,34 @@ contract YearnFactoryAdapter is YearnAdapter {
         _symbol = string.concat("vcY-", IERC20Metadata(asset()).symbol());
 
         IERC20(asset()).approve(address(yVault), type(uint256).max);
+    }
+
+    event log(uint256);
+
+    function _withdraw(
+        address caller,
+        address receiver,
+        address owner,
+        uint256 assets,
+        uint256 shares
+    ) internal virtual override {
+        if (caller != owner) {
+            _spendAllowance(owner, caller, shares);
+        }
+
+        if (!paused()) {
+            _protocolWithdraw(assets, shares);
+        }
+        
+        emit log(IERC20(asset()).balanceOf(address(this)));
+
+
+        _burn(owner, shares);
+
+        IERC20(asset()).safeTransfer(receiver, assets);
+
+        harvest();
+
+        emit Withdraw(caller, receiver, owner, assets, shares);
     }
 }

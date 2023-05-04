@@ -8,7 +8,7 @@ import {Test} from "forge-std/Test.sol";
 import {YearnFactoryAdapter, IERC20, IERC20Metadata, VaultAPI, IVaultFactory} from "../../../../../src/vault/adapter/yearn/vaultFactory/YearnFactoryAdapter.sol";
 import {YearnFactoryTestConfigStorage, YearnFactoryTestConfig} from "./YearnFactoryTestConfigStorage.sol";
 import {AbstractAdapterTest, ITestConfigStorage, IAdapter} from "../../abstract/AbstractAdapterTest.sol";
-import { MathUpgradeable as Math } from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
+import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
 import {IGauge} from "../../../../../src/vault/adapter/curve/ICurve.sol";
 
 contract YearnFactoryAdapterTest is AbstractAdapterTest {
@@ -228,5 +228,16 @@ contract YearnFactoryAdapterTest is AbstractAdapterTest {
         vm.startPrank(bob);
         adapter.deposit(minFuzz, bob);
         adapter.mint(minFuzz, bob);
+    }
+
+    function test_depositWithdrawal() public {
+        _mintAssetAndApproveForAdapter(1e18, bob);
+
+        prop_deposit(bob, bob, 1e18, testId);
+
+        emit log_named_uint("ta", adapter.totalAssets());
+        emit log_named_uint("mw", adapter.maxWithdraw(bob));
+
+        prop_withdraw(bob, bob, 1e18 - 1, testId);
     }
 }
