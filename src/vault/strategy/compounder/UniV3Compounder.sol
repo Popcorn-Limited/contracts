@@ -23,18 +23,26 @@ contract UniV3Compounder is StrategyBase {
             bytes[] memory toBaseAssetPaths,
             bytes memory toAssetPath,
             uint256[] memory minTradeAmounts,
-            bytes optionalData
+            bytes memory optionalData
         ) = abi.decode(
                 data,
                 (address, address, bytes[], bytes, uint256[], bytes)
             );
 
-        _verifyRewardToken(toBaseAssetPaths);
+        _verifyRewardToken(toBaseAssetPaths, baseAsset);
 
-        _verifyAsset(baseAsset, toAssetPath, optionalData);
+        _verifyAsset(
+            baseAsset,
+            IAdapter(address(this)).asset(),
+            toAssetPath,
+            optionalData
+        );
     }
 
-    function _verifyRewardToken(bytes[] memory toBaseAssetPaths) internal {
+    function _verifyRewardToken(
+        bytes[] memory toBaseAssetPaths,
+        address baseAsset
+    ) internal {
         // Verify rewardToken + paths
         address[] memory rewardTokens = IWithRewards(address(this))
             .rewardTokens();
@@ -58,7 +66,7 @@ contract UniV3Compounder is StrategyBase {
             bytes[] memory toBaseAssetPaths,
             bytes memory toAssetPath,
             uint256[] memory minTradeAmounts,
-            bytes optionalData
+            bytes memory optionalData
         ) = abi.decode(
                 data,
                 (address, address, bytes[], bytes, uint256[], bytes)
@@ -66,7 +74,12 @@ contract UniV3Compounder is StrategyBase {
 
         _approveRewards(router);
 
-        _setUpAsset(baseAsset, router, optionalData);
+        _setUpAsset(
+            baseAsset,
+            IAdapter(address(this)).asset(),
+            router,
+            optionalData
+        );
     }
 
     function _approveRewards(address router) internal {
@@ -91,7 +104,7 @@ contract UniV3Compounder is StrategyBase {
             bytes[] memory toBaseAssetPaths,
             bytes memory toAssetPath,
             uint256[] memory minTradeAmounts,
-            bytes optionalData
+            bytes memory optionalData
         ) = abi.decode(
                 IAdapter(address(this)).strategyConfig(),
                 (address, address, bytes[], bytes, uint256[], bytes)
@@ -105,7 +118,7 @@ contract UniV3Compounder is StrategyBase {
 
         _swapToBaseAsset(router, toBaseAssetPaths, minTradeAmounts);
 
-        _getAsset(baseAsset, router, toAssetPath, optionalData);
+        _getAsset(baseAsset, asset, router, toAssetPath, optionalData);
 
         // Deposit new assets into adapter
         IAdapter(address(this)).strategyDeposit(
@@ -136,37 +149,44 @@ contract UniV3Compounder is StrategyBase {
 
     function _verifyAsset(
         address baseAsset,
+        address asset,
         bytes memory toAssetPath,
-        bytes
+        bytes memory
     ) internal virtual {
-        // Verify base asset to asset path
-        address[] memory toAssetRoute = UniswapV3Utils.pathToRoute(toAssetPath);
-        if (toAssetRoute[0] != baseAsset) revert InvalidConfig();
-        if (
-            toAssetRoute[toAssetRoute.length - 1] !=
-            IAdapter(address(this)).asset()
-        ) revert InvalidConfig();
+        if (baseAsset != asset) {
+            // Verify base asset to asset path
+            address[] memory toAssetRoute = UniswapV3Utils.pathToRoute(
+                toAssetPath
+            );
+            if (toAssetRoute[0] != baseAsset) revert InvalidConfig();
+            if (toAssetRoute[toAssetRoute.length - 1] != asset)
+                revert InvalidConfig();
+        }
     }
 
     function _setUpAsset(
         address baseAsset,
+        address asset,
         address router,
-        bytes
+        bytes memory
     ) internal virtual {
-        IERC20(baseAsset).approve(router, type(uint256).max);
+        if (asset != baseAsset)
+            IERC20(baseAsset).approve(router, type(uint256).max);
     }
 
     function _getAsset(
         address baseAsset,
+        address asset,
         address router,
         bytes memory toAssetPath,
-        bytes
+        bytes memory
     ) internal virtual {
         // Trade base asset for asset
-        UniswapV3Utils.swap(
-            router,
-            toAssetPath,
-            IERC20(baseAsset).balanceOf(address(this))
-        );
+        if (asset != baseAsset)
+            UniswapV3Utils.swap(
+                router,
+                toAssetPath,
+                IERC20(baseAsset).balanceOf(address(this))
+            );
     }
 }

@@ -3,56 +3,64 @@
 
 pragma solidity ^0.8.15;
 
-import {UniV3Compounder, UniswapV3Utils} from "./UniV3Compounder.sol";
+import {UniV3Compounder, UniswapV3Utils, IERC20, IAdapter} from "./UniV3Compounder.sol";
 import {ISToken, IStargateRouter} from "../../adapter/stargate/IStargate.sol";
 
 contract UniV3StargateCompounder is UniV3Compounder {
     function _verifyAsset(
         address baseAsset,
+        address asset,
         bytes memory toAssetPath,
-        bytes
+        bytes memory
     ) internal override {
-        address[] memory toAssetRoute = UniswapV3Utils.pathToRoute(toAssetPath);
-        if (toAssetRoute[0] != baseAsset) revert InvalidConfig();
-        if (
-            toAssetRoute[toAssetRoute.length - 1] !=
-            ISToken(IAdapter(address(this)).asset()).token()
-        ) revert InvalidConfig();
+        address token = ISToken(asset).token();
+        if (baseAsset != token) {
+            address[] memory toAssetRoute = UniswapV3Utils.pathToRoute(
+                toAssetPath
+            );
+            if (toAssetRoute[0] != baseAsset) revert InvalidConfig();
+            if (toAssetRoute[toAssetRoute.length - 1] != token)
+                revert InvalidConfig();
+        }
     }
 
     function _setUpAsset(
         address baseAsset,
+        address asset,
         address router,
         bytes memory optionalData
     ) internal override {
-        IERC20(baseAsset).approve(router, type(uint256).max);
+        address token = ISToken(asset).token();
 
-        address stargateRouter = abi.decode(optionalData, address);
-        IERC20(ISToken(IAdapter(address(this)).asset()).token()).approve(
-            stargateRouter,
-            type(uint256).max
-        );
+        if (baseAsset != token)
+            IERC20(baseAsset).approve(router, type(uint256).max);
+
+        address stargateRouter = abi.decode(optionalData, (address));
+        IERC20(token).approve(stargateRouter, type(uint256).max);
     }
 
     function _getAsset(
         address baseAsset,
+        address asset,
         address router,
         bytes memory toAssetPath,
         bytes memory optionalData
     ) internal override {
+        ISToken sToken = ISToken(asset);
+        address token = sToken.token();
+
         // Trade base asset for asset
-        UniswapV3Utils.swap(
-            router,
-            toAssetPath,
-            IERC20(baseAsset).balanceOf(address(this))
-        );
+        if (baseAsset != token)
+            UniswapV3Utils.swap(
+                router,
+                toAssetPath,
+                IERC20(baseAsset).balanceOf(address(this))
+            );
 
-        ISToken sToken = ISToken(IAdapter(address(this)).asset());
-
-        address stargateRouter = abi.decode(optionalData, address);
-        stargateRouter.addLiquidity(
+        address stargateRouter = abi.decode(optionalData, (address));
+        IStargateRouter(stargateRouter).addLiquidity(
             sToken.poolId(),
-            IERC20(sToken.token()).balanceOf(address(this)),
+            IERC20(token).balanceOf(address(this)),
             address(this)
         );
     }
