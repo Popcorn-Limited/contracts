@@ -3,7 +3,7 @@
 pragma solidity ^0.8.0;
 
 import "./Path.sol";
-import {IUniswapRouterV3, ExactInputParams} from "../interfaces/external/uni/v3/IUniswapRouterV3.sol";
+import {IUniswapRouterV3, ExactInputSingleParams, ExactInputParams} from "../interfaces/external/uni/v3/IUniswapRouterV3.sol";
 
 library UniswapV3Utils {
     using Path for bytes;
@@ -34,6 +34,21 @@ library UniswapV3Utils {
         uint256 _amountIn
     ) internal returns (uint256 amountOut) {
         return swap(_router, routeToPath(_route, _fee), _amountIn);
+    }
+
+    function swapSingle(address _router, uint256 amountIn) internal {
+        IUniswapRouterV3(_router).exactInputSingle(
+            ExactInputSingleParams({
+                tokenIn: 0xAf5191B0De278C7286d6C7CC6ab6BB8A73bA2Cd6,
+                tokenOut: 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48,
+                fee: 3000,
+                recipient: address(this),
+                deadline: block.timestamp,
+                amountIn: amountIn,
+                amountOutMinimum: 0,
+                sqrtPriceLimitX96: 0
+            })
+        );
     }
 
     // Convert encoded path to token route
