@@ -101,38 +101,47 @@ contract AlpacaLendV1AdapterTest is AbstractAdapterTest {
     }
 
     /*//////////////////////////////////////////////////////////////
-                              CLAIM
+                              HARVEST
     //////////////////////////////////////////////////////////////*/
 
-    // function test__claim() public override {
-    //     strategy = IStrategy(address(new MockStrategyClaimer()));
-    //     createAdapter();
-    //     adapter.initialize(
-    //         abi.encode(asset, address(this), strategy, 0, sigs, ""),
-    //         externalRegistry,
-    //         testConfigStorage.getTestConfig(0)
-    //     );
+    function test__harvest() public virtual override {
+        uint256 performanceFee = 1e16;
+        uint256 hwm = 1e9;
 
-    //     _mintAssetAndApproveForAdapter(1000e18, bob);
+        _mintAssetAndApproveForAdapter(defaultAmount, bob);
 
-    //     vm.prank(bob);
-    //     adapter.deposit(1000e18, bob);
+        vm.prank(bob);
+        adapter.deposit(defaultAmount, bob);
 
-    //     vm.roll(block.number + 30);
-    //     vm.warp(block.timestamp + 2);
+        uint256 oldTotalAssets = adapter.totalAssets();
+        adapter.setPerformanceFee(performanceFee);
+        increasePricePerShare(raise);
 
-    //     vm.prank(bob);
-    //     adapter.withdraw(0, bob, bob);
+        uint256 gain = ((adapter.convertToAssets(1e18) +
+            1 -
+            adapter.highWaterMark()) * adapter.totalSupply()) / 1e18;
+        uint256 fee = (gain * performanceFee) / 1e18;
 
-    //     address[] memory rewardTokens = IWithRewards(address(adapter))
-    //         .rewardTokens();
-    //     assertEq(rewardTokens[0], rewardsToken);
+        uint256 expectedFee = adapter.convertToShares(fee);
 
-    //     assertGt(
-    //         IERC20(0x6B3595068778DD592e39A122f4f5a5cF09C90fE2).balanceOf(
-    //             address(adapter)
-    //         ),
-    //         0
-    //     );
-    // }
+        vm.expectEmit(false, false, false, true, address(adapter));
+
+        emit Harvested();
+
+        adapter.harvest();
+
+        // Multiply with the decimal offset
+        assertApproxEqAbs(
+            adapter.totalSupply(),
+            defaultAmount * 1e9 + expectedFee,
+            _delta_,
+            "totalSupply"
+        );
+        assertApproxEqAbs(
+            adapter.balanceOf(feeRecipient),
+            expectedFee,
+            _delta_,
+            "expectedFee"
+        );
+    }
 }

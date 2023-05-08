@@ -29,7 +29,7 @@ contract AbstractAdapterTest is PropertyTest {
 
     address bob = address(0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266);
     address alice = address(0x70997970C51812dc3A010C7d01b50e0d17dc79C8);
-    address feeRecipient = address(0x4444);
+    address feeRecipient = address(0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E);
 
     uint256 defaultAmount;
     uint256 raise;
@@ -554,9 +554,17 @@ contract AbstractAdapterTest is PropertyTest {
         adapter.setPerformanceFee(performanceFee);
         increasePricePerShare(raise);
 
+        emit log("PING");
+
+        emit log_named_uint("convertToAssets", adapter.convertToAssets(1e18));
+        emit log_named_uint("highWaterMark", adapter.highWaterMark());
+        emit log_named_uint("totalSupply", adapter.totalSupply());
+
         uint256 gain = ((adapter.convertToAssets(1e18) -
             adapter.highWaterMark()) * adapter.totalSupply()) / 1e18;
         uint256 fee = (gain * performanceFee) / 1e18;
+
+        emit log("PING1");
 
         uint256 expectedFee = adapter.convertToShares(fee);
 
