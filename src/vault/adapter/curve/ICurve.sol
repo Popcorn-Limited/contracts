@@ -36,3 +36,17 @@ interface IMinter {
 
     function controller() external view returns (address);
 }
+
+interface IMetaRegistry {
+    function pool_list(uint index) external view returns (address);
+    function get_lp_token(address pool) external view returns (address);
+    function get_n_coins(address pool) external view returns (uint);
+    function get_coins(address pool) external view returns (address[8] memory);
+}
+
+interface IPool {
+    function calc_withdraw_one_coin(uint amount, int128 tokenIndex) external view returns (uint);
+    function coins(uint index) external view returns (address);
+    function remove_liquidity_one_coin(uint amount, int128 tokenIndex, uint minOut) external;
+    function add_liquidity(uint[3] memory amounts, uint minOut) external;
+}

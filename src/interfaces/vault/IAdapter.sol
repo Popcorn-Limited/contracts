@@ -44,4 +44,5 @@ interface IAdapter is IERC4626, IOwned, IPermit, IPausable {
     function decimals() external view returns (uint8);
 
     function decimalOffset() external view returns (uint8);
+    function convertToUnderlyingShares(uint assets, uint shares) external view returns (uint);
 }
