@@ -17,30 +17,30 @@ contract SwapAdapterTest is Test {
     }
 
     function test_swap() public {
-        vaults.push(0xc1D4a319dD7C44e332Bd54c724433C6067FeDd0D);
+        vaults.push(0x5d344226578DC100b2001DA251A4b154df58194f);
 
         emit log_uint(
-            IERC4626(0xc1D4a319dD7C44e332Bd54c724433C6067FeDd0D).totalAssets()
+            IERC4626(0x5d344226578DC100b2001DA251A4b154df58194f).totalAssets()
         );
         emit log_uint(
-            IERC4626(0xc1D4a319dD7C44e332Bd54c724433C6067FeDd0D).totalSupply()
+            IERC4626(0x5d344226578DC100b2001DA251A4b154df58194f).totalSupply()
         );
         emit log_named_uint("time", block.timestamp);
         emit log_named_uint(
             "b",
-            IVault(0xc1D4a319dD7C44e332Bd54c724433C6067FeDd0D)
+            IVault(0x5d344226578DC100b2001DA251A4b154df58194f)
                 .proposedAdapterTime() +
-                IVault(0xc1D4a319dD7C44e332Bd54c724433C6067FeDd0D)
+                IVault(0x5d344226578DC100b2001DA251A4b154df58194f)
                     .quitPeriod()
         );
         vm.prank(0x22f5413C075Ccd56D575A54763831C4c27A37Bdb);
         controller.changeVaultAdapters(vaults);
 
         emit log_uint(
-            IERC4626(0xc1D4a319dD7C44e332Bd54c724433C6067FeDd0D).totalAssets()
+            IERC4626(0x5d344226578DC100b2001DA251A4b154df58194f).totalAssets()
         );
         emit log_uint(
-            IERC4626(0xc1D4a319dD7C44e332Bd54c724433C6067FeDd0D).totalSupply()
+            IERC4626(0x5d344226578DC100b2001DA251A4b154df58194f).totalSupply()
         );
     }
 }
