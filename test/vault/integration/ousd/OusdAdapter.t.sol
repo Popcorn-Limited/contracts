@@ -74,10 +74,6 @@ contract OusdAdapterTest is AbstractAdapterTest {
                           HELPER
     //////////////////////////////////////////////////////////////*/
 
-    function test__nothing() public {
-
-    }
-
     function _mintAsset(uint256 amount, address receiver) internal override {
         vm.prank(ousdWhale);
         IERC20(asset).transfer(receiver, amount + 1);
