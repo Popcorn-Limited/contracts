@@ -11,7 +11,7 @@ contract SetRageQuit is Script {
     address deployer;
 
     VaultController controller =
-        VaultController(0xa199409F99bDBD998Ae1ef4FdaA58b356370837d);
+        VaultController(0x757D953c53aD28748aCf94AD2d59C13955E09c08);
 
     address feeRecipient = address(0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E);
 
@@ -23,11 +23,11 @@ contract SetRageQuit is Script {
 
         vm.startBroadcast(deployerPrivateKey);
 
-        // setPermission(0xD2af830E8CBdFed6CC11Bab697bB25496ed6FA62, true, false);
+        setPermission(0xFF504594eDd93E09309d5EAB775e7c35f642931B, true, false);
 
         address adapter = controller.deployVault(
             VaultInitParams({
-                asset: IERC20(0x2A8e1E676Ec238d8A992307B495b45B3fEAa5e86),
+                asset: IERC20(0x207AddB05C548F262219f6bFC6e11c02d0f7fDbe),
                 adapter: IERC4626(address(0)),
                 fees: VaultFees({
                     deposit: 0,
@@ -39,7 +39,13 @@ contract SetRageQuit is Script {
                 depositLimit: type(uint256).max,
                 owner: deployer
             }),
-            DeploymentArgs({id: "OusdAdapter", data: abi.encode(address(0xD2af830E8CBdFed6CC11Bab697bB25496ed6FA62))}),
+            DeploymentArgs({
+                id: "BeefyAdapter",
+                data: abi.encode(
+                    address(0xFF504594eDd93E09309d5EAB775e7c35f642931B),
+                    address(0)
+                )
+            }),
             DeploymentArgs({id: "", data: ""}),
             false,
             "",
