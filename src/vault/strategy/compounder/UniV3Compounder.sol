@@ -16,12 +16,6 @@ contract UniV3Compounder is StrategyBase {
     // Errors
     error InvalidConfig();
 
-    event gotHere(uint256);
-
-    event log(string);
-    event log_bytes(bytes);
-    event log_address(address);
-
     function verifyAdapterCompatibility(bytes memory data) public override {
         (
             address baseAsset,
@@ -34,11 +28,8 @@ contract UniV3Compounder is StrategyBase {
                 data,
                 (address, address, bytes[], bytes, uint256[], bytes)
             );
-        emit gotHere(3);
-        emit log_address(IAdapter(msg.sender).asset());
 
         _verifyRewardToken(toBaseAssetPaths, baseAsset);
-        emit gotHere(4);
 
         _verifyAsset(
             baseAsset,
@@ -54,18 +45,13 @@ contract UniV3Compounder is StrategyBase {
     ) internal {
         // Verify rewardToken + paths
         address[] memory rewardTokens = IWithRewards(msg.sender).rewardTokens();
-        emit gotHere(2);
 
         uint256 len = rewardTokens.length;
         for (uint256 i; i < len; i++) {
             address[] memory route = UniswapV3Utils.pathToRoute(
                 toBaseAssetPaths[i]
             );
-            emit gotHere(3);
-            emit log_address(route[0]);
-            emit log_address(rewardTokens[i]);
-            emit log_address(route[route.length - 1]);
-            emit log_address(baseAsset);
+
             if (
                 route[0] != rewardTokens[i] ||
                 route[route.length - 1] != baseAsset
@@ -98,10 +84,10 @@ contract UniV3Compounder is StrategyBase {
 
     function _approveRewards(address router) internal {
         // Approve all rewardsToken for trading
-        address[] memory rewardTokens = IWithRewards(address(this)).rewardTokens();
+        address[] memory rewardTokens = IWithRewards(address(this))
+            .rewardTokens();
         uint256 len = rewardTokens.length;
         for (uint256 i = 0; i < len; i++) {
-            emit log_address(rewardTokens[i]);
             IERC20(rewardTokens[i]).approve(router, type(uint256).max);
         }
     }
@@ -129,12 +115,7 @@ contract UniV3Compounder is StrategyBase {
         uint256 balBefore = IERC20(asset).balanceOf(address(this));
 
         IWithRewards(address(this)).claim();
-        emit gotHere(
-            IERC20(0xAf5191B0De278C7286d6C7CC6ab6BB8A73bA2Cd6).allowance(
-                address(this),
-                router
-            )
-        );
+
         _swapToBaseAsset(router, toBaseAssetPaths, minTradeAmounts);
 
         _getAsset(baseAsset, asset, router, toAssetPath, optionalData);
@@ -162,7 +143,7 @@ contract UniV3Compounder is StrategyBase {
                 address(this)
             );
             if (rewardBal >= minTradeAmounts[i])
-                UniswapV3Utils.swapSingle(router, rewardBal);
+                UniswapV3Utils.swap(router, toBaseAssetPaths[i], rewardBal);
         }
     }
 
