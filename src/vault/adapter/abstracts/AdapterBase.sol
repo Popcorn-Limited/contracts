@@ -303,7 +303,6 @@ abstract contract AdapterBase is
   uint256 public performanceFee;
   uint256 public highWaterMark;
 
-  // TODO use deterministic fee recipient proxy
   address public constant FEE_RECIPIENT = address(0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E);
 
   event PerformanceFeeChanged(uint256 oldFee, uint256 newFee);
