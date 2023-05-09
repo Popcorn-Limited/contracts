@@ -198,7 +198,7 @@ abstract contract AdapterBase is
     function previewMint(
         uint256 shares
     ) public view virtual override returns (uint256) {
-        return paused() ? 0 : _convertToAssets(shares, Math.Rounding.Up);
+        return paused() ? 0 : _convertToAssets(shares, Math.Rounding.Down);
     }
 
     function _convertToShares(

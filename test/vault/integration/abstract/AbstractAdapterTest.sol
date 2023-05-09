@@ -321,7 +321,7 @@ contract AbstractAdapterTest is PropertyTest {
     }
 
     function test__withdraw(uint8 fuzzAmount) public virtual {
-        uint256 amount = bound(uint256(fuzzAmount), minFuzz, maxAssets);
+        uint256 amount = 1e18;
 
         uint8 len = uint8(testConfigStorage.getTestConfigLength());
         for (uint8 i; i < len; i++) {

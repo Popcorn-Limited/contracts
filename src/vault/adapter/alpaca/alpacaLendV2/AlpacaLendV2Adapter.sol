@@ -123,7 +123,7 @@ contract AlpacaLendV2Adapter is AdapterBase, WithRewards {
     }
 
     function _protocolWithdraw(uint256 amount, uint256) internal override {
-        uint256 alpacaShares = ibToken.convertToShares(amount);
+        uint256 alpacaShares = ibToken.convertToShares(amount + 1);
 
         alpacaManager.removeCollateralAndWithdraw(
             0,
