@@ -48,5 +48,11 @@ interface IPool {
     function calc_withdraw_one_coin(uint amount, int128 tokenIndex) external view returns (uint);
     function coins(uint index) external view returns (address);
     function remove_liquidity_one_coin(uint amount, int128 tokenIndex, uint minOut) external;
+    function add_liquidity(uint[2] memory amounts, uint minOut) external;
     function add_liquidity(uint[3] memory amounts, uint minOut) external;
+    function add_liquidity(uint[4] memory amounts, uint minOut) external;
+    function add_liquidity(uint[5] memory amounts, uint minOut) external;
+    function add_liquidity(uint[6] memory amounts, uint minOut) external;
+    function add_liquidity(uint[7] memory amounts, uint minOut) external;
+    function add_liquidity(uint[8] memory amounts, uint minOut) external;
 }
