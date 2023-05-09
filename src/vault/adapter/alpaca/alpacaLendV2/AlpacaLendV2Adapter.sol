@@ -5,25 +5,34 @@ pragma solidity ^0.8.15;
 
 import {AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20, Math, IStrategy, IAdapter} from "../../abstracts/AdapterBase.sol";
 import {WithRewards, IWithRewards} from "../../abstracts/WithRewards.sol";
-import {IAlpacaLendV1Vault} from "./IAlpacaLendV1.sol";
+import {IAlpacaLendV2Vault, IAlpacaLendV2Manger, IAlpacaLendV2MiniFL, IAlpacaLendV2IbToken} from "./IAlpacaLendV2.sol";
 
 /**
- * @title   AlpacaV1 Adapter
+ * @title   AlpacaV2 Adapter
  * @author  amatureApe
- * @notice  ERC4626 wrapper for AlpacaV1 Vaults.
+ * @notice  ERC4626 wrapper for AlpacaV2 Vaults.
  *
  * An ERC4626 compliant Wrapper for Alpaca Lend V1.
- * Allows wrapping AlpacaV1 Vaults.
+ * Allows wrapping AlpacaV2 Vaults.
  */
-contract AlpacaLendV1Adapter is AdapterBase, WithRewards {
+contract AlpacaLendV2Adapter is AdapterBase, WithRewards {
     using SafeERC20 for IERC20;
     using Math for uint256;
 
     string internal _name;
     string internal _symbol;
 
-    /// @notice The Alpaca Lend V1 Vault contract
-    IAlpacaLendV1Vault public alpacaVault;
+    /// @notice The Alpaca Lend V2 Manager contract
+    IAlpacaLendV2Manger public alpacaManager;
+
+    /// @notice The Alpaca Lend V2 MiniFL contract
+    IAlpacaLendV2MiniFL public miniFL;
+
+    /// @notice The Alpaca Lend V2 ibToken
+    IAlpacaLendV2IbToken public ibToken;
+
+    /// @notice PoolId corresponding to collateral in Alpaca Manger
+    uint256 public pid;
 
     /*//////////////////////////////////////////////////////////////
                             INITIALIZATION
@@ -32,35 +41,42 @@ contract AlpacaLendV1Adapter is AdapterBase, WithRewards {
     error InvalidAsset();
 
     /**
-     * @notice Initialize a new MasterChef Adapter.
+     * @notice Initialize a new Alpaca Lend V2 Adapter.
      * @param adapterInitData Encoded data for the base adapter initialization.
-     * @dev `_pid` - The poolId for lpToken.
-     * @dev `_rewardsToken` - The token rewarded by the MasterChef contract (Sushi, Cake...)
-     * @dev This function is called by the factory contract when deploying a new vault.
+     * @dev `_manager` - The manager contract for Alpaca Lend V2.
+     * @dev The poolId for the ibToken in Alpaca Manager contract
+\     * @dev This function is called by the factory contract when deploying a new vault.
      */
 
     function initialize(
         bytes memory adapterInitData,
         address registry,
-        bytes memory alpacaV1InitData
+        bytes memory alpacaV2InitData
     ) external initializer {
         __AdapterBase_init(adapterInitData);
 
-        address _vault = abi.decode(alpacaV1InitData, (address));
+        (address _manager, uint256 _pid) = abi.decode(
+            alpacaV2InitData,
+            (address, uint256)
+        );
 
-        alpacaVault = IAlpacaLendV1Vault(_vault);
+        alpacaManager = IAlpacaLendV2Manger(_manager);
+        miniFL = IAlpacaLendV2MiniFL(alpacaManager.miniFL());
 
-        if (alpacaVault.token() != asset()) revert InvalidAsset();
+        pid = _pid;
+        ibToken = IAlpacaLendV2IbToken(miniFL.stakingTokens(_pid));
+
+        if (ibToken.asset() != asset()) revert InvalidAsset();
 
         _name = string.concat(
-            "VaultCraft AlpacaLendV1 ",
+            "VaultCraft AlpacaLendV2 ",
             IERC20Metadata(asset()).name(),
             " Adapter"
         );
-        _symbol = string.concat("vcAlV1-", IERC20Metadata(asset()).symbol());
+        _symbol = string.concat("vcAlV2-", IERC20Metadata(asset()).symbol());
 
-        IERC20(alpacaVault.token()).approve(
-            address(alpacaVault),
+        IERC20(ibToken.asset()).approve(
+            address(alpacaManager),
             type(uint256).max
         );
     }
@@ -91,9 +107,11 @@ contract AlpacaLendV1Adapter is AdapterBase, WithRewards {
     /// @return The total amount of underlying tokens the Vault holds.
 
     function _totalAssets() internal view override returns (uint256) {
-        return
-            (alpacaVault.balanceOf(address(this)) * alpacaVault.totalToken()) /
-            alpacaVault.totalSupply();
+        (uint256 _totalAmount, ) = miniFL.userInfo(pid, address(this));
+
+        uint256 assets = ibToken.convertToAssets(_totalAmount);
+
+        return assets;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -101,32 +119,17 @@ contract AlpacaLendV1Adapter is AdapterBase, WithRewards {
     //////////////////////////////////////////////////////////////*/
 
     function _protocolDeposit(uint256 amount, uint256) internal override {
-        alpacaVault.deposit(amount);
+        alpacaManager.depositAndAddCollateral(0, address(asset()), amount);
     }
 
-    function _protocolWithdraw(
-        uint256 amount,
-        uint256 shares
-    ) internal override {
-        uint256 alpacaShares = convertToUnderlyingShares(0, shares);
+    function _protocolWithdraw(uint256 amount, uint256) internal override {
+        uint256 alpacaShares = ibToken.convertToShares(amount);
 
-        alpacaVault.withdraw(alpacaShares);
-    }
-
-    /// @notice The amount of alapacaV1 shares to withdraw given an mount of adapter shares
-    function convertToUnderlyingShares(
-        uint256 assets,
-        uint256 shares
-    ) public view override returns (uint256) {
-        uint256 supply = totalSupply();
-        return
-            supply == 0
-                ? shares
-                : shares.mulDiv(
-                    alpacaVault.balanceOf(address(this)),
-                    supply,
-                    Math.Rounding.Up
-                );
+        alpacaManager.removeCollateralAndWithdraw(
+            0,
+            address(ibToken),
+            alpacaShares
+        );
     }
 
     /*//////////////////////////////////////////////////////////////
