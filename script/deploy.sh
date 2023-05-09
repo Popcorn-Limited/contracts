@@ -3,35 +3,37 @@
 # Deploy Clone Implementations
 # source .env && forge create MultiRewardStaking --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY
 # source .env && forge create YearnAdapter --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY
-source .env && forge create BeefyAdapter --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY
+# source .env && forge create BeefyAdapter --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY
+# source .env && forge create CompoundV2Adapter --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY
+source .env && forge create OusdAdapter --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY
 # source .env && forge create MockStrategy --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY
 # source .env && forge create Vault --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY
 
 # Deploy Util Contracts
-#source .env && forge create AdminProxy --constructor-args 0x22f5413C075Ccd56D575A54763831C4c27A37Bdb --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY --verify --etherscan-api-key=$ETHERSCAN_API_KEY
-# source .env && forge create PermissionRegistry --constructor-args 0x7D224F9Eaf3855CE3109b205e6fA853d25Bb457f --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY --verify --etherscan-api-key=$ETHERSCAN_API_KEY
-# source .env && forge create VaultRegistry --constructor-args 0x7D224F9Eaf3855CE3109b205e6fA853d25Bb457f --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY --verify --etherscan-api-key=$ETHERSCAN_API_KEY
-# source .env && forge create MultiRewardEscrow --constructor-args 0x7D224F9Eaf3855CE3109b205e6fA853d25Bb457f 0x74bb390786072ea1329f270CA6C0058b2D1Afe3f --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY --verify --etherscan-api-key=$ETHERSCAN_API_KEY
+# source .env && forge create AdminProxy --constructor-args 0x22f5413C075Ccd56D575A54763831C4c27A37Bdb --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY --verify --etherscan-api-key=$ETHERSCAN_API_KEY
+# source .env && forge create PermissionRegistry --constructor-args 0xcC09F5bd7582D02Bb31825d09589F4773B65eCc9 --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY --verify --etherscan-api-key=$ETHERSCAN_API_KEY
+# source .env && forge create VaultRegistry --constructor-args 0xcC09F5bd7582D02Bb31825d09589F4773B65eCc9 --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY --verify --etherscan-api-key=$ETHERSCAN_API_KEY
+# source .env && forge create MultiRewardEscrow --constructor-args 0xcC09F5bd7582D02Bb31825d09589F4773B65eCc9 0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY --verify --etherscan-api-key=$ETHERSCAN_API_KEY
 # source .env && forge create VaultRouter --constructor-args 0x41813a5303597a68c0a780FF37A827b9c7e84397 --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY --verify --etherscan-api-key=$ETHERSCAN_API_KEY
 
 # Deploy Deployment Controller
 # source .env && forge create CloneFactory --constructor-args 0x22f5413C075Ccd56D575A54763831C4c27A37Bdb --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY --verify --etherscan-api-key=$ETHERSCAN_API_KEY
 # source .env && forge create CloneRegistry --constructor-args 0x22f5413C075Ccd56D575A54763831C4c27A37Bdb --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY --verify --etherscan-api-key=$ETHERSCAN_API_KEY
 # source .env && forge create TemplateRegistry --constructor-args 0x22f5413C075Ccd56D575A54763831C4c27A37Bdb --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY --verify --etherscan-api-key=$ETHERSCAN_API_KEY
-# source .env && forge create DeploymentController --constructor-args 0x22f5413C075Ccd56D575A54763831C4c27A37Bdb 0x504f828886aB10D09ca1c116d6E1C5b8963cB109 0x795d90945e5B9b320410b31e6E544b647d0ea5AA 0xA18735b352a926aD957F94Ff40764E63139ec0a6 --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY --verify --etherscan-api-key=$ETHERSCAN_API_KEY
+# source .env && forge create DeploymentController --constructor-args 0x22f5413C075Ccd56D575A54763831C4c27A37Bdb 0x99fDFcC95a45ca4604E3c1eB86f2b5d9E217f460 0x57c041e4504b05A7B3A3597134a1DA78e719fc73 0x1Ea65ae3d7E60E374221cdE29844df81F447D68c --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY --verify --etherscan-api-key=$ETHERSCAN_API_KEY
 
 # Set Deployment Controller Ownership
-# source .env && cast send 0x504f828886aB10D09ca1c116d6E1C5b8963cB109 "nominateNewOwner(address)" 0xf64f4f0e6964eb0f94AA79A0f787DdE57Fa4C043 --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY
-# source .env && cast send 0x795d90945e5B9b320410b31e6E544b647d0ea5AA "nominateNewOwner(address)" 0xf64f4f0e6964eb0f94AA79A0f787DdE57Fa4C043 --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY
-# source .env && cast send 0xA18735b352a926aD957F94Ff40764E63139ec0a6 "nominateNewOwner(address)" 0xf64f4f0e6964eb0f94AA79A0f787DdE57Fa4C043 --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY
-# source .env && cast send 0xf64f4f0e6964eb0f94AA79A0f787DdE57Fa4C043 "acceptDependencyOwnership()" --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY
-# source .env && cast send 0xf64f4f0e6964eb0f94AA79A0f787DdE57Fa4C043 "nominateNewOwner(address)" 0x7D224F9Eaf3855CE3109b205e6fA853d25Bb457f --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY
-# source .env && cast send 0x8E69C90FF6aafA7C2c8b175Ad4e29D3662c0FBb2 "execute(address, bytes)" 0x133D8127bed4bb7aD9Ba8e924590c0E771A308EE 0x79ba509700000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000000 --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY
+# source .env && cast send 0x99fDFcC95a45ca4604E3c1eB86f2b5d9E217f460 "nominateNewOwner(address)" 0x87eBAC6021F133E217FF6b8e374cae2C3456936E --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY
+# source .env && cast send 0x57c041e4504b05A7B3A3597134a1DA78e719fc73 "nominateNewOwner(address)" 0x87eBAC6021F133E217FF6b8e374cae2C3456936E --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY
+# source .env && cast send 0x1Ea65ae3d7E60E374221cdE29844df81F447D68c "nominateNewOwner(address)" 0x87eBAC6021F133E217FF6b8e374cae2C3456936E --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY
+# source .env && cast send 0x87eBAC6021F133E217FF6b8e374cae2C3456936E "acceptDependencyOwnership()" --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY
+# source .env && cast send 0x87eBAC6021F133E217FF6b8e374cae2C3456936E "nominateNewOwner(address)" 0xcC09F5bd7582D02Bb31825d09589F4773B65eCc9 --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY
+# source .env && cast send 0xcC09F5bd7582D02Bb31825d09589F4773B65eCc9 "execute(address, bytes)" 0x87eBAC6021F133E217FF6b8e374cae2C3456936E 0x79ba509700000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000000 --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY
 
 # Set up VaultController
-# source .env && forge create VaultController --constructor-args 0x22f5413C075Ccd56D575A54763831C4c27A37Bdb 0x7D224F9Eaf3855CE3109b205e6fA853d25Bb457f 0xf64f4f0e6964eb0f94AA79A0f787DdE57Fa4C043 0xdD0d135b5b52B7EDd90a83d4A4112C55a1A6D23A 0xf5862457AA842605f8b675Af13026d3Fd03bFfF0 0x823033d1014F0f4da2Bb5B2cE4bC73D6e7eAe7a8 --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY --verify --etherscan-api-key=$ETHERSCAN_API_KEY
-# source .env && cast send 0x7D224F9Eaf3855CE3109b205e6fA853d25Bb457f "nominateNewOwner(address)" 0x757D953c53aD28748aCf94AD2d59C13955E09c08 --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY
-# source .env && cast send 0x757D953c53aD28748aCf94AD2d59C13955E09c08 "acceptAdminProxyOwnership()" --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY
+# source .env && forge create VaultController --constructor-args 0x22f5413C075Ccd56D575A54763831C4c27A37Bdb 0xcC09F5bd7582D02Bb31825d09589F4773B65eCc9 0x87eBAC6021F133E217FF6b8e374cae2C3456936E 0xB205e94D402742B919E851892f7d515592a7A6cC 0xB67C4c9C3CebCeC2FD3fDE436340D728D990A8d9 0x23DBbE898A8b69eA0681F8d8C74f4B17dAAe5FCd --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY --verify --etherscan-api-key=$ETHERSCAN_API_KEY
+# source .env && cast send 0xcC09F5bd7582D02Bb31825d09589F4773B65eCc9 "nominateNewOwner(address)" 0xF40749d72Ab5422CC5d735A373E66d67f7cA9393 --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY
+# source .env && cast send 0xF40749d72Ab5422CC5d735A373E66d67f7cA9393 "acceptAdminProxyOwnership()" --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY
 
 # Add Template Categories
 # source .env && cast send 0x3602C76ab5ADA70d40A8e09BcfB91F2c195E20BE "addTemplateCategories(bytes32[])" [0x5661756c74000000000000000000000000000000000000000000000000000000,0x4164617074657200000000000000000000000000000000000000000000000000,0x5374726174656779000000000000000000000000000000000000000000000000,0x5374616b696e6700000000000000000000000000000000000000000000000000] --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY --gas-limit=15000000

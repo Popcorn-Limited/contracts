@@ -3,64 +3,82 @@
 
 pragma solidity ^0.8.15;
 
-import {AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20, Math, IStrategy, IAdapter, IERC4626} from "../abstracts/AdapterBase.sol";
-import {WithRewards, IWithRewards} from "../abstracts/WithRewards.sol";
-import {IPermissionRegistry} from "../../../interfaces/vault/IPermissionRegistry.sol";
+import {AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20, Math, IStrategy, IAdapter} from "../../abstracts/AdapterBase.sol";
+import {WithRewards, IWithRewards} from "../../abstracts/WithRewards.sol";
+import {IAlpacaLendV2Vault, IAlpacaLendV2Manger, IAlpacaLendV2MiniFL, IAlpacaLendV2IbToken} from "./IAlpacaLendV2.sol";
 
 /**
- * @title   Ousd Adapter
+ * @title   AlpacaV2 Adapter
  * @author  amatureApe
- * @notice  ERC4626 wrapper for Ousd Vault.
+ * @notice  ERC4626 wrapper for AlpacaV2 Vaults.
  *
- * An ERC4626 compliant Wrapper for https://github.com/sushiswap/sushiswap/blob/archieve/canary/contracts/MasterChefV2.sol.
- * Allows wrapping Ousd.
+ * An ERC4626 compliant Wrapper for Alpaca Lend V1.
+ * Allows wrapping AlpacaV2 Vaults.
  */
-contract OusdAdapter is AdapterBase, WithRewards {
+contract AlpacaLendV2Adapter is AdapterBase, WithRewards {
     using SafeERC20 for IERC20;
     using Math for uint256;
 
     string internal _name;
     string internal _symbol;
 
-    /// @notice The wOUSD token contract.
-    IERC4626 public wOusd;
+    /// @notice The Alpaca Lend V2 Manager contract
+    IAlpacaLendV2Manger public alpacaManager;
+
+    /// @notice The Alpaca Lend V2 MiniFL contract
+    IAlpacaLendV2MiniFL public miniFL;
+
+    /// @notice The Alpaca Lend V2 ibToken
+    IAlpacaLendV2IbToken public ibToken;
+
+    /// @notice PoolId corresponding to collateral in Alpaca Manger
+    uint256 public pid;
 
     /*//////////////////////////////////////////////////////////////
                             INITIALIZATION
     //////////////////////////////////////////////////////////////*/
 
-    error NotEndorsed();
     error InvalidAsset();
 
     /**
-     * @notice Initialize a new MasterChef Adapter.
+     * @notice Initialize a new Alpaca Lend V2 Adapter.
      * @param adapterInitData Encoded data for the base adapter initialization.
-     * @dev `_ousd` - The address of the OUSD token.
-     * @dev This function is called by the factory contract when deploying a new vault.
+     * @dev `_manager` - The manager contract for Alpaca Lend V2.
+     * @dev The poolId for the ibToken in Alpaca Manager contract
+\     * @dev This function is called by the factory contract when deploying a new vault.
      */
 
     function initialize(
         bytes memory adapterInitData,
         address registry,
-        bytes memory ousdInitData
+        bytes memory alpacaV2InitData
     ) external initializer {
         __AdapterBase_init(adapterInitData);
-        address _wousd = abi.decode(ousdInitData, (address));
 
-        if (!IPermissionRegistry(registry).endorsed(_wousd))
-            revert NotEndorsed();
-        if (IERC4626(_wousd).asset() != asset()) revert InvalidAsset();
+        (address _manager, uint256 _pid) = abi.decode(
+            alpacaV2InitData,
+            (address, uint256)
+        );
 
-        wOusd = IERC4626(_wousd);
+        alpacaManager = IAlpacaLendV2Manger(_manager);
+        miniFL = IAlpacaLendV2MiniFL(alpacaManager.miniFL());
+
+        pid = _pid;
+        ibToken = IAlpacaLendV2IbToken(miniFL.stakingTokens(_pid));
+
+        if (ibToken.asset() != asset()) revert InvalidAsset();
 
         _name = string.concat(
-            "VaultCraft Ousd ",
+            "VaultCraft AlpacaLendV2 ",
             IERC20Metadata(asset()).name(),
             " Adapter"
         );
-        _symbol = string.concat("vcO-", IERC20Metadata(asset()).symbol());
+        _symbol = string.concat("vcAlV2-", IERC20Metadata(asset()).symbol());
 
-        IERC20(asset()).approve(address(wOusd), type(uint256).max);
+        IERC20(ibToken.asset()).approve(
+            address(alpacaManager),
+            type(uint256).max
+        );
     }
 
     function name()
@@ -89,7 +107,11 @@ contract OusdAdapter is AdapterBase, WithRewards {
     /// @return The total amount of underlying tokens the Vault holds.
 
     function _totalAssets() internal view override returns (uint256) {
-        return wOusd.convertToAssets(wOusd.balanceOf(address(this)));
+        (uint256 _totalAmount, ) = miniFL.userInfo(pid, address(this));
+
+        uint256 assets = ibToken.convertToAssets(_totalAmount);
+
+        return assets;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -97,11 +119,17 @@ contract OusdAdapter is AdapterBase, WithRewards {
     //////////////////////////////////////////////////////////////*/
 
     function _protocolDeposit(uint256 amount, uint256) internal override {
-        wOusd.deposit(amount, address(this));
+        alpacaManager.depositAndAddCollateral(0, address(asset()), amount);
     }
 
     function _protocolWithdraw(uint256 amount, uint256) internal override {
-        wOusd.withdraw(amount, address(this), address(this));
+        uint256 alpacaShares = ibToken.convertToShares(amount + 1);
+
+        alpacaManager.removeCollateralAndWithdraw(
+            0,
+            address(ibToken),
+            alpacaShares
+        );
     }
 
     /*//////////////////////////////////////////////////////////////

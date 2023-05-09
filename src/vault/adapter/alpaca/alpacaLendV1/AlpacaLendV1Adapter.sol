@@ -3,64 +3,66 @@
 
 pragma solidity ^0.8.15;
 
-import {AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20, Math, IStrategy, IAdapter, IERC4626} from "../abstracts/AdapterBase.sol";
-import {WithRewards, IWithRewards} from "../abstracts/WithRewards.sol";
-import {IPermissionRegistry} from "../../../interfaces/vault/IPermissionRegistry.sol";
+import {AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20, Math, IStrategy, IAdapter} from "../../abstracts/AdapterBase.sol";
+import {WithRewards, IWithRewards} from "../../abstracts/WithRewards.sol";
+import {IAlpacaLendV1Vault} from "./IAlpacaLendV1.sol";
 
 /**
- * @title   Ousd Adapter
+ * @title   AlpacaV1 Adapter
  * @author  amatureApe
- * @notice  ERC4626 wrapper for Ousd Vault.
+ * @notice  ERC4626 wrapper for AlpacaV1 Vaults.
  *
- * An ERC4626 compliant Wrapper for https://github.com/sushiswap/sushiswap/blob/archieve/canary/contracts/MasterChefV2.sol.
- * Allows wrapping Ousd.
+ * An ERC4626 compliant Wrapper for Alpaca Lend V1.
+ * Allows wrapping AlpacaV1 Vaults.
  */
-contract OusdAdapter is AdapterBase, WithRewards {
+contract AlpacaLendV1Adapter is AdapterBase, WithRewards {
     using SafeERC20 for IERC20;
     using Math for uint256;
 
     string internal _name;
     string internal _symbol;
 
-    /// @notice The wOUSD token contract.
-    IERC4626 public wOusd;
+    /// @notice The Alpaca Lend V1 Vault contract
+    IAlpacaLendV1Vault public alpacaVault;
 
     /*//////////////////////////////////////////////////////////////
                             INITIALIZATION
     //////////////////////////////////////////////////////////////*/
 
-    error NotEndorsed();
     error InvalidAsset();
 
     /**
      * @notice Initialize a new MasterChef Adapter.
      * @param adapterInitData Encoded data for the base adapter initialization.
-     * @dev `_ousd` - The address of the OUSD token.
+     * @dev `_pid` - The poolId for lpToken.
+     * @dev `_rewardsToken` - The token rewarded by the MasterChef contract (Sushi, Cake...)
      * @dev This function is called by the factory contract when deploying a new vault.
      */
 
     function initialize(
         bytes memory adapterInitData,
         address registry,
-        bytes memory ousdInitData
+        bytes memory alpacaV1InitData
     ) external initializer {
         __AdapterBase_init(adapterInitData);
-        address _wousd = abi.decode(ousdInitData, (address));
 
-        if (!IPermissionRegistry(registry).endorsed(_wousd))
-            revert NotEndorsed();
-        if (IERC4626(_wousd).asset() != asset()) revert InvalidAsset();
+        address _vault = abi.decode(alpacaV1InitData, (address));
 
-        wOusd = IERC4626(_wousd);
+        alpacaVault = IAlpacaLendV1Vault(_vault);
+
+        if (alpacaVault.token() != asset()) revert InvalidAsset();
 
         _name = string.concat(
-            "VaultCraft Ousd ",
+            "VaultCraft AlpacaLendV1 ",
             IERC20Metadata(asset()).name(),
             " Adapter"
         );
-        _symbol = string.concat("vcO-", IERC20Metadata(asset()).symbol());
+        _symbol = string.concat("vcAlV1-", IERC20Metadata(asset()).symbol());
 
-        IERC20(asset()).approve(address(wOusd), type(uint256).max);
+        IERC20(alpacaVault.token()).approve(
+            address(alpacaVault),
+            type(uint256).max
+        );
     }
 
     function name()
@@ -89,7 +91,9 @@ contract OusdAdapter is AdapterBase, WithRewards {
     /// @return The total amount of underlying tokens the Vault holds.
 
     function _totalAssets() internal view override returns (uint256) {
-        return wOusd.convertToAssets(wOusd.balanceOf(address(this)));
+        return
+            (alpacaVault.balanceOf(address(this)) * alpacaVault.totalToken()) /
+            alpacaVault.totalSupply();
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -97,11 +101,32 @@ contract OusdAdapter is AdapterBase, WithRewards {
     //////////////////////////////////////////////////////////////*/
 
     function _protocolDeposit(uint256 amount, uint256) internal override {
-        wOusd.deposit(amount, address(this));
+        alpacaVault.deposit(amount);
     }
 
-    function _protocolWithdraw(uint256 amount, uint256) internal override {
-        wOusd.withdraw(amount, address(this), address(this));
+    function _protocolWithdraw(
+        uint256 amount,
+        uint256 shares
+    ) internal override {
+        uint256 alpacaShares = convertToUnderlyingShares(0, shares);
+
+        alpacaVault.withdraw(alpacaShares);
+    }
+
+    /// @notice The amount of alapacaV1 shares to withdraw given an mount of adapter shares
+    function convertToUnderlyingShares(
+        uint256 assets,
+        uint256 shares
+    ) public view override returns (uint256) {
+        uint256 supply = totalSupply();
+        return
+            supply == 0
+                ? shares
+                : shares.mulDiv(
+                    alpacaVault.balanceOf(address(this)),
+                    supply,
+                    Math.Rounding.Up
+                );
     }
 
     /*//////////////////////////////////////////////////////////////
