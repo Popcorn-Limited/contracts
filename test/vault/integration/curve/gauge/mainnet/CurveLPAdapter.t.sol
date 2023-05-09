@@ -22,7 +22,7 @@ contract CurveLPAdapterTest is AbstractAdapterTest {
             IERC20(asset),
             address(new CurveLPAdapter()),
             0x46a8a9CF4Fc8e99EC3A14558ACABC1D93A27de68,
-            1e6,
+            1e12, // delta is large because the pool tkaes fees with every deposit/withdrawal
             "Curve",
             true
         );
@@ -36,9 +36,13 @@ contract CurveLPAdapterTest is AbstractAdapterTest {
         vm.label(address(adapter), "adapter");
         vm.label(address(this), "test");
         vm.label(address(asset), "USDC");
-    
-        maxShares = type(uint).max;
+        vm.label(bob, "bob");
     }
+
+    function increasePricePerShare(uint256 amount) public override {
+        IERC20 poolToken = CurveLPAdapter(address(adapter)).poolToken();
+        deal(address(poolToken), address(adapter), poolToken.balanceOf(address(adapter)) + amount * 1e9);
+      }
 
     function test_totalAssets() public {
         uint amount = 1_000e6;
