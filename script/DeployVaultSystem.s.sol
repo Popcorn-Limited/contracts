@@ -40,24 +40,24 @@ import {MockStrategy} from "../test/utils/mocks/MockStrategy.sol";
 
 contract DeployVaultSystem is Script {
     ITemplateRegistry templateRegistry =
-        ITemplateRegistry(0xA18735b352a926aD957F94Ff40764E63139ec0a6);
+        ITemplateRegistry(0x1Ea65ae3d7E60E374221cdE29844df81F447D68c);
     IPermissionRegistry permissionRegistry =
-        IPermissionRegistry(0x7a33b5b57C8b235A3519e6C010027c5cebB15CB4);
+        IPermissionRegistry(0xB67C4c9C3CebCeC2FD3fDE436340D728D990A8d9);
     ICloneRegistry cloneRegistry =
-        ICloneRegistry(0x795d90945e5B9b320410b31e6E544b647d0ea5AA);
+        ICloneRegistry(0x57c041e4504b05A7B3A3597134a1DA78e719fc73);
     IVaultRegistry vaultRegistry =
-        IVaultRegistry(0xdD0d135b5b52B7EDd90a83d4A4112C55a1A6D23A);
+        IVaultRegistry(0xB205e94D402742B919E851892f7d515592a7A6cC);
 
     ICloneFactory factory =
-        ICloneFactory(0x504f828886aB10D09ca1c116d6E1C5b8963cB109);
+        ICloneFactory(0x99fDFcC95a45ca4604E3c1eB86f2b5d9E217f460);
     IDeploymentController deploymentController =
         IDeploymentController(0xa8C5815f6Ea5F7A1551541B0d7F970D546126bDB);
     IAdminProxy adminProxy =
-        IAdminProxy(0x7D224F9Eaf3855CE3109b205e6fA853d25Bb457f);
+        IAdminProxy(0xcC09F5bd7582D02Bb31825d09589F4773B65eCc9);
 
     IMultiRewardStaking staking;
     IMultiRewardEscrow escrow =
-        IMultiRewardEscrow(0x823033d1014F0f4da2Bb5B2cE4bC73D6e7eAe7a8);
+        IMultiRewardEscrow(0x23DBbE898A8b69eA0681F8d8C74f4B17dAAe5FCd);
 
     VaultController controller =
         VaultController(0xa199409F99bDBD998Ae1ef4FdaA58b356370837d);
@@ -65,11 +65,12 @@ contract DeployVaultSystem is Script {
 
     IERC20 pop = IERC20(0x6F0fecBC276de8fC69257065fE47C5a03d986394);
 
-    address stakingImpl = 0x9C45FE2Bf8F76f0de45ea9f56c3aCF6613C87675;
-    address yearnImpl = 0xfc90a1B7e86E20607871A23b0ca560591A5Db30d;
-    address beefyImpl = 0xaa733e18a26C23fBfdAdF9b2bE846F67412d0467;
+    address stakingImpl = 0x0b64206eAdD25f27145D1B29A27e3a242d0922F9;
+    address yearnImpl = 0x1DB17afE14732A5267a0839D5f3dE0AF1426cb9E;
+    address beefyImpl = 0x69c5290Eeae87d10D0b8d8dC6291DD31292A6A41;
+    address compV2Impl = 0x55A768Bf8D5fcD42E82cb08C81D02A48FB84c6be;
     address strategyImpl;
-    address vaultImpl = 0xA04f549b1eAb2D6669Ba57DA3e528587082ef5b1;
+    address vaultImpl = 0x3602C76ab5ADA70d40A8e09BcfB91F2c195E20BE;
 
     address deployer;
     address feeRecipient = address(0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E);
@@ -149,20 +150,28 @@ contract DeployVaultSystem is Script {
         // );
         // addTemplate(
         //     "Adapter",
-        //     "YearnAdapter1",
+        //     "YearnAdapter",
         //     yearnImpl,
-        //     address(0x50c1a2eA0a861A967D9d0FFE2AE4012c2E053804),
+        //     address(0x3199437193625DCcD6F9C9e98BDf93582200Eb1f),
         //     true,
         //     true
         // );
         // addTemplate(
         //     "Adapter",
-        //     "BeefyAdapter3",
+        //     "BeefyAdapter",
         //     beefyImpl,
         //     address(permissionRegistry),
         //     true,
         //     true
         // );
+        addTemplate(
+            "Adapter",
+            "CompoundV2Adapter",
+            compV2Impl,
+            address(0x95Af143a021DF745bc78e845b54591C53a8B3A51),
+            true,
+            true
+        );
         // addTemplate("Vault", "V1", vaultImpl, address(0), true, true);
 
         // emit log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
@@ -229,7 +238,7 @@ contract DeployVaultSystem is Script {
         // router.redeemAndWithdraw(IERC4626(yearn), 10e15, deployer, deployer);
 
         // // beefyVault stEth/eth = 0xa7739fd3d12ac7F16D8329AF3Ee407e19De10D8D
-        // setPermission(0xa7739fd3d12ac7F16D8329AF3Ee407e19De10D8D, true, false);
+        // setPermission(0xD019FD6267F93ebE5A92DEBB760135a4F02a75F7, true, false);
         // // beefyBooster = 0xAe3F0C61F3Dc48767ccCeF3aD50b29437BE4b1a4
         // setPermission(0xAe3F0C61F3Dc48767ccCeF3aD50b29437BE4b1a4, true, false);
 
@@ -243,7 +252,7 @@ contract DeployVaultSystem is Script {
         // // deploy stEth/eth beefy vault
         // address beefy = controller.deployVault(
         //     VaultInitParams({
-        //         asset: IERC20(0x06325440D014e39736583c165C2963BA99fAf14E),
+        //         asset: IERC20(0xF753A50fc755c6622BBCAa0f59F0522f264F006e),
         //         adapter: IERC4626(address(0)),
         //         fees: VaultFees({
         //             deposit: 0,
@@ -258,8 +267,8 @@ contract DeployVaultSystem is Script {
         //     DeploymentArgs({
         //         id: "BeefyAdapter",
         //         data: abi.encode(
-        //             0xa7739fd3d12ac7F16D8329AF3Ee407e19De10D8D,
-        //             0xAe3F0C61F3Dc48767ccCeF3aD50b29437BE4b1a4
+        //             0xD019FD6267F93ebE5A92DEBB760135a4F02a75F7,
+        //             address(0)
         //         )
         //     }),
         //     DeploymentArgs({id: "", data: ""}),
@@ -274,7 +283,7 @@ contract DeployVaultSystem is Script {
         //         swapAddress: address(0),
         //         exchange: uint256(0)
         //     }),
-        //     10e18
+        //     0
         // );
 
         // emit log_named_address("BeefyVault: ", beefy);

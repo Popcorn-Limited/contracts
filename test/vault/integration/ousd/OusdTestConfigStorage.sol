@@ -13,7 +13,6 @@ contract OusdTestConfigStorage is ITestConfigStorage {
   OusdTestConfig[] internal testConfigs;
 
   constructor() {
-    // Mainnet - wETH
     testConfigs.push(OusdTestConfig(0xD2af830E8CBdFed6CC11Bab697bB25496ed6FA62));
   }
 

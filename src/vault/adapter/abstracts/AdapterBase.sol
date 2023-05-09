@@ -341,37 +341,31 @@ abstract contract AdapterBase is
                       FEE LOGIC
   //////////////////////////////////////////////////////////////*/
 
-    uint256 public performanceFee;
-    uint256 public highWaterMark;
+  uint256 public performanceFee;
+  uint256 public highWaterMark;
 
-    // TODO use deterministic fee recipient proxy
-    address public constant FEE_RECIPIENT =
-        address(0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E);
+  address public constant FEE_RECIPIENT = address(0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E);
 
-    event PerformanceFeeChanged(uint256 oldFee, uint256 newFee);
+  event PerformanceFeeChanged(uint256 oldFee, uint256 newFee);
 
-    error InvalidPerformanceFee(uint256 fee);
+  error InvalidPerformanceFee(uint256 fee);
 
-    /**
-     * @notice Performance fee that has accrued since last fee harvest.
-     * @return Accrued performance fee in underlying `asset` token.
-     * @dev Performance fee is based on a high water mark value. If vault share value has increased above the
-     *   HWM in a fee period, issue fee shares to the vault equal to the performance fee.
-     */
-    function accruedPerformanceFee() public view returns (uint256) {
-        uint256 highWaterMark_ = highWaterMark;
-        uint256 shareValue = convertToAssets(1e18);
-        uint256 performanceFee_ = performanceFee;
+  /**
+   * @notice Performance fee that has accrued since last fee harvest.
+   * @return Accrued performance fee in underlying `asset` token.
+   * @dev Performance fee is based on a high water mark value. If vault share value has increased above the
+   *   HWM in a fee period, issue fee shares to the vault equal to the performance fee.
+   */
+  function accruedPerformanceFee() public view returns (uint256) {
+    uint256 highWaterMark_ = highWaterMark;
+    uint256 shareValue = convertToAssets(1e18);
+    uint256 performanceFee_ = performanceFee;
 
-        return
-            performanceFee_ > 0 && shareValue > highWaterMark_
-                ? performanceFee_.mulDiv(
-                    (shareValue - highWaterMark_) * totalSupply(),
-                    1e36,
-                    Math.Rounding.Down
-                )
-                : 0;
-    }
+    return
+      performanceFee_ > 0 && shareValue > highWaterMark_
+        ? performanceFee_.mulDiv((shareValue - highWaterMark_) * totalSupply(), 1e36, Math.Rounding.Down)
+        : 0;
+  }
 
     /**
      * @notice Set a new performance fee for this adapter. Caller must be owner.

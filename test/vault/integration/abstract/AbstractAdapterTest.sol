@@ -27,9 +27,11 @@ contract AbstractAdapterTest is PropertyTest {
             "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
         );
 
+
     address bob = address(0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266);
     address alice = address(0x70997970C51812dc3A010C7d01b50e0d17dc79C8);
     address feeRecipient = address(0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E);
+
 
     uint256 defaultAmount;
     uint256 raise;
