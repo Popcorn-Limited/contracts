@@ -83,27 +83,6 @@ contract AlpacaLendV2AdapterTest is AbstractAdapterTest {
     }
 
     /*//////////////////////////////////////////////////////////////
-                    DEPOSIT/MINT/WITHDRAW/REDEEM
-    //////////////////////////////////////////////////////////////*/
-
-    function test__deposit(uint8 fuzzAmount) public virtual override {
-        uint256 amount = bound(uint256(fuzzAmount), minFuzz, maxAssets);
-        uint8 len = uint8(testConfigStorage.getTestConfigLength());
-        for (uint8 i; i < len; i++) {
-            if (i > 0) overrideSetup(testConfigStorage.getTestConfig(i));
-
-            _mintAssetAndApproveForAdapter(amount, bob);
-
-            prop_deposit(bob, bob, amount, testId);
-
-            increasePricePerShare(raise);
-
-            _mintAssetAndApproveForAdapter(amount, bob);
-            prop_deposit(bob, alice, amount, testId);
-        }
-    }
-
-    /*//////////////////////////////////////////////////////////////
                           INITIALIZATION
     //////////////////////////////////////////////////////////////*/
 
@@ -128,6 +107,51 @@ contract AlpacaLendV2AdapterTest is AbstractAdapterTest {
             asset.allowance(address(adapter), address(alpacaManager)),
             type(uint256).max,
             "allowance"
+        );
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                              HARVEST
+    //////////////////////////////////////////////////////////////*/
+
+    function test__harvest() public virtual override {
+        uint256 performanceFee = 1e16;
+        uint256 hwm = 1e9;
+
+        _mintAssetAndApproveForAdapter(defaultAmount, bob);
+
+        vm.prank(bob);
+        adapter.deposit(defaultAmount, bob);
+
+        uint256 oldTotalAssets = adapter.totalAssets();
+        adapter.setPerformanceFee(performanceFee);
+        increasePricePerShare(raise);
+
+        uint256 gain = ((adapter.convertToAssets(1e18) +
+            1 -
+            adapter.highWaterMark()) * adapter.totalSupply()) / 1e18;
+        uint256 fee = (gain * performanceFee) / 1e18;
+
+        uint256 expectedFee = adapter.convertToShares(fee);
+
+        vm.expectEmit(false, false, false, true, address(adapter));
+
+        emit Harvested();
+
+        adapter.harvest();
+
+        // Multiply with the decimal offset
+        assertApproxEqAbs(
+            adapter.totalSupply(),
+            defaultAmount * 1e9 + expectedFee,
+            _delta_,
+            "totalSupply"
+        );
+        assertApproxEqAbs(
+            adapter.balanceOf(feeRecipient),
+            expectedFee,
+            _delta_,
+            "expectedFee"
         );
     }
 }
