@@ -79,6 +79,10 @@ contract AlpacaLendV2Adapter is AdapterBase, WithRewards {
             address(alpacaManager),
             type(uint256).max
         );
+        IERC20(address(ibToken)).approve(
+            address(alpacaManager),
+            type(uint256).max
+        );
     }
 
     function name()
@@ -107,11 +111,27 @@ contract AlpacaLendV2Adapter is AdapterBase, WithRewards {
     /// @return The total amount of underlying tokens the Vault holds.
 
     function _totalAssets() internal view override returns (uint256) {
-        (uint256 _totalAmount, ) = miniFL.userInfo(pid, address(this));
-
-        uint256 assets = ibToken.convertToAssets(_totalAmount);
+        uint256 assets = ibToken.convertToAssets(
+            ibToken.balanceOf(address(this))
+        );
 
         return assets;
+    }
+
+    /// @notice The amount of beefy shares to withdraw given an amount of adapter shares
+    function convertToUnderlyingShares(
+        uint256 assets,
+        uint256 shares
+    ) public view override returns (uint256) {
+        uint256 supply = totalSupply();
+        return
+            supply == 0
+                ? shares
+                : shares.mulDiv(
+                    ibToken.balanceOf(address(this)),
+                    supply,
+                    Math.Rounding.Up
+                );
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -119,17 +139,16 @@ contract AlpacaLendV2Adapter is AdapterBase, WithRewards {
     //////////////////////////////////////////////////////////////*/
 
     function _protocolDeposit(uint256 amount, uint256) internal override {
-        alpacaManager.depositAndAddCollateral(0, address(asset()), amount);
+        alpacaManager.deposit(address(asset()), amount);
     }
 
-    function _protocolWithdraw(uint256 amount, uint256) internal override {
-        uint256 alpacaShares = ibToken.convertToShares(amount + 1);
+    function _protocolWithdraw(
+        uint256 amount,
+        uint256 shares
+    ) internal override {
+        uint256 alpacaShares = convertToUnderlyingShares(0, shares);
 
-        alpacaManager.removeCollateralAndWithdraw(
-            0,
-            address(ibToken),
-            alpacaShares
-        );
+        alpacaManager.withdraw(address(ibToken), alpacaShares);
     }
 
     /*//////////////////////////////////////////////////////////////
