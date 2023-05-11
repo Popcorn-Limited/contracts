@@ -17,8 +17,8 @@ contract CurveLpCompounderTest is Test {
     address cvx = address(0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B);
     address eth = address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE);
     address usdt = address(0xdAC17F958D2ee523a2206206994597C13D831ec7);
-    address asset = address(0xdf55670e27bE5cDE7228dD0A6849181891c9ebA1);
-    address pool = address(0x3211C6cBeF1429da3D0d58494938299C92Ad5860);
+    address asset = address(0x9de1c3D446237ab9BaFF74127eb4F303802a2683);
+    address pool = address(0x867fe27FC2462cff8890B54DfD64E6d42a9D1aC8);
     address router = address(0x99a58482BD75cbab83b27EC03CA68fF489b5788f);
 
     ConvexAdapter adapter;
@@ -35,11 +35,11 @@ contract CurveLpCompounderTest is Test {
     IConvexRewards convexRewards;
 
     function setUp() public {
-        uint256 forkId = vm.createSelectFork(vm.rpcUrl("mainnet"), 16946755);
+        uint256 forkId = vm.createSelectFork(vm.rpcUrl("mainnet"));
         vm.selectFork(forkId);
 
         (address _asset, , , address _convexRewards, , ) = convexBooster
-            .poolInfo(95);
+            .poolInfo(150);
 
         convexRewards = IConvexRewards(_convexRewards);
 
@@ -54,7 +54,7 @@ contract CurveLpCompounderTest is Test {
             address(0),
             address(0)
         ];
-        swapParams[0] = [uint256(0), 1, 3];
+        swapParams[0] = [uint256(1), 0, 3];
         swapParams[1] = [uint256(2), 0, 3];
         swapParams[2] = [uint256(2), 1, 1];
 
@@ -65,18 +65,18 @@ contract CurveLpCompounderTest is Test {
 
         toBaseAssetRoute = [
             cvx,
-            0xBEc570d92AFB7fFc553bdD9d4B4638121000b10D, // cvx / (frax,usdc)
+            0xB576491F1E6e5E62f1d8F26062Ee822B40B0E0d4, // cvx / eth
+            eth,
+            0xD51a44d3FaE010294C616388b506AcdA1bfAAE46, // tricrypto2
+            usdt,
+            0xbEbc44782C7dB0a1A60Cb6fe97d0b483032FF1C7, // 3crv
             usdc,
-            address(0),
-            address(0),
-            address(0),
-            address(0),
             address(0),
             address(0)
         ];
-        swapParams[0] = [uint256(0), 1, 3];
-        swapParams[1] = [uint256(0), 0, 0];
-        swapParams[2] = [uint256(0), 0, 0];
+        swapParams[0] = [uint256(1), 0, 3];
+        swapParams[1] = [uint256(2), 0, 3];
+        swapParams[2] = [uint256(2), 1, 1];
 
         curveRoutes.push(
             CurveRoute({route: toBaseAssetRoute, swapParams: swapParams})
@@ -85,16 +85,17 @@ contract CurveLpCompounderTest is Test {
 
         toBaseAssetRoute = [
             usdc,
+            0x3211C6cBeF1429da3D0d58494938299C92Ad5860, // stg / usdc
+            stg,
             pool,
             asset,
             address(0),
             address(0),
             address(0),
-            address(0),
-            address(0),
             address(0)
         ];
-        swapParams[0] = [uint256(1), 0, 7];
+        swapParams[0] = [uint256(1), 0, 3];
+        swapParams[1] = [uint256(0), 0, 7];
 
         bytes memory stratData = abi.encode(
             usdc,
@@ -118,25 +119,9 @@ contract CurveLpCompounderTest is Test {
                 stratData
             ),
             address(convexBooster),
-            abi.encode(uint256(95))
+            abi.encode(uint256(150))
         );
     }
-
-    function test__convex() public {
-        deal(asset, address(this), 10000e18);
-        IERC20(asset).approve(address(convexBooster), type(uint256).max);
-        convexBooster.deposit(95, 10000e18, true);
-
-        emit log_uint(convexRewards.balanceOf(address(this)));
-
-        vm.warp(block.timestamp + 14 days);
-
-        convexRewards.getReward(address(this), true);
-        emit log_uint(IERC20(crv).balanceOf(address(this)));
-        emit log_uint(IERC20(cvx).balanceOf(address(this)));
-    }
-
-    function test__nothing() public {}
 
     function test__init() public {
         assertEq(
