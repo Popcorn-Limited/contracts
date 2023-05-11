@@ -119,15 +119,12 @@ contract CurveCompounder is StrategyBase {
         );
     }
 
-    event log_address(address);
-
     function _approveRewards(address router) internal {
         // Approve all rewardsToken for trading
         address[] memory rewardTokens = IWithRewards(address(this))
             .rewardTokens();
         uint256 len = rewardTokens.length;
         for (uint256 i = 0; i < len; i++) {
-            emit log_address(rewardTokens[i]);
             IERC20(rewardTokens[i]).approve(router, type(uint256).max);
         }
     }
@@ -145,8 +142,6 @@ contract CurveCompounder is StrategyBase {
     /*//////////////////////////////////////////////////////////////
                           HARVEST LOGIC
     //////////////////////////////////////////////////////////////*/
-
-    event log_uint(uint256);
 
     // Harvest rewards.
     function harvest() public override {
@@ -167,9 +162,6 @@ contract CurveCompounder is StrategyBase {
         uint256 balBefore = IERC20(asset).balanceOf(address(this));
 
         IWithRewards(address(this)).claim();
-
-        emit log_uint(IERC20(0xD533a949740bb3306d119CC777fa900bA034cd52).balanceOf(address(this)));
-        emit log_uint(IERC20(0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B).balanceOf(address(this)));
 
         _swapToBaseAsset(router, toBaseAssetRoutes, minTradeAmounts);
 

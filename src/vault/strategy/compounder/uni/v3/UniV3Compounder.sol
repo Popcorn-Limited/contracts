@@ -16,6 +16,10 @@ contract UniV3Compounder is StrategyBase {
     // Errors
     error InvalidConfig();
 
+    /*//////////////////////////////////////////////////////////////
+                          VERIFICATION
+    //////////////////////////////////////////////////////////////*/
+
     function verifyAdapterCompatibility(bytes memory data) public override {
         (
             address baseAsset,
@@ -59,6 +63,27 @@ contract UniV3Compounder is StrategyBase {
         }
     }
 
+    function _verifyAsset(
+        address baseAsset,
+        address asset,
+        bytes memory toAssetPath,
+        bytes memory
+    ) internal virtual {
+        if (baseAsset != asset) {
+            // Verify base asset to asset path
+            address[] memory toAssetRoute = UniswapV3Utils.pathToRoute(
+                toAssetPath
+            );
+            if (toAssetRoute[0] != baseAsset) revert InvalidConfig();
+            if (toAssetRoute[toAssetRoute.length - 1] != asset)
+                revert InvalidConfig();
+        }
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                                SETUP
+    //////////////////////////////////////////////////////////////*/
+
     function setUp(bytes memory data) public override {
         (
             address baseAsset,
@@ -90,6 +115,16 @@ contract UniV3Compounder is StrategyBase {
         for (uint256 i = 0; i < len; i++) {
             IERC20(rewardTokens[i]).approve(router, type(uint256).max);
         }
+    }
+
+    function _setUpAsset(
+        address baseAsset,
+        address asset,
+        address router,
+        bytes memory
+    ) internal virtual {
+        if (asset != baseAsset)
+            IERC20(baseAsset).approve(router, type(uint256).max);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -145,33 +180,6 @@ contract UniV3Compounder is StrategyBase {
             if (rewardBal >= minTradeAmounts[i])
                 UniswapV3Utils.swap(router, toBaseAssetPaths[i], rewardBal);
         }
-    }
-
-    function _verifyAsset(
-        address baseAsset,
-        address asset,
-        bytes memory toAssetPath,
-        bytes memory
-    ) internal virtual {
-        if (baseAsset != asset) {
-            // Verify base asset to asset path
-            address[] memory toAssetRoute = UniswapV3Utils.pathToRoute(
-                toAssetPath
-            );
-            if (toAssetRoute[0] != baseAsset) revert InvalidConfig();
-            if (toAssetRoute[toAssetRoute.length - 1] != asset)
-                revert InvalidConfig();
-        }
-    }
-
-    function _setUpAsset(
-        address baseAsset,
-        address asset,
-        address router,
-        bytes memory
-    ) internal virtual {
-        if (asset != baseAsset)
-            IERC20(baseAsset).approve(router, type(uint256).max);
     }
 
     function _getAsset(
