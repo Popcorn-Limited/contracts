@@ -4,10 +4,10 @@
 pragma solidity ^0.8.15;
 
 import {ERC4626Upgradeable as ERC4626, ERC20Upgradeable as ERC20, IERC20Upgradeable as IERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
-import {IAdapter} from "../../../interfaces/vault/IAdapter.sol";
-import {IWithRewards} from "../../../interfaces/vault/IWithRewards.sol";
-import {StrategyBase} from "../StrategyBase.sol";
-import {UniswapV3Utils} from "../../../utils/UniswapV3Utils.sol";
+import {IAdapter} from "../../../../../interfaces/vault/IAdapter.sol";
+import {IWithRewards} from "../../../../../interfaces/vault/IWithRewards.sol";
+import {StrategyBase} from "../../../StrategyBase.sol";
+import {UniswapV3Utils} from "../../../../../utils/UniswapV3Utils.sol";
 
 contract UniV3Compounder is StrategyBase {
     // Events

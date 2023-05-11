@@ -3,24 +3,30 @@
 
 pragma solidity ^0.8.15;
 
-import {UniV3Compounder, UniswapV3Utils, IERC20, IAdapter} from "./UniV3Compounder.sol";
-import {ISToken, IStargateRouter} from "../../adapter/stargate/IStargate.sol";
+import {ERC4626Upgradeable as ERC4626, ERC20Upgradeable as ERC20, IERC20Upgradeable as IERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
+import {CurveCompounder, IAdapter, IWithRewards, ICurveRouter, CurveRoute} from "./CurveCompounder.sol";
+import {ISToken, IStargateRouter} from "../../../adapter/stargate/IStargate.sol";
 
-contract UniV3StargateCompounder is UniV3Compounder {
+contract CurveStargateCompounder is CurveCompounder {
     function _verifyAsset(
         address baseAsset,
         address asset,
-        bytes memory toAssetPath,
+        CurveRoute memory toAssetRoute,
         bytes memory
     ) internal override {
         address token = ISToken(asset).token();
+
+        // Verify base asset to asset path
         if (baseAsset != token) {
-            address[] memory toAssetRoute = UniswapV3Utils.pathToRoute(
-                toAssetPath
-            );
-            if (toAssetRoute[0] != baseAsset) revert InvalidConfig();
-            if (toAssetRoute[toAssetRoute.length - 1] != token)
-                revert InvalidConfig();
+            if (toAssetRoute.route[0] != baseAsset) revert InvalidConfig();
+
+            // Loop through the route until there are no more token or the array is over
+            uint8 i = 1;
+            while (i < 9) {
+                if (i == 8 || toAssetRoute.route[i + 1] == address(0)) break;
+                i++;
+            }
+            if (toAssetRoute.route[i] != token) revert InvalidConfig();
         }
     }
 
@@ -32,7 +38,7 @@ contract UniV3StargateCompounder is UniV3Compounder {
     ) internal override {
         address token = ISToken(asset).token();
 
-        if (baseAsset != token)
+        if (asset != token)
             IERC20(baseAsset).approve(router, type(uint256).max);
 
         address stargateRouter = abi.decode(optionalData, (address));
@@ -43,7 +49,7 @@ contract UniV3StargateCompounder is UniV3Compounder {
         address baseAsset,
         address asset,
         address router,
-        bytes memory toAssetPath,
+        CurveRoute memory toAssetRoute,
         bytes memory optionalData
     ) internal override {
         ISToken sToken = ISToken(asset);
@@ -51,10 +57,11 @@ contract UniV3StargateCompounder is UniV3Compounder {
 
         // Trade base asset for asset
         if (baseAsset != token)
-            UniswapV3Utils.swap(
-                router,
-                toAssetPath,
-                IERC20(baseAsset).balanceOf(address(this))
+            ICurveRouter(router).exchange_multiple(
+                toAssetRoute.route,
+                toAssetRoute.swapParams,
+                IERC20(baseAsset).balanceOf(address(this)),
+                0
             );
 
         address stargateRouter = abi.decode(optionalData, (address));
