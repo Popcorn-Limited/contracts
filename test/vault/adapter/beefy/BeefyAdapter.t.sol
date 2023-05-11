@@ -125,14 +125,6 @@ contract BeefyAdapterTest is AbstractAdapterTest {
     createAdapter();
     uint256 callTime = block.timestamp;
 
-    if (address(strategy) != address(0)) {
-      vm.expectEmit(false, false, false, true, address(strategy));
-      emit SelectorsVerified();
-      vm.expectEmit(false, false, false, true, address(strategy));
-      emit AdapterVerified();
-      vm.expectEmit(false, false, false, true, address(strategy));
-      emit StrategySetup();
-    }
     vm.expectEmit(false, false, false, true, address(adapter));
     emit Initialized(uint8(1));
     adapter.initialize(

@@ -14,7 +14,7 @@ contract ConvexTestConfigStorage is ITestConfigStorage {
 
   constructor() {
     // Mainnet - wETH
-    testConfigs.push(ConvexTestConfig(61));
+    testConfigs.push(ConvexTestConfig(150));
   }
 
   function getTestConfig(uint256 i) public view returns (bytes memory) {

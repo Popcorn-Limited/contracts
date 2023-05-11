@@ -3,7 +3,7 @@ pragma solidity ^0.8.15;
 
 import { Test } from "forge-std/Test.sol";
 
-import { MasterChefV1Adapter, SafeERC20, IERC20, IERC20Metadata, Math, IMasterChefV1, IStrategy, IAdapter, IWithRewards } from "../../../../../../src/vault/adapter/sushi/masterChefV1/MasterChefV1Adapter.sol";
+import { MasterChefV1Adapter, SafeERC20, IERC20, IERC20Metadata, Math, IMasterChefV1, IStrategy, IAdapter, IWithRewards } from "../../../../../src/vault/adapter/sushi/masterChefV1/MasterChefV1Adapter.sol";
 import { MasterChefV1TestConfigStorage, MasterChefV1TestConfig } from "./MasterChefV1TestConfigStorage.sol";
 import { AbstractAdapterTest, ITestConfigStorage } from "../../abstract/AbstractAdapterTest.sol";
 import { MockStrategyClaimer } from "../../../../utils/mocks/MockStrategyClaimer.sol";

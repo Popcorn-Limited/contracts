@@ -8,7 +8,12 @@
     "demodata:vault": "forge script ./script/VaultDemoData.s.sol --rpc-url http://localhost:8545 --broadcast",
     "deploy:vaultSystem": "forge script ./script/DeployVaultSystem.s.sol --rpc-url https://eth-mainnet.g.alchemy.com/v2/KsuP431uPWKR3KFb-K_0MT1jcwpUnjAg --broadcast",
     "deploy:feeRecipient": "forge script ./script/DeployFeeRecipientProxy.s.sol --rpc-url https://eth-mainnet.g.alchemy.com/v2/KsuP431uPWKR3KFb-K_0MT1jcwpUnjAg --broadcast",
-    "deploy": "./script/deploy.sh"
+    "deploy": "./script/deploy.sh",
+    "vault:ragequit": "forge script ./script/SetRageQuit.s.sol --rpc-url https://eth-mainnet.g.alchemy.com/v2/KsuP431uPWKR3KFb-K_0MT1jcwpUnjAg --broadcast",
+    "vault:proposeAdapter": "forge script ./script/ProposeAdapter.s.sol --rpc-url https://eth-mainnet.g.alchemy.com/v2/KsuP431uPWKR3KFb-K_0MT1jcwpUnjAg --broadcast",
+    "vault:swapAdapter": "forge script ./script/SwapAdapter.s.sol --rpc-url https://eth-mainnet.g.alchemy.com/v2/KsuP431uPWKR3KFb-K_0MT1jcwpUnjAg --broadcast",
+    "vault:deploy": "forge script ./script/DeployVault.s.sol --rpc-url https://eth-mainnet.g.alchemy.com/v2/KsuP431uPWKR3KFb-K_0MT1jcwpUnjAg --broadcast",
+    "vault:addTemplate": "forge script ./script/AddTemplate.s.sol --rpc-url https://eth-mainnet.g.alchemy.com/v2/KsuP431uPWKR3KFb-K_0MT1jcwpUnjAg --broadcast"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^4.8.3",

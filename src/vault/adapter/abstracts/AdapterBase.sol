@@ -310,7 +310,6 @@ abstract contract AdapterBase is
     function _verifyAndSetupStrategy(bytes4[8] memory requiredSigs) internal {
         strategy.verifyAdapterSelectorCompatibility(requiredSigs);
         strategy.verifyAdapterCompatibility(strategyConfig);
-        // strategy.setUp(strategyConfig);
         (bool success, ) = address(strategy).delegatecall(
             abi.encodeWithSignature("setUp(bytes)", strategyConfig)
         );
@@ -347,7 +346,6 @@ abstract contract AdapterBase is
     uint256 public performanceFee;
     uint256 public highWaterMark;
 
-    // TODO use deterministic fee recipient proxy
     address public constant FEE_RECIPIENT =
         address(0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E);
 
