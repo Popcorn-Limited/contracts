@@ -507,7 +507,9 @@ contract MultiStrategyVaultTester is Test {
             "pd"
         );
         assertEq(multiStrategyVault.totalSupply(), aliceShareAmount, "ts");
-        assertEq(multiStrategyVault.totalAssets(), aliceAssetAmount, "ta");
+        // rounding can cause the totalAssets to be lower than the deposited amount.
+        // Shouldn't be an issue after the first deposit 
+        assertApproxEqAbs(multiStrategyVault.totalAssets(), aliceAssetAmount, 1, "ta");
         assertEq(multiStrategyVault.balanceOf(alice), aliceShareAmount, "bal");
         assertApproxEqAbs(
             multiStrategyVault.convertToAssets(

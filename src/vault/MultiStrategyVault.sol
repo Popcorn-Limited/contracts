@@ -230,17 +230,17 @@ contract MultiStrategyVault is
 
         IERC20(asset()).safeTransferFrom(caller, address(this), assets);
 
-        uint remainingAssets = assets;
+        uint remainingAssets = shares;
         for (uint8 i; i < adapterCount; i++) {
-            uint allocated = assets.mulDiv(
+            uint allocated = (shares / 10**decimalOffset).mulDiv(
                 adapters[i].allocation,
                 1e18,
                 Math.Rounding.Down
-            );
+            ) * 10**decimalOffset;
             if (allocated > remainingAssets || i == adapterCount - 1) {
                 allocated = remainingAssets;
             }
-            adapters[i].adapter.deposit(allocated, address(this));
+            adapters[i].adapter.mint(allocated, address(this));
             remainingAssets -= allocated;
         }
 
@@ -315,6 +315,7 @@ contract MultiStrategyVault is
             1e18,
             Math.Rounding.Down
         );
+        console.log("fee shares: ", feeShares);
 
         assets = _convertToAssets(shares - feeShares, Math.Rounding.Down);
         console.log("assets you get from redeem: ", assets);
