@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.15;
 
-import { CurveLPAdapter, IERC20, Math } from "../../../../../../src/vault/adapter/curve/CurveLPAdapter.sol";
+import { CurveLPAdapter, IERC20, Math } from "../../../../src/vault/adapter/curve/CurveLPAdapter.sol";
 import { CurveLPTestConfigStorage, CurveLPTestConfig } from "./CurveLPTestConfigStorage.sol";
-import { AbstractAdapterTest, ITestConfigStorage, IAdapter } from "../../../abstract/AbstractAdapterTest.sol";
+import { AbstractAdapterTest, ITestConfigStorage, IAdapter } from "../abstract/AbstractAdapterTest.sol";
 
 contract CurveLPAdapterTest is AbstractAdapterTest {
     using Math for uint;    

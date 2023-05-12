@@ -4,7 +4,7 @@
 pragma solidity ^0.8.15;
 
 import {AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20, Math, IAdapter} from "../abstracts/AdapterBase.sol";
-import {IPool, IMetaRegistry } from "./ICurve.sol";
+import {IPool, IMetaRegistry} from "./ICurve.sol";
 
 contract CurveLPAdapter is AdapterBase {
     using SafeERC20 for IERC20;
@@ -16,12 +16,18 @@ contract CurveLPAdapter is AdapterBase {
     /// @notice The Curve Pool contract
     IPool public pool;
     IERC20 public poolToken;
-    
+
     // these two are private because they are not necessary to interact with the vault.
     // the number of coins in the pool
     uint private numberOfTokens;
     // the index of the coin which we deposit/withdraw
     int128 private tokenIndex;
+
+    /*//////////////////////////////////////////////////////////////
+                            INITIALIZATION
+    //////////////////////////////////////////////////////////////*/
+
+    error AssetMismatch();
 
     function initialize(
         bytes memory adapterInitData,
@@ -29,40 +35,96 @@ contract CurveLPAdapter is AdapterBase {
         bytes memory curveInitData
     ) external initializer {
         __AdapterBase_init(adapterInitData);
-        
-        (uint poolId) = abi.decode(curveInitData, (uint));
+
         IMetaRegistry registry = IMetaRegistry(_registry);
+
+        uint poolId = abi.decode(curveInitData, (uint));
         // save to memory since we'll read this value multiple times
         address _pool = registry.pool_list(poolId);
+
         pool = IPool(_pool);
         poolToken = IERC20(registry.get_lp_token(_pool));
         numberOfTokens = registry.get_n_coins(_pool);
 
         address[8] memory coins = registry.get_coins(_pool);
+
         // cache to save gas
         address _asset = asset();
-        for (uint i; i < coins.length; ){
-            if (coins[i] == _asset){
+        for (uint i; i < coins.length; ) {
+            if (coins[i] == _asset) {
                 tokenIndex = int128(int(i));
                 break;
             }
-            unchecked {++i;}
+            unchecked {
+                ++i;
+            }
         }
 
         // `coins()` uses uint256 instead of int128 like the other function for the token index
-        require(pool.coins(uint(uint128(tokenIndex))) == asset(), "asset doesn't match pool token at given index");
+        if (pool.coins(uint(uint128(tokenIndex))) != asset())
+            revert AssetMismatch();
 
-        // TODO: name it properly
         _name = string.concat(
-            "VaultCraft Curve LP"
+            "VaultCraft Curve Lp ",
+            IERC20Metadata(_asset).name(),
+            " Adapter"
         );
-        _symbol = "vcCrvLP";
+        _symbol = string.concat("vcCrvLp-", IERC20Metadata(_asset).symbol());
 
         IERC20(asset()).approve(_pool, type(uint).max);
     }
 
-    function _protocolDeposit(uint amount, uint) internal override {
+    function name()
+        public
+        view
+        override(IERC20Metadata, ERC20)
+        returns (string memory)
+    {
+        return _name;
+    }
 
+    function symbol()
+        public
+        view
+        override(IERC20Metadata, ERC20)
+        returns (string memory)
+    {
+        return _symbol;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            ACCOUNTING LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    function _totalAssets() internal view override returns (uint) {
+        uint lpBalance = poolToken.balanceOf(address(this));
+        // `calc_withdraw_one_coin()` reverts if called with `0` for the token amount
+        return
+            lpBalance == 0
+                ? 0
+                : pool.calc_withdraw_one_coin(lpBalance, tokenIndex);
+    }
+
+    function convertToUnderlyingShares(
+        uint,
+        uint shares
+    ) public view override returns (uint) {
+        uint supply = totalSupply();
+        return
+            supply == 0
+                ? shares
+                : shares.mulDiv(
+                    poolToken.balanceOf(address(this)),
+                    supply,
+                    Math.Rounding.Down
+                );
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                          INTERNAL HOOKS LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    function _protocolDeposit(uint amount, uint) internal override {
         // Curve's `add_liquidity` expects a fixed-size array as the first argument.
         // The size of the array depends on the pool.
         // For example, 3CRV has a size of 3 while stETH/ETH has 2.
@@ -86,7 +148,7 @@ contract CurveLPAdapter is AdapterBase {
         //
         // Instead, we proceed with the "dumb" solution: a simple switch statement
         // We can't do `uint[numberOfTokens]` either. Has to be a constant/literal value
-        
+
         // cache for gas savings
         uint _numberOfTokens = numberOfTokens;
 
@@ -125,20 +187,5 @@ contract CurveLPAdapter is AdapterBase {
     function _protocolWithdraw(uint, uint shares) internal override {
         uint underlyingShares = convertToUnderlyingShares(0, shares);
         pool.remove_liquidity_one_coin(underlyingShares, tokenIndex, 0);
-    }
-
-    function _totalAssets() internal view override returns (uint) {
-        uint lpBalance = poolToken.balanceOf(address(this));
-        // `calc_withdraw_one_coin()` reverts if called with `0` for the token amount
-        return lpBalance == 0 ? 0 : pool.calc_withdraw_one_coin(lpBalance, tokenIndex);
-    }
-    
-
-    function convertToUnderlyingShares(
-        uint,
-        uint shares
-    ) public view override returns (uint) {
-        uint supply = totalSupply();
-        return supply == 0 ? shares : shares.mulDiv(poolToken.balanceOf(address(this)), supply, Math.Rounding.Down);
     }
 }
