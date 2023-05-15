@@ -73,9 +73,9 @@ contract YearnFactoryAdapterTest is AbstractAdapterTest {
 
     function increasePricePerShare(uint256 amount) public override {
         deal(
-            address(asset),
             address(yearnVault),
-            asset.balanceOf(address(yearnVault)) + amount
+            address(adapter),
+            IERC20(address(yearnVault)).balanceOf(address(adapter)) + amount
         );
     }
 
