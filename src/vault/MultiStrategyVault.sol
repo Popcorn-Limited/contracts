@@ -10,7 +10,6 @@ import {PausableUpgradeable} from "openzeppelin-contracts-upgradeable/security/P
 import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
 import {OwnedUpgradeable} from "../utils/OwnedUpgradeable.sol";
 import {VaultFees, IERC4626, IERC20} from "../interfaces/vault/IVault.sol";
-import "forge-std/console.sol";
 
 struct AdapterConfig {
     IERC4626 adapter;
@@ -230,18 +229,19 @@ contract MultiStrategyVault is
 
         IERC20(asset()).safeTransferFrom(caller, address(this), assets);
 
-        uint remainingAssets = shares;
+        uint remainingShares = shares;
+        uint offset = 10**decimalOffset;
         for (uint8 i; i < adapterCount; i++) {
-            uint allocated = (shares / 10**decimalOffset).mulDiv(
+            uint allocated = (shares / offset).mulDiv(
                 adapters[i].allocation,
                 1e18,
                 Math.Rounding.Down
-            ) * 10**decimalOffset;
-            if (allocated > remainingAssets || i == adapterCount - 1) {
-                allocated = remainingAssets;
+            ) * offset;
+            if (allocated > remainingShares || i == adapterCount - 1) {
+                allocated = remainingShares;
             }
             adapters[i].adapter.mint(allocated, address(this));
-            remainingAssets -= allocated;
+            remainingShares -= allocated;
         }
 
         _mint(receiver, shares);
@@ -315,10 +315,8 @@ contract MultiStrategyVault is
             1e18,
             Math.Rounding.Down
         );
-        console.log("fee shares: ", feeShares);
 
         assets = _convertToAssets(shares - feeShares, Math.Rounding.Down);
-        console.log("assets you get from redeem: ", assets);
         if (feeShares > 0) _mint(feeRecipient, feeShares);
 
         _burn(owner, shares);
@@ -339,8 +337,8 @@ contract MultiStrategyVault is
             _spendAllowance(owner, caller, shares);
         }
 
-        uint remainingAssets = shares;
-        uint received;
+        uint remainingShares = shares;
+        uint offset = 10**decimalOffset;
         for (uint8 i; i < adapterCount; i++) {
             // for small amounts, the decimal difference between `assets`
             // and `shares` causes them to round to different values.
@@ -353,22 +351,19 @@ contract MultiStrategyVault is
             // That's more than the shares the vault holds for the given adapter.
             // Because of that we have to calculate the allocation stuff with the "normal" decimals
 
-            uint allocated = (shares / 10**decimalOffset).mulDiv(
+            uint allocated = (shares / offset).mulDiv(
                 adapters[i].allocation,
                 1e18,
                 Math.Rounding.Down
-            ) * 10**decimalOffset;
-            if (remainingAssets < allocated || i == adapterCount - 1) {
-                allocated = remainingAssets;
+            ) * offset;
+            if (remainingShares < allocated || i == adapterCount - 1) {
+                allocated = remainingShares;
             }
-            console.log("adapter redeem: ", allocated);
-            received += adapters[i].adapter.redeem(allocated, address(this), address(this));
-            remainingAssets -= allocated;
+            adapters[i].adapter.redeem(allocated, address(this), address(this));
+            remainingShares -= allocated;
         }
-        console.log("received assets: ", received);
-        console.log("expected assets: ", assets);
 
-        IERC20(asset()).safeTransfer(receiver, received);
+        IERC20(asset()).safeTransfer(receiver, assets);
 
         emit Withdraw(caller, receiver, owner, assets, shares);
     }
@@ -460,19 +455,7 @@ contract MultiStrategyVault is
             Math.Rounding.Down
         );
 
-        uint remainingAssets = shares;
-        for (uint8 i; i < adapterCount; i++) {
-            uint allocated = shares.mulDiv(
-                adapters[i].allocation,
-                1e18,
-                Math.Rounding.Down
-            );
-            if (remainingAssets < allocated || i == adapterCount - 1) {
-                allocated = remainingAssets;
-            }
-            assets += adapters[i].adapter.previewRedeem(allocated);
-            remainingAssets -= allocated;
-        }
+        assets = _convertToAssets(shares, Math.Rounding.Down);
     }
 
     function _convertToShares(
@@ -553,56 +536,16 @@ contract MultiStrategyVault is
         return maxMint_;
     }
 
-    /// @return Maximum amount of underlying `asset` token that can be withdrawn by `caller` address. Delegates to adapters.
+    /// @return Maximum amount of underlying `asset` token that can be withdrawn by `caller` address.
     function maxWithdraw(address user) public view override returns (uint256) {
-        uint256 maxWithdraw_ = type(uint256).max;
-        uint256 leftover = _leftOver[user];
-
-        for (uint8 i = 0; i < adapterCount; i++) {
-            uint256 adapterMax = adapters[i].adapter.maxWithdraw(address(this));
-            uint256 scalar = 1e18 / uint256(adapters[i].allocation);
-
-            if (adapterMax > type(uint256).max / scalar) {
-                adapterMax = type(uint256).max;
-            } else {
-                adapterMax *= scalar;
-            }
-
-            if (maxWithdraw_ == type(uint256).max) {
-                maxWithdraw_ = adapterMax + leftover;
-            } else if (adapterMax + leftover < type(uint256).max) {
-                maxWithdraw_ = Math.max(maxWithdraw_, adapterMax + leftover);
-            }
-        }
-
-        return maxWithdraw_;
+        // adapters have no withdrawal limit. Neither does the vault.
+        // User can withdraw their whole balance at any time.
+        return _convertToAssets(balanceOf(user), Math.Rounding.Down);
     }
 
-    /// @return Maximum amount of shares that may be redeemed by `caller` address. Delegates to adapters.
+    /// @return Maximum amount of shares that may be redeemed by `user` address.
     function maxRedeem(address user) public view override returns (uint256) {
-        uint256 maxRedeem_ = type(uint256).max;
-        // uint256 leftover = _leftOver[user] > 0
-        //     ? _convertToShares(_leftOver[user], Math.Rounding.Down)
-        //     : 0;
-
-        // for (uint8 i; i < adapterCount; i++) {
-        //     uint256 adapterMax = adapters[i].adapter.maxRedeem(address(this));
-        //     uint256 scalar = 1e18 / uint256(adapters[i].allocation);
-
-        //     if (adapterMax > type(uint256).max / scalar) {
-        //         adapterMax = type(uint256).max;
-        //     } else {
-        //         adapterMax *= scalar;
-        //     }
-
-        //     if (maxRedeem_ == type(uint256).max) {
-        //         maxRedeem_ = adapterMax + leftover;
-        //     } else if (adapterMax + leftover < type(uint256).max) {
-        //         maxRedeem_ = Math.max(maxRedeem_, adapterMax + leftover);
-        //     }
-        // }
-
-        return maxRedeem_;
+        return balanceOf(user);
     }
 
     /*//////////////////////////////////////////////////////////////
