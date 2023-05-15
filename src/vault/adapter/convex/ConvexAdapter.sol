@@ -51,8 +51,6 @@ contract ConvexAdapter is AdapterBase, WithRewards {
         address registry,
         bytes memory convexInitData
     ) external initializer {
-        __AdapterBase_init(adapterInitData);
-
         uint256 _pid = abi.decode(convexInitData, (uint256));
 
         convexBooster = IConvexBooster(registry);
@@ -61,9 +59,11 @@ contract ConvexAdapter is AdapterBase, WithRewards {
         (address _asset, , , address _convexRewards, , ) = convexBooster
             .poolInfo(pid);
 
-        if (_asset != asset()) revert AssetMismatch();
-
         convexRewards = IConvexRewards(_convexRewards);
+
+        __AdapterBase_init(adapterInitData);
+
+        if (_asset != asset()) revert AssetMismatch();
 
         _name = string.concat(
             "VaultCraft Convex ",
@@ -112,8 +112,9 @@ contract ConvexAdapter is AdapterBase, WithRewards {
     {
         uint256 len = convexRewards.extraRewardsLength();
 
-        tokens = new address[](len + 1);
+        tokens = new address[](len + 2);
         tokens[0] = 0xD533a949740bb3306d119CC777fa900bA034cd52; // CRV
+        tokens[1] = 0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B; // CVX
 
         for (uint256 i; i < len; i++) {
             tokens[i + 1] = convexRewards.extraRewards(i).rewardToken();

@@ -44,8 +44,8 @@ contract EllipsisAdapter is AdapterBase, WithRewards {
         if (!IPermissionRegistry(registry).endorsed(_addressProvider)) revert NotEndorsed(_addressProvider);
         if (!IPermissionRegistry(registry).endorsed(_ellipsisLPStaking)) revert NotEndorsed(_ellipsisLPStaking);
 
-        _name = string.concat("Popcorn Ellipsis", IERC20Metadata(asset()).name(), " Adapter");
-        _symbol = string.concat("popE-", IERC20Metadata(asset()).symbol());
+        _name = string.concat("VaultCraft Ellipsis", IERC20Metadata(asset()).name(), " Adapter");
+        _symbol = string.concat("vcE-", IERC20Metadata(asset()).symbol());
 
         ellipsisPool = _ellipsisPool;
         addressProvider = _addressProvider;

@@ -50,7 +50,7 @@ contract BalancerGaugeAdapter is AdapterBase, WithRewards {
         IERC20(asset()).approve(_gauge, type(uint256).max);
 
         _name = string.concat(
-            "Vaultcraft Balancer ",
+            "VaultCraft Balancer ",
             IERC20Metadata(asset()).name(),
             " Adapter"
         );
