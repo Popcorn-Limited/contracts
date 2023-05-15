@@ -7,11 +7,14 @@ import {AlpacaLendV1Adapter, SafeERC20, IERC20, IERC20Metadata, Math, IAlpacaLen
 import {AlpacaLendV1TestConfigStorage, AlpacaLendV1TestConfig} from "./AlpacaLendV1TestConfigStorage.sol";
 import {AbstractAdapterTest, ITestConfigStorage} from "../../abstract/AbstractAdapterTest.sol";
 import {MockStrategyClaimer} from "../../../../utils/mocks/MockStrategyClaimer.sol";
+import {IPermissionRegistry, Permission} from "../../../../../src/interfaces/vault/IPermissionRegistry.sol";
+import {PermissionRegistry} from "../../../../../src/vault/PermissionRegistry.sol";
 
 contract AlpacaLendV1AdapterTest is AbstractAdapterTest {
     using Math for uint256;
 
     IAlpacaLendV1Vault public alpacaVault;
+    IPermissionRegistry permissionRegistry;
 
     function setUp() public {
         uint256 forkId = vm.createSelectFork(vm.rpcUrl("binance"));
@@ -33,10 +36,15 @@ contract AlpacaLendV1AdapterTest is AbstractAdapterTest {
 
         alpacaVault = IAlpacaLendV1Vault(_alpacaVault);
 
+        permissionRegistry = IPermissionRegistry(
+            address(new PermissionRegistry(address(this)))
+        );
+        setPermission(_alpacaVault, true, false);
+
         setUpBaseTest(
             IERC20(alpacaVault.token()),
             address(new AlpacaLendV1Adapter()),
-            address(alpacaVault),
+            address(permissionRegistry),
             10,
             "AlpacaLendV1",
             true
@@ -70,6 +78,18 @@ contract AlpacaLendV1AdapterTest is AbstractAdapterTest {
             adapter.convertToAssets(adapter.totalSupply()),
             string.concat("totalSupply converted != totalAssets", baseTestId)
         );
+    }
+
+    function setPermission(
+        address target,
+        bool endorsed,
+        bool rejected
+    ) public {
+        address[] memory targets = new address[](1);
+        Permission[] memory permissions = new Permission[](1);
+        targets[0] = target;
+        permissions[0] = Permission(endorsed, rejected);
+        permissionRegistry.setPermissions(targets, permissions);
     }
 
     /*//////////////////////////////////////////////////////////////

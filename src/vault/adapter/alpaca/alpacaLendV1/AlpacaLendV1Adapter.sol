@@ -6,6 +6,7 @@ pragma solidity ^0.8.15;
 import {AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20, Math, IStrategy, IAdapter} from "../../abstracts/AdapterBase.sol";
 import {WithRewards, IWithRewards} from "../../abstracts/WithRewards.sol";
 import {IAlpacaLendV1Vault} from "./IAlpacaLendV1.sol";
+import {IPermissionRegistry} from "../../../../interfaces/vault/IPermissionRegistry.sol";
 
 /**
  * @title   AlpacaV1 Adapter
@@ -15,7 +16,7 @@ import {IAlpacaLendV1Vault} from "./IAlpacaLendV1.sol";
  * An ERC4626 compliant Wrapper for Alpaca Lend V1.
  * Allows wrapping AlpacaV1 Vaults.
  */
-contract AlpacaLendV1Adapter is AdapterBase, WithRewards {
+contract AlpacaLendV1Adapter is AdapterBase {
     using SafeERC20 for IERC20;
     using Math for uint256;
 
@@ -29,13 +30,15 @@ contract AlpacaLendV1Adapter is AdapterBase, WithRewards {
                             INITIALIZATION
     //////////////////////////////////////////////////////////////*/
 
+    error NotEndorsed();
     error InvalidAsset();
 
     /**
      * @notice Initialize a new MasterChef Adapter.
      * @param adapterInitData Encoded data for the base adapter initialization.
-     * @dev `_pid` - The poolId for lpToken.
-     * @dev `_rewardsToken` - The token rewarded by the MasterChef contract (Sushi, Cake...)
+     * @param registry PermissionRegistry to check for endorsed vaults
+     * @param alpacaV1InitData Encoded data for the alpaca v1 initialization.
+     * @dev `_vault` - Alpaca V1 Vault
      * @dev This function is called by the factory contract when deploying a new vault.
      */
 
@@ -47,6 +50,9 @@ contract AlpacaLendV1Adapter is AdapterBase, WithRewards {
         __AdapterBase_init(adapterInitData);
 
         address _vault = abi.decode(alpacaV1InitData, (address));
+
+        if (!IPermissionRegistry(registry).endorsed(_vault))
+            revert NotEndorsed();
 
         alpacaVault = IAlpacaLendV1Vault(_vault);
 
@@ -104,10 +110,7 @@ contract AlpacaLendV1Adapter is AdapterBase, WithRewards {
         alpacaVault.deposit(amount);
     }
 
-    function _protocolWithdraw(
-        uint256 amount,
-        uint256 shares
-    ) internal override {
+    function _protocolWithdraw(uint256, uint256 shares) internal override {
         uint256 alpacaShares = convertToUnderlyingShares(0, shares);
 
         alpacaVault.withdraw(alpacaShares);
@@ -115,7 +118,7 @@ contract AlpacaLendV1Adapter is AdapterBase, WithRewards {
 
     /// @notice The amount of alapacaV1 shares to withdraw given an mount of adapter shares
     function convertToUnderlyingShares(
-        uint256 assets,
+        uint256,
         uint256 shares
     ) public view override returns (uint256) {
         uint256 supply = totalSupply();
@@ -127,17 +130,5 @@ contract AlpacaLendV1Adapter is AdapterBase, WithRewards {
                     supply,
                     Math.Rounding.Up
                 );
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                      EIP-165 LOGIC
-  //////////////////////////////////////////////////////////////*/
-
-    function supportsInterface(
-        bytes4 interfaceId
-    ) public pure override(WithRewards, AdapterBase) returns (bool) {
-        return
-            interfaceId == type(IWithRewards).interfaceId ||
-            interfaceId == type(IAdapter).interfaceId;
     }
 }

@@ -11,7 +11,8 @@ import {MockStrategyClaimer} from "../../../../utils/mocks/MockStrategyClaimer.s
 contract AlpacaLendV2AdapterTest is AbstractAdapterTest {
     using Math for uint256;
 
-    IAlpacaLendV2Manger alpacaManager;
+    IAlpacaLendV2Manger alpacaManager =
+        IAlpacaLendV2Manger(0xD20B887654dB8dC476007bdca83d22Fa51e93407);
     IAlpacaLendV2MiniFL miniFL;
     IAlpacaLendV2IbToken ibToken;
 
@@ -31,12 +32,8 @@ contract AlpacaLendV2AdapterTest is AbstractAdapterTest {
     }
 
     function _setUpTest(bytes memory testConfig) internal {
-        (address _manager, uint256 _pid) = abi.decode(
-            testConfig,
-            (address, uint256)
-        );
+        uint256 _pid = abi.decode(testConfig, (uint256));
 
-        alpacaManager = IAlpacaLendV2Manger(_manager);
         miniFL = IAlpacaLendV2MiniFL(alpacaManager.miniFL());
         ibToken = IAlpacaLendV2IbToken(miniFL.stakingTokens(_pid));
         asset = IERC20(ibToken.asset());

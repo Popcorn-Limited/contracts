@@ -43,9 +43,10 @@ contract AlpacaLendV2Adapter is AdapterBase, WithRewards {
     /**
      * @notice Initialize a new Alpaca Lend V2 Adapter.
      * @param adapterInitData Encoded data for the base adapter initialization.
-     * @dev `_manager` - The manager contract for Alpaca Lend V2.
+     * @param registry The manager contract for Alpaca Lend V2.
+     * @param alpacaV2InitData Encoded data for the alpaca v2 initialization.
      * @dev The poolId for the ibToken in Alpaca Manager contract
-\     * @dev This function is called by the factory contract when deploying a new vault.
+     * @dev This function is called by the factory contract when deploying a new vault.
      */
 
     function initialize(
@@ -55,12 +56,9 @@ contract AlpacaLendV2Adapter is AdapterBase, WithRewards {
     ) external initializer {
         __AdapterBase_init(adapterInitData);
 
-        (address _manager, uint256 _pid) = abi.decode(
-            alpacaV2InitData,
-            (address, uint256)
-        );
+        uint256 _pid = abi.decode(alpacaV2InitData, (uint256));
 
-        alpacaManager = IAlpacaLendV2Manger(_manager);
+        alpacaManager = IAlpacaLendV2Manger(registry);
         miniFL = IAlpacaLendV2MiniFL(alpacaManager.miniFL());
 
         pid = _pid;
