@@ -40,7 +40,7 @@ contract YearnAdapter is AdapterBase {
         bytes memory adapterInitData,
         address externalRegistry,
         bytes memory yearnData
-    ) external initializer {
+    ) external virtual initializer {
         (address _asset, , , , , ) = abi.decode(
             adapterInitData,
             (address, address, address, uint256, bytes4[8], bytes)
@@ -110,7 +110,7 @@ contract YearnAdapter is AdapterBase {
      * @notice Returns the total quantity of all assets under control of this Vault,
      * whether they're loaned out to a Strategy, or currently held in the Vault.
      */
-    function _yTotalAssets() internal view returns (uint256) {
+    function _yTotalAssets() internal view virtual returns (uint256) {
         return IERC20(asset()).balanceOf(address(yVault)) + yVault.totalDebt();
     }
 

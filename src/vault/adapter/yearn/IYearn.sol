@@ -31,8 +31,16 @@ interface VaultAPI is IERC20 {
     function lockedProfitDegradation() external view returns (uint256);
 
     function totalDebt() external view returns (uint256);
+
+    function totalIdle() external view returns (uint256);
 }
 
 interface IYearnRegistry {
     function latestVault(address token) external view returns (address);
+}
+
+interface IVaultFactory {
+    function latestStandardVaultFromGauge(
+        address gauge
+    ) external view returns (address);
 }

@@ -42,7 +42,7 @@ contract DotDotAdapter is AdapterBase, WithRewards {
 
         lpStaking = IDotDotStaking(registry);
 
-        if (lpStaking.depositTokens(asset()) != address(0))
+        if (lpStaking.depositTokens(asset()) == address(0))
             revert InvalidToken();
 
         _name = string.concat(
@@ -88,14 +88,16 @@ contract DotDotAdapter is AdapterBase, WithRewards {
         override
         returns (address[] memory _rewardTokens)
     {
-        address[] memory extraTokens = lpStaking.extraRewards(asset());
-        uint256 nRewardTokens = extraTokens.length + 2;
+        uint256 extraRewardsLength = lpStaking.extraRewardsLength(asset());
+        uint256 nRewardTokens = extraRewardsLength + 2;
+
         _rewardTokens = new address[](nRewardTokens);
-        for (uint256 i = 0; i < extraTokens.length; i++) {
-            _rewardTokens[0] = extraTokens[i];
+        _rewardTokens[0] = lpStaking.EPX();
+        _rewardTokens[1] = lpStaking.DDD();
+
+        for (uint256 i; i < extraRewardsLength; i++) {
+            _rewardTokens[i + 2] = lpStaking.extraRewards(asset(), i);
         }
-        _rewardTokens[nRewardTokens] = lpStaking.EPX();
-        _rewardTokens[nRewardTokens + 1] = lpStaking.DDD();
     }
 
     /*//////////////////////////////////////////////////////////////
