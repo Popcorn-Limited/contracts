@@ -5,11 +5,11 @@ pragma solidity ^0.8.15;
 
 import {Test} from "forge-std/Test.sol";
 
-import {YearnFactoryAdapter, IERC20, IERC20Metadata, VaultAPI, IVaultFactory} from "../../../../../src/vault/adapter/yearn/vaultFactory/YearnFactoryAdapter.sol";
+import {YearnFactoryAdapter, IERC20, IERC20Metadata, VaultAPI, IVaultFactory} from "../../../../../src/vault/adapter/yearn/factory/YearnFactoryAdapter.sol";
 import {YearnFactoryTestConfigStorage, YearnFactoryTestConfig} from "./YearnFactoryTestConfigStorage.sol";
 import {AbstractAdapterTest, ITestConfigStorage, IAdapter} from "../../abstract/AbstractAdapterTest.sol";
 import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
-import {IGauge} from "../../../../../src/vault/adapter/curve/ICurve.sol";
+import {IGauge} from "../../../../../src/vault/adapter/balancer/IBalancer.sol";
 
 contract YearnFactoryAdapterTest is AbstractAdapterTest {
     using Math for uint256;

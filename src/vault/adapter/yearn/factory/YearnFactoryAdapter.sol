@@ -59,32 +59,11 @@ contract YearnFactoryAdapter is YearnAdapter {
         IERC20(asset()).approve(address(yVault), type(uint256).max);
     }
 
-    event log(uint256);
-
-    function _withdraw(
-        address caller,
-        address receiver,
-        address owner,
-        uint256 assets,
-        uint256 shares
-    ) internal virtual override {
-        if (caller != owner) {
-            _spendAllowance(owner, caller, shares);
-        }
-
-        if (!paused()) {
-            _protocolWithdraw(assets, shares);
-        }
-        
-        emit log(IERC20(asset()).balanceOf(address(this)));
-
-
-        _burn(owner, shares);
-
-        IERC20(asset()).safeTransfer(receiver, assets);
-
-        harvest();
-
-        emit Withdraw(caller, receiver, owner, assets, shares);
+    /**
+     * @notice Returns the total quantity of all assets under control of this Vault,
+     * whether they're loaned out to a Strategy, or currently held in the Vault.
+     */
+    function _yTotalAssets() internal view override returns (uint256) {
+        return yVault.totalIdle() + yVault.totalDebt();
     }
 }
