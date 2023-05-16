@@ -132,13 +132,15 @@ contract MultiStrategyVaultTester is Test {
         // - one redeems the other withdraws
         // - vault takes fees
         // - the adapter earn yield
-        vm.assume(depositAmount > 0 && depositAmount <= 1000e18);
-        vm.assume(mintAmount >= 1e9 && mintAmount <= 1000e27);
+        uint withdrawalFee = 0.01e18; // 1%
+        vm.assume(depositAmount >= 100 && depositAmount <= 1000e18);
+        vm.assume(mintAmount >= 100e9 && mintAmount <= 1000e27);
         vm.assume(adapterYield <= 1000e18);
-        vm.assume(withdrawAmount > 0 && withdrawAmount <= depositAmount);
-        vm.assume(redeemAmount > 1e9 && redeemAmount <= mintAmount);
+        // got to limit the withdrawal amount so that amount + fees doesn't exceed user's balance
+        vm.assume(withdrawAmount > 0 && withdrawAmount <= depositAmount * (1e18 - withdrawalFee) / 1e18);
+        vm.assume(redeemAmount > 0 && redeemAmount <= mintAmount * (1e18 - withdrawalFee) /  1e18);
     
-        _setFees(1e16, 1e16, 0, 0);
+        _setFees(0, uint64(withdrawalFee), 0, 0);
     
         asset.mint(alice, depositAmount);
         vm.startPrank(alice);
