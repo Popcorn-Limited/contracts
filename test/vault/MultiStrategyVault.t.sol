@@ -6,6 +6,7 @@ import {Test} from "forge-std/Test.sol";
 import {MockERC20} from "../utils/mocks/MockERC20.sol";
 import {MockERC4626} from "../utils/mocks/MockERC4626.sol";
 import {MultiStrategyVault, AdapterConfig, VaultFees} from "../../src/vault/MultiStrategyVault.sol";
+import { IAdapter } from "../../src/interfaces/vault/IAdapter.sol";
 import {IERC4626Upgradeable as IERC4626, IERC20Upgradeable as IERC20} from "openzeppelin-contracts-upgradeable/interfaces/IERC4626Upgradeable.sol";
 import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
 import {Clones} from "openzeppelin-contracts/proxy/Clones.sol";
@@ -129,13 +130,15 @@ contract MultiStrategyVaultTester is Test {
         // - two users
         // - one mints the other deposits
         // - one redeems the other withdraws
-        // - vault and adapter both take fees
+        // - vault takes fees
         // - the adapter earn yield
         vm.assume(depositAmount > 0 && depositAmount <= 1000e18);
         vm.assume(mintAmount >= 1e9 && mintAmount <= 1000e27);
         vm.assume(adapterYield <= 1000e18);
         vm.assume(withdrawAmount > 0 && withdrawAmount <= depositAmount);
         vm.assume(redeemAmount > 1e9 && redeemAmount <= mintAmount);
+    
+        _setFees(1e16, 1e16, 0, 0);
     
         asset.mint(alice, depositAmount);
         vm.startPrank(alice);
