@@ -237,7 +237,7 @@ contract MultiStrategyVault is
                 1e18,
                 Math.Rounding.Down
             ) * offset;
-            if (allocated > remainingShares || i == adapterCount - 1) {
+            if (i == adapterCount - 1) {
                 allocated = remainingShares;
             }
             adapters[i].adapter.mint(allocated, address(this));
@@ -356,7 +356,7 @@ contract MultiStrategyVault is
                 1e18,
                 Math.Rounding.Down
             ) * offset;
-            if (remainingShares < allocated || i == adapterCount - 1) {
+            if (i == adapterCount - 1) {
                 allocated = remainingShares;
             }
             adapters[i].adapter.redeem(allocated, address(this), address(this));
