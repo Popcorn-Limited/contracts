@@ -118,50 +118,49 @@ contract MultiStrategyVaultTester is Test {
 
     // @audit when you change the allocation midway, you'll break subsequent withdrawals
 
-    function test__rounding() public  {
-        uint amount = 100e18;
-        asset.mint(alice, amount);
-        asset.mint(bob, amount);
-
+    function test__full_simulation(
+        uint depositAmount,
+        uint mintAmount,
+        uint withdrawAmount,
+        uint redeemAmount,
+        uint adapterYield
+    ) public {
+        // Goal is to have a test that simulates the whole thing:
+        // - two users
+        // - one mints the other deposits
+        // - one redeems the other withdraws
+        // - vault and adapter both take fees
+        // - the adapter earn yield
+        vm.assume(depositAmount > 0 && depositAmount <= 1000e18);
+        vm.assume(mintAmount >= 1e9 && mintAmount <= 1000e27);
+        vm.assume(adapterYield <= 1000e18);
+        vm.assume(withdrawAmount > 0 && withdrawAmount <= depositAmount);
+        vm.assume(redeemAmount > 1e9 && redeemAmount <= mintAmount);
+    
+        asset.mint(alice, depositAmount);
         vm.startPrank(alice);
-        asset.approve(address(multiStrategyVault), amount);
-        multiStrategyVault.deposit(amount, alice);
+        asset.approve(address(multiStrategyVault), depositAmount);
+        multiStrategyVault.deposit(depositAmount, alice);
         vm.stopPrank();
 
+        uint bobAssetAmount = multiStrategyVault.previewMint(mintAmount);
+        asset.mint(bob, bobAssetAmount);
         vm.startPrank(bob);
-        asset.approve(address(multiStrategyVault), amount);
-        multiStrategyVault.deposit(amount, bob);
-        vm.stopPrank(); 
-
-        asset.mint(address(adapters[0].adapter), 1);
-        asset.mint(address(adapters[1].adapter), 2);
-        asset.mint(address(adapters[2].adapter), 99);
-
-        console.log("alice vault shares: ", multiStrategyVault.balanceOf(alice));
-        console.log("bob vault shares: ", multiStrategyVault.balanceOf(bob));
-        console.log("vault totalAssets: ", multiStrategyVault.totalAssets());
-        for (uint i; i < 3; ++i) {
-            console.log("adapter shares: ", adapters[i].adapter.balanceOf(address(multiStrategyVault)));
-            console.log("adapter totalAssets: ", adapters[i].adapter.totalAssets());
-        }
-
-
-        vm.startPrank(alice);
-        multiStrategyVault.redeem(multiStrategyVault.balanceOf(alice), alice, alice);
+        asset.approve(address(multiStrategyVault), bobAssetAmount);
+        multiStrategyVault.mint(mintAmount, bob);
         vm.stopPrank();
+        
+        assertApproxEqAbs(multiStrategyVault.totalAssets(), depositAmount + bobAssetAmount, 1, "totalAssets doesn't match deposit amount");
+        
+        // one of the adapters earns yield that will be paid out to Alice and Bob when they redeem
+        // their shares.
+        asset.mint(address(adapters[2].adapter), adapterYield);
 
-        console.log("alice vault shares: ", multiStrategyVault.balanceOf(alice));
-        console.log("bob vault shares: ", multiStrategyVault.balanceOf(bob));
-        console.log("vault totalAssets: ", multiStrategyVault.totalAssets());
-        for (uint i; i < 3; ++i) {
-            console.log("adapter shares: ", adapters[i].adapter.balanceOf(address(multiStrategyVault)));
-            console.log("adapter totalAssets: ", adapters[i].adapter.totalAssets());
-        }
+        vm.prank(alice);
+        multiStrategyVault.withdraw(withdrawAmount, alice, alice);
 
-
-        vm.startPrank(bob);
-        multiStrategyVault.redeem(multiStrategyVault.balanceOf(bob), bob, bob);
-        vm.stopPrank();
+        vm.prank(bob);
+        multiStrategyVault.redeem(redeemAmount, bob, bob);
     }
 
     function test__metadata() public {
@@ -396,16 +395,6 @@ contract MultiStrategyVaultTester is Test {
         );
         assertEq(asset.balanceOf(alice), alicePreDepositBal - aliceassetAmount);
         
-        console.log("alice vault shares: ", multiStrategyVault.balanceOf(alice));
-        console.log("bob vault shares: ", multiStrategyVault.balanceOf(bob));
-        console.log("vault totalAssets: ", multiStrategyVault.totalAssets());
-        console.log("vault totalSupply: ", multiStrategyVault.totalSupply());
-        for (uint i; i < 3; ++i) {
-            console.log("adapter shares: ", adapters[i].adapter.balanceOf(address(multiStrategyVault)));
-            console.log("adapter totalAssets: ", adapters[i].adapter.totalAssets());
-        }
-
-
         vm.prank(alice);
         multiStrategyVault.withdraw(aliceassetAmount, alice, alice);
 
@@ -525,21 +514,10 @@ contract MultiStrategyVaultTester is Test {
             "a bal"
         );
         
-        console.log("alice vault shares: ", multiStrategyVault.balanceOf(alice));
-        console.log("bob vault shares: ", multiStrategyVault.balanceOf(bob));
-        console.log("vault totalAssets: ", multiStrategyVault.totalAssets());
-        console.log("vault totalSupply: ", multiStrategyVault.totalSupply());
-        for (uint i; i < 3; ++i) {
-            console.log("adapter shares: ", adapters[i].adapter.balanceOf(address(multiStrategyVault)));
-            console.log("adapter totalAssets: ", adapters[i].adapter.totalAssets());
-        }
-
         vm.prank(alice);
         multiStrategyVault.redeem(aliceShareAmount, alice, alice);
 
         // assertEq(adapter.beforeWithdrawHookCalledCounter(), 1);
-
-        // @audit can leave dust amount in the vault for some reason, e.g. 1 token remains
 
         assertEq(multiStrategyVault.totalAssets(), 0);
         assertEq(multiStrategyVault.balanceOf(alice), 0);
@@ -688,16 +666,6 @@ contract MultiStrategyVaultTester is Test {
         emit log_named_uint("Withdraw Amount", withdrawAmount);
         emit log_named_uint("Expected Shares", expectedShares);
 
-        console.log("alice vault shares: ", multiStrategyVault.balanceOf(alice));
-        console.log("bob vault shares: ", multiStrategyVault.balanceOf(bob));
-        console.log("vault totalAssets: ", multiStrategyVault.totalAssets());
-        console.log("vault totalSupply: ", multiStrategyVault.totalSupply());
-        for (uint i; i < 3; ++i) {
-            console.log("adapter shares: ", adapters[i].adapter.balanceOf(address(multiStrategyVault)));
-            console.log("adapter totalAssets: ", adapters[i].adapter.totalAssets());
-        }
-
-
         vm.prank(alice);
         uint256 actualShares = multiStrategyVault.withdraw(
             withdrawAmount,
@@ -709,19 +677,9 @@ contract MultiStrategyVaultTester is Test {
         // Test PreviewRedeem and Redeem
         uint256 expectedAssets = multiStrategyVault.previewRedeem(shares);
 
-        console.log("alice vault shares: ", multiStrategyVault.balanceOf(alice));
-        console.log("bob vault shares: ", multiStrategyVault.balanceOf(bob));
-        console.log("vault totalAssets: ", multiStrategyVault.totalAssets());
-        console.log("vault totalSupply: ", multiStrategyVault.totalSupply());
-        for (uint i; i < 3; ++i) {
-            console.log("adapter shares: ", adapters[i].adapter.balanceOf(address(multiStrategyVault)));
-            console.log("adapter totalAssets: ", adapters[i].adapter.totalAssets());
-        }
-
-        console.log("bob burns shares: ", shares);
         vm.prank(bob);
         uint256 actualAssets = multiStrategyVault.redeem(shares, bob, bob);
-        assertApproxEqAbs(expectedAssets, actualAssets, 3);
+        assertApproxEqAbs(expectedAssets, actualAssets, 1);
     }
 
     function test__managementFee(uint128 timeframe) public {
