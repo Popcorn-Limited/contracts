@@ -52,11 +52,11 @@ contract IdleJuniorAdapter is AdapterBase {
         cdo = IIdleCDO(_cdo);
 
         _name = string.concat(
-            "Popcorn Idle Junior ",
+            "VaultCraft Idle Junior ",
             IERC20Metadata(asset()).name(),
             " Adapter"
         );
-        _symbol = string.concat("popIdlJ-", IERC20Metadata(asset()).symbol());
+        _symbol = string.concat("vcIdlJ-", IERC20Metadata(asset()).symbol());
 
         IERC20(asset()).safeApprove(_cdo, type(uint256).max);
     }

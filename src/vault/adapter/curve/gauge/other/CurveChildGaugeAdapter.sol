@@ -36,6 +36,8 @@ contract CurveChildGaugeAdapter is AdapterBase, WithRewards {
 
     error InvalidAsset();
 
+    event log_address(address);
+
     /**
      * @notice Initialize a new MasterChef Adapter.
      * @param adapterInitData Encoded data for the base adapter initialization.
@@ -44,7 +46,6 @@ contract CurveChildGaugeAdapter is AdapterBase, WithRewards {
      * @dev '_gaugeFactory' - The gauge factory.
      * @dev This function is called by the factory contract when deploying a new vault.
      */
-
     function initialize(
         bytes memory adapterInitData,
         address registry,
@@ -57,6 +58,9 @@ contract CurveChildGaugeAdapter is AdapterBase, WithRewards {
         crv = _crv;
         gaugeFactory = IGaugeFactory(registry);
         gauge = IGauge(gaugeFactory.get_gauge_from_lp_token(asset()));
+
+        emit log_address(address(crv));
+        emit log_address(address(gauge));
 
         if (gauge.lp_token() != asset()) revert InvalidAsset();
 

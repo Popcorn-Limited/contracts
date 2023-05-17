@@ -18,28 +18,15 @@ interface IAlpacaLendV2Vault {
 }
 
 interface IAlpacaLendV2Manger {
-    function depositAndAddCollateral(
-        uint256 _subAccountId,
-        address _token,
-        uint256 _amount
-    ) external;
+    function deposit(address _token, uint256 _amount) external;
 
-    function removeCollateralAndWithdraw(
-        uint256 _subAccountId,
-        address _ibToken,
-        uint256 _amount
-    ) external;
+    function withdraw(address _ibToken, uint256 _amount) external;
 
     function miniFL() external view returns (address);
 }
 
 interface IAlpacaLendV2MiniFL {
     function stakingTokens(uint256 _pid) external view returns (address);
-
-    function userInfo(
-        uint256 _pid,
-        address _user
-    ) external view returns (uint256, int256);
 }
 
 interface IAlpacaLendV2IbToken {
@@ -50,4 +37,10 @@ interface IAlpacaLendV2IbToken {
     function balanceOf(address _user) external view returns (uint256);
 
     function asset() external view returns (address);
+
+    function withdraw(
+        uint256 _assets,
+        address _receiver,
+        address _owner
+    ) external;
 }

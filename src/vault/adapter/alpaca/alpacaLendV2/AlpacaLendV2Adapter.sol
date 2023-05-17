@@ -43,9 +43,10 @@ contract AlpacaLendV2Adapter is AdapterBase, WithRewards {
     /**
      * @notice Initialize a new Alpaca Lend V2 Adapter.
      * @param adapterInitData Encoded data for the base adapter initialization.
-     * @dev `_manager` - The manager contract for Alpaca Lend V2.
+     * @param registry The manager contract for Alpaca Lend V2.
+     * @param alpacaV2InitData Encoded data for the alpaca v2 initialization.
      * @dev The poolId for the ibToken in Alpaca Manager contract
-\     * @dev This function is called by the factory contract when deploying a new vault.
+     * @dev This function is called by the factory contract when deploying a new vault.
      */
 
     function initialize(
@@ -55,12 +56,9 @@ contract AlpacaLendV2Adapter is AdapterBase, WithRewards {
     ) external initializer {
         __AdapterBase_init(adapterInitData);
 
-        (address _manager, uint256 _pid) = abi.decode(
-            alpacaV2InitData,
-            (address, uint256)
-        );
+        uint256 _pid = abi.decode(alpacaV2InitData, (uint256));
 
-        alpacaManager = IAlpacaLendV2Manger(_manager);
+        alpacaManager = IAlpacaLendV2Manger(registry);
         miniFL = IAlpacaLendV2MiniFL(alpacaManager.miniFL());
 
         pid = _pid;
@@ -76,6 +74,10 @@ contract AlpacaLendV2Adapter is AdapterBase, WithRewards {
         _symbol = string.concat("vcAlV2-", IERC20Metadata(asset()).symbol());
 
         IERC20(ibToken.asset()).approve(
+            address(alpacaManager),
+            type(uint256).max
+        );
+        IERC20(address(ibToken)).approve(
             address(alpacaManager),
             type(uint256).max
         );
@@ -107,11 +109,27 @@ contract AlpacaLendV2Adapter is AdapterBase, WithRewards {
     /// @return The total amount of underlying tokens the Vault holds.
 
     function _totalAssets() internal view override returns (uint256) {
-        (uint256 _totalAmount, ) = miniFL.userInfo(pid, address(this));
-
-        uint256 assets = ibToken.convertToAssets(_totalAmount);
+        uint256 assets = ibToken.convertToAssets(
+            ibToken.balanceOf(address(this))
+        );
 
         return assets;
+    }
+
+    /// @notice The amount of beefy shares to withdraw given an amount of adapter shares
+    function convertToUnderlyingShares(
+        uint256 assets,
+        uint256 shares
+    ) public view override returns (uint256) {
+        uint256 supply = totalSupply();
+        return
+            supply == 0
+                ? shares
+                : shares.mulDiv(
+                    ibToken.balanceOf(address(this)),
+                    supply,
+                    Math.Rounding.Up
+                );
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -119,17 +137,16 @@ contract AlpacaLendV2Adapter is AdapterBase, WithRewards {
     //////////////////////////////////////////////////////////////*/
 
     function _protocolDeposit(uint256 amount, uint256) internal override {
-        alpacaManager.depositAndAddCollateral(0, address(asset()), amount);
+        alpacaManager.deposit(address(asset()), amount);
     }
 
-    function _protocolWithdraw(uint256 amount, uint256) internal override {
-        uint256 alpacaShares = ibToken.convertToShares(amount + 1);
+    function _protocolWithdraw(
+        uint256 amount,
+        uint256 shares
+    ) internal override {
+        uint256 alpacaShares = convertToUnderlyingShares(0, shares);
 
-        alpacaManager.removeCollateralAndWithdraw(
-            0,
-            address(ibToken),
-            alpacaShares
-        );
+        alpacaManager.withdraw(address(ibToken), alpacaShares);
     }
 
     /*//////////////////////////////////////////////////////////////
