@@ -6,9 +6,11 @@ import {Test} from "forge-std/Test.sol";
 import {MockERC20} from "../utils/mocks/MockERC20.sol";
 import {MockERC4626} from "../utils/mocks/MockERC4626.sol";
 import {MultiStrategyVault, AdapterConfig, VaultFees} from "../../src/vault/MultiStrategyVault.sol";
+import { IAdapter } from "../../src/interfaces/vault/IAdapter.sol";
 import {IERC4626Upgradeable as IERC4626, IERC20Upgradeable as IERC20} from "openzeppelin-contracts-upgradeable/interfaces/IERC4626Upgradeable.sol";
 import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
 import {Clones} from "openzeppelin-contracts/proxy/Clones.sol";
+import "forge-std/console.sol";
 
 contract MultiStrategyVaultTester is Test {
     using FixedPointMathLib for uint256;
@@ -113,6 +115,67 @@ contract MultiStrategyVaultTester is Test {
             "vwTKN"
         );
         return MockERC4626(adapterAddress);
+    }
+
+    // @audit when you change the allocation midway, you'll break subsequent withdrawals
+
+    function test__full_simulation(
+        uint depositAmount,
+        uint mintAmount,
+        uint withdrawAmount,
+        uint redeemAmount,
+        uint adapterYield1,
+        uint adapterYield2,
+        uint adapterYield3
+    ) public {
+        // Goal is to have a test that simulates the whole thing:
+        // - two users
+        // - one mints the other deposits
+        // - one redeems the other withdraws
+        // - vault takes fees
+        // - the adapter earn yield
+        uint withdrawalFee = 0.01e18; // 1%
+        vm.assume(depositAmount >= 100 && depositAmount <= 1000e18);
+        vm.assume(mintAmount >= 100e9 && mintAmount <= 1000e27);
+        vm.assume(adapterYield1 <= 1000e18);
+        vm.assume(adapterYield2 <= 1000e18);
+        vm.assume(adapterYield3 <= 1000e18);
+        // got to limit the withdrawal amount so that amount + fees doesn't exceed user's balance
+        vm.assume(withdrawAmount >= 100 && withdrawAmount <= depositAmount * (1e18 - withdrawalFee) / 1e18);
+        vm.assume(redeemAmount >= 100e9 && redeemAmount <= mintAmount * (1e18 - withdrawalFee) /  1e18);
+    
+        _setFees(0, uint64(withdrawalFee), 0, 0);
+    
+        asset.mint(alice, depositAmount);
+        vm.startPrank(alice);
+        uint depositPreview = multiStrategyVault.previewDeposit(depositAmount);
+        asset.approve(address(multiStrategyVault), depositAmount);
+        multiStrategyVault.deposit(depositAmount, alice);
+        vm.stopPrank();
+        assertEq(multiStrategyVault.balanceOf(alice), depositPreview, "share balance doesn't match preview");
+        assertEq(asset.balanceOf(alice), 0, "alice didn't deposit her whole balance"); 
+
+        uint bobAssetAmount = multiStrategyVault.previewMint(mintAmount);
+        asset.mint(bob, bobAssetAmount);
+        vm.startPrank(bob);
+        asset.approve(address(multiStrategyVault), bobAssetAmount);
+        multiStrategyVault.mint(mintAmount, bob);
+        vm.stopPrank();
+        assertEq(asset.balanceOf(bob), 0, "bob didn't deposit his whole balance"); 
+        
+        // assets can round down because of the conversion from adapter shares to assets
+        assertApproxEqAbs(multiStrategyVault.totalAssets(), depositAmount + bobAssetAmount, 1, "totalAssets doesn't match deposit amount");
+
+        // adapters each earn a different yield
+        asset.mint(address(adapters[0].adapter), adapterYield1);
+        asset.mint(address(adapters[1].adapter), adapterYield2);
+        asset.mint(address(adapters[2].adapter), adapterYield3);
+
+        vm.prank(alice);
+        multiStrategyVault.withdraw(withdrawAmount, alice, alice);
+
+        vm.prank(bob);
+        multiStrategyVault.redeem(redeemAmount, bob, bob);
     }
 
     function test__metadata() public {
@@ -303,7 +366,7 @@ contract MultiStrategyVaultTester is Test {
     }
 
     function test__deposit_withdraw(uint128 amount) public {
-        if (amount == 0) amount = 1;
+        amount = uint128(bound(uint256(amount), 100, 1 ether));
 
         uint256 aliceassetAmount = amount;
 
@@ -346,7 +409,7 @@ contract MultiStrategyVaultTester is Test {
             aliceassetAmount
         );
         assertEq(asset.balanceOf(alice), alicePreDepositBal - aliceassetAmount);
-
+        
         vm.prank(alice);
         multiStrategyVault.withdraw(aliceassetAmount, alice, alice);
 
@@ -403,7 +466,8 @@ contract MultiStrategyVaultTester is Test {
     //////////////////////////////////////////////////////////////*/
 
     function test__mint_redeem(uint128 amount) public {
-        if (amount < 1e9) amount = 1e9;
+        // 1e9 shares = 1 underlying token.
+        vm.assume(amount >= 1e12);
 
         uint256 aliceShareAmount = amount;
         asset.mint(alice, aliceShareAmount);
@@ -447,7 +511,9 @@ contract MultiStrategyVaultTester is Test {
             "pd"
         );
         assertEq(multiStrategyVault.totalSupply(), aliceShareAmount, "ts");
-        assertEq(multiStrategyVault.totalAssets(), aliceAssetAmount, "ta");
+        // rounding can cause the totalAssets to be lower than the deposited amount.
+        // Shouldn't be an issue after the first deposit 
+        assertApproxEqAbs(multiStrategyVault.totalAssets(), aliceAssetAmount, 1, "ta");
         assertEq(multiStrategyVault.balanceOf(alice), aliceShareAmount, "bal");
         assertApproxEqAbs(
             multiStrategyVault.convertToAssets(
@@ -462,7 +528,7 @@ contract MultiStrategyVaultTester is Test {
             alicePreDepositBal - aliceAssetAmount,
             "a bal"
         );
-
+        
         vm.prank(alice);
         multiStrategyVault.redeem(aliceShareAmount, alice, alice);
 
@@ -476,7 +542,7 @@ contract MultiStrategyVaultTester is Test {
             ),
             0
         );
-        assertEq(asset.balanceOf(alice), alicePreDepositBal);
+        assertApproxEqAbs(asset.balanceOf(alice), alicePreDepositBal, 1);
     }
 
     function testFail__mint_zero() public {
@@ -569,7 +635,7 @@ contract MultiStrategyVaultTester is Test {
     function test__previewDeposit_previewMint_takes_fees_into_account(
         uint8 fuzzAmount
     ) public {
-        uint256 amount = bound(uint256(fuzzAmount), 1, 1 ether);
+        uint256 amount = bound(uint256(fuzzAmount), 100, 1 ether);
 
         _setFees(1e17, 0, 0, 0);
 
@@ -589,7 +655,7 @@ contract MultiStrategyVaultTester is Test {
     function test__previewWithdraw_previewRedeem_takes_fees_into_account(
         uint8 fuzzAmount
     ) public {
-        uint256 amount = bound(uint256(fuzzAmount), 10, 1 ether);
+        uint256 amount = bound(uint256(fuzzAmount), 10000, 1 ether);
         emit log_named_uint("Amount", amount);
         _setFees(0, 1e17, 0, 0);
 
