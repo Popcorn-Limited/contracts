@@ -124,7 +124,9 @@ contract MultiStrategyVaultTester is Test {
         uint mintAmount,
         uint withdrawAmount,
         uint redeemAmount,
-        uint adapterYield
+        uint adapterYield1,
+        uint adapterYield2,
+        uint adapterYield3
     ) public {
         // Goal is to have a test that simulates the whole thing:
         // - two users
@@ -135,18 +137,23 @@ contract MultiStrategyVaultTester is Test {
         uint withdrawalFee = 0.01e18; // 1%
         vm.assume(depositAmount >= 100 && depositAmount <= 1000e18);
         vm.assume(mintAmount >= 100e9 && mintAmount <= 1000e27);
-        vm.assume(adapterYield <= 1000e18);
+        vm.assume(adapterYield1 <= 1000e18);
+        vm.assume(adapterYield2 <= 1000e18);
+        vm.assume(adapterYield3 <= 1000e18);
         // got to limit the withdrawal amount so that amount + fees doesn't exceed user's balance
-        vm.assume(withdrawAmount > 0 && withdrawAmount <= depositAmount * (1e18 - withdrawalFee) / 1e18);
-        vm.assume(redeemAmount > 0 && redeemAmount <= mintAmount * (1e18 - withdrawalFee) /  1e18);
+        vm.assume(withdrawAmount >= 100 && withdrawAmount <= depositAmount * (1e18 - withdrawalFee) / 1e18);
+        vm.assume(redeemAmount >= 100e9 && redeemAmount <= mintAmount * (1e18 - withdrawalFee) /  1e18);
     
         _setFees(0, uint64(withdrawalFee), 0, 0);
     
         asset.mint(alice, depositAmount);
         vm.startPrank(alice);
+        uint depositPreview = multiStrategyVault.previewDeposit(depositAmount);
         asset.approve(address(multiStrategyVault), depositAmount);
         multiStrategyVault.deposit(depositAmount, alice);
         vm.stopPrank();
+        assertEq(multiStrategyVault.balanceOf(alice), depositPreview, "share balance doesn't match preview");
+        assertEq(asset.balanceOf(alice), 0, "alice didn't deposit her whole balance"); 
 
         uint bobAssetAmount = multiStrategyVault.previewMint(mintAmount);
         asset.mint(bob, bobAssetAmount);
@@ -154,12 +161,15 @@ contract MultiStrategyVaultTester is Test {
         asset.approve(address(multiStrategyVault), bobAssetAmount);
         multiStrategyVault.mint(mintAmount, bob);
         vm.stopPrank();
+        assertEq(asset.balanceOf(bob), 0, "bob didn't deposit his whole balance"); 
         
+        // assets can round down because of the conversion from adapter shares to assets
         assertApproxEqAbs(multiStrategyVault.totalAssets(), depositAmount + bobAssetAmount, 1, "totalAssets doesn't match deposit amount");
-        
-        // one of the adapters earns yield that will be paid out to Alice and Bob when they redeem
-        // their shares.
-        asset.mint(address(adapters[2].adapter), adapterYield);
+
+        // adapters each earn a different yield
+        asset.mint(address(adapters[0].adapter), adapterYield1);
+        asset.mint(address(adapters[1].adapter), adapterYield2);
+        asset.mint(address(adapters[2].adapter), adapterYield3);
 
         vm.prank(alice);
         multiStrategyVault.withdraw(withdrawAmount, alice, alice);
