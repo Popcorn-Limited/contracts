@@ -4,26 +4,25 @@
 pragma solidity ^0.8.15;
 
 import {AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20, Math, IStrategy, IAdapter, IERC4626} from "../abstracts/AdapterBase.sol";
-import {WithRewards, IWithRewards} from "../abstracts/WithRewards.sol";
 import {IPermissionRegistry} from "../../../interfaces/vault/IPermissionRegistry.sol";
 
 /**
- * @title   Ousd Adapter
+ * @title   Origin Adapter
  * @author  amatureApe
- * @notice  ERC4626 wrapper for Ousd Vault.
+ * @notice  ERC4626 wrapper for Origin Vault.
  *
- * An ERC4626 compliant Wrapper for https://github.com/sushiswap/sushiswap/blob/archieve/canary/contracts/MasterChefV2.sol.
+ * An ERC4626 compliant Wrapper for .
  * Allows wrapping Ousd.
  */
-contract OusdAdapter is AdapterBase, WithRewards {
+contract OriginAdapter is AdapterBase {
     using SafeERC20 for IERC20;
     using Math for uint256;
 
     string internal _name;
     string internal _symbol;
 
-    /// @notice The wOUSD token contract.
-    IERC4626 public wOusd;
+    /// @notice The wrapped oToken contract.
+    IERC4626 public wAsset;
 
     /*//////////////////////////////////////////////////////////////
                             INITIALIZATION
@@ -35,7 +34,7 @@ contract OusdAdapter is AdapterBase, WithRewards {
     /**
      * @notice Initialize a new MasterChef Adapter.
      * @param adapterInitData Encoded data for the base adapter initialization.
-     * @dev `_ousd` - The address of the OUSD token.
+     * @dev `_wAsset` - The address of the wrapped asset.
      * @dev This function is called by the factory contract when deploying a new vault.
      */
 
@@ -45,22 +44,22 @@ contract OusdAdapter is AdapterBase, WithRewards {
         bytes memory ousdInitData
     ) external initializer {
         __AdapterBase_init(adapterInitData);
-        address _wousd = abi.decode(ousdInitData, (address));
+        address _wAsset = abi.decode(ousdInitData, (address));
 
-        if (!IPermissionRegistry(registry).endorsed(_wousd))
+        if (!IPermissionRegistry(registry).endorsed(_wAsset))
             revert NotEndorsed();
-        if (IERC4626(_wousd).asset() != asset()) revert InvalidAsset();
+        if (IERC4626(_wAsset).asset() != asset()) revert InvalidAsset();
 
-        wOusd = IERC4626(_wousd);
+        wAsset = IERC4626(_wAsset);
 
         _name = string.concat(
-            "VaultCraft Ousd ",
+            "VaultCraft Origin ",
             IERC20Metadata(asset()).name(),
             " Adapter"
         );
         _symbol = string.concat("vcO-", IERC20Metadata(asset()).symbol());
 
-        IERC20(asset()).approve(address(wOusd), type(uint256).max);
+        IERC20(asset()).approve(address(wAsset), type(uint256).max);
     }
 
     function name()
@@ -89,7 +88,7 @@ contract OusdAdapter is AdapterBase, WithRewards {
     /// @return The total amount of underlying tokens the Vault holds.
 
     function _totalAssets() internal view override returns (uint256) {
-        return wOusd.convertToAssets(wOusd.balanceOf(address(this)));
+        return wAsset.convertToAssets(wAsset.balanceOf(address(this)));
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -97,22 +96,10 @@ contract OusdAdapter is AdapterBase, WithRewards {
     //////////////////////////////////////////////////////////////*/
 
     function _protocolDeposit(uint256 amount, uint256) internal override {
-        wOusd.deposit(amount, address(this));
+        wAsset.deposit(amount, address(this));
     }
 
     function _protocolWithdraw(uint256 amount, uint256) internal override {
-        wOusd.withdraw(amount, address(this), address(this));
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                      EIP-165 LOGIC
-  //////////////////////////////////////////////////////////////*/
-
-    function supportsInterface(
-        bytes4 interfaceId
-    ) public pure override(WithRewards, AdapterBase) returns (bool) {
-        return
-            interfaceId == type(IWithRewards).interfaceId ||
-            interfaceId == type(IAdapter).interfaceId;
+        wAsset.withdraw(amount, address(this), address(this));
     }
 }
