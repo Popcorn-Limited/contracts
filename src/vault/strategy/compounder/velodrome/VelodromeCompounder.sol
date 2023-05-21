@@ -7,7 +7,7 @@ import {ERC4626Upgradeable as ERC4626, ERC20Upgradeable as ERC20, IERC20Upgradea
 import {IAdapter} from "../../../../interfaces/vault/IAdapter.sol";
 import {IWithRewards} from "../../../../interfaces/vault/IWithRewards.sol";
 import {StrategyBase} from "../../StrategyBase.sol";
-import {VelodromeUtils} from "./VelodromeUtils.sol";
+import {VelodromeUtils, IVelodromeRouter} from "./VelodromeUtils.sol";
 
 contract VelodromeCompounder is StrategyBase {
     // Events

@@ -3,7 +3,8 @@
 pragma solidity ^0.8.0;
 
 import "src/utils/Path.sol";
-import {IVelodromeRouter} from "../../../../interfaces/external/velodrome/IVelodromeRouter.sol";
+import {IVelodromeRouter, route} from "../../../../interfaces/external/velodrome/IVelodromeRouter.sol";
+import {ILpToken} from "src/vault/adapter/velodrome/IVelodrome.sol";
 
 library VelodromeUtils {
     using Path for bytes;
@@ -13,12 +14,46 @@ library VelodromeUtils {
         address _router,
         bytes memory _path,
         uint256 _amountIn
-    ) internal returns (uint256 amountOut) {
+    ) internal returns (uint256[] memory amountsOut) {
+        address[] memory path = pathToRoute(_path);
+
+        uint256 reserveA1;
+        uint256 reserveA2;
+
+        try
+            IVelodromeRouter(_router).getReserves(
+                path[0],
+                path[path.length - 1],
+                false
+            )
+        returns (uint256 reserveA, uint256 reserveB) {
+            reserveA1 = reserveA;
+        } catch {
+            reserveA1 = 0;
+        }
+
+        try
+            IVelodromeRouter(_router).getReserves(
+                path[0],
+                path[path.length - 1],
+                true
+            )
+        returns (uint256 reserveA, uint256 reserveB) {
+            reserveA2 = reserveA;
+        } catch {
+            reserveA2 = 0;
+        }
+
+        bool stable = reserveA1 >= reserveA2 ? false : true;
+
+        route[] memory routes;
+        routes[0] = route(path[0], path[path.length - 1], stable);
+
         return
             IVelodromeRouter(_router).swapExactTokensForTokens(
                 _amountIn,
                 0,
-                _path,
+                routes,
                 address(this),
                 block.timestamp
             );
@@ -30,7 +65,7 @@ library VelodromeUtils {
         address[] memory _route,
         uint24[] memory _fee,
         uint256 _amountIn
-    ) internal returns (uint256 amountOut) {
+    ) internal returns (uint256[] memory amountsOut) {
         return swap(_router, routeToPath(_route, _fee), _amountIn);
     }
 
