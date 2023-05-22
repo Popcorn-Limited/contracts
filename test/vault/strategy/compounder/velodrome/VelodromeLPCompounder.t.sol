@@ -42,7 +42,7 @@ contract VelodromeLpCompounderTest is Test {
             abi.encodePacked(velo, uint24(3000), lpToken.token1())
         );
 
-        minTradeAmounts.push(uint256(0));
+        minTradeAmounts.push(uint256(1));
 
         bytes memory stratData = abi.encode(
             address(lpToken),

@@ -46,13 +46,17 @@ library VelodromeUtils {
 
         bool stable = reserveA1 >= reserveA2 ? false : true;
 
-        route[] memory routes;
-        routes[0] = route(path[0], path[path.length - 1], stable);
+        route[] memory routes = new route[](1);
+        routes[0] = route(
+            0x4200000000000000000000000000000000000042,
+            0x4200000000000000000000000000000000000006,
+            false
+        );
 
         return
             IVelodromeRouter(_router).swapExactTokensForTokens(
                 _amountIn,
-                0,
+                1,
                 routes,
                 address(this),
                 block.timestamp
