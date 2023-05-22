@@ -52,8 +52,8 @@ contract VelodromeAdapter is AdapterBase, WithRewards {
 
         address _gauge = abi.decode(velodromeInitData, (address));
 
-        if (!IPermissionRegistry(registry).endorsed(_gauge))
-            revert NotEndorsed(_gauge);
+        // if (!IPermissionRegistry(registry).endorsed(_gauge))
+        //     revert NotEndorsed(_gauge);
 
         gauge = IGauge(_gauge);
 

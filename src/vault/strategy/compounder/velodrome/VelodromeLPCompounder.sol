@@ -3,8 +3,7 @@
 
 pragma solidity ^0.8.15;
 
-import {VelodromeCompounder, VelodromeUtils, IVelodromeRouter, IERC20, IAdapter} from "./VelodromeCompounder.sol";
-import {IGauge, ILpToken} from "../../../adapter/velodrome/IVelodrome.sol";
+import {VelodromeCompounder, VelodromeUtils, IVelodromeRouter, IERC20, IAdapter, IGauge, ILpToken} from "./VelodromeCompounder.sol";
 
 contract VelodromeLpCompounder is VelodromeCompounder {
     function _verifyAsset(

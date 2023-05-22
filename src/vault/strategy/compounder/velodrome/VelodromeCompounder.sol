@@ -8,6 +8,7 @@ import {IAdapter} from "../../../../interfaces/vault/IAdapter.sol";
 import {IWithRewards} from "../../../../interfaces/vault/IWithRewards.sol";
 import {StrategyBase} from "../../StrategyBase.sol";
 import {VelodromeUtils, IVelodromeRouter} from "./VelodromeUtils.sol";
+import {IGauge, ILpToken} from "../../../adapter/velodrome/IVelodrome.sol";
 
 contract VelodromeCompounder is StrategyBase {
     // Events
@@ -172,13 +173,20 @@ contract VelodromeCompounder is StrategyBase {
         // Trade rewards for base asset
         address[] memory rewardTokens = IWithRewards(address(this))
             .rewardTokens();
+
         uint256 len = rewardTokens.length;
         for (uint256 i = 0; i < len; i++) {
             uint256 rewardBal = IERC20(rewardTokens[i]).balanceOf(
                 address(this)
             );
-            if (rewardBal >= minTradeAmounts[i])
-                VelodromeUtils.swap(router, toBaseAssetPaths[i], rewardBal);
+            if (rewardBal >= minTradeAmounts[i]) {
+                VelodromeUtils.swap(router, toBaseAssetPaths[i], rewardBal / 2);
+                VelodromeUtils.swap(
+                    router,
+                    toBaseAssetPaths[i + 1],
+                    rewardBal / 2 - 1
+                );
+            }
         }
     }
 
