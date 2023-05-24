@@ -113,6 +113,7 @@ contract VelodromeCompounder is StrategyBase {
         address[] memory rewardTokens = IWithRewards(address(this))
             .rewardTokens();
         uint256 len = rewardTokens.length;
+
         for (uint256 i = 0; i < len; i++) {
             IERC20(rewardTokens[i]).approve(router, type(uint256).max);
         }
@@ -179,13 +180,11 @@ contract VelodromeCompounder is StrategyBase {
             uint256 rewardBal = IERC20(rewardTokens[i]).balanceOf(
                 address(this)
             );
+            uint256 bal0 = rewardBal / 2;
+            uint256 bal1 = rewardBal - bal0;
             if (rewardBal >= minTradeAmounts[i]) {
-                VelodromeUtils.swap(router, toBaseAssetPaths[i], rewardBal / 2);
-                VelodromeUtils.swap(
-                    router,
-                    toBaseAssetPaths[i + 1],
-                    rewardBal / 2 - 1
-                );
+                VelodromeUtils.swap(router, toBaseAssetPaths[i], bal0);
+                VelodromeUtils.swap(router, toBaseAssetPaths[i + 1], bal1);
             }
         }
     }

@@ -39,7 +39,13 @@ contract VelodromeLpCompounderTest is Test {
         );
 
         toBaseAssetPaths.push(
-            abi.encodePacked(velo, uint24(3000), lpToken.token1())
+            abi.encodePacked(
+                velo,
+                uint24(3000),
+                lpToken.token0(),
+                uint24(3000),
+                lpToken.token1()
+            )
         );
 
         minTradeAmounts.push(uint256(1));
@@ -82,9 +88,9 @@ contract VelodromeLpCompounderTest is Test {
     }
 
     function test__compound() public {
-        deal(address(lpToken), address(this), 10000e6);
+        deal(address(lpToken), address(this), 1e18);
         IERC20(address(lpToken)).approve(address(adapter), type(uint256).max);
-        adapter.deposit(10000e6, address(this));
+        adapter.deposit(1e18, address(this));
 
         uint256 oldTa = adapter.totalAssets();
 

@@ -15,6 +15,16 @@ interface IVelodromeRouter {
         uint256 deadline
     ) external returns (uint256[] memory amounts);
 
+    function swapExactTokensForTokensSimple(
+        uint256 amountIn,
+        uint256 amountOut,
+        address tokenFrom,
+        address tokenTo,
+        bool stable,
+        address to,
+        uint256 deadline
+    ) external returns (uint256[] memory amounts);
+
     function addLiquidity(
         address tokenA,
         address tokenB,

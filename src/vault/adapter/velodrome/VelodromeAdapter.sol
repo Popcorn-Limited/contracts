@@ -59,8 +59,8 @@ contract VelodromeAdapter is AdapterBase, WithRewards {
 
         if (gauge.stake() != asset()) revert InvalidAsset();
 
-        _rewardTokens.push(ILpToken(asset()).token0());
-        _rewardTokens.push(ILpToken(asset()).token1());
+        // _rewardTokens.push(ILpToken(asset()).token0());
+        // _rewardTokens.push(ILpToken(asset()).token1());
         _rewardTokens.push(gauge.rewards(2)); // velo
 
         _name = string.concat(

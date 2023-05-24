@@ -16,42 +16,42 @@ library VelodromeUtils {
         uint256 _amountIn
     ) internal returns (uint256[] memory amountsOut) {
         address[] memory path = pathToRoute(_path);
+        uint256 len = path.length;
 
-        uint256 reserveA1;
-        uint256 reserveA2;
+        route[] memory routes = new route[](len - 1);
 
-        try
-            IVelodromeRouter(_router).getReserves(
-                path[0],
-                path[path.length - 1],
-                false
-            )
-        returns (uint256 reserveA, uint256 reserveB) {
-            reserveA1 = reserveA;
-        } catch {
-            reserveA1 = 0;
+        for (uint256 i = 0; i < len - 1; ++i) {
+            uint256 reserveA1;
+            uint256 reserveA2;
+
+            try
+                IVelodromeRouter(_router).getReserves(
+                    path[0],
+                    path[path.length - 1],
+                    false
+                )
+            returns (uint256 reserveA, uint256 reserveB) {
+                reserveA1 = reserveA;
+            } catch {
+                reserveA1 = 0;
+            }
+
+            try
+                IVelodromeRouter(_router).getReserves(
+                    path[0],
+                    path[path.length - 1],
+                    true
+                )
+            returns (uint256 reserveA, uint256 reserveB) {
+                reserveA2 = reserveA;
+            } catch {
+                reserveA2 = 0;
+            }
+
+            bool stable = reserveA1 >= reserveA2 ? false : true;
+
+            routes[i] = route(path[i], path[i + 1], stable);
         }
-
-        try
-            IVelodromeRouter(_router).getReserves(
-                path[0],
-                path[path.length - 1],
-                true
-            )
-        returns (uint256 reserveA, uint256 reserveB) {
-            reserveA2 = reserveA;
-        } catch {
-            reserveA2 = 0;
-        }
-
-        bool stable = reserveA1 >= reserveA2 ? false : true;
-
-        route[] memory routes = new route[](1);
-        routes[0] = route(
-            0x4200000000000000000000000000000000000042,
-            0x4200000000000000000000000000000000000006,
-            false
-        );
 
         return
             IVelodromeRouter(_router).swapExactTokensForTokens(
