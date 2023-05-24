@@ -9,8 +9,6 @@ import {VelodromeLpCompounder, VelodromeUtils} from "../../../../../src/vault/st
 import {Clones} from "openzeppelin-contracts/proxy/Clones.sol";
 
 contract VelodromeLpCompounderTest is Test {
-    // IStargateStaking stargateStaking =
-    //     IStargateStaking(0xB0D502E938ed5f4df2E681fE6E419ff29631d62b);
     address _gauge = address(0x2f733b00127449fcF8B5a195bC51Abb73B7F7A75);
     address router = address(0x9c12939390052919aF3155f41Bf4160Fd3666A6f);
 

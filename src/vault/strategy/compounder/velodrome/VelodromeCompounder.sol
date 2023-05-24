@@ -113,7 +113,6 @@ contract VelodromeCompounder is StrategyBase {
         address[] memory rewardTokens = IWithRewards(address(this))
             .rewardTokens();
         uint256 len = rewardTokens.length;
-
         for (uint256 i = 0; i < len; i++) {
             IERC20(rewardTokens[i]).approve(router, type(uint256).max);
         }

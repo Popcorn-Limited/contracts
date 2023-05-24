@@ -46,15 +46,9 @@ contract VelodromeLpCompounder is VelodromeCompounder {
             type(uint256).max
         );
 
-        IERC20(0x4200000000000000000000000000000000000042).approve(
-            router,
-            type(uint256).max
-        );
+        IERC20(ILpToken(token).token0()).approve(router, type(uint256).max);
 
-        IERC20(0x4200000000000000000000000000000000000006).approve(
-            router,
-            type(uint256).max
-        );
+        IERC20(ILpToken(token).token1()).approve(router, type(uint256).max);
 
         address velodromeRouter = abi.decode(optionalData, (address));
         IERC20(token).approve(velodromeRouter, type(uint256).max);
@@ -70,14 +64,6 @@ contract VelodromeLpCompounder is VelodromeCompounder {
         ILpToken LpToken = ILpToken(asset);
 
         address token = asset;
-
-        // Trade base asset for asset
-        if (baseAsset != token)
-            VelodromeUtils.swap(
-                router,
-                toAssetPath,
-                IERC20(baseAsset).balanceOf(address(this))
-            );
 
         address velodromeRouter = abi.decode(optionalData, (address));
 
