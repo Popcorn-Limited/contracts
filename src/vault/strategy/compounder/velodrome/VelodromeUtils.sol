@@ -63,6 +63,21 @@ library VelodromeUtils {
             );
     }
 
+    function swap(
+        address _router,
+        route[] memory routes,
+        uint256 _amountIn
+    ) internal returns (uint256[] memory amountsOut) {
+        return
+            IVelodromeRouter(_router).swapExactTokensForTokens(
+                _amountIn,
+                1,
+                routes,
+                address(this),
+                block.timestamp
+            );
+    }
+
     // Swap along a token route using known fees and amountIn
     function swap(
         address _router,

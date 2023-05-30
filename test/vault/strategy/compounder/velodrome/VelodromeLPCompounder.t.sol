@@ -5,22 +5,26 @@ pragma solidity ^0.8.15;
 
 import {Test} from "forge-std/Test.sol";
 import {VelodromeAdapter, SafeERC20, IERC20, IERC20Metadata, Math, IGauge, ILpToken} from "../../../../../src/vault/adapter/velodrome/VelodromeAdapter.sol";
-import {VelodromeLpCompounder, VelodromeUtils} from "../../../../../src/vault/strategy/compounder/velodrome/VelodromeLpCompounder.sol";
+import {VelodromeLpCompounder, VelodromeUtils, route} from "../../../../../src/vault/strategy/compounder/velodrome/VelodromeLpCompounder.sol";
 import {Clones} from "openzeppelin-contracts/proxy/Clones.sol";
 
 contract VelodromeLpCompounderTest is Test {
     address _gauge = address(0x2f733b00127449fcF8B5a195bC51Abb73B7F7A75);
     address router = address(0x9c12939390052919aF3155f41Bf4160Fd3666A6f);
+    address op = address(0x4200000000000000000000000000000000000042);
 
     VelodromeAdapter adapter;
 
     IGauge gauge;
     ILpToken lpToken;
+    address lpToken0;
+    address lpToken1;
     address velo;
     address asset;
 
     bytes4[8] sigs;
-    bytes[] toBaseAssetPaths;
+    route[][] toBaseAssetPaths;
+    route[][] toAssetPaths;
     uint256[] minTradeAmounts;
 
     function setUp() public {
@@ -28,33 +32,27 @@ contract VelodromeLpCompounderTest is Test {
         vm.selectFork(forkId);
 
         IGauge gauge = IGauge(_gauge);
-        lpToken = ILpToken(gauge.stake());
+        asset = gauge.stake();
+        lpToken = ILpToken(asset);
         velo = gauge.rewards(2);
-        asset = address(lpToken);
+        lpToken0 = lpToken.token0();
+        lpToken1 = lpToken.token1();
 
-        toBaseAssetPaths.push(
-            abi.encodePacked(velo, uint24(3000), lpToken.token0())
-        );
+        toBaseAssetPaths.push();
+        toBaseAssetPaths[0].push(route(velo, lpToken1, false));
 
-        toBaseAssetPaths.push(
-            abi.encodePacked(
-                velo,
-                uint24(3000),
-                lpToken.token0(),
-                uint24(3000),
-                lpToken.token1()
-            )
-        );
+        toAssetPaths.push();
+        toAssetPaths[0].push(route(lpToken1, lpToken0, false));
 
         minTradeAmounts.push(uint256(1));
 
         bytes memory stratData = abi.encode(
-            address(lpToken),
+            op,
             router,
             toBaseAssetPaths,
-            "",
+            toAssetPaths,
             minTradeAmounts,
-            abi.encode(address(router))
+            abi.encode("")
         );
 
         address impl = address(new VelodromeAdapter());
