@@ -5,7 +5,7 @@
 # source .env && forge create YearnAdapter --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY
 # source .env && forge create BeefyAdapter --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY
 # source .env && forge create CompoundV2Adapter --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY
-source .env && forge create OusdAdapter --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY
+# source .env && forge create OusdAdapter --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY
 # source .env && forge create MockStrategy --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY
 # source .env && forge create Vault --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY
 
@@ -13,7 +13,7 @@ source .env && forge create OusdAdapter --rpc-url=$FORKING_RPC_URL --private-key
 # source .env && forge create AdminProxy --constructor-args 0x22f5413C075Ccd56D575A54763831C4c27A37Bdb --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY --verify --etherscan-api-key=$ETHERSCAN_API_KEY
 # source .env && forge create PermissionRegistry --constructor-args 0xcC09F5bd7582D02Bb31825d09589F4773B65eCc9 --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY --verify --etherscan-api-key=$ETHERSCAN_API_KEY
 # source .env && forge create VaultRegistry --constructor-args 0xcC09F5bd7582D02Bb31825d09589F4773B65eCc9 --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY --verify --etherscan-api-key=$ETHERSCAN_API_KEY
-# source .env && forge create MultiRewardEscrow --constructor-args 0xcC09F5bd7582D02Bb31825d09589F4773B65eCc9 0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY --verify --etherscan-api-key=$ETHERSCAN_API_KEY
+# source .env && forge create MultiRewardEscrow --constructor-args 0x7Edd61A58B5920dF39208E9888D8be713f639A60 0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY --verify --etherscan-api-key=$ETHERSCAN_API_KEY
 # source .env && forge create VaultRouter --constructor-args 0x41813a5303597a68c0a780FF37A827b9c7e84397 --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY --verify --etherscan-api-key=$ETHERSCAN_API_KEY
 
 # Deploy Deployment Controller
@@ -31,7 +31,7 @@ source .env && forge create OusdAdapter --rpc-url=$FORKING_RPC_URL --private-key
 # source .env && cast send 0xcC09F5bd7582D02Bb31825d09589F4773B65eCc9 "execute(address, bytes)" 0x87eBAC6021F133E217FF6b8e374cae2C3456936E 0x79ba509700000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000000 --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY
 
 # Set up VaultController
-# source .env && forge create VaultController --constructor-args 0x22f5413C075Ccd56D575A54763831C4c27A37Bdb 0xcC09F5bd7582D02Bb31825d09589F4773B65eCc9 0x87eBAC6021F133E217FF6b8e374cae2C3456936E 0xB205e94D402742B919E851892f7d515592a7A6cC 0xB67C4c9C3CebCeC2FD3fDE436340D728D990A8d9 0x23DBbE898A8b69eA0681F8d8C74f4B17dAAe5FCd --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY --verify --etherscan-api-key=$ETHERSCAN_API_KEY
+source .env && forge create VaultController --constructor-args 0x22f5413C075Ccd56D575A54763831C4c27A37Bdb 0x7Edd61A58B5920dF39208E9888D8be713f639A60 0x58A2704deA4168D307EFF593E897eC73C6670F6A 0x2246c4c469735bCE95C120939b0C078EC37A08D0 0x1F381429943AFBb6870b3b9B0aB4707a6BdC2356 0x0E9C19bF470ecd5f167c97bF5f2FcA433adD2066 --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY --verify --etherscan-api-key=$ETHERSCAN_API_KEY
 # source .env && cast send 0xcC09F5bd7582D02Bb31825d09589F4773B65eCc9 "nominateNewOwner(address)" 0xF40749d72Ab5422CC5d735A373E66d67f7cA9393 --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY
 # source .env && cast send 0xF40749d72Ab5422CC5d735A373E66d67f7cA9393 "acceptAdminProxyOwnership()" --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY
 
