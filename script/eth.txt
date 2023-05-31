@@ -24,3 +24,9 @@ YearnUsdcVault=0xc1D4a319dD7C44e332Bd54c724433C6067FeDd0D #0x2fd2c18f79f93ef299b
 
 yearnAdapterKey=YearnAdapter1
 beefyAdapterKey=BeefyAdapter3
+
+
+
+DaiFluxVault=0x5d344226578DC100b2001DA251A4b154df58194f
+OusdVault=0xc8C88fdF2802733f8c4cd7c0bE0557fdC5d2471c
+BeefyVault=0xBae30fBD558A35f147FDBaeDbFF011557d3C8bd2
