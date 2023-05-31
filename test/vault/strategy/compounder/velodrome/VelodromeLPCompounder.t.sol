@@ -75,7 +75,15 @@ contract VelodromeLpCompounderTest is Test {
 
     function test__init() public {
         assertEq(
-            IERC20(address(lpToken)).allowance(
+            IERC20(address(lpToken0)).allowance(
+                address(adapter),
+                address(router)
+            ),
+            type(uint256).max
+        );
+
+        assertEq(
+            IERC20(address(lpToken1)).allowance(
                 address(adapter),
                 address(router)
             ),

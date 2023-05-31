@@ -125,6 +125,7 @@ contract VelodromeLpCompounder is StrategyBase {
         address router,
         bytes memory optionalData
     ) internal virtual {
+        // Approve velo
         IERC20(0x3c8B650257cFb5f272f799F5e2b4e65093a11a05).approve(
             router,
             type(uint256).max
