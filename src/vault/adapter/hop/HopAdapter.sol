@@ -74,7 +74,7 @@ contract HopAdapter is AdapterBase, WithRewards {
             IERC20Metadata(asset()).name(),
             " Adapter"
         );
-        _symbol = string.concat("vcB-", IERC20Metadata(asset()).symbol());
+        _symbol = string.concat("vcHop-", IERC20Metadata(asset()).symbol());
 
         IERC20(asset()).approve(address(liquidityPool), type(uint256).max);
         IERC20(LPToken).approve(address(liquidityPool), type(uint256).max);
