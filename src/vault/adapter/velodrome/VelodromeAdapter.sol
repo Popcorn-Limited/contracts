@@ -48,27 +48,30 @@ contract VelodromeAdapter is AdapterBase, WithRewards {
         address registry,
         bytes memory velodromeInitData
     ) external initializer {
-        __AdapterBase_init(adapterInitData);
-
         address _gauge = abi.decode(velodromeInitData, (address));
 
         // if (!IPermissionRegistry(registry).endorsed(_gauge))
         //     revert NotEndorsed(_gauge);
 
         gauge = IGauge(_gauge);
+        address _asset = gauge.stake();
 
-        if (gauge.stake() != asset()) revert InvalidAsset();
-
+        _rewardTokens.push(ILpToken(_asset).token0());
+        _rewardTokens.push(ILpToken(_asset).token1());
         _rewardTokens.push(gauge.rewards(2)); // velo
+
+        __AdapterBase_init(adapterInitData);
+
+        if (_asset != asset()) revert InvalidAsset();
 
         _name = string.concat(
             "VaultCraft Velodrome ",
-            IERC20Metadata(asset()).name(),
+            IERC20Metadata(_asset).name(),
             " Adapter"
         );
-        _symbol = string.concat("vcVelo-", IERC20Metadata(asset()).symbol());
+        _symbol = string.concat("vcVelo-", IERC20Metadata(_asset).symbol());
 
-        IERC20(asset()).approve(address(gauge), type(uint256).max);
+        IERC20(_asset).approve(address(gauge), type(uint256).max);
     }
 
     function name()

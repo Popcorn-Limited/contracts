@@ -125,22 +125,7 @@ contract VelodromeLpCompounder is StrategyBase {
         address router,
         bytes memory optionalData
     ) internal virtual {
-        // Approve velo
-        IERC20(0x3c8B650257cFb5f272f799F5e2b4e65093a11a05).approve(
-            router,
-            type(uint256).max
-        );
-
-        ILpToken lpToken = ILpToken(asset);
-
-        address token0 = lpToken.token0();
-        address token1 = lpToken.token1();
-
-        IERC20(token0).approve(router, type(uint256).max);
-
-        IERC20(token1).approve(router, type(uint256).max);
-
-        if (baseAsset != token0 && baseAsset != token1)
+        if (baseAsset != asset)
             IERC20(baseAsset).approve(router, type(uint256).max);
     }
 
