@@ -1,6 +1,6 @@
 pragma solidity ^0.8.15;
 
-struct route {
+struct Route {
     address from;
     address to;
     bool stable;
@@ -10,7 +10,7 @@ interface IVelodromeRouter {
     function swapExactTokensForTokens(
         uint256 amountIn,
         uint256 amountOutMin,
-        route[] calldata routes,
+        Route[] calldata routes,
         address to,
         uint256 deadline
     ) external returns (uint256[] memory amounts);

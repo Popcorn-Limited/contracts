@@ -3,7 +3,7 @@
 pragma solidity ^0.8.0;
 
 import "src/utils/Path.sol";
-import {IVelodromeRouter, route} from "../../../../interfaces/external/velodrome/IVelodromeRouter.sol";
+import {IVelodromeRouter, Route} from "../../../../interfaces/external/velodrome/IVelodromeRouter.sol";
 import {ILpToken} from "src/vault/adapter/velodrome/IVelodrome.sol";
 
 library VelodromeUtils {
@@ -18,7 +18,7 @@ library VelodromeUtils {
         address[] memory path = pathToRoute(_path);
         uint256 len = path.length;
 
-        route[] memory routes = new route[](len - 1);
+        Route[] memory routes = new Route[](len - 1);
 
         for (uint256 i = 0; i < len - 1; ++i) {
             uint256 reserveA1;
@@ -50,7 +50,7 @@ library VelodromeUtils {
 
             bool stable = reserveA1 >= reserveA2 ? false : true;
 
-            routes[i] = route(path[i], path[i + 1], stable);
+            routes[i] = Route(path[i], path[i + 1], stable);
         }
 
         return
@@ -65,7 +65,7 @@ library VelodromeUtils {
 
     function swap(
         address _router,
-        route[] memory routes,
+        Route[] memory routes,
         uint256 _amountIn
     ) internal returns (uint256[] memory amountsOut) {
         return

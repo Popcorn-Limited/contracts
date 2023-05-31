@@ -7,7 +7,7 @@ import {ERC4626Upgradeable as ERC4626, ERC20Upgradeable as ERC20, IERC20Upgradea
 import {IAdapter} from "../../../../interfaces/vault/IAdapter.sol";
 import {IWithRewards} from "../../../../interfaces/vault/IWithRewards.sol";
 import {StrategyBase} from "../../StrategyBase.sol";
-import {VelodromeUtils, IVelodromeRouter, route} from "./VelodromeUtils.sol";
+import {VelodromeUtils, IVelodromeRouter, Route} from "./VelodromeUtils.sol";
 import {IGauge, ILpToken} from "../../../adapter/velodrome/IVelodrome.sol";
 
 contract VelodromeLpCompounder is StrategyBase {
@@ -25,13 +25,13 @@ contract VelodromeLpCompounder is StrategyBase {
         (
             address baseAsset,
             address router,
-            route[][] memory toBaseAssetPaths,
-            route[][] memory toAssetPaths,
+            Route[][] memory toBaseAssetPaths,
+            Route[][] memory toAssetPaths,
             uint256[] memory minTradeAmounts,
             bytes memory optionalData
         ) = abi.decode(
                 data,
-                (address, address, route[][], route[][], uint256[], bytes)
+                (address, address, Route[][], Route[][], uint256[], bytes)
             );
 
         _verifyRewardToken(toBaseAssetPaths, baseAsset);
@@ -45,7 +45,7 @@ contract VelodromeLpCompounder is StrategyBase {
     }
 
     function _verifyRewardToken(
-        route[][] memory toBaseAssetPaths,
+        Route[][] memory toBaseAssetPaths,
         address baseAsset
     ) internal {
         // Verify rewardToken + paths
@@ -53,7 +53,7 @@ contract VelodromeLpCompounder is StrategyBase {
 
         uint256 len = rewardTokens.length;
         for (uint256 i; i < len; i++) {
-            route[] memory route = toBaseAssetPaths[i];
+            Route[] memory route = toBaseAssetPaths[i];
             if (
                 route[0].from != rewardTokens[i] ||
                 route[route.length - 1].to != baseAsset
@@ -64,18 +64,18 @@ contract VelodromeLpCompounder is StrategyBase {
     function _verifyAsset(
         address baseAsset,
         address asset,
-        route[][] memory toAssetPaths,
+        Route[][] memory toAssetPaths,
         bytes memory
     ) internal virtual {
         // Verify base asset to asset path
         ILpToken lpToken = ILpToken(asset);
-        route[] memory toLp0Route = toAssetPaths[0];
+        Route[] memory toLp0Route = toAssetPaths[0];
         if (toLp0Route[0].from != baseAsset) revert InvalidConfig();
         if (toLp0Route[toLp0Route.length - 1].to != lpToken.token0())
             revert InvalidConfig();
 
         if (toAssetPaths.length > 1) {
-            route[] memory toLp1Route = toAssetPaths[1];
+            Route[] memory toLp1Route = toAssetPaths[1];
             if (toLp1Route[0].from != baseAsset) revert InvalidConfig();
             if (toLp1Route[toLp1Route.length - 1].to != lpToken.token1())
                 revert InvalidConfig();
@@ -90,13 +90,13 @@ contract VelodromeLpCompounder is StrategyBase {
         (
             address baseAsset,
             address router,
-            route[][] memory toBaseAssetPaths,
-            route[][] memory toAssetPath,
+            Route[][] memory toBaseAssetPaths,
+            Route[][] memory toAssetPath,
             uint256[] memory minTradeAmounts,
             bytes memory optionalData
         ) = abi.decode(
                 data,
-                (address, address, route[][], route[][], uint256[], bytes)
+                (address, address, Route[][], Route[][], uint256[], bytes)
             );
 
         _approveRewards(router);
@@ -138,13 +138,13 @@ contract VelodromeLpCompounder is StrategyBase {
         (
             address baseAsset,
             address router,
-            route[][] memory toBaseAssetPaths,
-            route[][] memory toAssetPaths,
+            Route[][] memory toBaseAssetPaths,
+            Route[][] memory toAssetPaths,
             uint256[] memory minTradeAmounts,
             bytes memory optionalData
         ) = abi.decode(
                 IAdapter(address(this)).strategyConfig(),
-                (address, address, route[][], route[][], uint256[], bytes)
+                (address, address, Route[][], Route[][], uint256[], bytes)
             );
 
         address asset = IAdapter(address(this)).asset();
@@ -168,7 +168,7 @@ contract VelodromeLpCompounder is StrategyBase {
 
     function _swapToBaseAsset(
         address router,
-        route[][] memory toBaseAssetPaths,
+        Route[][] memory toBaseAssetPaths,
         uint256[] memory minTradeAmounts
     ) internal {
         // Trade rewards for base asset
@@ -190,7 +190,7 @@ contract VelodromeLpCompounder is StrategyBase {
         address baseAsset,
         address asset,
         address router,
-        route[][] memory toAssetPaths,
+        Route[][] memory toAssetPaths,
         bytes memory optionalData
     ) internal virtual {
         uint256 lp0Amount = IERC20(baseAsset).balanceOf(address(this)) / 2;
