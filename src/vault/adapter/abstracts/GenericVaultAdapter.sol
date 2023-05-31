@@ -41,6 +41,7 @@ contract GenericVaultAdapter is AdapterBase {
         bytes memory vaultInitData
     ) external initializer {
         __AdapterBase_init(adapterInitData);
+        
         address _vault = abi.decode(vaultInitData, (address));
 
         if (!IPermissionRegistry(registry).endorsed(_vault))
