@@ -127,6 +127,11 @@ contract VelodromeLpCompounder is StrategyBase {
     ) internal virtual {
         if (baseAsset != asset)
             IERC20(baseAsset).approve(router, type(uint256).max);
+
+        ILpToken token = ILpToken(asset);
+
+        IERC20(token.token0()).approve(router, type(uint256).max);
+        IERC20(token.token1()).approve(router, type(uint256).max);
     }
 
     /*//////////////////////////////////////////////////////////////

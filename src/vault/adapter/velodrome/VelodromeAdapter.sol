@@ -56,8 +56,6 @@ contract VelodromeAdapter is AdapterBase, WithRewards {
         gauge = IGauge(_gauge);
         address _asset = gauge.stake();
 
-        _rewardTokens.push(ILpToken(_asset).token0());
-        _rewardTokens.push(ILpToken(_asset).token1());
         _rewardTokens.push(gauge.rewards(2)); // velo
 
         __AdapterBase_init(adapterInitData);

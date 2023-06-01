@@ -5,7 +5,7 @@ pragma solidity ^0.8.15;
 
 import {Test} from "forge-std/Test.sol";
 import {VelodromeAdapter, SafeERC20, IERC20, IERC20Metadata, Math, IGauge, ILpToken} from "../../../../../src/vault/adapter/velodrome/VelodromeAdapter.sol";
-import {VelodromeLpCompounder, VelodromeUtils, route} from "../../../../../src/vault/strategy/compounder/velodrome/VelodromeLpCompounder.sol";
+import {VelodromeLpCompounder, VelodromeUtils, Route} from "../../../../../src/vault/strategy/compounder/velodrome/VelodromeLpCompounder.sol";
 import {Clones} from "openzeppelin-contracts/proxy/Clones.sol";
 
 contract VelodromeLpCompounderTest is Test {
@@ -23,8 +23,8 @@ contract VelodromeLpCompounderTest is Test {
     address asset;
 
     bytes4[8] sigs;
-    route[][] toBaseAssetPaths;
-    route[][] toAssetPaths;
+    Route[][] toBaseAssetPaths;
+    Route[][] toAssetPaths;
     uint256[] minTradeAmounts;
 
     function setUp() public {
@@ -39,10 +39,10 @@ contract VelodromeLpCompounderTest is Test {
         lpToken1 = lpToken.token1();
 
         toBaseAssetPaths.push();
-        toBaseAssetPaths[0].push(route(velo, lpToken1, false));
+        toBaseAssetPaths[0].push(Route(velo, lpToken1, false));
 
         toAssetPaths.push();
-        toAssetPaths[0].push(route(lpToken1, lpToken0, false));
+        toAssetPaths[0].push(Route(lpToken1, lpToken0, false));
 
         minTradeAmounts.push(uint256(1));
 
