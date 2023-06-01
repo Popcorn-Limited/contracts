@@ -39,6 +39,7 @@ contract MetaPoolAdapterTest is AbstractAdapterTest {
         iPool = IMetaPool(poolAddress);
 
         wNear = iPool.wNear();
+        stNear = iPool.stNear();
 
         setUpBaseTest(
             IERC20(wNear),
