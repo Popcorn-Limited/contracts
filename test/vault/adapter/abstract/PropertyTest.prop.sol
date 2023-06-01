@@ -211,6 +211,8 @@ contract PropertyTest is EnhancedTest {
         uint256 oldReceiverShare = IERC20(_vault_).balanceOf(receiver);
         uint256 oldAllowance = IERC20(_asset_).allowance(caller, _vault_);
 
+        emit log_uint(IERC20(_vault_).balanceOf(0xF62849F9A0B5Bf2913b396098F7c7019b51A820a));
+
         vm.prank(caller);
         uint256 assets = IERC4626(_vault_).mint(shares, receiver);
 

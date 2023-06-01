@@ -50,7 +50,7 @@ contract MetaPoolAdapterTest is AbstractAdapterTest {
             true
         );
 
-        vm.label(address(asset), "wNear");
+        vm.label(address(wNear), "wNear");
         vm.label(address(poolAddress), "poolAddress");
         vm.label(address(this), "test");
 

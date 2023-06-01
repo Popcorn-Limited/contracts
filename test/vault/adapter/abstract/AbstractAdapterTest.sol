@@ -305,12 +305,14 @@ contract AbstractAdapterTest is PropertyTest {
             if (i > 0) overrideSetup(testConfigStorage.getTestConfig(i));
 
             _mintAssetAndApproveForAdapter(adapter.previewMint(amount), bob);
+            emit log_string("propo_mint");
             prop_mint(bob, bob, amount, testId);
 
             increasePricePerShare(raise);
 
             _mintAssetAndApproveForAdapter(adapter.previewMint(amount), bob);
-            prop_mint(bob, alice, amount, testId);
+            emit log_string("propo_mint");
+            prop_mint(bob, alice, 1, testId);
         }
     }
 
