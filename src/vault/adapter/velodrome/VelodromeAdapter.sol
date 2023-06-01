@@ -42,7 +42,6 @@ contract VelodromeAdapter is AdapterBase, WithRewards {
      * @dev `_gauge` - the gauge address to stake our asset in
      * @dev This function is called by the factory contract when deploying a new vault.
      */
-
     function initialize(
         bytes memory adapterInitData,
         address registry,
