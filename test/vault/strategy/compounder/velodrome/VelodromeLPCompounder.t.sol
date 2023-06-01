@@ -4,9 +4,10 @@
 pragma solidity ^0.8.15;
 
 import {Test} from "forge-std/Test.sol";
-import {VelodromeAdapter, SafeERC20, IERC20, IERC20Metadata, Math, IGauge, ILpToken} from "../../../../../src/vault/adapter/velodrome/VelodromeAdapter.sol";
+import {VelodromeAdapter, SafeERC20, IERC20, IERC20Metadata, Math, IGauge, ILpToken, IStrategy} from "../../../../../src/vault/adapter/velodrome/VelodromeAdapter.sol";
 import {VelodromeLpCompounder, VelodromeUtils, Route} from "../../../../../src/vault/strategy/compounder/velodrome/VelodromeLpCompounder.sol";
 import {Clones} from "openzeppelin-contracts/proxy/Clones.sol";
+import {MockStrategyClaimer} from "../../../../utils/mocks/MockStrategyClaimer.sol";
 
 contract VelodromeLpCompounderTest is Test {
     address _gauge = address(0x2f733b00127449fcF8B5a195bC51Abb73B7F7A75);
@@ -104,5 +105,22 @@ contract VelodromeLpCompounderTest is Test {
         adapter.harvest();
 
         assertGt(adapter.totalAssets(), oldTa);
+    }
+
+    function test__claim() public {
+        address bob = address(0x2e234DAe75C793f67A35089C9d99245E1C58470b);
+
+        deal(address(lpToken), address(this), 1e18);
+        IERC20(address(lpToken)).approve(address(adapter), type(uint256).max);
+        adapter.deposit(1e18, address(this));
+
+        vm.roll(block.number + 10_000);
+        vm.warp(block.timestamp + 150_000);
+
+        vm.prank(bob);
+
+        adapter.claim();
+
+        assertGt(IERC20(velo).balanceOf(address(adapter)), 0);
     }
 }
