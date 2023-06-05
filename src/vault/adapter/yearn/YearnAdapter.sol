@@ -85,7 +85,7 @@ contract YearnAdapter is AdapterBase {
   //////////////////////////////////////////////////////////////*/
 
     /// @notice Emulate yearns total asset calculation to return the total assets of the vault.
-    function _totalAssets() internal view override returns (uint256) {
+    function _totalAssets() internal view virtual override returns (uint256) {
         return _shareValue(yVault.balanceOf(address(this)));
     }
 
@@ -195,14 +195,22 @@ contract YearnAdapter is AdapterBase {
         yVault.deposit(amount);
     }
 
+    event log_named_uint(string, uint256);
+
     function _protocolWithdraw(
         uint256 assets,
         uint256 shares
     ) internal virtual override {
-        yVault.withdraw(
-            convertToUnderlyingShares(assets, shares),
-            address(this),
-            maxLoss
+        emit log_named_uint("assets", assets);
+        emit log_named_uint("shares", shares);
+
+        uint256 yShares = convertToUnderlyingShares(assets, shares);
+        emit log_named_uint("yShares", yShares);
+        emit log_named_uint(
+            "yAssets",
+            (yShares * yVault.pricePerShare()) / 1e18
         );
+
+        yVault.withdraw(yShares, address(this), maxLoss);
     }
 }

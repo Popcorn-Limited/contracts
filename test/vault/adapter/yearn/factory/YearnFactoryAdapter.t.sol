@@ -230,14 +230,23 @@ contract YearnFactoryAdapterTest is AbstractAdapterTest {
         adapter.mint(minFuzz, bob);
     }
 
-    function test_depositWithdrawal() public {
+    function test__depositWithdraw() public {
         _mintAssetAndApproveForAdapter(1e18, bob);
 
         prop_deposit(bob, bob, 1e18, testId);
 
-        emit log_named_uint("ta", adapter.totalAssets());
-        emit log_named_uint("mw", adapter.maxWithdraw(bob));
-
         prop_withdraw(bob, bob, 1e18 - 1, testId);
+    }
+
+    function test__depositRedeem() public {
+        _mintAssetAndApproveForAdapter(1e18, bob);
+
+        prop_deposit(bob, bob, 1e18, testId);
+
+        uint256 shares = adapter.balanceOf(bob);
+
+        increasePricePerShare(raise);
+
+        prop_redeem(bob, bob, shares - 1000, testId);
     }
 }

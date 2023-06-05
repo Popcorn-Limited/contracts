@@ -349,6 +349,7 @@ contract AbstractAdapterTest is PropertyTest {
 
             uint256 reqAssets = adapter.previewMint(amount) * 10;
             _mintAssetAndApproveForAdapter(reqAssets, bob);
+            
             vm.prank(bob);
             adapter.deposit(reqAssets, bob);
             prop_redeem(bob, bob, amount, testId);

@@ -3,7 +3,7 @@
 
 pragma solidity ^0.8.15;
 
-import {YearnAdapter, IERC20, IERC20Metadata, SafeERC20} from "../YearnAdapter.sol";
+import {YearnAdapter, IERC20, IERC20Metadata, SafeERC20, Math} from "../YearnAdapter.sol";
 import {IVaultFactory, VaultAPI} from "../IYearn.sol";
 
 /**
@@ -16,6 +16,7 @@ import {IVaultFactory, VaultAPI} from "../IYearn.sol";
  */
 contract YearnFactoryAdapter is YearnAdapter {
     using SafeERC20 for IERC20;
+    using Math for uint256;
 
     error InvalidAsset();
 
@@ -63,7 +64,12 @@ contract YearnFactoryAdapter is YearnAdapter {
      * @notice Returns the total quantity of all assets under control of this Vault,
      * whether they're loaned out to a Strategy, or currently held in the Vault.
      */
-    function _yTotalAssets() internal view override returns (uint256) {
-        return yVault.totalIdle() + yVault.totalDebt();
+    function _totalAssets() internal view override returns (uint256) {
+        return
+            yVault.balanceOf(address(this)).mulDiv(
+                yVault.totalAssets(),
+                yVault.totalSupply(),
+                Math.Rounding.Down
+            );
     }
 }
