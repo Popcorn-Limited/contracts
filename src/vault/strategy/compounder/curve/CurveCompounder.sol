@@ -46,6 +46,14 @@ contract CurveCompounder is StrategyBase {
             toAssetRoute,
             optionalData
         );
+
+        // trading 0 tokens through Curve will cause the tx to revert.
+        for (uint i; i < minTradeAmounts.length;) {
+            require(minTradeAmounts[i] != 0, "min trade amount has to be > 0");
+            unchecked {
+                ++i;
+            }
+        }
     }
 
     function _verifyRewardToken(
@@ -156,14 +164,19 @@ contract CurveCompounder is StrategyBase {
                 IAdapter(address(this)).strategyConfig(),
                 (address, address, CurveRoute[], CurveRoute, uint256[], bytes)
             );
-
         address asset = IAdapter(address(this)).asset();
 
         uint256 balBefore = IERC20(asset).balanceOf(address(this));
 
         IWithRewards(address(this)).claim();
-
         _swapToBaseAsset(router, toBaseAssetRoutes, minTradeAmounts);
+
+        // if reward token balance is < minTradeAmounts, we won't trade any reward tokens for the base asset.
+        // Because we have no base assets we can't trade to the adapter's underlying asset.
+        if (IERC20(baseAsset).balanceOf(address(this)) == 0) {
+            emit Harvest();
+            return;
+        }
 
         _getAsset(baseAsset, asset, router, toAssetRoute, optionalData);
 
