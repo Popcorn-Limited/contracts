@@ -10,7 +10,6 @@ import {IERC4626Upgradeable as IERC4626, IERC20Upgradeable as IERC20} from "open
 import {LidoTestConfigStorage, LidoTestConfig} from "./LidoTestConfigStorage.sol";
 import {AbstractAdapterTest, ITestConfigStorage, IAdapter} from "../abstract/AbstractAdapterTest.sol";
 import {SafeMath} from "openzeppelin-contracts/utils/math/SafeMath.sol";
-import {ICurveFi} from "../../../../src/vault/adapter/lido/ICurveFi.sol";
 
 contract LidoAdapterTest is AbstractAdapterTest {
     using Math for uint256;
@@ -23,8 +22,7 @@ contract LidoAdapterTest is AbstractAdapterTest {
     int128 private constant WETHID = 0;
     int128 private constant STETHID = 1;
     uint8 internal constant decimalOffset = 9;
-    ICurveFi public constant StableSwapSTETH =
-        ICurveFi(0xDC24316b9AE028F1497c275EB9192a3Ea0f67022);
+    address public constant StableSwapSTETH = 0xDC24316b9AE028F1497c275EB9192a3Ea0f67022;
     uint256 public constant DENOMINATOR = 10000;
     uint256 public slippageProtectionOut = 100; // = 100; //out of 10000. 100 = 1%
 
@@ -128,91 +126,6 @@ contract LidoAdapterTest is AbstractAdapterTest {
         );
     }
 
-    // Assets wont be the same as before so this overwrites the base function
-    function prop_withdraw(
-        address caller,
-        address owner,
-        uint256 assets,
-        string memory testPreFix
-    ) public virtual override returns (uint256 paid, uint256 received) {
-        uint256 oldReceiverAsset = IERC20(_asset_).balanceOf(caller);
-        uint256 oldOwnerShare = IERC20(_vault_).balanceOf(owner);
-        uint256 oldAllowance = IERC20(_vault_).allowance(owner, caller);
-
-        vm.prank(caller);
-        uint256 shares = IERC4626(_vault_).withdraw(assets, caller, owner);
-
-        uint256 newReceiverAsset = IERC20(_asset_).balanceOf(caller);
-        uint256 newOwnerShare = IERC20(_vault_).balanceOf(owner);
-        uint256 newAllowance = IERC20(_vault_).allowance(owner, caller);
-
-        assertApproxEqAbs(
-            newOwnerShare,
-            oldOwnerShare - shares,
-            _delta_,
-            string.concat("share", testPreFix)
-        );
-        // assertApproxEqAbs(newReceiverAsset, oldReceiverAsset + assets, _delta_, string.concat("asset", testPreFix)); // NOTE: this may fail if the receiver is a contract in which the asset is stored
-        if (caller != owner && oldAllowance != type(uint256).max)
-            assertApproxEqAbs(
-                newAllowance,
-                oldAllowance - shares,
-                _delta_,
-                string.concat("allowance", testPreFix)
-            );
-
-        assertTrue(
-            caller == owner ||
-                oldAllowance != 0 ||
-                (shares == 0 && assets == 0),
-            string.concat("access control", testPreFix)
-        );
-
-        return (shares, assets);
-    }
-
-    function prop_redeem(
-        address caller,
-        address owner,
-        uint256 shares,
-        string memory testPreFix
-    ) public virtual override returns (uint256 paid, uint256 received) {
-        uint256 oldReceiverAsset = IERC20(_asset_).balanceOf(caller);
-        uint256 oldOwnerShare = IERC20(_vault_).balanceOf(owner);
-        uint256 oldAllowance = IERC20(_vault_).allowance(owner, caller);
-
-        vm.prank(caller);
-        uint256 assets = IERC4626(_vault_).redeem(shares, caller, owner);
-
-        uint256 newReceiverAsset = IERC20(_asset_).balanceOf(caller);
-        uint256 newOwnerShare = IERC20(_vault_).balanceOf(owner);
-        uint256 newAllowance = IERC20(_vault_).allowance(owner, caller);
-
-        assertApproxEqAbs(
-            newOwnerShare,
-            oldOwnerShare - shares,
-            _delta_,
-            string.concat("share", testPreFix)
-        );
-        // assertApproxEqAbs(newReceiverAsset, oldReceiverAsset + assets, _delta_, string.concat("asset", testPreFix)); // NOTE: this may fail if the receiver is a contract in which the asset is stored
-        if (caller != owner && oldAllowance != type(uint256).max)
-            assertApproxEqAbs(
-                newAllowance,
-                oldAllowance - shares,
-                _delta_,
-                string.concat("allowance", testPreFix)
-            );
-
-        assertTrue(
-            caller == owner ||
-                oldAllowance != 0 ||
-                (shares == 0 && assets == 0),
-            string.concat("access control", testPreFix)
-        );
-
-        return (shares, assets);
-    }
-
     /*//////////////////////////////////////////////////////////////
                           INITIALIZATION
     //////////////////////////////////////////////////////////////*/
@@ -247,7 +160,7 @@ contract LidoAdapterTest is AbstractAdapterTest {
 
     // Because withdrawing loses some tokens due to slippage when swapping StEth for Weth
     function test__unpause() public virtual override {
-        _mintFor(defaultAmount * 3, bob);
+        _mintAssetAndApproveForAdapter(defaultAmount * 3, bob);
 
         vm.prank(bob);
         adapter.deposit(defaultAmount, bob);
@@ -285,7 +198,7 @@ contract LidoAdapterTest is AbstractAdapterTest {
     }
 
     function test__RT_mint_withdraw() public virtual override {
-        _mintFor(adapter.previewMint(defaultAmount), bob);
+        _mintAssetAndApproveForAdapter(adapter.previewMint(defaultAmount), bob);
 
         vm.startPrank(bob);
         uint256 assets = adapter.mint(defaultAmount, bob);
@@ -296,7 +209,7 @@ contract LidoAdapterTest is AbstractAdapterTest {
     }
 
     function test__RT_deposit_withdraw() public virtual override {
-        _mintFor(defaultAmount, bob);
+        _mintAssetAndApproveForAdapter(defaultAmount, bob);
 
         vm.startPrank(bob);
         uint256 shares1 = adapter.deposit(defaultAmount, bob);
@@ -307,7 +220,7 @@ contract LidoAdapterTest is AbstractAdapterTest {
     }
 
     function test__pause() public virtual override {
-        _mintFor(defaultAmount, bob);
+        _mintAssetAndApproveForAdapter(defaultAmount, bob);
 
         vm.prank(bob);
         adapter.deposit(defaultAmount, bob);
