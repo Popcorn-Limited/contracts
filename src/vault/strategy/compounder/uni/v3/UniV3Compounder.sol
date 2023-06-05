@@ -41,6 +41,14 @@ contract UniV3Compounder is StrategyBase {
             toAssetPath,
             optionalData
         );
+    
+        // trading 0 tokens through Uniswap will cause the tx to revert.
+        for (uint i; i < minTradeAmounts.length;) {
+            require(minTradeAmounts[i] != 0, "min trade amount has to be > 0");
+            unchecked {
+                ++i;
+            }
+        }
     }
 
     function _verifyRewardToken(
@@ -152,6 +160,13 @@ contract UniV3Compounder is StrategyBase {
         IWithRewards(address(this)).claim();
 
         _swapToBaseAsset(router, toBaseAssetPaths, minTradeAmounts);
+
+        // if reward token balance is < minTradeAmounts, we won't trade any reward tokens for the base asset.
+        // Because we have no base assets we can't trade to the adapter's underlying asset.
+        if (IERC20(baseAsset).balanceOf(address(this)) == 0) {
+            emit Harvest();
+            return;
+        }
 
         _getAsset(baseAsset, asset, router, toAssetPath, optionalData);
 
