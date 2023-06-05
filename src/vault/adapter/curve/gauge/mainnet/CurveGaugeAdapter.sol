@@ -35,6 +35,10 @@ contract CurveGaugeAdapter is AdapterBase, WithRewards {
 
     error InvalidAsset();
 
+    // TODO - Use 0x90E00ACe148ca3b23Ac1bC8C240C2a7Dd9c2d7f5 as Registry
+    // TODO - Call get_pool_from_lp_token(asset)
+    // TODO - Call get_gauges(pool) returns [address[10],int128[10]] --> choose res[0][0] to get the gauge
+    // TODO - Call registry.gauge_controller() -> gaugeController.token() -> token.minter()
     /**
      * @notice Initialize a new MasterChef Adapter.
      * @param adapterInitData Encoded data for the base adapter initialization.
