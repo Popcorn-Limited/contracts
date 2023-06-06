@@ -3,6 +3,7 @@
 # Deploy Clone Implementations
 # source .env && forge create MultiRewardStaking --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY
 # source .env && forge create YearnAdapter --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY
+source .env && forge create YearnFactoryAdapter --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY
 # source .env && forge create BeefyAdapter --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY
 # source .env && forge create CompoundV2Adapter --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY
 # source .env && forge create OusdAdapter --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY

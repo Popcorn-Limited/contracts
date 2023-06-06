@@ -41,13 +41,11 @@ contract YearnAdapter is AdapterBase {
         address externalRegistry,
         bytes memory yearnData
     ) external virtual initializer {
-        (address _asset, , , , , ) = abi.decode(
-            adapterInitData,
-            (address, address, address, uint256, bytes4[8], bytes)
-        );
         __AdapterBase_init(adapterInitData);
 
-        yVault = VaultAPI(IYearnRegistry(externalRegistry).latestVault(_asset));
+        yVault = VaultAPI(
+            IYearnRegistry(externalRegistry).latestVault(asset())
+        );
 
         _name = string.concat(
             "VaultCraft Yearn ",
@@ -59,7 +57,7 @@ contract YearnAdapter is AdapterBase {
         maxLoss = abi.decode(yearnData, (uint256));
         if (maxLoss > 10_000) revert MaxLossTooHigh();
 
-        IERC20(_asset).approve(address(yVault), type(uint256).max);
+        IERC20(asset()).approve(address(yVault), type(uint256).max);
     }
 
     function name()
@@ -171,22 +169,14 @@ contract YearnAdapter is AdapterBase {
         yVault.deposit(amount);
     }
 
-    event log_named_uint(string, uint256);
-
     function _protocolWithdraw(
         uint256 assets,
         uint256 shares
     ) internal virtual override {
-        emit log_named_uint("assets", assets);
-        emit log_named_uint("shares", shares);
-
-        uint256 yShares = convertToUnderlyingShares(assets, shares);
-        emit log_named_uint("yShares", yShares);
-        emit log_named_uint(
-            "yAssets",
-            (yShares * yVault.pricePerShare()) / 1e18
+        yVault.withdraw(
+            convertToUnderlyingShares(assets, shares),
+            address(this),
+            maxLoss
         );
-
-        yVault.withdraw(yShares, address(this), maxLoss);
     }
 }
