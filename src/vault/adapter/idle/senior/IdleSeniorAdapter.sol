@@ -125,7 +125,7 @@ contract IdleSeniorAdapter is AdapterBase {
         uint256 amount,
         uint256
     ) internal virtual override {
-        cdo.depositAA(amount);
+        cdo.depositAARef(amount, FEE_RECIPIENT);
     }
 
     /// @notice Withdraw from the Idle vault and optionally from the booster given its configured
