@@ -7,7 +7,7 @@ import {ERC4626Upgradeable as ERC4626, ERC20Upgradeable as ERC20, IERC20Upgradea
 import {IAdapter} from "../../../../interfaces/vault/IAdapter.sol";
 import {IWithRewards} from "../../../../interfaces/vault/IWithRewards.sol";
 import {StrategyBase} from "../../StrategyBase.sol";
-import {BalancerUtils, IBalancerVault} from "./BalancerUtils.sol";
+import {BalancerUtils, IBalancerVault, SwapKind, BatchSwapStep, BatchSwapStruct, FundManagement, IAsset} from "./BalancerUtils.sol";
 import {IGauge, IMinter, IController} from "../../../adapter/balancer/IBalancer.sol";
 
 contract BalancerLpCompounder is StrategyBase {
@@ -23,76 +23,57 @@ contract BalancerLpCompounder is StrategyBase {
 
     function verifyAdapterCompatibility(bytes memory data) public override {
         (
-            address baseAsset,
-            address router,
-            bytes32[] memory _poolIds,
-            uint256[] memory _assetInIndexes,
-            uint256[] memory _assetOutIndexes,
-            uint256[] memory _amountsIn,
-            address[] memory _assets,
-            address[] memory toBaseAssetPaths,
-            address[] memory toAssetPaths,
+            address _asset,
+            address _baseAsset,
+            address _vault,
+            bytes32 _poolId,
+            SwapKind _swapKind,
+            BatchSwapStruct[] memory _route,
+            FundManagement memory _funds,
+            address[] memory _tokens,
             bytes memory optionalData
         ) = abi.decode(
                 data,
                 (
                     address,
                     address,
-                    bytes32[],
-                    uint256[],
-                    uint256[],
-                    uint256[],
+                    address,
+                    bytes32,
+                    SwapKind,
+                    BatchSwapStruct[],
+                    FundManagement,
                     address[],
+                    address,
                     bytes
                 )
             );
 
-        _verifyRewardToken(toBaseAssetPaths, baseAsset);
+        _verifyRewardToken(_poolId, _baseAsset);
 
         _verifyAsset(
-            baseAsset,
+            _baseAsset,
             IAdapter(msg.sender).asset(),
-            toAssetPaths,
+            _vault,
+            _poolId,
             optionalData
         );
     }
 
-    function _verifyRewardToken(
-        bytes32[] memory _poolIds,
-        address baseAsset
-    ) internal {
+    function _verifyRewardToken(bytes32 _poolId, address _baseAsset) internal {
         // Verify rewardToken + paths
         address[] memory rewardTokens = IWithRewards(msg.sender).rewardTokens();
 
         uint256 len = rewardTokens.length;
-        for (uint256 i; i < len; i++) {
-            // Route[] memory route = toBaseAssetPaths[i];
-            // if (
-            //     route[0].from != rewardTokens[i] ||
-            //     route[route.length - 1].to != baseAsset
-            // ) revert InvalidConfig();
-        }
+        for (uint256 i; i < len; i++) {}
     }
 
     function _verifyAsset(
-        address baseAsset,
-        address asset,
-        bytes32[] memory _poolIds,
+        address _baseAsset,
+        address _asset,
+        address _vault,
+        bytes32 _poolId,
         bytes memory
-    ) internal virtual {
-        // Verify base asset to asset path
-        // ILpToken lpToken = ILpToken(asset);
-        // Route[] memory toLp0Route = toAssetPaths[0];
-        // if (toLp0Route[0].from != baseAsset) revert InvalidConfig();
-        // if (toLp0Route[toLp0Route.length - 1].to != lpToken.token0())
-        //     revert InvalidConfig();
-        // if (toAssetPaths.length > 1) {
-        //     Route[] memory toLp1Route = toAssetPaths[1];
-        //     if (toLp1Route[0].from != baseAsset) revert InvalidConfig();
-        //     if (toLp1Route[toLp1Route.length - 1].to != lpToken.token1())
-        //         revert InvalidConfig();
-        // }
-    }
+    ) internal virtual {}
 
     /*//////////////////////////////////////////////////////////////
                                 SETUP
@@ -100,36 +81,36 @@ contract BalancerLpCompounder is StrategyBase {
 
     function setUp(bytes memory data) public override {
         (
-            address baseAsset,
-            address router,
-            bytes32[] memory _poolIds,
-            uint256[] memory _assetInIndexes,
-            uint256[] memory _assetOutIndexes,
-            uint256[] memory _amountsIn,
-            address[] memory _assets,
-            address[] memory toBaseAssetPaths,
-            address[] memory toAssetPaths,
+            address _asset,
+            address _baseAsset,
+            address _vault,
+            bytes32 _poolId,
+            SwapKind _swapKind,
+            BatchSwapStruct[] memory _route,
+            FundManagement memory _funds,
+            address[] memory _tokens,
             bytes memory optionalData
         ) = abi.decode(
                 data,
                 (
                     address,
                     address,
-                    bytes32[],
-                    uint256[],
-                    uint256[],
-                    uint256[],
+                    address,
+                    bytes32,
+                    SwapKind,
+                    BatchSwapStruct[],
+                    FundManagement,
                     address[],
                     bytes
                 )
             );
 
-        _approveRewards(router);
+        _approveRewards(_vault);
 
         _setUpAsset(
-            baseAsset,
+            _baseAsset,
             IAdapter(address(this)).asset(),
-            router,
+            _vault,
             optionalData
         );
     }
@@ -161,26 +142,26 @@ contract BalancerLpCompounder is StrategyBase {
     // Harvest rewards.
     function harvest() public override {
         (
+            address _asset,
             address _baseAsset,
-            address _router,
-            bytes32[] memory _poolIds,
-            uint256[] memory _assetInIndexes,
-            uint256[] memory _assetOutIndexes,
-            uint256[] memory _amountsIn,
-            address[] memory _assets,
-            address[] memory _toBaseAssetPaths,
-            address[] memory _toAssetPaths,
-            bytes memory _optionalData
+            address _vault,
+            bytes32 _poolId,
+            SwapKind _swapKind,
+            BatchSwapStruct[] memory _route,
+            FundManagement memory _funds,
+            IAsset[] memory _tokens,
+            bytes memory optionalData
         ) = abi.decode(
                 IAdapter(address(this)).strategyConfig(),
                 (
                     address,
                     address,
-                    bytes32[],
-                    uint256[],
-                    uint256[],
-                    uint256[],
-                    address[],
+                    address,
+                    bytes32,
+                    SwapKind,
+                    BatchSwapStruct[],
+                    FundManagement,
+                    IAsset[],
                     bytes
                 )
             );
@@ -191,9 +172,9 @@ contract BalancerLpCompounder is StrategyBase {
 
         IWithRewards(address(this)).claim();
 
-        _swapToBaseAsset(_router, _toBaseAssetPaths, _amountsIn);
+        _swapToBaseAsset(_vault, _swapKind, _route, _funds, _tokens);
 
-        _getAsset(_baseAsset, asset, _router, _toAssetPaths, _optionalData);
+        _getAsset(_baseAsset, _vault, _poolId);
 
         // Deposit new assets into adapter
         IAdapter(address(this)).strategyDeposit(
@@ -205,13 +186,11 @@ contract BalancerLpCompounder is StrategyBase {
     }
 
     function _swapToBaseAsset(
-        address _router,
-        bytes32[] memory _poolIds,
-        uint256[] memory _assetInIndexes,
-        uint256[] memory _assetOutIndexes,
-        uint256[] memory _amountsIn,
-        address[] memory _assets,
-        bytes[] memory _toBaseAssetPaths
+        address _vault,
+        SwapKind _swapKind,
+        BatchSwapStruct[][] memory _toBaseAssetPaths,
+        FundManagement memory _funds,
+        IAsset[] memory _tokens
     ) internal {
         // Trade rewards for base asset
         address[] memory rewardTokens = IWithRewards(address(this))
@@ -222,56 +201,30 @@ contract BalancerLpCompounder is StrategyBase {
             uint256 rewardBal = IERC20(rewardTokens[i]).balanceOf(
                 address(this)
             );
-            if (rewardBal >= _amountsIn[i]) {
+            if (rewardBal > 0) {
+                BatchSwapStep[] memory swaps = BalancerUtils
+                    .buildSwapStructArray(_toBaseAssetPaths[i], rewardBal);
+
                 BalancerUtils.swap(
-                    _router,
-                    _poolIds,
-                    _assetInIndexes,
-                    _assetOutIndexes,
-                    _amountsIn,
-                    _assets
+                    _vault,
+                    _swapKind,
+                    swaps,
+                    _tokens,
+                    _funds,
+                    int256(rewardBal)
                 );
             }
         }
     }
 
     function _getAsset(
-        address _router,
+        address _asset,
         address _baseAsset,
-        bytes32[] memory _poolIds,
-        uint256[] memory _assetInIndexes,
-        uint256[] memory _assetOutIndexes,
-        uint256[] memory _amountsIn,
-        address[] memory _assets,
-        bytes memory optionalData
+        address _vault,
+        bytes32 _poolId
     ) internal virtual {
-        uint256 lp0Amount = IERC20(_baseAsset).balanceOf(address(this)) / 2;
-        BalancerUtils.swap(
-            _router,
-            _poolIds,
-            _assetInIndexes,
-            _assetOutIndexes,
-            _amountsIn,
-            _assets
-        );
+        uint256 amountIn = IERC20(_baseAsset).balanceOf(address(this));
 
-        ILpToken LpToken = ILpToken(asset);
-
-        address tokenA = LpToken.token0();
-        address tokenB = LpToken.token1();
-        uint256 amountA = IERC20(tokenA).balanceOf(address(this));
-        uint256 amountB = IERC20(tokenB).balanceOf(address(this));
-
-        IBalancerRouter(router).addLiquidity(
-            tokenA,
-            tokenB,
-            false,
-            amountA,
-            amountB,
-            0,
-            0,
-            address(this),
-            block.timestamp
-        );
+        BalancerUtils.joinPool(_vault, _poolId, _baseAsset, amountIn);
     }
 }
