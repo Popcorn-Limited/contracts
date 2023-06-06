@@ -133,7 +133,7 @@ contract YearnAdapter is AdapterBase {
     function convertToUnderlyingShares(
         uint256,
         uint256 shares
-    ) public view override returns (uint256) {
+    ) public view virtual override returns (uint256) {
         uint256 supply = totalSupply();
         return
             supply == 0
@@ -143,30 +143,6 @@ contract YearnAdapter is AdapterBase {
                     supply,
                     Math.Rounding.Up
                 );
-    }
-
-    function previewDeposit(
-        uint256 assets
-    ) public view override returns (uint256) {
-        return paused() ? 0 : _convertToShares(assets - 0, Math.Rounding.Down);
-    }
-
-    function previewMint(
-        uint256 shares
-    ) public view override returns (uint256) {
-        return paused() ? 0 : _convertToAssets(shares + 0, Math.Rounding.Up);
-    }
-
-    function previewWithdraw(
-        uint256 assets
-    ) public view override returns (uint256) {
-        return _convertToShares(assets + 0, Math.Rounding.Up);
-    }
-
-    function previewRedeem(
-        uint256 shares
-    ) public view override returns (uint256) {
-        return _convertToAssets(shares - 0, Math.Rounding.Down);
     }
 
     /*//////////////////////////////////////////////////////////////

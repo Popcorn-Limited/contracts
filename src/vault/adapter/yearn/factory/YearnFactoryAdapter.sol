@@ -66,10 +66,28 @@ contract YearnFactoryAdapter is YearnAdapter {
      */
     function _totalAssets() internal view override returns (uint256) {
         return
+            // yVault.balanceOf(address(this)).mulDiv(
+            //     yVault.totalAssets(),
+            //     yVault.totalSupply(),
+            //     Math.Rounding.Down
+            // );
             yVault.balanceOf(address(this)).mulDiv(
-                yVault.totalAssets(),
-                yVault.totalSupply(),
+                yVault.pricePerShare(),
+                1e18,
                 Math.Rounding.Down
             );
     }
+
+    // /// @notice The amount of aave shares to withdraw given an mount of adapter shares
+    // function convertToUnderlyingShares(
+    //     uint256 assets,
+    //     uint256
+    // ) public view override returns (uint256) {
+    //     return
+    //         assets.mulDiv(
+    //             yVault.totalSupply(),
+    //             yVault.totalAssets(),
+    //             Math.Rounding.Up
+    //         );
+    // }
 }
