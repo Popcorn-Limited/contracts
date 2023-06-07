@@ -125,13 +125,14 @@ contract BalancerLpCompounder is StrategyBase {
     }
 
     function _setUpAsset(
-        address baseAsset,
-        address asset,
-        address router,
+        address _baseAsset,
+        address _asset,
+        address _vault,
         bytes memory optionalData
     ) internal virtual {
-        if (baseAsset != asset)
-            IERC20(baseAsset).approve(router, type(uint256).max);
+        // if (_baseAsset != _asset)
+        // IERC20(_baseAsset).approve(_vault, type(uint256).max);
+        IERC20(_baseAsset).approve(_vault, type(uint256).max);
     }
 
     /*//////////////////////////////////////////////////////////////

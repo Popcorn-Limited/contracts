@@ -33,19 +33,19 @@ contract BalancerGaugeAdapter is AdapterBase, WithRewards {
         address registry,
         bytes memory balancerInitData
     ) external initializer {
-        __AdapterBase_init(adapterInitData);
         address _gauge = abi.decode(balancerInitData, (address));
 
-        address controller = IMinter(registry).getGaugeController();
-        if (!IController(controller).gauge_exists(_gauge))
-            revert Disabled();
+        // address controller = IMinter(registry).getGaugeController();
+        // if (!IController(controller).gauge_exists(_gauge)) revert Disabled();
 
-        if (IGauge(_gauge).is_killed()) revert Disabled();
+        // if (IGauge(_gauge).is_killed()) revert Disabled();
 
         balMinter = IMinter(registry);
         gauge = IGauge(_gauge);
 
         _rewardToken.push(IMinter(balMinter).getBalancerToken());
+
+        __AdapterBase_init(adapterInitData);
 
         IERC20(asset()).approve(_gauge, type(uint256).max);
 

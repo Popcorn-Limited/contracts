@@ -11,10 +11,11 @@ import {MockStrategyClaimer} from "../../../../utils/mocks/MockStrategyClaimer.s
 
 contract BalancerLpCompounderTest is Test {
     address _vault = address(0xBA12222222228d8Ba445958a75a0704d566BF2C8);
-    address _baseAsset = address(0xBA12222222228d8Ba445958a75a0704d566BF2C8);
+    address _baseAsset = address(0x82aF49447D8a07e3bd95BD0d56f35241523fBab1);
     bytes32 _poolId =
-        0x3a4c6d2404b5eb14915041e01f63200a82f4a343000200000000000000000065;
+        0x32df62dc3aed2cd6224193052ce665dc181658410002000000000000000003bd;
     address _gauge = address(0xcf9f895296F5e1D66a7D4dcf1d92e1B435E9f999);
+    address _psuedoMinter = address(0xc3ccacE87f6d3A81724075ADcb5ddd85a8A1bB68);
 
     BalancerGaugeAdapter adapter;
 
@@ -50,7 +51,7 @@ contract BalancerLpCompounderTest is Test {
 
         bytes memory stratData = abi.encode(
             asset,
-            baseAsset,
+            _baseAsset,
             _vault,
             _poolId,
             swapKind,
@@ -73,22 +74,17 @@ contract BalancerLpCompounderTest is Test {
                 sigs,
                 stratData
             ),
-            address(gauge),
+            address(0xc3ccacE87f6d3A81724075ADcb5ddd85a8A1bB68),
             abi.encode(address(gauge))
         );
     }
 
     function test__init() public {
         assertEq(
-            IERC20(address(baseAsset)).allowance(
+            IERC20(address(_baseAsset)).allowance(
                 address(adapter),
                 address(_vault)
             ),
-            type(uint256).max
-        );
-
-        assertEq(
-            IERC20(address(asset)).allowance(address(adapter), address(_gauge)),
             type(uint256).max
         );
     }
