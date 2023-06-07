@@ -5,48 +5,58 @@ pragma solidity ^0.8.15;
 
 import {Test} from "forge-std/Test.sol";
 import {BalancerGaugeAdapter, SafeERC20, IERC20, IERC20Metadata, Math, IGauge, IStrategy} from "../../../../../src/vault/adapter/balancer/BalancerGaugeAdapter.sol";
-import {BalancerLpCompounder, BalancerUtils, IBalancerVault, BatchSwapStruct} from "../../../../../src/vault/strategy/compounder/balancer/BalancerLpCompounder.sol";
+import {BalancerLpCompounder, BalancerUtils, IBalancerVault, BatchSwapStruct, SwapKind, FundManagement} from "../../../../../src/vault/strategy/compounder/balancer/BalancerLpCompounder.sol";
 import {Clones} from "openzeppelin-contracts/proxy/Clones.sol";
 import {MockStrategyClaimer} from "../../../../utils/mocks/MockStrategyClaimer.sol";
 
 contract BalancerLpCompounderTest is Test {
     address _vault = address(0xBA12222222228d8Ba445958a75a0704d566BF2C8);
+    address _baseAsset = address(0xBA12222222228d8Ba445958a75a0704d566BF2C8);
+    bytes32 _poolId =
+        0x3a4c6d2404b5eb14915041e01f63200a82f4a343000200000000000000000065;
+    address _gauge = address(0xcf9f895296F5e1D66a7D4dcf1d92e1B435E9f999);
 
     BalancerGaugeAdapter adapter;
 
     address asset;
-    address lpToken1;
+    address baseAsset;
     address bal;
+    SwapKind swapKind = SwapKind.GIVEN_IN;
 
     bytes4[8] sigs;
     BatchSwapStruct[][] toBaseAssetPaths;
+    FundManagement funds;
+    address[] tokens;
     uint256[] minTradeAmounts;
 
     function setUp() public {
-        uint256 forkId = vm.createSelectFork(vm.rpcUrl("polygon"));
+        uint256 forkId = vm.createSelectFork(vm.rpcUrl("arbitrum"));
         vm.selectFork(forkId);
 
         IGauge gauge = IGauge(_gauge);
-        asset = gauge.stake();
-        lpToken = ILpToken(asset);
-        bal = gauge.rewards(2);
-        lpToken0 = lpToken.token0();
-        lpToken1 = lpToken.token1();
+        asset = gauge.lp_token();
+        bal = gauge.bal_token();
 
         toBaseAssetPaths.push();
-        toBaseAssetPaths[0].push(Route(bal, lpToken1, false));
-
-        toAssetPaths.push();
-        toAssetPaths[0].push(Route(lpToken1, lpToken0, false));
+        toBaseAssetPaths[0].push(BatchSwapStruct(_poolId, 0, 1));
+        funds = FundManagement(
+            address(this),
+            false,
+            payable(address(this)),
+            false
+        );
 
         minTradeAmounts.push(uint256(1));
 
         bytes memory stratData = abi.encode(
-            op,
-            router,
+            asset,
+            baseAsset,
+            _vault,
+            _poolId,
+            swapKind,
             toBaseAssetPaths,
-            toAssetPaths,
-            minTradeAmounts,
+            funds,
+            tokens,
             abi.encode("")
         );
 
@@ -72,13 +82,13 @@ contract BalancerLpCompounderTest is Test {
         assertEq(
             IERC20(address(baseAsset)).allowance(
                 address(adapter),
-                address(vault)
+                address(_vault)
             ),
             type(uint256).max
         );
 
         assertEq(
-            IERC20(address(asset)).allowance(address(adapter), address(gauge)),
+            IERC20(address(asset)).allowance(address(adapter), address(_gauge)),
             type(uint256).max
         );
     }

@@ -28,7 +28,7 @@ contract BalancerLpCompounder is StrategyBase {
             address _vault,
             bytes32 _poolId,
             SwapKind _swapKind,
-            BatchSwapStruct[] memory _route,
+            BatchSwapStruct[] memory _toBaseAssetPaths,
             FundManagement memory _funds,
             address[] memory _tokens,
             bytes memory optionalData
@@ -43,7 +43,6 @@ contract BalancerLpCompounder is StrategyBase {
                     BatchSwapStruct[],
                     FundManagement,
                     address[],
-                    address,
                     bytes
                 )
             );
@@ -86,7 +85,7 @@ contract BalancerLpCompounder is StrategyBase {
             address _vault,
             bytes32 _poolId,
             SwapKind _swapKind,
-            BatchSwapStruct[] memory _route,
+            BatchSwapStruct[] memory _toBaseAssetPaths,
             FundManagement memory _funds,
             address[] memory _tokens,
             bytes memory optionalData
@@ -147,7 +146,7 @@ contract BalancerLpCompounder is StrategyBase {
             address _vault,
             bytes32 _poolId,
             SwapKind _swapKind,
-            BatchSwapStruct[] memory _route,
+            BatchSwapStruct[][] memory _toBaseAssetPaths,
             FundManagement memory _funds,
             IAsset[] memory _tokens,
             bytes memory optionalData
@@ -159,7 +158,7 @@ contract BalancerLpCompounder is StrategyBase {
                     address,
                     bytes32,
                     SwapKind,
-                    BatchSwapStruct[],
+                    BatchSwapStruct[][],
                     FundManagement,
                     IAsset[],
                     bytes
@@ -172,7 +171,7 @@ contract BalancerLpCompounder is StrategyBase {
 
         IWithRewards(address(this)).claim();
 
-        _swapToBaseAsset(_vault, _swapKind, _route, _funds, _tokens);
+        _swapToBaseAsset(_vault, _swapKind, _toBaseAssetPaths, _funds, _tokens);
 
         _getAsset(_baseAsset, _vault, _poolId);
 
@@ -218,7 +217,6 @@ contract BalancerLpCompounder is StrategyBase {
     }
 
     function _getAsset(
-        address _asset,
         address _baseAsset,
         address _vault,
         bytes32 _poolId

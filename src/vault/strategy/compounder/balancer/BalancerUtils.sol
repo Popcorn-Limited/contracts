@@ -90,7 +90,7 @@ library BalancerUtils {
 
         IAsset[] memory _lpTokens = new IAsset[](lpTokens.length);
         for (uint256 i = 0; i < lpTokens.length; ++i) {
-            _lpTokens[i] = IAsset(_lpTokens[i]);
+            _lpTokens[i] = IAsset(address(lpTokens[i]));
         }
 
         JoinPoolRequest memory request = JoinPoolRequest(
