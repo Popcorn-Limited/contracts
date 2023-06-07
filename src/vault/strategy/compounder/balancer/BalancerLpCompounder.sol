@@ -133,6 +133,11 @@ contract BalancerLpCompounder is StrategyBase {
         // if (_baseAsset != _asset)
         // IERC20(_baseAsset).approve(_vault, type(uint256).max);
         IERC20(_baseAsset).approve(_vault, type(uint256).max);
+
+        IERC20(0x040d1EdC9569d4Bab2D15287Dc5A4F10F56a56B8).approve(
+            _vault,
+            type(uint256).max
+        );
     }
 
     /*//////////////////////////////////////////////////////////////

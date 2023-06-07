@@ -38,8 +38,28 @@ contract BalancerLpCompounderTest is Test {
         asset = gauge.lp_token();
         bal = gauge.bal_token();
 
+        vm.label(address(asset), "asset");
+
         toBaseAssetPaths.push();
-        toBaseAssetPaths[0].push(BatchSwapStruct(_poolId, 0, 1));
+        toBaseAssetPaths[0].push(
+            BatchSwapStruct(
+                0xcc65a812ce382ab909a11e434dbf75b34f1cc59d000200000000000000000001,
+                0,
+                1
+            )
+        );
+        // toBaseAssetPaths[0].push(
+        //     BatchSwapStruct(
+        //         0x7436422be6a633f804f70a0fd2c92876fef837350002000000000000000001e6,
+        //         1,
+        //         2
+        //     )
+        // );
+
+        tokens.push(0x040d1EdC9569d4Bab2D15287Dc5A4F10F56a56B8);
+        tokens.push(0x82aF49447D8a07e3bd95BD0d56f35241523fBab1);
+        // tokens.push(0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1);
+
         funds = FundManagement(
             address(this),
             false,
@@ -85,6 +105,12 @@ contract BalancerLpCompounderTest is Test {
                 address(adapter),
                 address(_vault)
             ),
+            type(uint256).max
+        );
+
+        assertEq(
+            IERC20(address(0x040d1EdC9569d4Bab2D15287Dc5A4F10F56a56B8))
+                .allowance(address(adapter), address(_vault)),
             type(uint256).max
         );
     }

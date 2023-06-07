@@ -91,7 +91,7 @@ contract BalancerGaugeAdapter is AdapterBase, WithRewards {
         uint256 amount,
         uint256
     ) internal virtual override {
-        gauge.deposit(amount, address(this), false);
+        gauge.deposit(amount);
     }
 
     function _protocolWithdraw(

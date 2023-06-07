@@ -16,11 +16,7 @@ interface IGauge {
 
     function withdraw(uint256 amount, bool _claim_rewards) external;
 
-    function deposit(
-        uint256 amount,
-        address recipient,
-        bool claim_rewards
-    ) external;
+    function deposit(uint256 amount) external;
 }
 
 interface IMinter {
