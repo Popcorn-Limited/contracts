@@ -34,6 +34,10 @@ contract BalancerLpCompounderTest is Test {
         uint256 forkId = vm.createSelectFork(vm.rpcUrl("arbitrum"));
         vm.selectFork(forkId);
 
+        address impl = address(new BalancerGaugeAdapter());
+
+        adapter = BalancerGaugeAdapter(Clones.clone(impl));
+
         IGauge gauge = IGauge(_gauge);
         asset = gauge.lp_token();
         bal = gauge.bal_token();
@@ -61,9 +65,9 @@ contract BalancerLpCompounderTest is Test {
         // tokens.push(0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1);
 
         funds = FundManagement(
-            address(this),
+            address(adapter),
             false,
-            payable(address(this)),
+            payable(adapter),
             false
         );
 
@@ -81,9 +85,7 @@ contract BalancerLpCompounderTest is Test {
             abi.encode("")
         );
 
-        address impl = address(new BalancerGaugeAdapter());
-
-        adapter = BalancerGaugeAdapter(Clones.clone(impl));
+        
 
         adapter.initialize(
             abi.encode(
