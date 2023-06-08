@@ -16,6 +16,9 @@ contract BalancerLpCompounderTest is Test {
         0x32df62dc3aed2cd6224193052ce665dc181658410002000000000000000003bd;
     address _gauge = address(0xcf9f895296F5e1D66a7D4dcf1d92e1B435E9f999);
     address _psuedoMinter = address(0xc3ccacE87f6d3A81724075ADcb5ddd85a8A1bB68);
+    address _weth = address(0x82aF49447D8a07e3bd95BD0d56f35241523fBab1);
+    bytes32 _balWethPoolId =
+        0xcc65a812ce382ab909a11e434dbf75b34f1cc59d000200000000000000000001;
 
     BalancerGaugeAdapter adapter;
 
@@ -45,29 +48,15 @@ contract BalancerLpCompounderTest is Test {
         vm.label(address(asset), "asset");
 
         toBaseAssetPaths.push();
-        toBaseAssetPaths[0].push(
-            BatchSwapStruct(
-                0xcc65a812ce382ab909a11e434dbf75b34f1cc59d000200000000000000000001,
-                0,
-                1
-            )
-        );
-        // toBaseAssetPaths[0].push(
-        //     BatchSwapStruct(
-        //         0x7436422be6a633f804f70a0fd2c92876fef837350002000000000000000001e6,
-        //         1,
-        //         2
-        //     )
-        // );
+        toBaseAssetPaths[0].push(BatchSwapStruct(_balWethPoolId, 0, 1));
 
-        tokens.push(0x040d1EdC9569d4Bab2D15287Dc5A4F10F56a56B8);
-        tokens.push(0x82aF49447D8a07e3bd95BD0d56f35241523fBab1);
-        // tokens.push(0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1);
+        tokens.push(bal);
+        tokens.push(_weth);
 
         funds = FundManagement(
             address(adapter),
             false,
-            payable(adapter),
+            payable(address(adapter)),
             false
         );
 
@@ -84,8 +73,6 @@ contract BalancerLpCompounderTest is Test {
             tokens,
             abi.encode("")
         );
-
-        
 
         adapter.initialize(
             abi.encode(
