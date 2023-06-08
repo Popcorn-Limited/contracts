@@ -280,6 +280,11 @@ abstract contract AdapterBase is
         emit Harvested();
     }
 
+    // @ev Exists for compatibility for flywheel systems.
+    function claimRewards() external {
+        harvest();
+    }
+
     /**
      * @notice Allows the strategy to deposit assets into the underlying protocol without minting new adapter shares.
      * @dev This can be used e.g. for a compounding strategy to increase the value of each adapter share.
