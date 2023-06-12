@@ -3,7 +3,7 @@ pragma solidity ^0.8.15;
 
 import {Test} from "forge-std/Test.sol";
 
-import {RamsesAdapter, SafeERC20, IERC20, IERC20Metadata, Math, IGauge, ILpToken} from "../../../../../src/vault/adapter/ramses/ramsesV1/RamsesV1Adapter.sol";
+import {RamsesV1Adapter, SafeERC20, IERC20, IERC20Metadata, Math, IGauge, ILpToken} from "../../../../../src/vault/adapter/ramses/ramsesV1/RamsesV1Adapter.sol";
 import {RamsesTestConfigStorage, RamsesTestConfig} from "./RamsesV1TestConfigStorage.sol";
 import {AbstractAdapterTest, ITestConfigStorage, IAdapter} from "../../abstract/AbstractAdapterTest.sol";
 import {IPermissionRegistry, Permission} from "../../../../../src/interfaces/vault/IPermissionRegistry.sol";
@@ -47,7 +47,7 @@ contract RamsesAdapterTest is AbstractAdapterTest {
 
         setUpBaseTest(
             IERC20(asset),
-            address(new RamsesAdapter()),
+            address(new RamsesV1Adapter()),
             address(permissionRegistry),
             10,
             "Ramses",

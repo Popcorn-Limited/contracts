@@ -15,7 +15,7 @@ import {IPermissionRegistry} from "../../../../interfaces/vault/IPermissionRegis
  *
  * Allows wrapping Ramses Vaults.
  */
-contract RamsesAdapter is AdapterBase, WithRewards {
+contract RamsesV1Adapter is AdapterBase, WithRewards {
     using SafeERC20 for IERC20;
     using Math for uint256;
 
@@ -51,15 +51,13 @@ contract RamsesAdapter is AdapterBase, WithRewards {
 
         address _gauge = abi.decode(ramsesInitData, (address));
 
-        if (!IPermissionRegistry(registry).endorsed(_gauge))
-            revert NotEndorsed(_gauge);
+        // if (!IPermissionRegistry(registry).endorsed(_gauge))
+        //     revert NotEndorsed(_gauge);
 
         gauge = IGauge(_gauge);
 
         if (gauge.stake() != asset()) revert InvalidAsset();
 
-        _rewardTokens.push(ILpToken(asset()).token0());
-        _rewardTokens.push(ILpToken(asset()).token1());
         _rewardTokens.push(gauge.rewards(0)); // RAM
 
         _name = string.concat(
