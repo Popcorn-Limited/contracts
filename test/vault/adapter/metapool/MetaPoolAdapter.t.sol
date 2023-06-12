@@ -51,6 +51,7 @@ contract MetaPoolAdapterTest is AbstractAdapterTest {
         );
 
         vm.label(address(wNear), "wNear");
+        vm.label(address(stNear), "stNear");
         vm.label(address(poolAddress), "poolAddress");
         vm.label(address(this), "test");
 
@@ -153,5 +154,75 @@ contract MetaPoolAdapterTest is AbstractAdapterTest {
             type(uint256).max,
             "allowance"
         );
+    }
+
+
+    /*//////////////////////////////////////////////////////////////
+                          OVERRIDES
+  //////////////////////////////////////////////////////////////*/
+
+    function test__unpause() public override {
+        _mintAssetAndApproveForAdapter(defaultAmount * 3, bob);
+
+        vm.prank(bob);
+        adapter.deposit(defaultAmount, bob);
+
+        uint256 oldTotalAssets = adapter.totalAssets();
+        uint256 oldTotalSupply = adapter.totalSupply();
+        uint256 oldIouBalance = iouBalance();
+
+        uint16 wNearSwapFee = IMetaPool(externalRegistry).wNearSwapFee();
+        uint256 stNearPrice = IMetaPool(externalRegistry).stNearPrice();
+        uint256 balance = stNear.balanceOf(address(adapter));
+
+        adapter.pause();
+        adapter.unpause();
+
+        uint256 balanceDifference = balance;
+
+        wNearSwapFee = IMetaPool(externalRegistry).wNearSwapFee();
+        stNearPrice = IMetaPool(externalRegistry).stNearPrice();
+        balance = stNear.balanceOf(address(adapter));
+
+        balanceDifference -= balance;
+
+        uint256 fee = _totalAssets(wNearSwapFee, balanceDifference, stNearPrice);
+
+        // We simply deposit back into the external protocol
+        // TotalSupply and Assets dont change
+        assertApproxEqAbs(
+            oldTotalAssets,
+            adapter.totalAssets(),
+            _delta_+fee,
+            "totalAssets"
+        );
+        assertApproxEqAbs(
+            oldTotalSupply,
+            adapter.totalSupply(),
+            _delta_,
+            "totalSupply"
+        );
+        assertApproxEqAbs(
+            asset.balanceOf(address(adapter)),
+            0,
+            _delta_,
+            "asset balance"
+        );
+        assertApproxEqAbs(iouBalance(), oldIouBalance, _delta_, "iou balance");
+
+        // Deposit and mint dont revert
+        vm.startPrank(bob);
+        adapter.deposit(defaultAmount, bob);
+        adapter.mint(defaultAmount, bob);
+    }
+
+    function _totalAssets(uint16 wNearSwapFee, uint256 stNearBalance, uint256 stNearPrice) internal view returns (uint256) {
+        uint256 stNearDecimals = stNear.decimals();
+        // aurora testnet bug
+        if (stNearDecimals == 0){
+            stNearDecimals = 24;
+        }
+        
+        return stNearBalance * (10000 - wNearSwapFee) * stNearPrice / 10000 / (10 ** stNearDecimals);
     }
 }
