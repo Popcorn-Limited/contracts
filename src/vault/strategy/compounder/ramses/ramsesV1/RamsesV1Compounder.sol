@@ -137,18 +137,10 @@ contract RamsesV1Compounder is StrategyBase {
         bytes memory optionalData
     ) internal virtual {
         if (baseAsset != asset) {
-            IERC20(baseAsset).approve(ramsesRouter, type(uint256).max);
             IERC20(baseAsset).approve(uniRouter, type(uint256).max);
         }
-        IERC20(0xAAA6C1E32C55A7Bfa8066A6FAE9b42650F262418).approve(
-            uniRouter,
-            type(uint256).max
-        );
 
         ILpToken token = ILpToken(asset);
-
-        IERC20(token.token0()).approve(uniRouter, type(uint256).max);
-        IERC20(token.token1()).approve(uniRouter, type(uint256).max);
 
         IERC20(token.token0()).approve(ramsesRouter, type(uint256).max);
         IERC20(token.token1()).approve(ramsesRouter, type(uint256).max);
@@ -201,7 +193,7 @@ contract RamsesV1Compounder is StrategyBase {
     }
 
     function _swapToBaseAsset(
-        address router,
+        address uniRouter,
         bytes[] memory toBaseAssetPaths,
         uint256[] memory minTradeAmounts
     ) internal {
@@ -213,8 +205,9 @@ contract RamsesV1Compounder is StrategyBase {
             uint256 rewardBal = IERC20(rewardTokens[i]).balanceOf(
                 address(this)
             );
+
             if (rewardBal >= minTradeAmounts[i])
-                UniswapV3Utils.swap(router, toBaseAssetPaths[i], rewardBal);
+                UniswapV3Utils.swap(uniRouter, toBaseAssetPaths[i], rewardBal);
         }
     }
 
@@ -231,11 +224,10 @@ contract RamsesV1Compounder is StrategyBase {
 
         address token0 = LpToken.token0();
         address token1 = LpToken.token1();
-        uint256 lp0Amount;
+        uint256 lp0Amount = IERC20(baseAsset).balanceOf(address(this)) / 2;
         uint256 lp1Amount;
 
         if (baseAsset != token0) {
-            lp0Amount = IERC20(baseAsset).balanceOf(address(this)) / 2;
             if (lp0Amount >= minTradeAmounts[0])
                 UniswapV3Utils.swap(uniRouter, toAssetPaths[0], lp0Amount);
         }

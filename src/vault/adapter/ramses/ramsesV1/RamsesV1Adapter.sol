@@ -47,8 +47,6 @@ contract RamsesV1Adapter is AdapterBase, WithRewards {
         address registry,
         bytes memory ramsesInitData
     ) external initializer {
-        __AdapterBase_init(adapterInitData);
-
         address _gauge = abi.decode(ramsesInitData, (address));
 
         // if (!IPermissionRegistry(registry).endorsed(_gauge))
@@ -56,9 +54,11 @@ contract RamsesV1Adapter is AdapterBase, WithRewards {
 
         gauge = IGauge(_gauge);
 
-        if (gauge.stake() != asset()) revert InvalidAsset();
-
         _rewardTokens.push(gauge.rewards(0)); // RAM
+
+        __AdapterBase_init(adapterInitData);
+
+        if (gauge.stake() != asset()) revert InvalidAsset();
 
         _name = string.concat(
             "VaultCraft Ramses ",

@@ -9,7 +9,7 @@ import {AbstractAdapterTest, ITestConfigStorage, IAdapter} from "../../abstract/
 import {IPermissionRegistry, Permission} from "../../../../../src/interfaces/vault/IPermissionRegistry.sol";
 import {PermissionRegistry} from "../../../../../src/vault/PermissionRegistry.sol";
 
-contract RamsesAdapterTest is AbstractAdapterTest {
+contract RamsesV1AdapterTest is AbstractAdapterTest {
     using Math for uint256;
 
     IGauge gauge;

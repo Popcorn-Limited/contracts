@@ -11,6 +11,28 @@ library UniswapV3Utils {
     // Swap along an encoded path using known amountIn
     function swap(
         address _router,
+        address _tokenIn,
+        address _tokenOut,
+        uint24 _fee,
+        uint256 _amountIn
+    ) internal returns (uint256 amountOut) {
+        return
+            IUniswapRouterV3(_router).exactInputSingle(
+                ExactInputSingleParams({
+                    tokenIn: _tokenIn,
+                    tokenOut: _tokenOut,
+                    fee: _fee,
+                    recipient: address(this),
+                    deadline: block.timestamp,
+                    amountIn: _amountIn,
+                    amountOutMinimum: 0,
+                    sqrtPriceLimitX96: 0
+                })
+            );
+    }
+
+    function swap(
+        address _router,
         bytes memory _path,
         uint256 _amountIn
     ) internal returns (uint256 amountOut) {

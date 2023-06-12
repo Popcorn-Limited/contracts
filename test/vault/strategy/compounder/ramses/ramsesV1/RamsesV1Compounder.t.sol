@@ -40,11 +40,11 @@ contract RamsesLpCompounderTest is Test {
         lpToken0 = lpToken.token0();
         lpToken1 = lpToken.token1();
 
-        toBaseAssetPaths.push(abi.encodePacked(ram, uint24(3000), weth));
+        toBaseAssetPaths.push(abi.encodePacked(ram, uint24(10000), weth));
 
-        toAssetPaths.push(abi.encodePacked(weth, uint24(3000), frxeth));
+        toAssetPaths.push(abi.encodePacked(weth, uint24(100), frxeth));
 
-        minTradeAmounts.push(uint256(1));
+        minTradeAmounts.push(uint256(0));
 
         bytes memory stratData = abi.encode(
             weth,
@@ -92,25 +92,9 @@ contract RamsesLpCompounderTest is Test {
         );
 
         assertEq(
-            IERC20(address(lpToken0)).allowance(
-                address(adapter),
-                address(uniRouter)
-            ),
-            type(uint256).max
-        );
-
-        assertEq(
             IERC20(address(lpToken1)).allowance(
                 address(adapter),
                 address(ramsesRouter)
-            ),
-            type(uint256).max
-        );
-
-        assertEq(
-            IERC20(address(lpToken1)).allowance(
-                address(adapter),
-                address(uniRouter)
             ),
             type(uint256).max
         );
