@@ -73,9 +73,9 @@ contract MetaPoolAdapterTest is AbstractAdapterTest {
 
     function increasePricePerShare(uint256 amount) public override {
         deal(
-            address(stNear),
+            address(asset),
             address(adapter),
-            IERC20(address(asset)).balanceOf(address(adapter)) + amount
+            asset.balanceOf(address(adapter)) + amount
         );
     }
 
@@ -224,5 +224,54 @@ contract MetaPoolAdapterTest is AbstractAdapterTest {
         }
         
         return stNearBalance * (10000 - wNearSwapFee) * stNearPrice / 10000 / (10 ** stNearDecimals);
+    }
+
+    function test__harvest() public override {
+        uint256 performanceFee = 1e16;
+        uint256 hwm = 1e9;
+
+        _mintAssetAndApproveForAdapter(defaultAmount, bob);
+
+        vm.prank(bob);
+        adapter.deposit(defaultAmount, bob);
+
+        uint256 oldTotalAssets = adapter.totalAssets();
+        adapter.setPerformanceFee(performanceFee);
+        increasePricePerShare(raise);
+        deal(address(stNear), address(adapter), defaultAmount); 
+
+        emit log("PING");
+
+        emit log_named_uint("convertToAssets", adapter.convertToAssets(1e18));
+        emit log_named_uint("highWaterMark", adapter.highWaterMark());
+        emit log_named_uint("totalSupply", adapter.totalSupply());
+
+        uint256 gain = ((adapter.convertToAssets(1e18) -
+            adapter.highWaterMark()) * adapter.totalSupply()) / 1e18;
+        uint256 fee = (gain * performanceFee) / 1e18;
+
+        emit log("PING1");
+
+        uint256 expectedFee = adapter.convertToShares(fee);
+
+        vm.expectEmit(false, false, false, true, address(adapter));
+
+        emit Harvested();
+
+        adapter.harvest();
+
+        // Multiply with the decimal offset
+        assertApproxEqAbs(
+            adapter.totalSupply(),
+            defaultAmount * 1e9 + expectedFee,
+            _delta_,
+            "totalSupply"
+        );
+        assertApproxEqAbs(
+            adapter.balanceOf(feeRecipient),
+            expectedFee,
+            _delta_,
+            "expectedFee"
+        );
     }
 }

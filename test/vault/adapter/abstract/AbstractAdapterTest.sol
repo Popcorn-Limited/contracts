@@ -71,6 +71,9 @@ contract AbstractAdapterTest is PropertyTest {
         _asset_ = address(asset_);
         _delta_ = delta_;
 
+        vm.label(alice, "alice");
+        vm.label(bob, "bob");
+
         defaultAmount = 10 ** IERC20Metadata(address(asset_)).decimals() * 1e9;
 
         raise = defaultAmount;
