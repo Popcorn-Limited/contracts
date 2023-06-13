@@ -11,7 +11,7 @@ import {Clones} from "openzeppelin-contracts/proxy/Clones.sol";
 contract RamsesLpCompounderTest is Test {
     address _gauge = address(0x148Ca200d452AD9F310501ca3fd5C3bD4a5aBe81);
     address ramsesRouter = address(0xAAA87963EFeB6f7E0a2711F397663105Acb1805e);
-    address uniRouter = address(0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD);
+    address uniRouter = address(0xE592427A0AEce92De3Edee1F18E0157C05861564);
     address weth = address(0x82aF49447D8a07e3bd95BD0d56f35241523fBab1);
     address frxeth = address(0x178412e79c25968a32e89b11f63B33F733770c2A);
 
@@ -23,6 +23,7 @@ contract RamsesLpCompounderTest is Test {
     address lpToken1;
     address ram;
     address asset;
+    bool stable;
 
     bytes4[8] sigs;
     bytes[] toBaseAssetPaths;
@@ -39,6 +40,7 @@ contract RamsesLpCompounderTest is Test {
         ram = gauge.rewards(0);
         lpToken0 = lpToken.token0();
         lpToken1 = lpToken.token1();
+        stable = true;
 
         toBaseAssetPaths.push(abi.encodePacked(ram, uint24(10000), weth));
 
@@ -48,6 +50,7 @@ contract RamsesLpCompounderTest is Test {
 
         bytes memory stratData = abi.encode(
             weth,
+            stable,
             ramsesRouter,
             uniRouter,
             toBaseAssetPaths,
@@ -113,5 +116,22 @@ contract RamsesLpCompounderTest is Test {
         adapter.harvest();
 
         assertGt(adapter.totalAssets(), oldTa);
+    }
+
+    function test__claim() public {
+        address bob = address(0x2e234DAe75C793f67A35089C9d99245E1C58470b);
+
+        deal(address(lpToken), address(this), 1e18);
+        IERC20(address(lpToken)).approve(address(adapter), type(uint256).max);
+        adapter.deposit(1e18, address(this));
+
+        vm.roll(block.number + 10_000);
+        vm.warp(block.timestamp + 150_000);
+
+        vm.prank(bob);
+
+        adapter.claim();
+
+        assertGt(IERC20(ram).balanceOf(address(adapter)), 0);
     }
 }

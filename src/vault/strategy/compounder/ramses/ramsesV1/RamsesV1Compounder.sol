@@ -25,6 +25,7 @@ contract RamsesV1Compounder is StrategyBase {
     function verifyAdapterCompatibility(bytes memory data) public override {
         (
             address baseAsset,
+            bool stable,
             address ramsesRouter,
             address uniRouter,
             bytes[] memory toBaseAssetPaths,
@@ -33,7 +34,16 @@ contract RamsesV1Compounder is StrategyBase {
             bytes memory optionalData
         ) = abi.decode(
                 data,
-                (address, address, address, bytes[], bytes[], uint256[], bytes)
+                (
+                    address,
+                    bool,
+                    address,
+                    address,
+                    bytes[],
+                    bytes[],
+                    uint256[],
+                    bytes
+                )
             );
 
         _verifyRewardToken(toBaseAssetPaths, baseAsset);
@@ -97,15 +107,25 @@ contract RamsesV1Compounder is StrategyBase {
     function setUp(bytes memory data) public override {
         (
             address baseAsset,
+            bool stable,
             address ramsesRouter,
             address uniRouter,
             bytes[] memory toBaseAssetPaths,
-            bytes[] memory toAssetPath,
+            bytes[] memory toAssetPaths,
             uint256[] memory minTradeAmounts,
             bytes memory optionalData
         ) = abi.decode(
                 data,
-                (address, address, address, bytes[], bytes[], uint256[], bytes)
+                (
+                    address,
+                    bool,
+                    address,
+                    address,
+                    bytes[],
+                    bytes[],
+                    uint256[],
+                    bytes
+                )
             );
 
         _approveRewards(uniRouter);
@@ -154,6 +174,7 @@ contract RamsesV1Compounder is StrategyBase {
     function harvest() public override {
         (
             address baseAsset,
+            bool stable,
             address ramsesRouter,
             address uniRouter,
             bytes[] memory toBaseAssetPaths,
@@ -162,7 +183,16 @@ contract RamsesV1Compounder is StrategyBase {
             bytes memory optionalData
         ) = abi.decode(
                 IAdapter(address(this)).strategyConfig(),
-                (address, address, address, bytes[], bytes[], uint256[], bytes)
+                (
+                    address,
+                    bool,
+                    address,
+                    address,
+                    bytes[],
+                    bytes[],
+                    uint256[],
+                    bytes
+                )
             );
 
         address asset = IAdapter(address(this)).asset();
@@ -176,6 +206,7 @@ contract RamsesV1Compounder is StrategyBase {
         _getAsset(
             baseAsset,
             asset,
+            stable,
             ramsesRouter,
             uniRouter,
             toAssetPaths,
@@ -214,6 +245,7 @@ contract RamsesV1Compounder is StrategyBase {
     function _getAsset(
         address baseAsset,
         address asset,
+        bool stable,
         address ramsesRouter,
         address uniRouter,
         bytes[] memory toAssetPaths,
@@ -224,29 +256,25 @@ contract RamsesV1Compounder is StrategyBase {
 
         address token0 = LpToken.token0();
         address token1 = LpToken.token1();
+
         uint256 lp0Amount = IERC20(baseAsset).balanceOf(address(this)) / 2;
-        uint256 lp1Amount;
+        uint256 lp1Amount = IERC20(baseAsset).balanceOf(address(this)) -
+            lp0Amount;
 
         if (baseAsset != token0) {
-            if (lp0Amount >= minTradeAmounts[0])
-                UniswapV3Utils.swap(uniRouter, toAssetPaths[0], lp0Amount);
+            UniswapV3Utils.swap(uniRouter, toAssetPaths[0], lp0Amount);
         }
 
         if (baseAsset != token1) {
-            lp1Amount = IERC20(baseAsset).balanceOf(address(this)) - lp0Amount;
-            if (lp1Amount >= minTradeAmounts[1])
-                UniswapV3Utils.swap(uniRouter, toAssetPaths[1], lp1Amount);
+            UniswapV3Utils.swap(uniRouter, toAssetPaths[1], lp1Amount);
         }
-
-        uint256 amountA = IERC20(token0).balanceOf(address(this));
-        uint256 amountB = IERC20(token1).balanceOf(address(this));
 
         IRamsesV1Router(ramsesRouter).addLiquidity(
             token0,
             token1,
-            false,
-            amountA,
-            amountB,
+            stable,
+            IERC20(token0).balanceOf(address(this)),
+            IERC20(token1).balanceOf(address(this)),
             0,
             0,
             address(this),
