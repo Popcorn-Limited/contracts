@@ -7,7 +7,7 @@ import {AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20, Math, IStrategy, 
 
 import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
 import {IWETH} from "../../../interfaces/external/IWETH.sol";
-import {ICurveMetapool} from "../../../interfaces/external/ICurveMetapool.sol";
+import {ICurveMetapool} from "../../../interfaces/external/curve/ICurveMetapool.sol";
 import {ILido, VaultAPI} from "./ILido.sol";
 import {SafeMath} from "openzeppelin-contracts/utils/math/SafeMath.sol";
 
@@ -26,10 +26,10 @@ contract LidoAdapter is AdapterBase {
     string internal _name;
     string internal _symbol;
 
-    int128 private constant WETHID = 0;
-    int128 private constant STETHID = 1;
-    ICurveFi public constant StableSwapSTETH =
-        ICurveFi(0xDC24316b9AE028F1497c275EB9192a3Ea0f67022);
+    uint256 private constant WETHID = 0;
+    uint256 private constant STETHID = 1;
+    ICurveMetapool public constant StableSwapSTETH =
+        ICurveMetapool(0xDC24316b9AE028F1497c275EB9192a3Ea0f67022);
     uint256 public constant DENOMINATOR = 10000;
     uint256 public slippage; // = 100; //out of 10000. 100 = 1%
 

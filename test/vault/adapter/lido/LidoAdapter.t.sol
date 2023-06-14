@@ -10,7 +10,7 @@ import {IERC4626Upgradeable as IERC4626, IERC20Upgradeable as IERC20} from "open
 import {LidoTestConfigStorage, LidoTestConfig} from "./LidoTestConfigStorage.sol";
 import {AbstractAdapterTest, ITestConfigStorage, IAdapter} from "../abstract/AbstractAdapterTest.sol";
 import {SafeMath} from "openzeppelin-contracts/utils/math/SafeMath.sol";
-import {ICurveFi} from "../../../../src/vault/adapter/lido/ICurveFi.sol";
+import {ICurveMetapool} from "../../../../src/interfaces/external/curve/ICurveMetapool.sol";
 
 contract LidoAdapterTest is AbstractAdapterTest {
     using Math for uint256;
@@ -23,8 +23,8 @@ contract LidoAdapterTest is AbstractAdapterTest {
     int128 private constant WETHID = 0;
     int128 private constant STETHID = 1;
     uint8 internal constant decimalOffset = 9;
-    ICurveFi public constant StableSwapSTETH =
-        ICurveFi(0xDC24316b9AE028F1497c275EB9192a3Ea0f67022);
+    ICurveMetapool public constant StableSwapSTETH =
+        ICurveMetapool(0xDC24316b9AE028F1497c275EB9192a3Ea0f67022);
     uint256 public constant DENOMINATOR = 10000;
     uint256 public slippageProtectionOut = 100; // = 100; //out of 10000. 100 = 1%
 
