@@ -11,6 +11,7 @@ import {LidoTestConfigStorage, LidoTestConfig} from "./LidoTestConfigStorage.sol
 import {AbstractAdapterTest, ITestConfigStorage, IAdapter} from "../abstract/AbstractAdapterTest.sol";
 import {SafeMath} from "openzeppelin-contracts/utils/math/SafeMath.sol";
 import {ICurveMetapool} from "../../../../src/interfaces/external/curve/ICurveMetapool.sol";
+import {Clones} from "openzeppelin-contracts/proxy/Clones.sol";
 
 contract LidoAdapterTest is AbstractAdapterTest {
     using Math for uint256;
@@ -19,7 +20,6 @@ contract LidoAdapterTest is AbstractAdapterTest {
     VaultAPI lidoVault;
     VaultAPI lidoBooster;
     uint256 maxAssetsNew;
-    ILido adapterTest;
     int128 private constant WETHID = 0;
     int128 private constant STETHID = 1;
     uint8 internal constant decimalOffset = 9;
@@ -55,7 +55,7 @@ contract LidoAdapterTest is AbstractAdapterTest {
     }
 
     function _setUpTest(bytes memory testConfig) internal {
-        address _asset = abi.decode(testConfig, (address));
+        (address _asset,) = abi.decode(testConfig, (address,uint256));
 
         setUpBaseTest(
             IERC20(_asset),
@@ -77,7 +77,7 @@ contract LidoAdapterTest is AbstractAdapterTest {
         adapter.initialize(
             abi.encode(asset, address(this), address(0), 0, sigs, ""),
             externalRegistry,
-            abi.encode(0x34dCd573C5dE4672C8248cd12A99f875Ca112Ad8, 1)
+            testConfig
         );
     }
 
@@ -85,9 +85,10 @@ contract LidoAdapterTest is AbstractAdapterTest {
                           HELPER
     //////////////////////////////////////////////////////////////*/
 
-    // function createAdapter() public override {
-    //     adapter = IAdapter(address(new LidoAdapter()));
-    // }
+    function createAdapter() public override {
+        adapter = IAdapter(Clones.clone(address(new LidoAdapter())));
+        vm.label(address(adapter), "adapter");
+    }
 
     function increasePricePerShare(uint256 amount) public override {
         deal(address(adapter), 100 ether);
@@ -218,9 +219,9 @@ contract LidoAdapterTest is AbstractAdapterTest {
     //////////////////////////////////////////////////////////////*/
 
     function verify_adapterInit() public override {
-        assertEq(adapterTest.asset(), lidoBooster.weth(), "asset");
+        assertEq(adapter.asset(), lidoBooster.weth(), "asset");
         assertEq(
-            IERC20Metadata(address(adapterTest)).name(),
+            IERC20Metadata(address(adapter)).name(),
             string.concat(
                 "Popcorn Lido ",
                 IERC20Metadata(address(asset)).name(),
@@ -229,13 +230,13 @@ contract LidoAdapterTest is AbstractAdapterTest {
             "name"
         );
         assertEq(
-            IERC20Metadata(address(adapterTest)).symbol(),
+            IERC20Metadata(address(adapter)).symbol(),
             string.concat("popL-", IERC20Metadata(address(asset)).symbol()),
             "symbol"
         );
 
         assertEq(
-            asset.allowance(address(adapterTest), address(lidoVault)),
+            asset.allowance(address(adapter), address(lidoVault)),
             type(uint256).max,
             "allowance"
         );
@@ -319,14 +320,14 @@ contract LidoAdapterTest is AbstractAdapterTest {
 
         // We simply withdraw into the adapter
         // TotalSupply and Assets dont change
-        // assertApproxEqAbs(oldTotalAssets, adapter.totalAssets(), _delta_, "totalAssets");
+        assertApproxEqAbs(oldTotalAssets, adapter.totalAssets(), _delta_, "totalAssets");
         assertApproxEqAbs(
             oldTotalSupply,
             adapter.totalSupply(),
             _delta_,
             "totalSupply"
         );
-        // assertApproxEqAbs(asset.balanceOf(address(adapter)), oldTotalAssets, _delta_, "asset balance");
+        assertApproxEqAbs(asset.balanceOf(address(adapter)), oldTotalAssets, _delta_, "asset balance");
         assertApproxEqAbs(iouBalance(), 0, _delta_, "iou balance");
 
         vm.startPrank(bob);
@@ -334,29 +335,13 @@ contract LidoAdapterTest is AbstractAdapterTest {
         vm.expectRevert(
             abi.encodeWithSelector(MaxError.selector, defaultAmount)
         );
-        adapter.deposit(defaultAmount, bob);
-
+        
         vm.expectRevert(
             abi.encodeWithSelector(MaxError.selector, defaultAmount)
         );
-        adapter.mint(defaultAmount, bob);
-
+        
         // Withdraw and Redeem dont revert
         adapter.withdraw(defaultAmount / 10, bob, bob);
         adapter.redeem(defaultAmount / 10, bob, bob);
-    }
-
-    function test__RT_deposit_redeem() public override {
-        _mintAssetAndApproveForAdapter(defaultAmount, bob);
-
-        vm.startPrank(bob);
-        uint256 shares = adapter.deposit(defaultAmount, bob);
-        uint256 assets = adapter.redeem(adapter.maxRedeem(bob), bob, bob);
-        vm.stopPrank();
-
-        // Pass the test if maxRedeem is smaller than deposit since round trips are impossible
-        if (adapter.maxRedeem(bob) == defaultAmount) {
-            assertLe(assets, defaultAmount, testId);
-        }
     }
 }

@@ -60,12 +60,12 @@ contract LidoAdapter is AdapterBase {
      */
     function initialize(
         bytes memory adapterInitData,
-        address _wethAddress,
+        address _lidoAddress,
         bytes memory lidoInitData
     ) public initializer {
         __AdapterBase_init(adapterInitData);
 
-        (address _lidoAddress, uint256 _pid) = abi.decode(
+        (,uint256 _pid) = abi.decode(
             lidoInitData,
             (address, uint256)
         );

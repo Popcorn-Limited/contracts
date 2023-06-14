@@ -100,7 +100,7 @@ contract AbstractAdapterTest is PropertyTest {
     }
 
     // Clone a new Adapter and set it to `adapter`
-    function createAdapter() public {
+    function createAdapter() public virtual {
         adapter = IAdapter(Clones.clone(implementation));
         vm.label(address(adapter), "adapter");
     }
