@@ -26,8 +26,8 @@ contract LidoAdapter is AdapterBase {
     string internal _name;
     string internal _symbol;
 
-    uint256 private constant WETHID = 0;
-    uint256 private constant STETHID = 1;
+    int128 private constant WETHID = 0;
+    int128 private constant STETHID = 1;
     ICurveMetapool public constant StableSwapSTETH =
         ICurveMetapool(0xDC24316b9AE028F1497c275EB9192a3Ea0f67022);
     uint256 public constant DENOMINATOR = 10000;
