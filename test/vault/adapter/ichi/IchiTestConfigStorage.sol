@@ -17,14 +17,14 @@ contract IchiTestConfigStorage is ITestConfigStorage {
     IchiTestConfig[] internal testConfigs;
 
     constructor() {
-        // Mainnet - ichiwETH
+        // Polygon - USDC/WETH
         testConfigs.push(
             IchiTestConfig(
-                25,
-                0xe6e32D20258f475BaA8d0B39d4C391B96f0ef70A,
-                0xfF7B5E167c9877f2b9f65D19d9c8c9aa651Fe19F,
+                16,
+                0xA5cE107711789b350e04063D4EffBe6aB6eB05a4,
+                0x0768A75F616B98ee0937673bD83B7aBF142236Ea,
                 0xE592427A0AEce92De3Edee1F18E0157C05861564,
-                100
+                500
             )
         );
     }

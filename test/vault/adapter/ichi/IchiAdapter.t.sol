@@ -19,10 +19,10 @@ contract IchiAdapterTest is AbstractAdapterTest {
     uint256 public pid;
     uint8 public assetIndex;
     address public uniRouter;
-    uint24 public swapFee;
+    uint24 public uniSwapFee;
 
     function setUp() public {
-        uint256 forkId = vm.createSelectFork(vm.rpcUrl("mainnet"));
+        uint256 forkId = vm.createSelectFork(vm.rpcUrl("polygon"));
         vm.selectFork(forkId);
 
         testConfigStorage = ITestConfigStorage(
@@ -42,7 +42,7 @@ contract IchiAdapterTest is AbstractAdapterTest {
             address _depositGuard,
             address _vaultDeployer,
             address _uniRouter,
-            uint24 _swapFee
+            uint24 _uniSwapFee
         ) = abi.decode(
                 testConfig,
                 (uint256, address, address, address, uint24)
@@ -51,17 +51,16 @@ contract IchiAdapterTest is AbstractAdapterTest {
         pid = _pid;
         vaultDeployer = _vaultDeployer;
         uniRouter = _uniRouter;
-        swapFee = _swapFee;
+        uniSwapFee = _uniSwapFee;
 
         depositGuard = IDepositGuard(_depositGuard);
         vaultFactory = IVaultFactory(depositGuard.ICHIVaultFactory());
         vault = IVault(vaultFactory.allVaults(pid));
 
         assetIndex = vault.token0() == address(asset) ? 0 : 1;
-        asset = assetIndex == 0
-            ? IERC20(vault.token0())
-            : IERC20(vault.token1());
-        ichi = assetIndex == 0 ? vault.token0() : vault.token1();
+        address token0 = vault.token0();
+        address token1 = vault.token1();
+        asset = assetIndex == 0 ? IERC20(token0) : IERC20(token1);
 
         setUpBaseTest(
             IERC20(asset),
@@ -74,6 +73,8 @@ contract IchiAdapterTest is AbstractAdapterTest {
 
         vm.label(address(vaultFactory), "Vault Factory");
         vm.label(address(asset), "asset");
+        vm.label(address(token0), "token0");
+        vm.label(address(token1), "token1");
         vm.label(address(this), "test");
 
         adapter.initialize(

@@ -16,6 +16,10 @@ interface IVault {
         uint256 _amount,
         address _recipient
     ) external returns (uint256, uint256);
+
+    function deposit0Max() external view returns (uint256);
+
+    function deposit1Max() external view returns (uint256);
 }
 
 interface IVaultFactory {
@@ -29,8 +33,8 @@ interface IDepositGuard {
         address _vault,
         address _vaultDeployer,
         address _asset,
-        uint256 amountIn,
-        uint256 minAmountOut,
-        address recipient
+        uint256 _amountIn,
+        uint256 _minAmountOut,
+        address _recipient
     ) external;
 }

@@ -23,8 +23,8 @@ contract IchiAdapter is AdapterBase, WithRewards {
     string internal _name;
     string internal _symbol;
 
-    /// @notice Ichi token
-    address public ichi;
+    // /// @notice Ichi token
+    // address public ichi;
 
     /// @notice The Ichi vault contract
     IVault public vault;
@@ -42,13 +42,19 @@ contract IchiAdapter is AdapterBase, WithRewards {
     uint256 public pid;
 
     /// @notice The index of the asset token within the pool
-    uint8 public assetIndex;
+    uint256 public assetIndex;
+
+    /// @notice Token0
+    address public token0;
+
+    /// @notice Token1
+    address public token1;
 
     /// @notice Uniswap Router
     address public uniRouter;
 
-    /// @notice Uniswap Ichi -> asset swapfee
-    uint24 public swapFee;
+    /// @notice Uniswap alternate token -> asset swapfee
+    uint24 public uniSwapFee;
 
     /*//////////////////////////////////////////////////////////////
                             INITIALIZATION
@@ -75,7 +81,7 @@ contract IchiAdapter is AdapterBase, WithRewards {
             address _depositGuard,
             address _vaultDeployer,
             address _uniRouter,
-            uint24 _swapFee
+            uint24 _uniSwapFee
         ) = abi.decode(
                 ichiInitData,
                 (uint256, address, address, address, uint24)
@@ -87,17 +93,18 @@ contract IchiAdapter is AdapterBase, WithRewards {
         pid = _pid;
         vaultDeployer = _vaultDeployer;
         uniRouter = _uniRouter;
-        swapFee = _swapFee;
+        uniSwapFee = _uniSwapFee;
 
         depositGuard = IDepositGuard(_depositGuard);
         vaultFactory = IVaultFactory(depositGuard.ICHIVaultFactory());
         vault = IVault(vaultFactory.allVaults(pid));
+        token0 = vault.token0();
+        token1 = vault.token1();
 
-        if (vault.token0() != asset() && vault.token1() != asset())
+        if (token0 != address(asset()) && token1 != address(asset()))
             revert InvalidAsset();
 
-        assetIndex = vault.token0() == address(asset()) ? 0 : 1;
-        ichi = assetIndex == 0 ? vault.token0() : vault.token1();
+        assetIndex = token0 == address(asset()) ? 0 : 1;
 
         _name = string.concat(
             "VaultCraft Ichi ",
@@ -106,7 +113,14 @@ contract IchiAdapter is AdapterBase, WithRewards {
         );
         _symbol = string.concat("vcIchi-", IERC20Metadata(asset()).symbol());
 
-        IERC20(asset()).approve(address(depositGuard), type(uint256).max);
+        IERC20(assetIndex == 0 ? token0 : token1).approve(
+            address(depositGuard),
+            type(uint256).max
+        );
+        IERC20(assetIndex == 0 ? token1 : token0).approve(
+            address(uniRouter),
+            type(uint256).max
+        );
     }
 
     function name()
@@ -135,37 +149,39 @@ contract IchiAdapter is AdapterBase, WithRewards {
     /// @return The total amount of underlying tokens the Vault holds.
 
     function _totalAssets() internal view override returns (uint256) {
-        (uint256 amount0, uint256 amount1) = vault.getTotalAmounts();
-
-        // uint256 underlyingAmount0 = Math.mulDiv(
-        //     vault.balanceOf(address(this)),
-        //     amount0,
-        //     totalSupply()
-        // );
-        // uint256 underlyingAmount1 = Math.mulDiv(
-        //     vault.balanceOf(address(this)),
-        //     amount1,
-        //     totalSupply()
-        // );
-
-        // uint256 amountAsset = assetIndex == 0
-        //     ? underlyingAmount0
-        //     : underlyingAmount1;
-
-        // uint256 ichiAmount = assetIndex == 0
-        //     ? underlyingAmount1
-        //     : underlyingAmount0;
-
-        // uint256 totalAssets = amountAsset + ichiAmount;
-
-        return vault.balanceOf(address(this));
+        // (uint256 amount0, uint256 amount1) = vault.getTotalAmounts();
+        // // uint256 underlyingAmount0 = Math.mulDiv(
+        // //     vault.balanceOf(address(this)),
+        // //     amount0,
+        // //     totalSupply()
+        // // );
+        // // uint256 underlyingAmount1 = Math.mulDiv(
+        // //     vault.balanceOf(address(this)),
+        // //     amount1,
+        // //     totalSupply()
+        // // );
+        // // uint256 amountAsset = assetIndex == 0
+        // //     ? underlyingAmount0
+        // //     : underlyingAmount1;
+        // // uint256 ichiAmount = assetIndex == 0
+        // //     ? underlyingAmount1
+        // //     : underlyingAmount0;
+        // // uint256 totalAssets = amountAsset + ichiAmount;
+        // return vault.balanceOf(address(this));
     }
 
     /*//////////////////////////////////////////////////////////////
                           INTERNAL HOOKS LOGIC
     //////////////////////////////////////////////////////////////*/
+    error OverMaxDeposit(uint256 amount, uint256 max);
 
     function _protocolDeposit(uint256 amount, uint256) internal override {
+        uint256 depositMax = assetIndex == 0
+            ? vault.deposit0Max()
+            : vault.deposit1Max();
+
+        if (amount > depositMax) revert OverMaxDeposit(amount, depositMax);
+
         depositGuard.forwardDepositToICHIVault(
             address(vault),
             address(vaultDeployer),
@@ -182,14 +198,15 @@ contract IchiAdapter is AdapterBase, WithRewards {
             address(this)
         );
 
-        uint256 ichiAmount = assetIndex == 0 ? amount1 : amount0;
+        address oppositePair = assetIndex == 0 ? token1 : token0;
+        uint256 oppositePairAmount = assetIndex == 0 ? amount1 : amount0;
 
         UniswapV3Utils.swap(
             uniRouter,
-            ichi,
+            oppositePair,
             address(asset()),
             swapFee,
-            ichiAmount
+            oppositePairAmount
         );
     }
 

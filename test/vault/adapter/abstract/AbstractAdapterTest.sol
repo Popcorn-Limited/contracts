@@ -54,7 +54,9 @@ contract AbstractAdapterTest is PropertyTest {
         address externalRegistry_,
         uint256 delta_,
         string memory baseTestId_,
-        bool useStrategy_
+        bool useStrategy_,
+        uint256 defaultAmountMultiplier_,
+        uint256 maxAssetsMultiplier_
     ) public {
         asset = asset_;
 
@@ -67,10 +69,16 @@ contract AbstractAdapterTest is PropertyTest {
         _asset_ = address(asset_);
         _delta_ = delta_;
 
-        defaultAmount = 10 ** IERC20Metadata(address(asset_)).decimals() * 1e9;
+        defaultAmountMultiplier_ == 0 ? 1e9 : defaultAmountMultiplier_;
+        defaultAmount =
+            10 ** IERC20Metadata(address(asset_)).decimals() *
+            defaultAmountMultiplier_;
 
         raise = defaultAmount;
-        maxAssets = defaultAmount * 1000;
+
+        maxAssetsMultiplier_ == 0 ? 1000 : maxAssetsMultiplier_;
+        maxAssets = defaultAmount * maxAssetsMultiplier_;
+
         maxShares = maxAssets / 2;
 
         baseTestId = baseTestId_;
@@ -286,8 +294,10 @@ contract AbstractAdapterTest is PropertyTest {
             uint256 amount = bound(uint256(fuzzAmount), minFuzz, maxAssets);
 
             _mintAssetAndApproveForAdapter(amount, bob);
+            emit log("PING");
 
             prop_deposit(bob, bob, amount, testId);
+            emit log("PING1");
 
             increasePricePerShare(raise);
 
@@ -349,7 +359,7 @@ contract AbstractAdapterTest is PropertyTest {
 
             uint256 reqAssets = adapter.previewMint(amount) * 10;
             _mintAssetAndApproveForAdapter(reqAssets, bob);
-            
+
             vm.prank(bob);
             adapter.deposit(reqAssets, bob);
             prop_redeem(bob, bob, amount, testId);
