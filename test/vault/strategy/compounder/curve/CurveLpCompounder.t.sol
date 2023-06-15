@@ -6,6 +6,7 @@ pragma solidity ^0.8.15;
 import {Test} from "forge-std/Test.sol";
 import {ConvexAdapter, IConvexBooster, IConvexRewards, SafeERC20, IERC20, IERC20Metadata, Math} from "../../../../../src/vault/adapter/convex/ConvexAdapter.sol";
 import {CurveLpCompounder, CurveRoute} from "../../../../../src/vault/strategy/compounder/curve/CurveLpCompounder.sol";
+import {CurveCompounder} from "../../../../../src/vault/strategy/compounder/curve/CurveCompounder.sol";
 import {Clones} from "openzeppelin-contracts/proxy/Clones.sol";
 
 contract CurveLpCompounderTest is Test {
@@ -61,7 +62,7 @@ contract CurveLpCompounderTest is Test {
         curveRoutes.push(
             CurveRoute({route: toBaseAssetRoute, swapParams: swapParams})
         );
-        minTradeAmounts.push(uint256(0));
+        minTradeAmounts.push(uint256(1e18));
 
         toBaseAssetRoute = [
             cvx,
@@ -81,7 +82,7 @@ contract CurveLpCompounderTest is Test {
         curveRoutes.push(
             CurveRoute({route: toBaseAssetRoute, swapParams: swapParams})
         );
-        minTradeAmounts.push(uint256(0));
+        minTradeAmounts.push(uint256(1e18));
 
         toBaseAssetRoute = [
             usdc,
@@ -121,6 +122,14 @@ contract CurveLpCompounderTest is Test {
             address(convexBooster),
             abi.encode(uint256(150))
         );
+
+        // we deposit the initial funds so that the adapter actually holds some assets.
+        // We also increase the block timestamp so that `harvest()` is executed when we
+        // call it in one of the tests.
+        deal(asset, address(this), 10000e18);
+        IERC20(asset).approve(address(adapter), type(uint256).max);
+        adapter.deposit(10000e18, address(this));
+        vm.warp(block.timestamp + 12);
     }
 
     function test__init() public {
@@ -142,16 +151,99 @@ contract CurveLpCompounderTest is Test {
     }
 
     function test__compound() public {
-        deal(asset, address(this), 10000e18);
-        IERC20(asset).approve(address(adapter), type(uint256).max);
-        adapter.deposit(10000e18, address(this));
-
         uint256 oldTa = adapter.totalAssets();
+        vm.warp(block.timestamp + 30 days);
+        adapter.harvest();
+
+        assertGt(adapter.totalAssets(), oldTa);
+    }
+
+    function test__min_trade_amount() public {
+        // the strategy should only compound if its balance > minTradeAmount
+        adapter.harvest();
+
+        assertGt(IERC20(crv).balanceOf(address(adapter)), 0, "shouldn't trade if crv minAmount > balance");
+        assertGt(IERC20(cvx).balanceOf(address(adapter)), 0, "shouldn't trade if cvx minAmount > balance");
+    }
+
+    function test__should_trade_whole_balance() public {
+        // when trading, it should use all the available funds
+        vm.warp(block.timestamp + 30 days);
+
+        adapter.harvest();
+
+        assertEq(IERC20(crv).balanceOf(address(this)), 0, "should trade whole balance");
+        assertEq(IERC20(cvx).balanceOf(address(this)), 0, "should trade whole balance");
+    }
+
+    function test__should_hold_no_tokens() public {
+        // after trading, the adapter shouldn't hold any additional assets.
+        // The funds it got from the trade should be deposited.
+        // so oldBalance = newBalance for the underlying asset
+        uint oldBal = IERC20(asset).balanceOf(address(adapter));
 
         vm.warp(block.timestamp + 30 days);
 
         adapter.harvest();
 
-        assertGt(adapter.totalAssets(), oldTa);
+        uint newBal = IERC20(asset).balanceOf(address(adapter));
+        assertEq(oldBal, newBal, "shouldn't hold any assets in adapter");
+    }
+
+    function test__init_only_allow_asset() public {
+        // token that we trade to MUST be the base asset used to get the adapter's asset.
+        // In this case it would be USDC but we swap to asset (Stargate LP token)
+        address[9] memory _toBaseAssetPaths = [
+            crv,
+            0x8301AE4fc9c624d1D396cbDAa1ed877821D7C511, // crv / eth
+            eth,
+            0xD51a44d3FaE010294C616388b506AcdA1bfAAE46, // tricrypto2
+            usdt,
+            0xbEbc44782C7dB0a1A60Cb6fe97d0b483032FF1C7, // 3crv
+            stg,
+            address(0),
+            address(0)
+        ];
+        curveRoutes[0].route = _toBaseAssetPaths;
+        bytes memory stratData = abi.encode(
+            usdc,
+            router,
+            curveRoutes,
+            CurveRoute({route: toBaseAssetRoute, swapParams: swapParams}),
+            minTradeAmounts,
+            abi.encode(pool, 1)
+        );
+
+        address impl = address(new ConvexAdapter());
+        ConvexAdapter _adapter = ConvexAdapter(Clones.clone(impl));
+
+        // need to do this before the call to initalize because expectRevert
+        // would try to catch this call otherwise
+        CurveLpCompounder compounder = new CurveLpCompounder();
+        vm.expectRevert(CurveCompounder.InvalidConfig.selector);
+        _adapter.initialize(
+            abi.encode(
+                asset,
+                address(this),
+                compounder,
+                0,
+                sigs,
+                stratData
+            ),
+            address(convexBooster),
+            abi.encode(150)
+        );
+    }
+
+    function test__no_rewards_available() public {
+        // How to set the balance to 0?
+        // For harvest() to be callable, it has to be a called at a unique timestamp.
+        // Since we increase the timestamp, we earn rewards. So there's no moment where we earn
+        // 0 rewards
+
+        // uint totalAssets = adapter.totalAssets();
+        // adapter.harvest();
+
+        // assertEq(totalAssets, adapter.totalAssets(), "totalAssets shouldn't change if there are no reward tokens");
     }
 }
