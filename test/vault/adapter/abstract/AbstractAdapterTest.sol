@@ -310,7 +310,7 @@ contract AbstractAdapterTest is PropertyTest {
             _mintAssetAndApproveForAdapter(adapter.previewMint(amount), bob);
 
             prop_mint(bob, bob, amount, testId);
-            
+
             increasePricePerShare(raise);
 
             _mintAssetAndApproveForAdapter(adapter.previewMint(amount), bob);
@@ -356,7 +356,7 @@ contract AbstractAdapterTest is PropertyTest {
 
             uint256 reqAssets = adapter.previewMint(amount) * 10;
             _mintAssetAndApproveForAdapter(reqAssets, bob);
-            
+
             vm.prank(bob);
             adapter.deposit(reqAssets, bob);
             prop_redeem(bob, bob, amount, testId);
@@ -554,17 +554,9 @@ contract AbstractAdapterTest is PropertyTest {
         adapter.setPerformanceFee(performanceFee);
         increasePricePerShare(raise);
 
-        emit log("PING");
-
-        emit log_named_uint("convertToAssets", adapter.convertToAssets(1e18));
-        emit log_named_uint("highWaterMark", adapter.highWaterMark());
-        emit log_named_uint("totalSupply", adapter.totalSupply());
-
         uint256 gain = ((adapter.convertToAssets(1e18) -
             adapter.highWaterMark()) * adapter.totalSupply()) / 1e18;
         uint256 fee = (gain * performanceFee) / 1e18;
-
-        emit log("PING1");
 
         uint256 expectedFee = adapter.convertToShares(fee);
 
@@ -590,7 +582,9 @@ contract AbstractAdapterTest is PropertyTest {
     }
 
     function test__disable_auto_harvest() public {
-        adapter.setShouldAutoHarvest(false);
+        adapter.toggleAutoHarvest();
+
+        assertFalse(adapter.autoHarvest());
 
         uint lastHarvest = adapter.lastHarvest();
 

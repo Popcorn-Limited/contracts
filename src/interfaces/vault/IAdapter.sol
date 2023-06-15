@@ -29,7 +29,9 @@ interface IAdapter is IERC4626, IOwned, IPermit, IPausable {
 
     function harvest() external;
 
-    function setShouldAutoHarvest(bool shouldAutoHarvest) external;
+    function toggleAutoHarvest() external;
+
+    function autoHarvest() external view returns (bool);
 
     function lastHarvest() external view returns (uint256);
 
