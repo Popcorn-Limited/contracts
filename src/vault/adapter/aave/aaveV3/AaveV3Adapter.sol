@@ -49,7 +49,6 @@ contract AaveV3Adapter is AdapterBase, WithRewards {
      * @param aaveDataProvider Encoded data for the base adapter initialization.
      * @dev This function is called by the factory contract when deploying a new vault.
      */
-
     function initialize(
         bytes memory adapterInitData,
         address aaveDataProvider,

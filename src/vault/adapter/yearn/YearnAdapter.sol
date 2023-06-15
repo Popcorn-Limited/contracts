@@ -41,13 +41,11 @@ contract YearnAdapter is AdapterBase {
         address externalRegistry,
         bytes memory yearnData
     ) external virtual initializer {
-        (address _asset, , , , , ) = abi.decode(
-            adapterInitData,
-            (address, address, address, uint256, bytes4[8], bytes)
-        );
         __AdapterBase_init(adapterInitData);
 
-        yVault = VaultAPI(IYearnRegistry(externalRegistry).latestVault(_asset));
+        yVault = VaultAPI(
+            IYearnRegistry(externalRegistry).latestVault(asset())
+        );
 
         _name = string.concat(
             "VaultCraft Yearn ",
@@ -59,7 +57,7 @@ contract YearnAdapter is AdapterBase {
         maxLoss = abi.decode(yearnData, (uint256));
         if (maxLoss > 10_000) revert MaxLossTooHigh();
 
-        IERC20(_asset).approve(address(yVault), type(uint256).max);
+        IERC20(asset()).approve(address(yVault), type(uint256).max);
     }
 
     function name()
@@ -85,7 +83,7 @@ contract YearnAdapter is AdapterBase {
   //////////////////////////////////////////////////////////////*/
 
     /// @notice Emulate yearns total asset calculation to return the total assets of the vault.
-    function _totalAssets() internal view override returns (uint256) {
+    function _totalAssets() internal view virtual override returns (uint256) {
         return _shareValue(yVault.balanceOf(address(this)));
     }
 
@@ -133,7 +131,7 @@ contract YearnAdapter is AdapterBase {
     function convertToUnderlyingShares(
         uint256,
         uint256 shares
-    ) public view override returns (uint256) {
+    ) public view virtual override returns (uint256) {
         uint256 supply = totalSupply();
         return
             supply == 0
@@ -143,30 +141,6 @@ contract YearnAdapter is AdapterBase {
                     supply,
                     Math.Rounding.Up
                 );
-    }
-
-    function previewDeposit(
-        uint256 assets
-    ) public view override returns (uint256) {
-        return paused() ? 0 : _convertToShares(assets - 0, Math.Rounding.Down);
-    }
-
-    function previewMint(
-        uint256 shares
-    ) public view override returns (uint256) {
-        return paused() ? 0 : _convertToAssets(shares + 0, Math.Rounding.Up);
-    }
-
-    function previewWithdraw(
-        uint256 assets
-    ) public view override returns (uint256) {
-        return _convertToShares(assets + 0, Math.Rounding.Up);
-    }
-
-    function previewRedeem(
-        uint256 shares
-    ) public view override returns (uint256) {
-        return _convertToAssets(shares - 0, Math.Rounding.Down);
     }
 
     /*//////////////////////////////////////////////////////////////

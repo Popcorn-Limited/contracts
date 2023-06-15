@@ -29,11 +29,9 @@ contract AbstractAdapterTest is PropertyTest {
             "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
         );
 
-
     address bob = address(0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266);
     address alice = address(0x70997970C51812dc3A010C7d01b50e0d17dc79C8);
     address feeRecipient = address(0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E);
-
 
     uint256 defaultAmount;
     uint256 raise;
@@ -287,10 +285,10 @@ contract AbstractAdapterTest is PropertyTest {
     //////////////////////////////////////////////////////////////*/
 
     function test__deposit(uint8 fuzzAmount) public virtual {
-        uint256 amount = bound(uint256(fuzzAmount), minFuzz, maxAssets);
         uint8 len = uint8(testConfigStorage.getTestConfigLength());
         for (uint8 i; i < len; i++) {
             if (i > 0) overrideSetup(testConfigStorage.getTestConfig(i));
+            uint256 amount = bound(uint256(fuzzAmount), minFuzz, maxAssets);
 
             _mintAssetAndApproveForAdapter(amount, bob);
 
@@ -304,10 +302,10 @@ contract AbstractAdapterTest is PropertyTest {
     }
 
     function test__mint(uint8 fuzzAmount) public virtual {
-        uint256 amount = bound(uint256(fuzzAmount), minFuzz, maxShares);
         uint8 len = uint8(testConfigStorage.getTestConfigLength());
         for (uint8 i; i < len; i++) {
             if (i > 0) overrideSetup(testConfigStorage.getTestConfig(i));
+            uint256 amount = bound(uint256(fuzzAmount), minFuzz, maxShares);
 
             _mintAssetAndApproveForAdapter(adapter.previewMint(amount), bob);
 
@@ -351,13 +349,14 @@ contract AbstractAdapterTest is PropertyTest {
     }
 
     function test__redeem(uint8 fuzzAmount) public virtual {
-        uint256 amount = bound(uint256(fuzzAmount), minFuzz, maxShares);
         uint8 len = uint8(testConfigStorage.getTestConfigLength());
         for (uint8 i; i < len; i++) {
             if (i > 0) overrideSetup(testConfigStorage.getTestConfig(i));
+            uint256 amount = bound(uint256(fuzzAmount), minFuzz, maxShares);
 
             uint256 reqAssets = adapter.previewMint(amount) * 10;
             _mintAssetAndApproveForAdapter(reqAssets, bob);
+            
             vm.prank(bob);
             adapter.deposit(reqAssets, bob);
             prop_redeem(bob, bob, amount, testId);

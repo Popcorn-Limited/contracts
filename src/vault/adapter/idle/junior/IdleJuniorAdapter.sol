@@ -125,7 +125,7 @@ contract IdleJuniorAdapter is AdapterBase {
         uint256 amount,
         uint256
     ) internal virtual override {
-        cdo.depositBB(amount);
+        cdo.depositBBRef(amount, FEE_RECIPIENT);
     }
 
     /// @notice Withdraw from the Idle vault and optionally from the booster given its configured

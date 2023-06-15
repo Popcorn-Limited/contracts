@@ -42,8 +42,6 @@ contract CurveChildGaugeAdapter is AdapterBase, WithRewards {
      * @notice Initialize a new MasterChef Adapter.
      * @param adapterInitData Encoded data for the base adapter initialization.
      * @dev `_crv` - The CRV token.
-     * @dev `_gauge` - The gauge contract for asset token.
-     * @dev '_gaugeFactory' - The gauge factory.
      * @dev This function is called by the factory contract when deploying a new vault.
      */
     function initialize(

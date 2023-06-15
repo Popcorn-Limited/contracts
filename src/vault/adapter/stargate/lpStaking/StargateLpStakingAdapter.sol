@@ -47,7 +47,6 @@ contract StargateLpStakingAdapter is AdapterBase, WithRewards {
      * @param stargateInitData Encoded data for the base adapter initialization.
      * @dev This function is called by the factory contract when deploying a new vault.
      */
-
     function initialize(
         bytes memory adapterInitData,
         address registry,
