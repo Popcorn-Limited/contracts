@@ -12,8 +12,6 @@ import {IPermissionRegistry} from "../../../interfaces/vault/IPermissionRegistry
  * @author  0xSolDev
  * @notice  ERC4626 wrapper for MetaPool Vaults.
  *
- * An ERC4626 compliant Wrapper for https://app.idle.finance/#/earn/yield-tranches.
- * Allows wrapping MetaPool Vaults with junior tranches.
  */
 contract MetaPoolAdapter is AdapterBase {
     using SafeERC20 for IERC20;
@@ -25,6 +23,9 @@ contract MetaPoolAdapter is AdapterBase {
     IMetaPool public iPool;
     IERC20Metadata public stNear;
     IERC20Metadata public wNear;
+
+    uint256 internal constant stNearDecimals = 24;
+    uint256 internal constant BPS_DENOMINATOR = 10_000;
 
     error NotValidCDO(address cdo);
     error PausedCDO(address cdo);
@@ -85,70 +86,52 @@ contract MetaPoolAdapter is AdapterBase {
     //////////////////////////////////////////////////////////////*/
 
     function _totalAssets() internal view override returns (uint256) {
-        uint256 stNearDecimals = stNear.decimals();
-        // aurora testnet bug
-        if (stNearDecimals == 0){
-            stNearDecimals = 24;
-        }
-
-        uint16 wNearSwapFee = iPool.wNearSwapFee();
-
-        uint256 stNearBalance = stNear.balanceOf(address(this));
-        return stNearBalance * (10000 - wNearSwapFee) * iPool.stNearPrice() / 10000 / (10 ** stNearDecimals);
+        return
+            (stNear.balanceOf(address(this)) *
+                (BPS_DENOMINATOR - iPool.wNearSwapFee()) *
+                iPool.stNearPrice()) /
+            BPS_DENOMINATOR /
+            (10 ** stNearDecimals);
     }
 
     /// @notice The amount of ellipsis shares to withdraw given an amount of adapter shares
-    function convertToUnderlyingShares(uint256, uint256 shares) public view override returns (uint256) {
-        uint256 stNearBalance = stNear.balanceOf(address(this));
+    function convertToUnderlyingShares(
+        uint256,
+        uint256 shares
+    ) public view override returns (uint256) {
         uint256 supply = totalSupply();
-        return supply == 0 ? shares : shares.mulDiv(stNearBalance, supply, Math.Rounding.Up);
+        return
+            supply == 0
+                ? shares
+                : shares.mulDiv(
+                    stNear.balanceOf(address(this)),
+                    supply,
+                    Math.Rounding.Up
+                );
     }
 
     // /// @notice Applies the idle deposit limit to the adapter.
     function maxDeposit(address) public view override returns (uint256) {
         if (paused()) return 0;
 
-        uint256 totalStNear = IERC20(stNear).balanceOf(address(iPool));
+        uint256 stNearAmount = (IERC20(stNear).balanceOf(address(iPool)) *
+            (BPS_DENOMINATOR - iPool.stNearSwapFee())) / BPS_DENOMINATOR; // Swap fees in basis points. 10000 == 100%
 
-        uint256 stNearDecimals = stNear.decimals();
-        // aurora testnet bug
-        if (stNearDecimals == 0){
-            stNearDecimals = 24;
-        }
-
-        uint16 stNearSwapFee = iPool.stNearSwapFee();
-
-        uint256 stNearAmount = totalStNear * (10000 - stNearSwapFee) / 10000;     // Swap fees in basis points. 10000 == 100%
-
-        uint256 stNearPrice = iPool.stNearPrice();
-
-        return stNearAmount * stNearPrice / (10 ** stNearDecimals);
+        return (stNearAmount * iPool.stNearPrice()) / (10 ** stNearDecimals);
     }
 
     function maxWithdraw(address owner) public view override returns (uint256) {
-
-        uint256 totalwNear = IERC20(wNear).balanceOf(address(iPool));
-
         uint256 amount = convertToAssets(balanceOf(owner));
 
-        uint256 stNearDecimals = stNear.decimals();
-        // aurora testnet bug
-        if (stNearDecimals == 0){
-            stNearDecimals = 24;
-        }
+        uint256 wNearAmount = (IERC20(wNear).balanceOf(address(iPool)) *
+            (BPS_DENOMINATOR - iPool.wNearSwapFee())) / BPS_DENOMINATOR; // Swap fees in basis points. 10000 == 100%
 
-        uint16 wNearSwapFee = iPool.wNearSwapFee();
-
-        uint256 wNearAmount = totalwNear * (10000 - wNearSwapFee) / 10000;     // Swap fees in basis points. 10000 == 100%
-
-        uint256 stNearPrice = iPool.stNearPrice();
-
-        uint256 maxAmount = wNearAmount * (10 ** stNearDecimals) / stNearPrice;
+        uint256 maxAmount = (wNearAmount * (10 ** stNearDecimals)) /
+            iPool.stNearPrice();
 
         return amount > maxAmount ? maxAmount : amount;
-        
     }
-    
+
     /*//////////////////////////////////////////////////////////////
                           INTERNAL HOOKS LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -158,7 +141,6 @@ contract MetaPoolAdapter is AdapterBase {
         uint256 amount,
         uint256
     ) internal virtual override {
-
         iPool.swapwNEARForstNEAR(amount);
     }
 
@@ -171,5 +153,4 @@ contract MetaPoolAdapter is AdapterBase {
         uint256 underlyingShare = convertToUnderlyingShares(0, shares);
         iPool.swapstNEARForwNEAR(underlyingShare);
     }
-
 }
