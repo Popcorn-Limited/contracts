@@ -589,6 +589,20 @@ contract AbstractAdapterTest is PropertyTest {
         );
     }
 
+    function test__disable_auto_harvest() public {
+        adapter.setShouldAutoHarvest(false);
+
+        uint lastHarvest = adapter.lastHarvest();
+
+        vm.warp(block.timestamp + 12);
+
+        _mintAssetAndApproveForAdapter(defaultAmount, bob);
+        vm.prank(bob);
+        adapter.deposit(defaultAmount, bob);
+
+        assertEq(lastHarvest, adapter.lastHarvest(), "should not auto harvest");
+    }
+
     /*//////////////////////////////////////////////////////////////
                         HARVEST COOLDOWN
     //////////////////////////////////////////////////////////////*/

@@ -116,7 +116,7 @@ abstract contract AdapterBase is
         _protocolDeposit(assets, shares);
         _mint(receiver, shares);
 
-        harvest();
+        if (shouldAutoHarvest) harvest();
 
         emit Deposit(caller, receiver, assets, shares);
     }
@@ -144,7 +144,7 @@ abstract contract AdapterBase is
 
         IERC20(asset()).safeTransfer(receiver, assets);
 
-        harvest();
+        if (shouldAutoHarvest) harvest();
 
         emit Withdraw(caller, receiver, owner, assets, shares);
     }
@@ -256,6 +256,7 @@ abstract contract AdapterBase is
     IStrategy public strategy;
     bytes public strategyConfig;
     uint256 public lastHarvest;
+    bool public shouldAutoHarvest = true;
 
     event Harvested();
 
@@ -320,6 +321,12 @@ abstract contract AdapterBase is
         );
     
         if (!success) revert StrategySetupFailed();
+    }
+
+    event ShouldAutoHarvestChanged(bool oldValue, bool newValue);
+    function setShouldAutoHarvest(bool _shouldAutoHarvest) external onlyOwner {
+        emit ShouldAutoHarvestChanged(shouldAutoHarvest, _shouldAutoHarvest);
+        shouldAutoHarvest = _shouldAutoHarvest;
     }
 
     /*//////////////////////////////////////////////////////////////
