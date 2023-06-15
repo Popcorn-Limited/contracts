@@ -318,6 +318,8 @@ abstract contract AdapterBase is
         (bool success, ) = address(strategy).delegatecall(
             abi.encodeWithSignature("setUp(bytes)", strategyConfig)
         );
+    
+        if (!success) revert StrategySetupFailed();
     }
 
     /*//////////////////////////////////////////////////////////////
