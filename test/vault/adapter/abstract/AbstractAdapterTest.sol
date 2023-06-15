@@ -7,6 +7,8 @@ import {Test} from "forge-std/Test.sol";
 
 import {PropertyTest} from "./PropertyTest.prop.sol";
 import {IAdapter, IERC4626} from "../../../../src/interfaces/vault/IAdapter.sol";
+
+import {IMetaPool, MetaPoolAdapter} from "../../../../src/vault/adapter/metapool/MetaPoolAdapter.sol";
 import {IStrategy} from "../../../../src/interfaces/vault/IStrategy.sol";
 import {IERC20Upgradeable as IERC20, IERC20MetadataUpgradeable as IERC20Metadata} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
 import {ITestConfigStorage} from "./ITestConfigStorage.sol";
@@ -68,6 +70,9 @@ contract AbstractAdapterTest is PropertyTest {
         _vault_ = address(adapter);
         _asset_ = address(asset_);
         _delta_ = delta_;
+
+        vm.label(alice, "alice");
+        vm.label(bob, "bob");
 
         defaultAmount = 10 ** IERC20Metadata(address(asset_)).decimals() * 1e9;
 
@@ -305,11 +310,13 @@ contract AbstractAdapterTest is PropertyTest {
             if (i > 0) overrideSetup(testConfigStorage.getTestConfig(i));
 
             _mintAssetAndApproveForAdapter(adapter.previewMint(amount), bob);
-            prop_mint(bob, bob, amount, testId);
 
+            prop_mint(bob, bob, amount, testId);
+            
             increasePricePerShare(raise);
 
             _mintAssetAndApproveForAdapter(adapter.previewMint(amount), bob);
+
             prop_mint(bob, alice, amount, testId);
         }
     }

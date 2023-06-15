@@ -39,6 +39,7 @@ contract MetaPoolAdapterTest is AbstractAdapterTest {
         iPool = IMetaPool(poolAddress);
 
         wNear = iPool.wNear();
+        stNear = iPool.stNear();
 
         setUpBaseTest(
             IERC20(wNear),
@@ -49,7 +50,8 @@ contract MetaPoolAdapterTest is AbstractAdapterTest {
             true
         );
 
-        vm.label(address(asset), "wNear");
+        vm.label(address(wNear), "wNear");
+        vm.label(address(stNear), "stNear");
         vm.label(address(poolAddress), "poolAddress");
         vm.label(address(this), "test");
 
@@ -71,9 +73,9 @@ contract MetaPoolAdapterTest is AbstractAdapterTest {
 
     function increasePricePerShare(uint256 amount) public override {
         deal(
-            address(stNear),
+            address(asset),
             address(adapter),
-            IERC20(address(asset)).balanceOf(address(adapter)) + amount
+            asset.balanceOf(address(adapter)) + amount
         );
     }
 
@@ -151,6 +153,125 @@ contract MetaPoolAdapterTest is AbstractAdapterTest {
             IERC20(wNear).allowance(address(adapter), poolAddress),
             type(uint256).max,
             "allowance"
+        );
+    }
+
+
+    /*//////////////////////////////////////////////////////////////
+                          OVERRIDES
+  //////////////////////////////////////////////////////////////*/
+
+    function test__unpause() public override {
+        _mintAssetAndApproveForAdapter(defaultAmount * 3, bob);
+
+        vm.prank(bob);
+        adapter.deposit(defaultAmount, bob);
+
+        uint256 oldTotalAssets = adapter.totalAssets();
+        uint256 oldTotalSupply = adapter.totalSupply();
+        uint256 oldIouBalance = iouBalance();
+
+        uint16 wNearSwapFee = IMetaPool(externalRegistry).wNearSwapFee();
+        uint256 stNearPrice = IMetaPool(externalRegistry).stNearPrice();
+        uint256 balance = stNear.balanceOf(address(adapter));
+
+        adapter.pause();
+        adapter.unpause();
+
+        uint256 balanceDifference = balance;
+
+        wNearSwapFee = IMetaPool(externalRegistry).wNearSwapFee();
+        stNearPrice = IMetaPool(externalRegistry).stNearPrice();
+        balance = stNear.balanceOf(address(adapter));
+
+        balanceDifference -= balance;
+
+        uint256 fee = _totalAssets(wNearSwapFee, balanceDifference, stNearPrice);
+
+        // We simply deposit back into the external protocol
+        // TotalSupply and Assets dont change
+        assertApproxEqAbs(
+            oldTotalAssets,
+            adapter.totalAssets(),
+            _delta_+fee,
+            "totalAssets"
+        );
+        assertApproxEqAbs(
+            oldTotalSupply,
+            adapter.totalSupply(),
+            _delta_,
+            "totalSupply"
+        );
+        assertApproxEqAbs(
+            asset.balanceOf(address(adapter)),
+            0,
+            _delta_,
+            "asset balance"
+        );
+        assertApproxEqAbs(iouBalance(), oldIouBalance, _delta_, "iou balance");
+
+        // Deposit and mint dont revert
+        vm.startPrank(bob);
+        adapter.deposit(defaultAmount, bob);
+        adapter.mint(defaultAmount, bob);
+    }
+
+    function _totalAssets(uint16 wNearSwapFee, uint256 stNearBalance, uint256 stNearPrice) internal view returns (uint256) {
+        uint256 stNearDecimals = stNear.decimals();
+        // aurora testnet bug
+        if (stNearDecimals == 0){
+            stNearDecimals = 24;
+        }
+        
+        return stNearBalance * (10000 - wNearSwapFee) * stNearPrice / 10000 / (10 ** stNearDecimals);
+    }
+
+    function test__harvest() public override {
+        uint256 performanceFee = 1e16;
+        uint256 hwm = 1e9;
+
+        _mintAssetAndApproveForAdapter(defaultAmount, bob);
+
+        vm.prank(bob);
+        adapter.deposit(defaultAmount, bob);
+
+        uint256 oldTotalAssets = adapter.totalAssets();
+        adapter.setPerformanceFee(performanceFee);
+        increasePricePerShare(raise);
+        deal(address(stNear), address(adapter), defaultAmount); 
+
+        emit log("PING");
+
+        emit log_named_uint("convertToAssets", adapter.convertToAssets(1e18));
+        emit log_named_uint("highWaterMark", adapter.highWaterMark());
+        emit log_named_uint("totalSupply", adapter.totalSupply());
+
+        uint256 gain = ((adapter.convertToAssets(1e18) -
+            adapter.highWaterMark()) * adapter.totalSupply()) / 1e18;
+        uint256 fee = (gain * performanceFee) / 1e18;
+
+        emit log("PING1");
+
+        uint256 expectedFee = adapter.convertToShares(fee);
+
+        vm.expectEmit(false, false, false, true, address(adapter));
+
+        emit Harvested();
+
+        adapter.harvest();
+
+        // Multiply with the decimal offset
+        assertApproxEqAbs(
+            adapter.totalSupply(),
+            defaultAmount * 1e9 + expectedFee,
+            _delta_,
+            "totalSupply"
+        );
+        assertApproxEqAbs(
+            adapter.balanceOf(feeRecipient),
+            expectedFee,
+            _delta_,
+            "expectedFee"
         );
     }
 }
