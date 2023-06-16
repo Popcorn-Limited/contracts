@@ -7,6 +7,8 @@ import {IchiAdapter, SafeERC20, IERC20, IERC20Metadata, Math, IVault, IVaultFact
 import {IchiTestConfigStorage, IchiTestConfig} from "./IchiTestConfigStorage.sol";
 import {AbstractAdapterTest, ITestConfigStorage} from "../abstract/AbstractAdapterTest.sol";
 import {MockStrategyClaimer} from "../../../utils/mocks/MockStrategyClaimer.sol";
+import {MockStrategy} from "../../../utils/mocks/MockStrategy.sol";
+import {Clones} from "openzeppelin-contracts/proxy/Clones.sol";
 
 contract IchiAdapterTest is AbstractAdapterTest {
     using Math for uint256;
@@ -71,7 +73,7 @@ contract IchiAdapterTest is AbstractAdapterTest {
             true
         );
 
-        vm.label(address(vaultFactory), "Vault Factory");
+        vm.label(address(vaultFactory), "vaultFactory");
         vm.label(address(asset), "asset");
         vm.label(address(token0), "token0");
         vm.label(address(token1), "token1");
@@ -129,5 +131,43 @@ contract IchiAdapterTest is AbstractAdapterTest {
             type(uint256).max,
             "allowance"
         );
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                          SETUP OVERRIDES
+    //////////////////////////////////////////////////////////////*/
+
+    function setUpBaseTest(
+        IERC20 asset_,
+        address implementation_,
+        address externalRegistry_,
+        uint256 delta_,
+        string memory baseTestId_,
+        bool useStrategy_
+    ) public override {
+        asset = asset_;
+
+        implementation = implementation_;
+        adapter = IAdapter(Clones.clone(implementation_));
+        externalRegistry = externalRegistry_;
+
+        // Setup PropertyTest
+        _vault_ = address(adapter);
+        _asset_ = address(asset_);
+        _delta_ = delta_;
+
+        defaultAmount = 10 ** IERC20Metadata(address(asset_)).decimals();
+
+        raise = defaultAmount;
+        maxAssets = defaultAmount * 100;
+        maxShares = maxAssets / 2;
+
+        baseTestId = baseTestId_;
+        testId = string.concat(
+            baseTestId_,
+            IERC20Metadata(address(asset)).symbol()
+        );
+
+        if (useStrategy_) strategy = IStrategy(address(new MockStrategy()));
     }
 }

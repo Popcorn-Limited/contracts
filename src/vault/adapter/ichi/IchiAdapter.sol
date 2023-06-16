@@ -53,6 +53,9 @@ contract IchiAdapter is AdapterBase, WithRewards {
     /// @notice Uniswap Router
     address public uniRouter;
 
+    /// @notice Uniswap Price Quoter
+    address public uniQuoter;
+
     /// @notice Uniswap alternate token -> asset swapfee
     uint24 public uniSwapFee;
 
@@ -81,10 +84,11 @@ contract IchiAdapter is AdapterBase, WithRewards {
             address _depositGuard,
             address _vaultDeployer,
             address _uniRouter,
+            address _uniQuoter,
             uint24 _uniSwapFee
         ) = abi.decode(
                 ichiInitData,
-                (uint256, address, address, address, uint24)
+                (uint256, address, address, address, address, uint24)
             );
 
         // if (!IPermissionRegistry(registry).endorsed(_gauge))
@@ -93,6 +97,7 @@ contract IchiAdapter is AdapterBase, WithRewards {
         pid = _pid;
         vaultDeployer = _vaultDeployer;
         uniRouter = _uniRouter;
+        uniQuoter = _uniQuoter;
         uniSwapFee = _uniSwapFee;
 
         depositGuard = IDepositGuard(_depositGuard);
@@ -149,25 +154,54 @@ contract IchiAdapter is AdapterBase, WithRewards {
     /// @return The total amount of underlying tokens the Vault holds.
 
     function _totalAssets() internal view override returns (uint256) {
-        // (uint256 amount0, uint256 amount1) = vault.getTotalAmounts();
-        // // uint256 underlyingAmount0 = Math.mulDiv(
-        // //     vault.balanceOf(address(this)),
-        // //     amount0,
-        // //     totalSupply()
-        // // );
-        // // uint256 underlyingAmount1 = Math.mulDiv(
-        // //     vault.balanceOf(address(this)),
-        // //     amount1,
-        // //     totalSupply()
-        // // );
-        // // uint256 amountAsset = assetIndex == 0
-        // //     ? underlyingAmount0
-        // //     : underlyingAmount1;
-        // // uint256 ichiAmount = assetIndex == 0
-        // //     ? underlyingAmount1
-        // //     : underlyingAmount0;
-        // // uint256 totalAssets = amountAsset + ichiAmount;
-        // return vault.balanceOf(address(this));
+        uint256 lpTokenBalance = vault.balanceOf(address(this));
+        uint256 totalSupply = vault.totalSupply();
+        (uint256 underlyingTokenSupplyA, uint256 underlyingTokenSupplyB) = vault
+            .getTotalAmounts();
+
+        (uint256 tokenShareA, uint256 tokenShareB) = calculateUnderlyingShare(
+            lpTokenBalance,
+            totalSupply,
+            underlyingTokenSupplyA,
+            underlyingTokenSupplyB
+        );
+
+        address assetPair = assetIndex == 0 ? token0 : token1;
+        uint256 assetPairAmount = assetIndex == 0 ? tokenShareA : tokenShareB;
+
+        address oppositePair = assetIndex == 0 ? token1 : token0;
+        uint256 oppositePairAmount = assetIndex == 0
+            ? tokenShareB
+            : tokenShareA;
+
+        uint256 oppositePairCurrentSwapPrice = UniswapV3Utils
+            .quoteExactSinglePrice(
+                uniQuoter,
+                oppositePair,
+                assetPair,
+                oppositePairAmount,
+                uniSwapFee,
+                0
+            );
+
+        return assetPairAmount + oppositePairCurrentSwapPrice;
+    }
+
+    function calculateUnderlyingShare(
+        uint256 lpTokenBalance,
+        uint256 totalSupply,
+        uint256 underlyingTokenSupplyA,
+        uint256 underlyingTokenSupplyB
+    ) public pure returns (uint256, uint256) {
+        uint256 lpShare = lpTokenBalance * 1e18;
+        uint256 lpShareFraction = lpShare / totalSupply;
+
+        uint256 underlyingTokenShareA = (underlyingTokenSupplyA *
+            lpShareFraction) / 1e18;
+        uint256 underlyingTokenShareB = (underlyingTokenSupplyB *
+            lpShareFraction) / 1e18;
+
+        return (underlyingTokenShareA, underlyingTokenShareB);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -205,7 +239,7 @@ contract IchiAdapter is AdapterBase, WithRewards {
             uniRouter,
             oppositePair,
             address(asset()),
-            swapFee,
+            uniSwapFee,
             oppositePairAmount
         );
     }

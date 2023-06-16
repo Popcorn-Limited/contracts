@@ -54,10 +54,8 @@ contract AbstractAdapterTest is PropertyTest {
         address externalRegistry_,
         uint256 delta_,
         string memory baseTestId_,
-        bool useStrategy_,
-        uint256 defaultAmountMultiplier_,
-        uint256 maxAssetsMultiplier_
-    ) public {
+        bool useStrategy_
+    ) public virtual {
         asset = asset_;
 
         implementation = implementation_;
@@ -69,16 +67,10 @@ contract AbstractAdapterTest is PropertyTest {
         _asset_ = address(asset_);
         _delta_ = delta_;
 
-        defaultAmountMultiplier_ == 0 ? 1e9 : defaultAmountMultiplier_;
-        defaultAmount =
-            10 ** IERC20Metadata(address(asset_)).decimals() *
-            defaultAmountMultiplier_;
+        defaultAmount = 10 ** IERC20Metadata(address(asset_)).decimals() * 1e9;
 
         raise = defaultAmount;
-
-        maxAssetsMultiplier_ == 0 ? 1000 : maxAssetsMultiplier_;
-        maxAssets = defaultAmount * maxAssetsMultiplier_;
-
+        maxAssets = defaultAmount * 1000;
         maxShares = maxAssets / 2;
 
         baseTestId = baseTestId_;

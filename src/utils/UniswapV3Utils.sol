@@ -3,12 +3,11 @@
 pragma solidity ^0.8.0;
 
 import "./Path.sol";
-import {IUniswapRouterV3, ExactInputSingleParams, ExactInputParams} from "../interfaces/external/uni/v3/IUniswapRouterV3.sol";
+import {IUniswapRouterV3, ExactInputSingleParams, ExactInputParams, IUniQuoterV2, QuoteExactInputSingleParams} from "../interfaces/external/uni/v3/IUniswapRouterV3.sol";
 
 library UniswapV3Utils {
     using Path for bytes;
 
-    // Swap along an encoded path using known amountIn
     // Swap along an encoded path using known amountIn
     function swap(
         address _router,
@@ -85,5 +84,31 @@ library UniswapV3Utils {
         for (uint256 i = 0; i < feeLength; i++) {
             path = abi.encodePacked(path, _fee[i], _route[i + 1]);
         }
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            PRICE QUOTING
+    //////////////////////////////////////////////////////////////*/
+
+    function quoteExactSinglePrice(
+        address _quoter,
+        address _tokenIn,
+        address _tokenOut,
+        uint256 _amountIn,
+        uint24 _fee,
+        uint160 _sqrtPriceLimitX96
+    ) public returns (uint256) {
+        QuoteExactInputSingleParams memory params = QuoteExactInputSingleParams(
+            _tokenIn,
+            _tokenOut,
+            _amountIn,
+            _fee,
+            _sqrtPriceLimitX96
+        );
+        (uint256 amountOut, , , ) = IUniQuoterV2(_quoter).quoteExactInputSingle(
+            params
+        );
+
+        return amountOut;
     }
 }

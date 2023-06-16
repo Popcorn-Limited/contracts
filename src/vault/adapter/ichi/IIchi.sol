@@ -8,6 +8,8 @@ interface IVault {
 
     function token1() external view returns (address);
 
+    function totalSupply() external view returns (uint256);
+
     function getTotalAmounts() external view returns (uint256, uint256);
 
     function balanceOf(address _user) external view returns (uint256);
