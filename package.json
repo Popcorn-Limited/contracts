@@ -16,8 +16,5 @@
     "vault:addTemplate": "forge script ./script/AddTemplate.s.sol --rpc-url https://eth-mainnet.g.alchemy.com/v2/KsuP431uPWKR3KFb-K_0MT1jcwpUnjAg --broadcast",
     "verify": "./script/verifyContract.sh"
   },
-  "dependencies": {
-    "@openzeppelin/contracts": "^4.8.3",
-    "@openzeppelin/contracts-upgradeable": "^4.8.3"
-  }
+  "dependencies": {}
 }
