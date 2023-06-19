@@ -6,7 +6,8 @@ pragma solidity ^0.8.15;
 import {AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20, Math, IStrategy, IAdapter} from "../abstracts/AdapterBase.sol";
 import {WithRewards, IWithRewards} from "../abstracts/WithRewards.sol";
 import {IVault, IVaultFactory, IDepositGuard} from "./IIchi.sol";
-import {UniswapV3Utils} from "../../../utils/UniswapV3Utils.sol";
+import {UniswapV3Utils, IUniV3Pool} from "../../../utils/UniswapV3Utils.sol";
+import {TickMath} from "src/interfaces/external/uni/v3/TickMath.sol";
 
 /**
  * @title   Ichi Adapter
@@ -53,8 +54,8 @@ contract IchiAdapter is AdapterBase, WithRewards {
     /// @notice Uniswap Router
     address public uniRouter;
 
-    /// @notice Uniswap Price Quoter
-    address public uniQuoter;
+    /// @notice Uniswap underlyin Pool
+    IUniV3Pool public uniPool;
 
     /// @notice Uniswap alternate token -> asset swapfee
     uint24 public uniSwapFee;
@@ -84,11 +85,10 @@ contract IchiAdapter is AdapterBase, WithRewards {
             address _depositGuard,
             address _vaultDeployer,
             address _uniRouter,
-            address _uniQuoter,
             uint24 _uniSwapFee
         ) = abi.decode(
                 ichiInitData,
-                (uint256, address, address, address, address, uint24)
+                (uint256, address, address, address, uint24)
             );
 
         // if (!IPermissionRegistry(registry).endorsed(_gauge))
@@ -97,12 +97,12 @@ contract IchiAdapter is AdapterBase, WithRewards {
         pid = _pid;
         vaultDeployer = _vaultDeployer;
         uniRouter = _uniRouter;
-        uniQuoter = _uniQuoter;
         uniSwapFee = _uniSwapFee;
 
         depositGuard = IDepositGuard(_depositGuard);
         vaultFactory = IVaultFactory(depositGuard.ICHIVaultFactory());
         vault = IVault(vaultFactory.allVaults(pid));
+        uniPool = IUniV3Pool(vault.pool());
         token0 = vault.token0();
         token1 = vault.token1();
 
@@ -166,25 +166,32 @@ contract IchiAdapter is AdapterBase, WithRewards {
             underlyingTokenSupplyB
         );
 
-        address assetPair = assetIndex == 0 ? token0 : token1;
         uint256 assetPairAmount = assetIndex == 0 ? tokenShareA : tokenShareB;
-
-        address oppositePair = assetIndex == 0 ? token1 : token0;
         uint256 oppositePairAmount = assetIndex == 0
             ? tokenShareB
             : tokenShareA;
 
-        uint256 oppositePairCurrentSwapPrice = UniswapV3Utils
-            .quoteExactSinglePrice(
-                uniQuoter,
-                oppositePair,
-                assetPair,
-                oppositePairAmount,
-                uniSwapFee,
-                0
-            );
+        uint32[] memory secondsAgos = new uint32[](2);
+        secondsAgos[0] = 0;
+        secondsAgos[1] = 300;
+        (int56[] memory tickCumulatives, ) = uniPool.observe(secondsAgos);
 
-        return assetPairAmount + oppositePairCurrentSwapPrice;
+        int256 averageTick = int256(
+            (tickCumulatives[0] - tickCumulatives[1]) /
+                int256(uint256(secondsAgos[1] - secondsAgos[0]))
+        );
+
+        uint160 sqrtPriceX96 = getSqrtPriceX96(int24(averageTick));
+        uint256 priceRatio = (uint256(sqrtPriceX96) * uint256(sqrtPriceX96)) >>
+            192;
+
+        if (assetIndex == 0) {
+            priceRatio = (1 << 192) / priceRatio;
+        }
+
+        uint256 oppositePairInAssetPairTerms = oppositePairAmount * priceRatio;
+
+        return assetPairAmount + oppositePairInAssetPairTerms;
     }
 
     function calculateUnderlyingShare(
@@ -202,6 +209,23 @@ contract IchiAdapter is AdapterBase, WithRewards {
             lpShareFraction) / 1e18;
 
         return (underlyingTokenShareA, underlyingTokenShareB);
+    }
+
+    // function getSqrtPriceX96(
+    //     int24 tick
+    // ) public pure returns (uint160 sqrtPriceX96) {
+    //     sqrtPriceX96 = uint160(1 << 96);
+    //     if (tick > 0)
+    //         sqrtPriceX96 = uint160(sqrtPriceX96 * (1 << (tick >> 64)));
+    //     else if (tick < 0)
+    //         sqrtPriceX96 = uint160(sqrtPriceX96 / (1 << ((-tick) >> 64)));
+    // }
+
+    function getSqrtPriceX96(
+        int24 tick
+    ) public pure returns (uint160 sqrtPriceX96) {
+        sqrtPriceX96 = TickMath.getSqrtRatioAtTick(tick);
+        return sqrtPriceX96;
     }
 
     /*//////////////////////////////////////////////////////////////

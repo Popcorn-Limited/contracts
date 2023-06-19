@@ -10,7 +10,6 @@ struct IchiTestConfig {
     address depositGuard;
     address vaultDeployer;
     address uniRouter;
-    address uniQuoter;
     uint256 swapFee;
 }
 
@@ -25,7 +24,6 @@ contract IchiTestConfigStorage is ITestConfigStorage {
                 0xA5cE107711789b350e04063D4EffBe6aB6eB05a4,
                 0x0768A75F616B98ee0937673bD83B7aBF142236Ea,
                 0xE592427A0AEce92De3Edee1F18E0157C05861564,
-                0x61fFE014bA17989E743c5F6cB21bF9697530B21e,
                 500
             )
         );
@@ -38,7 +36,6 @@ contract IchiTestConfigStorage is ITestConfigStorage {
                 testConfigs[i].depositGuard,
                 testConfigs[i].vaultDeployer,
                 testConfigs[i].uniRouter,
-                testConfigs[i].uniQuoter,
                 testConfigs[i].swapFee
             );
     }

@@ -3,7 +3,7 @@ pragma solidity ^0.8.15;
 
 import {Test} from "forge-std/Test.sol";
 
-import {IchiAdapter, SafeERC20, IERC20, IERC20Metadata, Math, IVault, IVaultFactory, IDepositGuard, IStrategy, IAdapter, IWithRewards} from "../../../../src/vault/adapter/ichi/IchiAdapter.sol";
+import {IchiAdapter, SafeERC20, IERC20, IERC20Metadata, Math, IVault, IVaultFactory, IDepositGuard, IUniV3Pool, IStrategy, IAdapter, IWithRewards} from "../../../../src/vault/adapter/ichi/IchiAdapter.sol";
 import {IchiTestConfigStorage, IchiTestConfig} from "./IchiTestConfigStorage.sol";
 import {AbstractAdapterTest, ITestConfigStorage} from "../abstract/AbstractAdapterTest.sol";
 import {MockStrategyClaimer} from "../../../utils/mocks/MockStrategyClaimer.sol";
@@ -21,6 +21,7 @@ contract IchiAdapterTest is AbstractAdapterTest {
     uint256 public pid;
     uint8 public assetIndex;
     address public uniRouter;
+    IUniV3Pool public uniPool;
     uint24 public uniSwapFee;
 
     function setUp() public {
@@ -58,6 +59,7 @@ contract IchiAdapterTest is AbstractAdapterTest {
         depositGuard = IDepositGuard(_depositGuard);
         vaultFactory = IVaultFactory(depositGuard.ICHIVaultFactory());
         vault = IVault(vaultFactory.allVaults(pid));
+        uniPool = IUniV3Pool(vault.pool());
 
         assetIndex = vault.token0() == address(asset) ? 0 : 1;
         address token0 = vault.token0();

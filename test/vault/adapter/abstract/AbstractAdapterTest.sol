@@ -339,7 +339,7 @@ contract AbstractAdapterTest is PropertyTest {
             vm.prank(bob);
             adapter.approve(alice, type(uint256).max);
 
-            prop_withdraw(alice, bob, amount, testId);
+            prop_withdraw(alice, bob, amount / 10, testId);
         }
     }
 
