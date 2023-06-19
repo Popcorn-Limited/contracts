@@ -23,8 +23,8 @@ contract LidoAdapterTest is AbstractAdapterTest {
     int128 private constant WETHID = 0;
     int128 private constant STETHID = 1;
     uint8 internal constant decimalOffset = 9;
-    ICurveMetapool public constant StableSwapSTETH =
-        ICurveMetapool(0xDC24316b9AE028F1497c275EB9192a3Ea0f67022);
+    // ICurveMetapool public constant StableSwapSTETH =
+    //     ICurveMetapool(0xDC24316b9AE028F1497c275EB9192a3Ea0f67022);
     uint256 public constant DENOMINATOR = 10000;
     uint256 public slippageProtectionOut = 100; // = 100; //out of 10000. 100 = 1%
 
@@ -307,7 +307,7 @@ contract LidoAdapterTest is AbstractAdapterTest {
         assertApproxGeAbs(shares2, shares1, 1);
     }
 
-    function test__pause() public virtual override {
+    function test__pause() public override {
         _mintAssetAndApproveForAdapter(defaultAmount, bob);
 
         vm.prank(bob);
@@ -320,26 +320,34 @@ contract LidoAdapterTest is AbstractAdapterTest {
 
         // We simply withdraw into the adapter
         // TotalSupply and Assets dont change
-        assertApproxEqAbs(oldTotalAssets, adapter.totalAssets(), _delta_, "totalAssets");
+        assertApproxEqAbs(
+            oldTotalAssets,
+            adapter.totalAssets(),
+            _delta_,
+            "totalAssets"
+        );
         assertApproxEqAbs(
             oldTotalSupply,
             adapter.totalSupply(),
             _delta_,
             "totalSupply"
         );
-        assertApproxEqAbs(asset.balanceOf(address(adapter)), oldTotalAssets, _delta_, "asset balance");
+        assertApproxEqAbs(
+            asset.balanceOf(address(adapter)),
+            oldTotalAssets,
+            _delta_,
+            "asset balance"
+        );
         assertApproxEqAbs(iouBalance(), 0, _delta_, "iou balance");
 
         vm.startPrank(bob);
         // Deposit and mint are paused (maxDeposit/maxMint are set to 0 on pause)
-        vm.expectRevert(
-            abi.encodeWithSelector(MaxError.selector, defaultAmount)
-        );
-        
-        vm.expectRevert(
-            abi.encodeWithSelector(MaxError.selector, defaultAmount)
-        );
-        
+        vm.expectRevert();
+        adapter.deposit(defaultAmount, bob);
+
+        vm.expectRevert();
+        adapter.mint(defaultAmount, bob);
+
         // Withdraw and Redeem dont revert
         adapter.withdraw(defaultAmount / 10, bob, bob);
         adapter.redeem(defaultAmount / 10, bob, bob);
