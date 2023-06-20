@@ -125,6 +125,10 @@ abstract contract AdapterBase is
      * @notice Withdraws `assets` from the underlying protocol and burns vault shares from `owner`.
      * @dev Executes harvest if `harvestCooldown` is passed since last invocation.
      */
+
+    error Test(uint256 x, uint256 y);
+    error Ping(uint256 x);
+
     function _withdraw(
         address caller,
         address receiver,
@@ -141,6 +145,8 @@ abstract contract AdapterBase is
         }
 
         _burn(owner, shares);
+
+        // revert Ping(IERC20(asset()).balanceOf(address(this)));
 
         IERC20(asset()).safeTransfer(receiver, assets);
 

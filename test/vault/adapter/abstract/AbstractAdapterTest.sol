@@ -286,10 +286,8 @@ contract AbstractAdapterTest is PropertyTest {
             uint256 amount = bound(uint256(fuzzAmount), minFuzz, maxAssets);
 
             _mintAssetAndApproveForAdapter(amount, bob);
-            emit log("PING");
 
             prop_deposit(bob, bob, amount, testId);
-            emit log("PING1");
 
             increasePricePerShare(raise);
 
@@ -324,22 +322,41 @@ contract AbstractAdapterTest is PropertyTest {
             uint256 reqAssets = adapter.previewMint(
                 adapter.previewWithdraw(amount)
             ) * 10;
+
+            emit log("PING");
+
             _mintAssetAndApproveForAdapter(reqAssets, bob);
+
+            emit log("PING0");
+
             vm.prank(bob);
             adapter.deposit(reqAssets, bob);
+
+            emit log("PING1");
 
             prop_withdraw(bob, bob, amount / 10, testId);
 
+            emit log("PING2");
+
             _mintAssetAndApproveForAdapter(reqAssets, bob);
+
+            emit log("PING3");
+
             vm.prank(bob);
             adapter.deposit(reqAssets, bob);
 
+            emit log("PING4");
+
             increasePricePerShare(raise);
+
+            emit log("PING5");
 
             vm.prank(bob);
             adapter.approve(alice, type(uint256).max);
 
-            prop_withdraw(alice, bob, amount / 10, testId);
+            prop_withdraw(alice, bob, amount, testId);
+
+            emit log("PING6");
         }
     }
 

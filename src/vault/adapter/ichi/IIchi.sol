@@ -10,6 +10,8 @@ interface IVault {
 
     function pool() external view returns (address);
 
+    function currentTick() external view returns (int24);
+
     function totalSupply() external view returns (uint256);
 
     function getTotalAmounts() external view returns (uint256, uint256);

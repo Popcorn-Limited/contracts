@@ -171,17 +171,8 @@ contract IchiAdapter is AdapterBase, WithRewards {
             ? tokenShareB
             : tokenShareA;
 
-        uint32[] memory secondsAgos = new uint32[](2);
-        secondsAgos[0] = 0;
-        secondsAgos[1] = 300;
-        (int56[] memory tickCumulatives, ) = uniPool.observe(secondsAgos);
-
-        int256 averageTick = int256(
-            (tickCumulatives[0] - tickCumulatives[1]) /
-                int256(uint256(secondsAgos[1] - secondsAgos[0]))
-        );
-
-        uint160 sqrtPriceX96 = getSqrtPriceX96(int24(averageTick));
+        int24 currentTick = vault.currentTick();
+        uint160 sqrtPriceX96 = TickMath.getSqrtRatioAtTick(currentTick);
         uint256 priceRatio = (uint256(sqrtPriceX96) * uint256(sqrtPriceX96)) >>
             192;
 
@@ -210,16 +201,6 @@ contract IchiAdapter is AdapterBase, WithRewards {
 
         return (underlyingTokenShareA, underlyingTokenShareB);
     }
-
-    // function getSqrtPriceX96(
-    //     int24 tick
-    // ) public pure returns (uint160 sqrtPriceX96) {
-    //     sqrtPriceX96 = uint160(1 << 96);
-    //     if (tick > 0)
-    //         sqrtPriceX96 = uint160(sqrtPriceX96 * (1 << (tick >> 64)));
-    //     else if (tick < 0)
-    //         sqrtPriceX96 = uint160(sqrtPriceX96 / (1 << ((-tick) >> 64)));
-    // }
 
     function getSqrtPriceX96(
         int24 tick
