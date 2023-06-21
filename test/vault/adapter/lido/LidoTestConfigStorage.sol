@@ -15,7 +15,7 @@ contract LidoTestConfigStorage is ITestConfigStorage {
 
     constructor() {
         testConfigs.push(
-            LidoTestConfig(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2, 1)
+            LidoTestConfig(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2 , 1)
         );
     }
 
