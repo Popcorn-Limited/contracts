@@ -163,34 +163,6 @@ contract LidoAdapter is AdapterBase {
     }
 
     /**
-     * @notice Simulate the effects of a withdraw at the current block, given current on-chain conditions.
-     * @dev Override this function if the underlying protocol has a unique withdrawal logic and/or withdraw fees.
-     */
-    function previewWithdraw(
-        uint256 assets
-    ) public view virtual override returns (uint256) {
-        uint256 slippageAllowance = assets.mul(DENOMINATOR.add(slippage)).div(
-            DENOMINATOR
-        );
-        // return StableSwapSTETH.get_dy(WETHID, STETHID, assets);
-        return _convertToShares(slippageAllowance, Math.Rounding.Down);
-    }
-
-    /**
-     * @notice Simulate the effects of a redeem at the current block, given current on-chain conditions.
-     * @dev Override this function if the underlying protocol has a unique redeem logic and/or redeem fees.
-     */
-    function previewRedeem(
-        uint256 shares
-    ) public view virtual override returns (uint256) {
-        uint256 slippageAllowance = shares.mul(DENOMINATOR.sub(slippage)).div(
-            DENOMINATOR
-        );
-        // return StableSwapSTETH.get_dy(STETHID, WETHID, shares);
-        return _convertToAssets(slippageAllowance, Math.Rounding.Down);
-    }
-
-    /**
      * @notice Withdraws `assets` from the underlying protocol and burns vault shares from `owner`.
      * @dev Executes harvest if `harvestCooldown` is passed since last invocation.
      */

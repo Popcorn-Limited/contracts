@@ -247,7 +247,8 @@ contract LidoAdapterTest is AbstractAdapterTest {
     //////////////////////////////////////////////////////////////*/
 
     // Because withdrawing loses some tokens due to slippage when swapping StEth for Weth
-    function test__unpause() public virtual override {
+    
+    function test__unpause() public override {
         _mintAssetAndApproveForAdapter(defaultAmount * 3, bob);
 
         vm.prank(bob);
@@ -256,72 +257,15 @@ contract LidoAdapterTest is AbstractAdapterTest {
         uint256 oldTotalAssets = adapter.totalAssets();
         uint256 oldTotalSupply = adapter.totalSupply();
         uint256 oldIouBalance = iouBalance();
-
-        // If we pause and unpause, the total asset amount will change because of the swap mechanism in withdrawing
-
+        uint256 dy = StableSwapSTETH.get_dy(STETHID, WETHID, oldTotalAssets);
+        
         adapter.pause();
         adapter.unpause();
 
         // We simply deposit back into the external protocol
         // TotalSupply and Assets dont change
-        // assertApproxEqAbs(oldTotalAssets, adapter.totalAssets(), _delta_, "totalAssets");
         assertApproxEqAbs(
-            oldTotalSupply,
-            adapter.totalSupply(),
-            _delta_,
-            "totalSupply"
-        );
-        assertApproxEqAbs(
-            asset.balanceOf(address(adapter)),
-            0,
-            _delta_,
-            "asset balance"
-        );
-        // assertApproxEqAbs(iouBalance(), oldIouBalance, _delta_, "iou balance");
-
-        // Deposit and mint dont revert
-        vm.startPrank(bob);
-        adapter.deposit(defaultAmount, bob);
-        adapter.mint(defaultAmount, bob);
-    }
-
-    function test__RT_mint_withdraw() public virtual override {
-        _mintAssetAndApproveForAdapter(adapter.previewMint(defaultAmount), bob);
-
-        vm.startPrank(bob);
-        uint256 assets = adapter.mint(defaultAmount, bob);
-        uint256 shares = adapter.withdraw(assets - 1, bob, bob);
-        vm.stopPrank();
-
-        assertApproxEqAbs(shares, defaultAmount, 1, testId);
-    }
-
-    function test__RT_deposit_withdraw() public virtual override {
-        _mintAssetAndApproveForAdapter(defaultAmount, bob);
-
-        vm.startPrank(bob);
-        uint256 shares1 = adapter.deposit(defaultAmount, bob);
-        uint256 shares2 = adapter.withdraw(defaultAmount - 1, bob, bob);
-        vm.stopPrank();
-
-        assertApproxGeAbs(shares2, shares1, 1);
-    }
-
-    function test__pause() public override {
-        _mintAssetAndApproveForAdapter(defaultAmount, bob);
-
-        vm.prank(bob);
-        adapter.deposit(defaultAmount, bob);
-
-        uint256 oldTotalAssets = adapter.totalAssets();
-        uint256 oldTotalSupply = adapter.totalSupply();
-
-        adapter.pause();
-
-        // We simply withdraw into the adapter
-        // TotalSupply and Assets dont change
-        assertApproxEqAbs(
-            oldTotalAssets,
+            dy, // NOTE: oldTotalAssets doesn't take commission into account
             adapter.totalAssets(),
             _delta_,
             "totalAssets"
@@ -334,7 +278,48 @@ contract LidoAdapterTest is AbstractAdapterTest {
         );
         assertApproxEqAbs(
             asset.balanceOf(address(adapter)),
-            oldTotalAssets,
+            0,
+            _delta_,
+            "asset balance"
+        );
+        assertApproxEqAbs(iouBalance(), dy, _delta_, "iou balance"); // NOTE: oldTotalAssets doesn't take commission into account
+
+        // Deposit and mint dont revert
+        vm.startPrank(bob);
+        adapter.deposit(defaultAmount, bob);
+        adapter.mint(defaultAmount, bob);
+    }
+
+    function test__pause() public override {
+        _mintAssetAndApproveForAdapter(defaultAmount, bob);
+
+        vm.prank(bob);
+        adapter.deposit(defaultAmount, bob);
+
+        uint256 oldTotalAssets = adapter.totalAssets();
+        uint256 oldTotalSupply = adapter.totalSupply();
+        uint256 oldBalance = asset.balanceOf(address(adapter));
+        uint256 dy = StableSwapSTETH.get_dy(STETHID, WETHID, oldTotalAssets);
+        
+        adapter.pause();
+
+        // We simply withdraw into the adapter
+        // TotalSupply and Assets dont change
+        assertApproxEqAbs(
+            dy, // NOTE: oldTotalAssets doesn't take commission into account
+            adapter.totalAssets(),
+            _delta_,
+            "totalAssets"
+        );
+        assertApproxEqAbs(
+            oldTotalSupply,
+            adapter.totalSupply(),
+            _delta_,
+            "totalSupply"
+        );
+        assertApproxEqAbs(
+            asset.balanceOf(address(adapter)),
+            dy, // NOTE: oldTotalAssets doesn't take commission into account
             _delta_,
             "asset balance"
         );
