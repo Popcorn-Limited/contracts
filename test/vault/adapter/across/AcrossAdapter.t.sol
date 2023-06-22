@@ -52,6 +52,9 @@ contract AcrossAdapterTest is AbstractAdapterTest {
         setPermission(acrossHop, true, false);
         setPermission(acrossDistributor, true, false);
 
+        vm.label(acrossHop, "acrossHop");
+        vm.label(acrossDistributor, "acrossDistributor");
+
         setUpBaseTest(
             IERC20(l1Token),
             address(new AcrossAdapter()),
@@ -233,5 +236,57 @@ contract AcrossAdapterTest is AbstractAdapterTest {
         address[] memory rewardTokens = IWithRewards(address(adapter))
             .rewardTokens();
         assertGt(IERC20(rewardTokens[0]).balanceOf(address(adapter)), 0);
+    }
+
+    function test__harvest() public override {
+        uint256 performanceFee = 1e16;
+        uint256 hwm = 1e9;
+
+        _mintAssetAndApproveForAdapter(defaultAmount, bob);
+
+        vm.prank(bob);
+        adapter.deposit(defaultAmount, bob);
+
+        // emit log_named_uint("convertToAssets", adapter.convertToAssets(1e18));
+        // emit log_named_uint("highWaterMark", adapter.highWaterMark());
+        // emit log_named_uint("totalSupply", adapter.totalSupply());
+        // emit log_named_uint("totalAssets", adapter.totalAssets());
+     
+        uint256 oldTotalAssets = adapter.totalAssets();
+        adapter.setPerformanceFee(performanceFee);
+        
+        increasePricePerShare(raise);
+        
+        // uint256 gain = ((adapter.convertToAssets(1e18) -
+        //     adapter.highWaterMark()) * adapter.totalSupply()) / 1e18;
+        // uint256 fee = (gain * performanceFee) / 1e18;
+
+        uint256 fee = adapter.accruedPerformanceFee();
+
+        emit log("PING1");
+
+        emit log_named_uint("fee", fee);
+
+        uint256 expectedFee = adapter.convertToShares(fee);
+
+        vm.expectEmit(false, false, false, true, address(adapter));
+
+        emit Harvested();
+
+        adapter.harvest();
+
+        // Multiply with the decimal offset
+        assertApproxEqAbs(
+            adapter.totalSupply(),
+            defaultAmount * 1e9 + expectedFee,
+            _delta_,
+            "totalSupply"
+        );
+        assertApproxEqAbs(
+            adapter.balanceOf(feeRecipient),
+            expectedFee,
+            _delta_,
+            "expectedFee"
+        );
     }
 }
