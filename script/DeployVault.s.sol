@@ -7,7 +7,7 @@ import {VaultController, IAdapter, VaultInitParams, VaultMetadata, IERC4626, IER
 import {IVaultController, DeploymentArgs} from "../src/interfaces/vault/IVaultController.sol";
 import {IPermissionRegistry, Permission} from "../src/interfaces/vault/IPermissionRegistry.sol";
 
-contract SetRageQuit is Script {
+contract DeployVault is Script {
     address deployer;
 
     VaultController controller =
@@ -27,7 +27,7 @@ contract SetRageQuit is Script {
 
         address adapter = controller.deployVault(
             VaultInitParams({
-                asset: IERC20(0x5271045F7B73c17825A7A7aee6917eE46b0B7520),
+                asset: IERC20(0xdAC17F958D2ee523a2206206994597C13D831ec7),
                 adapter: IERC4626(address(0)),
                 fees: VaultFees({
                     deposit: 0,
@@ -40,8 +40,8 @@ contract SetRageQuit is Script {
                 owner: deployer
             }),
             DeploymentArgs({
-                id: "YearnFactoryAdapter",
-                data: abi.encode(0x06f691180F643B35E3644a2296a4097E1f577d0d, 1)
+                id: "IdleSeniorAdapter",
+                data: abi.encode(0xc4574C60a455655864aB80fa7638561A756C5E61)
             }),
             DeploymentArgs({id: "", data: ""}),
             false,
