@@ -159,7 +159,7 @@ contract IchiAdapter is AdapterBase, WithRewards {
         (uint256 underlyingTokenSupplyA, uint256 underlyingTokenSupplyB) = vault
             .getTotalAmounts();
 
-        (uint256 tokenShareA, uint256 tokenShareB) = calculateUnderlyingShare(
+        (uint256 tokenShareA, uint256 tokenShareB) = calculateUnderlyingShares(
             lpTokenBalance,
             totalSupply,
             underlyingTokenSupplyA,
@@ -185,7 +185,7 @@ contract IchiAdapter is AdapterBase, WithRewards {
         return assetPairAmount + oppositePairInAssetPairTerms;
     }
 
-    function calculateUnderlyingShare(
+    function calculateUnderlyingShares(
         uint256 lpTokenBalance,
         uint256 totalSupply,
         uint256 underlyingTokenSupplyA,
@@ -240,13 +240,15 @@ contract IchiAdapter is AdapterBase, WithRewards {
         address oppositePair = assetIndex == 0 ? token1 : token0;
         uint256 oppositePairAmount = assetIndex == 0 ? amount1 : amount0;
 
-        UniswapV3Utils.swap(
-            uniRouter,
-            oppositePair,
-            address(asset()),
-            uniSwapFee,
-            oppositePairAmount
-        );
+        if (oppositePairAmount > 0) {
+            UniswapV3Utils.swap(
+                uniRouter,
+                oppositePair,
+                address(asset()),
+                uniSwapFee,
+                oppositePairAmount
+            );
+        }
     }
 
     /*//////////////////////////////////////////////////////////////

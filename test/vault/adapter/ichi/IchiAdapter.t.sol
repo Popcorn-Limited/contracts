@@ -9,6 +9,7 @@ import {AbstractAdapterTest, ITestConfigStorage} from "../abstract/AbstractAdapt
 import {MockStrategyClaimer} from "../../../utils/mocks/MockStrategyClaimer.sol";
 import {MockStrategy} from "../../../utils/mocks/MockStrategy.sol";
 import {Clones} from "openzeppelin-contracts/proxy/Clones.sol";
+import {UniswapV3Utils} from "src/utils/UniswapV3Utils.sol";
 
 contract IchiAdapterTest is AbstractAdapterTest {
     using Math for uint256;
@@ -107,6 +108,57 @@ contract IchiAdapterTest is AbstractAdapterTest {
         );
     }
 
+    function generateUniV3Fees() public {
+        address charlie = 0x409F5E7c126275566C3092F0cDB8D5b6820446BC;
+        address weth = 0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619;
+        address usdc = 0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174;
+        address uniRouter = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
+        uint24 uniSwapFee = 500;
+        uint256 amount = 100e18;
+
+        deal(weth, charlie, amount);
+
+        vm.startPrank(charlie);
+
+        emit log_named_uint("weth balance", IERC20(weth).balanceOf(charlie));
+        emit log_named_uint("usdc balance", IERC20(usdc).balanceOf(charlie));
+
+        IERC20(weth).approve(uniRouter, type(uint256).max);
+        IERC20(usdc).approve(uniRouter, type(uint256).max);
+
+        bool wethToUsdc = true;
+        for (uint256 i; i < 1000; ++i) {
+            address tokenIn = wethToUsdc ? weth : usdc;
+            address tokenOut = wethToUsdc ? usdc : weth;
+            uint256 amountIn = wethToUsdc
+                ? IERC20(weth).balanceOf(address(charlie))
+                : IERC20(usdc).balanceOf(address(charlie));
+
+            UniswapV3Utils.swap(
+                uniRouter,
+                charlie,
+                tokenIn,
+                tokenOut,
+                uniSwapFee,
+                amountIn
+            );
+
+            wethToUsdc = !wethToUsdc;
+        }
+
+        emit log_named_uint(
+            "usdc balance after",
+            IERC20(usdc).balanceOf(charlie)
+        );
+
+        emit log_named_uint(
+            "weth balance after",
+            IERC20(weth).balanceOf(charlie)
+        );
+
+        vm.stopPrank();
+    }
+
     /*//////////////////////////////////////////////////////////////
                           INITIALIZATION
     //////////////////////////////////////////////////////////////*/
@@ -171,5 +223,28 @@ contract IchiAdapterTest is AbstractAdapterTest {
         );
 
         if (useStrategy_) strategy = IStrategy(address(new MockStrategy()));
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                          TESTING OVERRIDES
+    //////////////////////////////////////////////////////////////*/
+
+    function test__RT_deposit_withdraw() public override {
+        _mintAssetAndApproveForAdapter(defaultAmount, bob);
+
+        vm.startPrank(bob);
+        uint256 shares1 = adapter.deposit(defaultAmount, bob);
+        vm.stopPrank();
+
+        generateUniV3Fees();
+
+        vm.startPrank(bob);
+        uint256 shares2 = adapter.withdraw(adapter.maxWithdraw(bob), bob, bob);
+        vm.stopPrank();
+
+        // Pass the test if maxWithdraw is smaller than deposit since round trips are impossible
+        if (adapter.maxWithdraw(bob) == defaultAmount) {
+            assertGe(shares2, shares1, testId);
+        }
     }
 }

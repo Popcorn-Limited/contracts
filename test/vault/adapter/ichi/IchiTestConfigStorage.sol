@@ -10,7 +10,7 @@ struct IchiTestConfig {
     address depositGuard;
     address vaultDeployer;
     address uniRouter;
-    uint256 swapFee;
+    uint24 uniSwapFee;
 }
 
 contract IchiTestConfigStorage is ITestConfigStorage {
@@ -36,7 +36,7 @@ contract IchiTestConfigStorage is ITestConfigStorage {
                 testConfigs[i].depositGuard,
                 testConfigs[i].vaultDeployer,
                 testConfigs[i].uniRouter,
-                testConfigs[i].swapFee
+                testConfigs[i].uniSwapFee
             );
     }
 
