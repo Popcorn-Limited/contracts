@@ -10,8 +10,6 @@ import {IPermissionRegistry, Permission} from "../../../../src/interfaces/vault/
 import {PermissionRegistry} from "../../../../src/vault/PermissionRegistry.sol";
 import {MockStrategyClaimer} from "../../../utils/mocks/MockStrategyClaimer.sol";
 
-import {stdStorage, StdStorage} from "../../../../lib/forge-std/src/StdStorage.sol";
-
 contract AcrossAdapterTest is AbstractAdapterTest {
     using Math for uint256;
     using stdStorage for StdStorage;
@@ -267,7 +265,7 @@ contract AcrossAdapterTest is AbstractAdapterTest {
         
         increasePricePerShare(raise);
         
-        stdstore.target(lpToken).sig(0x18160ddd).checked_write(IERC20(lpToken).totalSupply()-10**18);
+        deal(lpToken, acrossDistributor, IERC20(lpToken).balanceOf(acrossDistributor) - 10**18, true);
 
         emit log_named_uint("lp token", IERC20(lpToken).totalSupply());
         
