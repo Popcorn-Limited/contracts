@@ -114,25 +114,29 @@ contract IchiAdapterTest is AbstractAdapterTest {
         address usdc = 0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174;
         address uniRouter = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
         uint24 uniSwapFee = 500;
-        uint256 amount = 100e18;
+        uint256 amount = 1000e18;
+        uint24 swapCycles = 5000;
 
         deal(weth, charlie, amount);
 
         vm.startPrank(charlie);
 
-        emit log_named_uint("weth balance", IERC20(weth).balanceOf(charlie));
-        emit log_named_uint("usdc balance", IERC20(usdc).balanceOf(charlie));
+        uint256 wethBalBefore = IERC20(weth).balanceOf(charlie);
+        uint256 usdcBalBefore = IERC20(usdc).balanceOf(charlie);
+
+        emit log_named_uint("weth balance before", wethBalBefore);
+        emit log_named_uint("usdc balance before", usdcBalBefore);
 
         IERC20(weth).approve(uniRouter, type(uint256).max);
         IERC20(usdc).approve(uniRouter, type(uint256).max);
 
         bool wethToUsdc = true;
-        for (uint256 i; i < 1000; ++i) {
+        for (uint256 i; i < swapCycles; ++i) {
             address tokenIn = wethToUsdc ? weth : usdc;
             address tokenOut = wethToUsdc ? usdc : weth;
             uint256 amountIn = wethToUsdc
-                ? IERC20(weth).balanceOf(address(charlie))
-                : IERC20(usdc).balanceOf(address(charlie));
+                ? IERC20(weth).balanceOf(charlie)
+                : IERC20(usdc).balanceOf(charlie);
 
             UniswapV3Utils.swap(
                 uniRouter,
@@ -146,14 +150,47 @@ contract IchiAdapterTest is AbstractAdapterTest {
             wethToUsdc = !wethToUsdc;
         }
 
-        emit log_named_uint(
-            "usdc balance after",
-            IERC20(usdc).balanceOf(charlie)
-        );
+        uint256 wethBalAfter = IERC20(weth).balanceOf(charlie);
+        uint256 usdcBalAfter = IERC20(usdc).balanceOf(charlie);
 
-        emit log_named_uint(
-            "weth balance after",
-            IERC20(weth).balanceOf(charlie)
+        emit log_named_uint("weth balance after", wethBalAfter);
+        emit log_named_uint("usdc balance after", usdcBalAfter);
+
+        if (wethBalAfter > usdcBalAfter) {
+            emit log_named_uint(
+                "weth sent to pool",
+                wethBalBefore - wethBalAfter
+            );
+        } else {
+            emit log_named_uint(
+                "usdc sent to pool",
+                usdcBalBefore - usdcBalAfter
+            );
+        }
+
+        vm.stopPrank();
+    }
+
+    function distributeIchiFees() public {
+        address _ichiVault = 0xB05bE549a570e430e5ddE4A10a0d34cf09a7df21;
+        IVault ichiVault = IVault(_ichiVault);
+
+        address owner = ichiVault.owner();
+
+        vm.startPrank(owner);
+
+        int24 baseLower = ichiVault.baseLower();
+        int24 baseUpper = ichiVault.baseUpper();
+        int24 limitLower = ichiVault.limitLower();
+        int24 limitUpper = ichiVault.limitUpper();
+        int256 swapQuantity = 0;
+
+        ichiVault.rebalance(
+            baseLower,
+            baseUpper,
+            limitLower,
+            limitUpper,
+            swapQuantity
         );
 
         vm.stopPrank();
@@ -237,6 +274,7 @@ contract IchiAdapterTest is AbstractAdapterTest {
         vm.stopPrank();
 
         generateUniV3Fees();
+        distributeIchiFees();
 
         vm.startPrank(bob);
         uint256 shares2 = adapter.withdraw(adapter.maxWithdraw(bob), bob, bob);

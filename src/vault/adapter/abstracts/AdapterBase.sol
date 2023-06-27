@@ -144,6 +144,8 @@ abstract contract AdapterBase is
             _protocolWithdraw(assets, shares);
         }
 
+        // revert Ping(shares);
+
         _burn(owner, shares);
 
         // revert Ping(IERC20(asset()).balanceOf(address(this)));
