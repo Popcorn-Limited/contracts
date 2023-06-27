@@ -10,8 +10,11 @@ import {IPermissionRegistry, Permission} from "../../../../src/interfaces/vault/
 import {PermissionRegistry} from "../../../../src/vault/PermissionRegistry.sol";
 import {MockStrategyClaimer} from "../../../utils/mocks/MockStrategyClaimer.sol";
 
+import {stdStorage, StdStorage} from "../../../../lib/forge-std/src/StdStorage.sol";
+
 contract AcrossAdapterTest is AbstractAdapterTest {
     using Math for uint256;
+    using stdStorage for StdStorage;
 
     // Mainnet Across L1 token - 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2 // WETH
     address public l1Token = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
@@ -51,6 +54,9 @@ contract AcrossAdapterTest is AbstractAdapterTest {
         );
         setPermission(acrossHop, true, false);
         setPermission(acrossDistributor, true, false);
+
+        vm.label(acrossHop, "acrossHop");
+        vm.label(acrossDistributor, "acrossDistributor");
 
         setUpBaseTest(
             IERC20(l1Token),
@@ -233,5 +239,79 @@ contract AcrossAdapterTest is AbstractAdapterTest {
         address[] memory rewardTokens = IWithRewards(address(adapter))
             .rewardTokens();
         assertGt(IERC20(rewardTokens[0]).balanceOf(address(adapter)), 0);
+    }
+
+    function test__harvest() public override {
+        uint256 performanceFee = 1e16;
+        uint256 hwm = 1e9;
+
+        _mintAssetAndApproveForAdapter(defaultAmount, bob);
+
+        vm.prank(bob);
+        adapter.deposit(defaultAmount, bob);
+
+        emit log_named_uint("convertToAssets", adapter.convertToAssets(1e18));
+        emit log_named_uint("highWaterMark", adapter.highWaterMark());
+        emit log_named_uint("totalSupply", adapter.totalSupply());
+        emit log_named_uint("totalAssets", adapter.totalAssets());
+     
+        uint256 oldTotalAssets = adapter.totalAssets();
+        address lpToken = IAcrossHop(acrossHop).pooledTokens(address(asset)).lpToken;
+        emit log_named_address("lpTokne", lpToken);
+        adapter.setPerformanceFee(performanceFee);
+        
+        emit log_named_uint("balance", asset.balanceOf(acrossHop));
+        emit log_named_uint("asset total supply", asset.totalSupply());
+        
+        emit log_named_uint("lp token", IERC20(lpToken).totalSupply());
+        
+        increasePricePerShare(raise);
+        
+        stdstore.target(lpToken).sig(0x18160ddd).checked_write(IERC20(lpToken).totalSupply()-10**18);
+
+        emit log_named_uint("lp token", IERC20(lpToken).totalSupply());
+        
+        emit log_named_uint("convertToAssets", adapter.convertToAssets(1e18));
+        emit log_named_uint("highWaterMark", adapter.highWaterMark());
+        emit log_named_uint("totalSupply", adapter.totalSupply());
+        emit log_named_uint("totalAssets", adapter.totalAssets());    
+
+        emit log_named_uint("balance", asset.balanceOf(acrossHop));
+        emit log_named_uint("asset total supply", asset.totalSupply());
+
+
+        uint256 gain = ((adapter.convertToAssets(1e18) -
+            adapter.highWaterMark()) * adapter.totalSupply()) / 1e18;
+        uint256 fee = (gain * performanceFee) / 1e18;
+
+        emit log("PING1");
+
+        emit log_named_uint("fee", fee);
+
+        uint256 expectedFee = adapter.convertToShares(fee);
+
+        vm.expectEmit(false, false, false, true, address(adapter));
+
+        emit Harvested();
+
+        adapter.harvest();
+
+        // Multiply with the decimal offset
+        assertApproxEqAbs(
+            adapter.totalSupply(),
+            defaultAmount * 1e9 + expectedFee,
+            _delta_,
+            "totalSupply"
+        );
+        assertApproxEqAbs(
+            adapter.balanceOf(feeRecipient),
+            expectedFee,
+            _delta_,
+            "expectedFee"
+        );
+    }
+
+    function increasePricePerShare(uint256 amount) public override {
+        deal(address(asset), acrossHop, asset.balanceOf(acrossHop) + amount);
     }
 }

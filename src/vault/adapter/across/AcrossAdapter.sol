@@ -19,8 +19,6 @@ contract AcrossAdapter is AdapterBase, WithRewards {
     address public acrossDistributor;
     address public lpToken;
 
-    uint256 public exchangeRate;
-
     error NotEndorsed(address _acrossHop);
     error Disabled();
 
