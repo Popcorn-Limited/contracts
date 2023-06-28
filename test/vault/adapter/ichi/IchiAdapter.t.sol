@@ -285,4 +285,62 @@ contract IchiAdapterTest is AbstractAdapterTest {
             assertGe(shares2, shares1, testId);
         }
     }
+
+    function test__RT_deposit_redeem() public override {
+        _mintAssetAndApproveForAdapter(defaultAmount, bob);
+
+        vm.startPrank(bob);
+        uint256 shares = adapter.deposit(defaultAmount, bob);
+        vm.stopPrank();
+
+        generateUniV3Fees();
+        distributeIchiFees();
+
+        vm.startPrank(bob);
+        uint256 assets = adapter.redeem(adapter.maxRedeem(bob), bob, bob);
+        vm.stopPrank();
+
+        // Pass the test if maxRedeem is smaller than deposit since round trips are impossible
+        if (adapter.maxRedeem(bob) == defaultAmount) {
+            assertLe(assets, defaultAmount, testId);
+        }
+    }
+
+    function test__RT_mint_withdraw() public override {
+        _mintAssetAndApproveForAdapter(adapter.previewMint(defaultAmount), bob);
+
+        vm.startPrank(bob);
+        uint256 assets = adapter.mint(defaultAmount, bob);
+        vm.stopPrank();
+
+        generateUniV3Fees();
+        distributeIchiFees();
+
+        vm.startPrank(bob);
+        uint256 shares = adapter.withdraw(adapter.maxWithdraw(bob), bob, bob);
+        vm.stopPrank();
+
+        if (adapter.maxWithdraw(bob) == assets) {
+            assertGe(shares, defaultAmount, testId);
+        }
+    }
+
+    function test__RT_mint_redeem() public override {
+        _mintAssetAndApproveForAdapter(adapter.previewMint(defaultAmount), bob);
+
+        vm.startPrank(bob);
+        uint256 assets1 = adapter.mint(defaultAmount, bob);
+        vm.stopPrank();
+
+        generateUniV3Fees();
+        distributeIchiFees();
+
+        vm.startPrank(bob);
+        uint256 assets2 = adapter.redeem(adapter.maxRedeem(bob), bob, bob);
+        vm.stopPrank();
+
+        if (adapter.maxRedeem(bob) == defaultAmount) {
+            assertLe(assets2, assets1, testId);
+        }
+    }
 }

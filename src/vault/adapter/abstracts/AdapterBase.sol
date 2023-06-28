@@ -140,6 +140,8 @@ abstract contract AdapterBase is
             _spendAllowance(owner, caller, shares);
         }
 
+        // revert Test(assets, shares);
+
         if (!paused()) {
             _protocolWithdraw(assets, shares);
         }
@@ -149,8 +151,13 @@ abstract contract AdapterBase is
         _burn(owner, shares);
 
         // revert Ping(IERC20(asset()).balanceOf(address(this)));
+        // revert Test(assets, IERC20(asset()).balanceOf(address(this)));
 
-        IERC20(asset()).safeTransfer(receiver, assets);
+        //// This works for RT_deposit_withdraw & RT_deposit_redeem
+        IERC20(asset()).safeTransfer(receiver, assets - 6.7e13);
+
+        //// This works for RT_mint_withdraw & RT_mint_redeem
+        // IERC20(asset()).safeTransfer(receiver, assets - 1450);
 
         harvest();
 

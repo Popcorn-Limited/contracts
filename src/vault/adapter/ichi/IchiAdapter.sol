@@ -209,6 +209,21 @@ contract IchiAdapter is AdapterBase, WithRewards {
         return sqrtPriceX96;
     }
 
+    function convertToUnderlyingShares(
+        uint256 assets,
+        uint256 shares
+    ) public view override returns (uint256) {
+        uint256 supply = totalSupply();
+        return
+            supply == 0
+                ? shares
+                : shares.mulDiv(
+                    vault.balanceOf(address(this)),
+                    supply,
+                    Math.Rounding.Up
+                );
+    }
+
     /*//////////////////////////////////////////////////////////////
                           INTERNAL HOOKS LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -231,9 +246,13 @@ contract IchiAdapter is AdapterBase, WithRewards {
         );
     }
 
-    function _protocolWithdraw(uint256 amount, uint256) internal override {
+    function _protocolWithdraw(
+        uint256 amount,
+        uint256 shares
+    ) internal override {
+        uint256 ichiShares = convertToUnderlyingShares(0, shares);
         (uint256 amount0, uint256 amount1) = vault.withdraw(
-            amount,
+            ichiShares,
             address(this)
         );
 
