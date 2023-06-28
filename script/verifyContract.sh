@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+
+source .env && forge verify-contract --chain-id 1 --watch 0xa199409F99bDBD998Ae1ef4FdaA58b356370837d src/vault/VaultController.sol:VaultController MGUB1EPXRCPMP2A3TGKDP5839ZYU88QHCS --compiler-version v0.8.15+commit.e14f2714 --constructor-args $(cast abi-encode "constructor(address,address,address,address,address,address)" 0x22f5413C075Ccd56D575A54763831C4c27A37Bdb 0x564fBe59c448743FA9382E691a0320458F6dCDE5 0xa8C5815f6Ea5F7A1551541B0d7F970D546126bDB 0x007318Dc89B314b47609C684260CfbfbcD412864 0x7a33b5b57C8b235A3519e6C010027c5cebB15CB4 0x4A2a63a08A8663c66b3A908F4890f34c0cAbc111) 

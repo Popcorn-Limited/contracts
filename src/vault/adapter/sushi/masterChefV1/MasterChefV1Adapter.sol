@@ -43,7 +43,6 @@ contract MasterChefV1Adapter is AdapterBase, WithRewards {
      * @dev `_rewardsToken` - The token rewarded by the MasterChef contract (Sushi, Cake...)
      * @dev This function is called by the factory contract when deploying a new vault.
      */
-
     function initialize(
         bytes memory adapterInitData,
         address registry,

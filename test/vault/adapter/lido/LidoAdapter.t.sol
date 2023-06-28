@@ -1,12 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0
-// Docgen-SOLC: 0.8.15
-
 pragma solidity ^0.8.15;
 
 import {Test} from "forge-std/Test.sol";
 
-import {LidoAdapter, SafeERC20, IERC20, IERC20Metadata, Math, VaultAPI, ILido} from "../../../../src/vault/adapter/lido/LidoAdapter.sol";
-import {IERC4626Upgradeable as IERC4626, IERC20Upgradeable as IERC20} from "openzeppelin-contracts-upgradeable/interfaces/IERC4626Upgradeable.sol";
+import {LidoAdapter, SafeERC20, IERC20, Math, IERC20Metadata, ILido} from "../../../../src/vault/adapter/lido/LidoAdapter.sol";
 import {LidoTestConfigStorage, LidoTestConfig} from "./LidoTestConfigStorage.sol";
 import {AbstractAdapterTest, ITestConfigStorage, IAdapter} from "../abstract/AbstractAdapterTest.sol";
 import {SafeMath} from "openzeppelin-contracts/utils/math/SafeMath.sol";
@@ -37,17 +34,6 @@ contract LidoAdapterTest is AbstractAdapterTest {
         );
 
         _setUpTest(testConfigStorage.getTestConfig(0));
-
-        maxAssetsNew = IERC20(asset).totalSupply() / 10 ** 5;
-        defaultAmount = Math.min(
-            10 ** IERC20Metadata(address(asset)).decimals() * 1e9,
-            maxAssetsNew
-        );
-        maxAssets = Math.min(
-            10 ** IERC20Metadata(address(asset)).decimals() * 1e9,
-            maxAssetsNew
-        );
-        maxShares = maxAssets / 2;
     }
 
     function overrideSetup(bytes memory testConfig) public override {
@@ -58,27 +44,27 @@ contract LidoAdapterTest is AbstractAdapterTest {
         (address _asset,) = abi.decode(testConfig, (address,uint256));
 
         setUpBaseTest(
-            IERC20(_asset),
+            IERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2), // Weth
             address(new LidoAdapter()),
-            0x34dCd573C5dE4672C8248cd12A99f875Ca112Ad8,
+            address(0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84), // stEth
             10,
-            "Lido  ",
-            false
+            "Lido ",
+            true
         );
 
-        lidoBooster = VaultAPI(externalRegistry);
-
-        lidoVault = VaultAPI(lidoBooster.token());
-
-        vm.label(address(lidoVault), "lidoVault");
         vm.label(address(asset), "asset");
         vm.label(address(this), "test");
 
         adapter.initialize(
-            abi.encode(asset, address(this), address(0), 0, sigs, ""),
+            abi.encode(asset, address(this), strategy, 0, sigs, ""),
             externalRegistry,
             testConfig
         );
+
+        defaultAmount = 1 ether;
+        raise = 100 ether;
+        maxAssets = 10 ether;
+        maxShares = 10e27;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -93,125 +79,24 @@ contract LidoAdapterTest is AbstractAdapterTest {
     function increasePricePerShare(uint256 amount) public override {
         deal(address(adapter), 100 ether);
         vm.prank(address(adapter));
-        ILido(address(lidoVault)).submit{value: 100 ether}(address(0));
-    }
-
-    function iouBalance() public view override returns (uint256) {
-        return lidoVault.balanceOf(address(adapter));
+        ILido(0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84).submit{
+            value: 100 ether
+        }(address(0));
     }
 
     // Verify that totalAssets returns the expected amount
     function verify_totalAssets() public override {
-        // Make sure totalAssets isnt 0
-        deal(address(asset), bob, defaultAmount);
+        _mintAsset(defaultAmount, bob);
         vm.startPrank(bob);
         asset.approve(address(adapter), defaultAmount);
         adapter.deposit(defaultAmount, bob);
         vm.stopPrank();
 
-        assertApproxEqAbs(
+        assertEq(
             adapter.totalAssets(),
             adapter.convertToAssets(adapter.totalSupply()),
-            _delta_,
             string.concat("totalSupply converted != totalAssets", baseTestId)
         );
-
-        uint256 pricePerShare = (adapter.totalAssets()).mulDiv(
-            1,
-            adapter.totalSupply(),
-            Math.Rounding.Up
-        );
-        assertApproxEqAbs(
-            adapter.totalAssets(),
-            iouBalance(), // didnt multiply by price per share as it causes it to fail
-            _delta_,
-            string.concat("totalAssets != yearn assets", baseTestId)
-        );
-    }
-
-    // Assets wont be the same as before so this overwrites the base function
-    function prop_withdraw(
-        address caller,
-        address owner,
-        uint256 assets,
-        string memory testPreFix
-    ) public virtual override returns (uint256 paid, uint256 received) {
-        uint256 oldReceiverAsset = IERC20(_asset_).balanceOf(caller);
-        uint256 oldOwnerShare = IERC20(_vault_).balanceOf(owner);
-        uint256 oldAllowance = IERC20(_vault_).allowance(owner, caller);
-
-        vm.prank(caller);
-        uint256 shares = IERC4626(_vault_).withdraw(assets, caller, owner);
-
-        uint256 newReceiverAsset = IERC20(_asset_).balanceOf(caller);
-        uint256 newOwnerShare = IERC20(_vault_).balanceOf(owner);
-        uint256 newAllowance = IERC20(_vault_).allowance(owner, caller);
-
-        assertApproxEqAbs(
-            newOwnerShare,
-            oldOwnerShare - shares,
-            _delta_,
-            string.concat("share", testPreFix)
-        );
-        // assertApproxEqAbs(newReceiverAsset, oldReceiverAsset + assets, _delta_, string.concat("asset", testPreFix)); // NOTE: this may fail if the receiver is a contract in which the asset is stored
-        if (caller != owner && oldAllowance != type(uint256).max)
-            assertApproxEqAbs(
-                newAllowance,
-                oldAllowance - shares,
-                _delta_,
-                string.concat("allowance", testPreFix)
-            );
-
-        assertTrue(
-            caller == owner ||
-                oldAllowance != 0 ||
-                (shares == 0 && assets == 0),
-            string.concat("access control", testPreFix)
-        );
-
-        return (shares, assets);
-    }
-
-    function prop_redeem(
-        address caller,
-        address owner,
-        uint256 shares,
-        string memory testPreFix
-    ) public virtual override returns (uint256 paid, uint256 received) {
-        uint256 oldReceiverAsset = IERC20(_asset_).balanceOf(caller);
-        uint256 oldOwnerShare = IERC20(_vault_).balanceOf(owner);
-        uint256 oldAllowance = IERC20(_vault_).allowance(owner, caller);
-
-        vm.prank(caller);
-        uint256 assets = IERC4626(_vault_).redeem(shares, caller, owner);
-
-        uint256 newReceiverAsset = IERC20(_asset_).balanceOf(caller);
-        uint256 newOwnerShare = IERC20(_vault_).balanceOf(owner);
-        uint256 newAllowance = IERC20(_vault_).allowance(owner, caller);
-
-        assertApproxEqAbs(
-            newOwnerShare,
-            oldOwnerShare - shares,
-            _delta_,
-            string.concat("share", testPreFix)
-        );
-        // assertApproxEqAbs(newReceiverAsset, oldReceiverAsset + assets, _delta_, string.concat("asset", testPreFix)); // NOTE: this may fail if the receiver is a contract in which the asset is stored
-        if (caller != owner && oldAllowance != type(uint256).max)
-            assertApproxEqAbs(
-                newAllowance,
-                oldAllowance - shares,
-                _delta_,
-                string.concat("allowance", testPreFix)
-            );
-
-        assertTrue(
-            caller == owner ||
-                oldAllowance != 0 ||
-                (shares == 0 && assets == 0),
-            string.concat("access control", testPreFix)
-        );
-
-        return (shares, assets);
     }
 
     /*//////////////////////////////////////////////////////////////

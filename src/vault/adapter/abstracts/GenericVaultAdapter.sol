@@ -4,26 +4,23 @@
 pragma solidity ^0.8.15;
 
 import {AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20, Math, IStrategy, IAdapter, IERC4626} from "../abstracts/AdapterBase.sol";
-import {WithRewards, IWithRewards} from "../abstracts/WithRewards.sol";
 import {IPermissionRegistry} from "../../../interfaces/vault/IPermissionRegistry.sol";
 
 /**
- * @title   Ousd Adapter
- * @author  amatureApe
- * @notice  ERC4626 wrapper for Ousd Vault.
+ * @title   ERC4626 Vauöt Adapter
+ * @author  RedVeil
+ * @notice  ERC4626 wrapper for any generic ERC4626 Vault.
  *
- * An ERC4626 compliant Wrapper for https://github.com/sushiswap/sushiswap/blob/archieve/canary/contracts/MasterChefV2.sol.
- * Allows wrapping Ousd.
+ * An ERC4626 compliant Wrapper for any generic vault following the EIP-4626 standard https://eips.ethereum.org/EIPS/eip-4626.
  */
-contract OusdAdapter is AdapterBase, WithRewards {
+contract GenericVaultAdapter is AdapterBase {
     using SafeERC20 for IERC20;
     using Math for uint256;
 
     string internal _name;
     string internal _symbol;
 
-    /// @notice The wOUSD token contract.
-    IERC4626 public wOusd;
+    IERC4626 public vault;
 
     /*//////////////////////////////////////////////////////////////
                             INITIALIZATION
@@ -33,34 +30,34 @@ contract OusdAdapter is AdapterBase, WithRewards {
     error InvalidAsset();
 
     /**
-     * @notice Initialize a new MasterChef Adapter.
+     * @notice Initialize a new generic Vault Adapter.
      * @param adapterInitData Encoded data for the base adapter initialization.
-     * @dev `_ousd` - The address of the OUSD token.
+     * @dev `_vault` - The address of the 4626 vault to use.
      * @dev This function is called by the factory contract when deploying a new vault.
      */
-
     function initialize(
         bytes memory adapterInitData,
         address registry,
-        bytes memory ousdInitData
+        bytes memory vaultInitData
     ) external initializer {
         __AdapterBase_init(adapterInitData);
-        address _wousd = abi.decode(ousdInitData, (address));
+        
+        address _vault = abi.decode(vaultInitData, (address));
 
-        if (!IPermissionRegistry(registry).endorsed(_wousd))
+        if (!IPermissionRegistry(registry).endorsed(_vault))
             revert NotEndorsed();
-        if (IERC4626(_wousd).asset() != asset()) revert InvalidAsset();
+        if (IERC4626(_vault).asset() != asset()) revert InvalidAsset();
 
-        wOusd = IERC4626(_wousd);
+        vault = IERC4626(_vault);
 
         _name = string.concat(
-            "VaultCraft Ousd ",
+            "VaultCraft ",
             IERC20Metadata(asset()).name(),
             " Adapter"
         );
-        _symbol = string.concat("vcO-", IERC20Metadata(asset()).symbol());
+        _symbol = string.concat("vc-", IERC20Metadata(asset()).symbol());
 
-        IERC20(asset()).approve(address(wOusd), type(uint256).max);
+        IERC20(asset()).approve(address(vault), type(uint256).max);
     }
 
     function name()
@@ -88,31 +85,25 @@ contract OusdAdapter is AdapterBase, WithRewards {
     /// @notice Calculates the total amount of underlying tokens the Vault holds.
     /// @return The total amount of underlying tokens the Vault holds.
 
-    function _totalAssets() internal view override returns (uint256) {
-        return wOusd.convertToAssets(wOusd.balanceOf(address(this)));
+    function _totalAssets() internal view virtual override returns (uint256) {
+        return vault.previewRedeem(vault.balanceOf(address(this)));
     }
 
     /*//////////////////////////////////////////////////////////////
                           INTERNAL HOOKS LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function _protocolDeposit(uint256 amount, uint256) internal override {
-        wOusd.deposit(amount, address(this));
+    function _protocolDeposit(
+        uint256 amount,
+        uint256
+    ) internal virtual override {
+        vault.deposit(amount, address(this));
     }
 
-    function _protocolWithdraw(uint256 amount, uint256) internal override {
-        wOusd.withdraw(amount, address(this), address(this));
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                      EIP-165 LOGIC
-  //////////////////////////////////////////////////////////////*/
-
-    function supportsInterface(
-        bytes4 interfaceId
-    ) public pure override(WithRewards, AdapterBase) returns (bool) {
-        return
-            interfaceId == type(IWithRewards).interfaceId ||
-            interfaceId == type(IAdapter).interfaceId;
+    function _protocolWithdraw(
+        uint256 amount,
+        uint256
+    ) internal virtual override {
+        vault.withdraw(amount, address(this), address(this));
     }
 }
