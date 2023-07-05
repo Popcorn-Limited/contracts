@@ -581,7 +581,7 @@ contract AbstractAdapterTest is PropertyTest {
         );
     }
 
-    function test__disable_auto_harvest() public {
+    function test__disable_auto_harvest() public virtual {
         adapter.toggleAutoHarvest();
 
         assertFalse(adapter.autoHarvest());

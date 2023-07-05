@@ -4,6 +4,7 @@ pragma solidity ^0.8.15;
 import "./IGmdVault.sol";
 import { AdapterBase, IERC20, IERC20Metadata, ERC20, SafeERC20, Math, IAdapter} from "../abstracts/AdapterBase.sol";
 import { WithRewards, IWithRewards } from "../abstracts/WithRewards.sol";
+import "forge-std/console.sol";
 
 
 contract GmdAdapter is AdapterBase, WithRewards {
@@ -16,6 +17,7 @@ contract GmdAdapter is AdapterBase, WithRewards {
     uint256 public poolId;
     IGmdVault public gmdVault;
 
+    error MaxLossTooHigh();
     error InvalidPool(uint poolId);
     error AssetMismatch(uint poolId, address asset, address lpToken);
 
@@ -27,12 +29,14 @@ contract GmdAdapter is AdapterBase, WithRewards {
         address registry,
         bytes memory gmdInitData
     ) external initializer {
+        __AdapterBase_init(adapterInitData);
 
         _name = string.concat(
             "VaultCraft GMD ",
             IERC20Metadata(asset()).name(),
             " Adapter"
         );
+
         _symbol = string.concat("vcGMD-", IERC20Metadata(asset()).symbol());
 
         poolId = abi.decode(gmdInitData, (uint256));
@@ -50,10 +54,11 @@ contract GmdAdapter is AdapterBase, WithRewards {
             adapterInitData,
             (address, address, address, uint256, bytes4[8], bytes)
         );
+        console.log("poolId: ",  poolInfo.lpToken, _asset);
+
         if(_asset != poolInfo.lpToken)
             revert AssetMismatch(poolId, _asset, poolInfo.lpToken);
 
-        __AdapterBase_init(adapterInitData);
         IERC20(asset()).approve(address(gmdVault), type(uint256).max);
     }
 
@@ -80,7 +85,30 @@ contract GmdAdapter is AdapterBase, WithRewards {
     //////////////////////////////////////////////////////////////*/
     function _totalAssets() internal view override returns (uint256) {
         IGmdVault.PoolInfo memory poolInfo = gmdVault.poolInfo(poolId);
-        return IERC20(poolInfo.GDlptoken).balanceOf(address(this)) * gmdVault.GDpriceToStakedtoken(poolId);
+        uint256 gmdLpTokenBalance = IERC20(poolInfo.GDlptoken).balanceOf(address(this));
+        uint256 gmdLpTokenTotalSupply = IERC20(poolInfo.GDlptoken).totalSupply();
+        uint256 asset = gmdLpTokenBalance.mulDiv(
+            poolInfo.totalStaked,
+            gmdLpTokenTotalSupply,
+            Math.Rounding.Down
+        );
+        return asset.mulDiv(1e6, 1e18, Math.Rounding.Down); //scaled down the value since
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                    DEPOSIT/WITHDRAWAL LIMIT LOGIC
+  //////////////////////////////////////////////////////////////*/
+
+    /// @notice Applies the yVault deposit limit to the adapter.
+    function maxDeposit(address) public view override returns (uint256) {
+        if (paused()) return 0;
+
+        IGmdVault.PoolInfo memory poolInfo = gmdVault.poolInfo(poolId);
+
+        uint256 vaultcap = poolInfo.vaultcap;
+        uint256 totalStaked = poolInfo.totalStaked;
+        if (totalStaked >= vaultcap) return 0;
+        return vaultcap - totalStaked;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -107,7 +135,14 @@ contract GmdAdapter is AdapterBase, WithRewards {
         uint256 amount,
         uint256
     ) internal virtual override {
+        IGmdVault.PoolInfo memory poolInfo = gmdVault.poolInfo(poolId);
+        IERC20 receiptToken = IERC20(poolInfo.GDlptoken);
+        uint256 initialReceiptTokenBalance = receiptToken.balanceOf(address(this));
+
         gmdVault.enter(amount, poolId);
+        uint256 sharesReceived = receiptToken.balanceOf(address(this)) - initialReceiptTokenBalance;
+        console.log("receipt tokens shares: ", sharesReceived);
+        require(sharesReceived >= 0, "Insufficient shares output");
     }
 
     /// @notice Withdraw from the beefy vault and optionally from the booster given its configured
@@ -115,7 +150,10 @@ contract GmdAdapter is AdapterBase, WithRewards {
         uint256,
         uint256 shares
     ) internal virtual override {
+        console.log("protocol withdraw: ", shares);
         uint256 gmdVaultShares = convertToUnderlyingShares(0, shares);
+        console.log("gmdVaultShares: ", gmdVaultShares);
+
         gmdVault.leave(gmdVaultShares, poolId);
     }
 
