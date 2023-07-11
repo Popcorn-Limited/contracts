@@ -107,7 +107,11 @@ contract AbstractAdapterTest is PropertyTest {
 
     // Increase the pricePerShare of the external protocol
     // sometimes its enough to simply add assets, othertimes one also needs to call some functions before the external protocol reflects the change
-    function increasePricePerShare(uint256 amount) public virtual {}
+    function increasePricePerShare(uint256 amount) public virtual {
+        // vm.prank(bob);
+        // adapter.deposit(amount, bob);
+        deal(address(asset), address(adapter), asset.balanceOf(address(adapter)) + amount);
+    }
 
     // Check the balance of the external protocol held by the adapter
     // Most of the time this should be a simple `balanceOf` call to the external protocol but some might have different implementations
@@ -292,12 +296,26 @@ contract AbstractAdapterTest is PropertyTest {
 
             _mintAssetAndApproveForAdapter(amount, bob);
 
-            prop_deposit(bob, bob, amount, testId);
+            (uint256 paidBefore, uint256 receivedBefore) = prop_deposit(bob, bob, amount, testId);
+            emit log_named_uint("amount", amount);
+            emit log_named_uint("paid", paidBefore);
+            emit log_named_uint("receivedBefore", receivedBefore);
+            
+            emit log_named_uint("previewDeposit", adapter.previewDeposit(amount));
 
             increasePricePerShare(raise);
 
+            emit log_named_uint("previewDeposit", adapter.previewDeposit(amount));
+
             _mintAssetAndApproveForAdapter(amount, bob);
-            prop_deposit(bob, alice, amount, testId);
+            (uint256 paidAfter, uint256 receivedAfter) = prop_deposit(bob, alice, amount, testId);
+            emit log_named_uint("amount", amount);  
+            emit log_named_uint("paid", paidAfter);
+            emit log_named_uint("receivedAfter", receivedAfter);
+
+            assertGt(receivedBefore, receivedAfter, "assertGt");
+            // assertEq(paidBefore, paidAfter, "assertEq");
+            
         }
     }
 
@@ -309,13 +327,17 @@ contract AbstractAdapterTest is PropertyTest {
 
             _mintAssetAndApproveForAdapter(adapter.previewMint(amount), bob);
 
-            prop_mint(bob, bob, amount, testId);
+            (uint256 receivedBefore, uint256 paidBefore) = prop_mint(bob, bob, amount, testId);
 
             increasePricePerShare(raise);
 
             _mintAssetAndApproveForAdapter(adapter.previewMint(amount), bob);
 
-            prop_mint(bob, alice, amount, testId);
+            (uint256 receivedAfter, uint256 paidAfter) = prop_mint(bob, alice, amount, testId);
+
+            assertGt(receivedAfter, receivedBefore, "assertGt");
+            // assertEq(paidBefore, paidAfter, "assertEq");
+            
         }
     }
 
@@ -333,7 +355,7 @@ contract AbstractAdapterTest is PropertyTest {
             vm.prank(bob);
             adapter.deposit(reqAssets, bob);
 
-            prop_withdraw(bob, bob, amount / 10, testId);
+            (uint256 receivedBefore, uint256 paidBefore) = prop_withdraw(bob, bob, amount, testId);
 
             _mintAssetAndApproveForAdapter(reqAssets, bob);
             vm.prank(bob);
@@ -344,7 +366,10 @@ contract AbstractAdapterTest is PropertyTest {
             vm.prank(bob);
             adapter.approve(alice, type(uint256).max);
 
-            prop_withdraw(alice, bob, amount, testId);
+            (uint256 receivedAfter, uint256 paidAfter) = prop_withdraw(alice, bob, amount, testId);
+
+            assertGt(receivedAfter, receivedBefore, "assertGt");
+            // assertEq(paidBefore, paidAfter, "assertEq");
         }
     }
 
@@ -359,7 +384,7 @@ contract AbstractAdapterTest is PropertyTest {
 
             vm.prank(bob);
             adapter.deposit(reqAssets, bob);
-            prop_redeem(bob, bob, amount, testId);
+            (uint256 paidBefore, uint256 receivedBefore) = prop_redeem(bob, bob, amount, testId);
 
             _mintAssetAndApproveForAdapter(reqAssets, bob);
             vm.prank(bob);
@@ -369,9 +394,14 @@ contract AbstractAdapterTest is PropertyTest {
 
             vm.prank(bob);
             adapter.approve(alice, type(uint256).max);
-            prop_redeem(alice, bob, amount, testId);
+            (uint256 paidAfter, uint256 receivedAfter) = prop_redeem(alice, bob, amount, testId);
+
+
+            assertGt(receivedBefore, receivedAfter, "assertGt");
+            // assertEq(paidBefore, paidAfter, "assertEq");
+            
         }
-    }
+    }   
 
     /*//////////////////////////////////////////////////////////////
                           ROUNDTRIP TESTS
