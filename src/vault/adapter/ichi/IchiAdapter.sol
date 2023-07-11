@@ -60,6 +60,8 @@ contract IchiAdapter is AdapterBase, WithRewards {
     /// @notice Uniswap alternate token -> asset swapfee
     uint24 public uniSwapFee;
 
+    uint256 public constant SLIPPAGE = 1e15;
+
     /*//////////////////////////////////////////////////////////////
                             INITIALIZATION
     //////////////////////////////////////////////////////////////*/
@@ -246,6 +248,18 @@ contract IchiAdapter is AdapterBase, WithRewards {
         );
     }
 
+    event logUint(uint256);
+
+    function previewWithdraw(
+        uint256 assets
+    ) public view virtual override returns (uint256) {
+        return
+            _convertToShares(
+                assets + assets.mulDiv(SLIPPAGE, 1e18, Math.Rounding.Up),
+                Math.Rounding.Up
+            );
+    }
+
     function _protocolWithdraw(
         uint256 amount,
         uint256 shares
@@ -268,6 +282,7 @@ contract IchiAdapter is AdapterBase, WithRewards {
                 oppositePairAmount
             );
         }
+        emit logUint(IERC20(asset()).balanceOf(address(this)));
     }
 
     /*//////////////////////////////////////////////////////////////
