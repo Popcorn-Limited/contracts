@@ -12,7 +12,6 @@ import {MockStrategyClaimer} from "../../../utils/mocks/MockStrategyClaimer.sol"
 
 contract AcrossAdapterTest is AbstractAdapterTest {
     using Math for uint256;
-    using stdStorage for StdStorage;
 
     // Mainnet Across L1 token - 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2 // WETH
     address public l1Token = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
@@ -72,6 +71,10 @@ contract AcrossAdapterTest is AbstractAdapterTest {
         );
     }
 
+    /*//////////////////////////////////////////////////////////////
+                          HELPER
+    //////////////////////////////////////////////////////////////*/
+
     function setPermission(
         address target,
         bool endorsed,
@@ -82,6 +85,10 @@ contract AcrossAdapterTest is AbstractAdapterTest {
         targets[0] = target;
         permissions[0] = Permission(endorsed, rejected);
         permissionRegistry.setPermissions(targets, permissions);
+    }
+
+    function increasePricePerShare(uint256 amount) public override {
+        deal(address(asset), acrossHop, asset.balanceOf(acrossHop) + amount);
     }
 
     // Verify that totalAssets returns the expected amount
@@ -97,6 +104,34 @@ contract AcrossAdapterTest is AbstractAdapterTest {
             adapter.totalAssets(),
             adapter.convertToAssets(adapter.totalSupply()),
             string.concat("totalSupply converted != totalAssets", baseTestId)
+        );
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                          INITIALIZATION
+    //////////////////////////////////////////////////////////////*/
+
+    function verify_adapterInit() public override {
+        assertEq(adapter.asset(), address(asset), "asset");
+        assertEq(
+            IERC20Metadata(address(adapter)).name(),
+            string.concat(
+                "VaultCraft Across ",
+                IERC20Metadata(address(asset)).name(),
+                " Adapter"
+            ),
+            "name"
+        );
+        assertEq(
+            IERC20Metadata(address(adapter)).symbol(),
+            string.concat("vcAxc-", IERC20Metadata(address(asset)).symbol()),
+            "symbol"
+        );
+
+        assertEq(
+            asset.allowance(address(adapter), address(acrossHop)),
+            type(uint256).max,
+            "allowance"
         );
     }
 
@@ -147,76 +182,6 @@ contract AcrossAdapterTest is AbstractAdapterTest {
     }
 
     /*//////////////////////////////////////////////////////////////
-                    DEPOSIT/MINT/WITHDRAW/REDEEM
-    //////////////////////////////////////////////////////////////*/
-
-    function test__deposit(uint8 fuzzAmount) public override {
-        uint256 amount = bound(uint256(fuzzAmount), minFuzz, maxAssets);
-
-        _mintAssetAndApproveForAdapter(amount, bob);
-        prop_deposit(bob, bob, amount, testId);
-
-        increasePricePerShare(raise);
-
-        _mintAssetAndApproveForAdapter(amount, bob);
-        prop_deposit(bob, alice, amount, testId);
-    }
-
-    function test__mint(uint8 fuzzAmount) public override {
-        uint256 amount = bound(uint256(fuzzAmount), minFuzz, maxShares);
-
-        _mintAssetAndApproveForAdapter(adapter.previewMint(amount), bob);
-        prop_mint(bob, bob, amount, testId);
-
-        increasePricePerShare(raise);
-
-        _mintAssetAndApproveForAdapter(adapter.previewMint(amount), bob);
-        prop_mint(bob, alice, amount, testId);
-    }
-
-    function test__redeem(uint8 fuzzAmount) public override {
-        uint256 amount = bound(uint256(fuzzAmount), minFuzz, maxShares);
-
-        uint256 reqAssets = (adapter.previewMint(amount) * 10) / 9;
-        _mintAssetAndApproveForAdapter(reqAssets, bob);
-        vm.prank(bob);
-        adapter.deposit(reqAssets, bob);
-        prop_redeem(bob, bob, amount, testId);
-
-        _mintAssetAndApproveForAdapter(reqAssets, bob);
-        vm.prank(bob);
-        adapter.deposit(reqAssets, bob);
-
-        increasePricePerShare(raise);
-
-        vm.prank(bob);
-        adapter.approve(alice, type(uint256).max);
-        prop_redeem(alice, bob, amount, testId);
-    }
-
-    function test__withdraw(uint8 fuzzAmount) public override {
-        uint256 amount = bound(uint256(fuzzAmount), minFuzz, maxAssets);
-
-        uint256 reqAssets = (adapter.previewMint(
-            adapter.previewWithdraw(amount)
-        ) * 10) / 8;
-        _mintAssetAndApproveForAdapter(reqAssets, bob);
-        vm.prank(bob);
-        adapter.deposit(reqAssets, bob);
-        prop_withdraw(bob, bob, amount, testId);
-
-        _mintAssetAndApproveForAdapter(reqAssets, bob);
-        vm.prank(bob);
-        adapter.deposit(reqAssets, bob);
-
-        increasePricePerShare(raise);
-
-        vm.prank(bob);
-        adapter.approve(alice, type(uint256).max);
-        prop_withdraw(alice, bob, amount, testId);
-    }
-
-    /*//////////////////////////////////////////////////////////////
                               CLAIM
     //////////////////////////////////////////////////////////////*/
 
@@ -248,43 +213,24 @@ contract AcrossAdapterTest is AbstractAdapterTest {
         vm.prank(bob);
         adapter.deposit(defaultAmount, bob);
 
-        emit log_named_uint("convertToAssets", adapter.convertToAssets(1e18));
-        emit log_named_uint("highWaterMark", adapter.highWaterMark());
-        emit log_named_uint("totalSupply", adapter.totalSupply());
-        emit log_named_uint("totalAssets", adapter.totalAssets());
-     
         uint256 oldTotalAssets = adapter.totalAssets();
-        address lpToken = IAcrossHop(acrossHop).pooledTokens(address(asset)).lpToken;
-        emit log_named_address("lpTokne", lpToken);
+        address lpToken = IAcrossHop(acrossHop)
+            .pooledTokens(address(asset))
+            .lpToken;
         adapter.setPerformanceFee(performanceFee);
-        
-        emit log_named_uint("balance", asset.balanceOf(acrossHop));
-        emit log_named_uint("asset total supply", asset.totalSupply());
-        
-        emit log_named_uint("lp token", IERC20(lpToken).totalSupply());
-        
+
         increasePricePerShare(raise);
-        
-        deal(lpToken, acrossDistributor, IERC20(lpToken).balanceOf(acrossDistributor) - 10**18, true);
 
-        emit log_named_uint("lp token", IERC20(lpToken).totalSupply());
-        
-        emit log_named_uint("convertToAssets", adapter.convertToAssets(1e18));
-        emit log_named_uint("highWaterMark", adapter.highWaterMark());
-        emit log_named_uint("totalSupply", adapter.totalSupply());
-        emit log_named_uint("totalAssets", adapter.totalAssets());    
-
-        emit log_named_uint("balance", asset.balanceOf(acrossHop));
-        emit log_named_uint("asset total supply", asset.totalSupply());
-
+        deal(
+            lpToken,
+            acrossDistributor,
+            IERC20(lpToken).balanceOf(acrossDistributor) - 10 ** 18,
+            true
+        );
 
         uint256 gain = ((adapter.convertToAssets(1e18) -
             adapter.highWaterMark()) * adapter.totalSupply()) / 1e18;
         uint256 fee = (gain * performanceFee) / 1e18;
-
-        emit log("PING1");
-
-        emit log_named_uint("fee", fee);
 
         uint256 expectedFee = adapter.convertToShares(fee);
 
@@ -307,9 +253,5 @@ contract AcrossAdapterTest is AbstractAdapterTest {
             _delta_,
             "expectedFee"
         );
-    }
-
-    function increasePricePerShare(uint256 amount) public override {
-        deal(address(asset), acrossHop, asset.balanceOf(acrossHop) + amount);
     }
 }

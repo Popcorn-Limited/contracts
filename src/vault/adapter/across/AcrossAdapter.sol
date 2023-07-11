@@ -48,11 +48,11 @@ contract AcrossAdapter is AdapterBase, WithRewards {
             revert NotEndorsed(_acrossDistributor);
 
         _name = string.concat(
-            "Popcorn Across ",
+            "VaultCraft Across ",
             IERC20Metadata(asset()).name(),
             " Adapter"
         );
-        _symbol = string.concat("popAxc-", IERC20Metadata(asset()).symbol());
+        _symbol = string.concat("vcAxc-", IERC20Metadata(asset()).symbol());
 
         if (!IAcrossHop(_acrossHop).pooledTokens(asset()).isEnabled)
             revert Disabled();
