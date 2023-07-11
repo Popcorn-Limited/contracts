@@ -6,35 +6,21 @@ pragma solidity ^0.8.15;
 import {ITestConfigStorage} from "../abstract/ITestConfigStorage.sol";
 
 struct LidoTestConfig {
-    address pool;
-    uint256 wEthId;
-    uint256 stEthId;
-    uint256 slippage;
+    address asset;
+    uint256 pid;
 }
 
 contract LidoTestConfigStorage is ITestConfigStorage {
     LidoTestConfig[] internal testConfigs;
 
     constructor() {
-        // WETH
         testConfigs.push(
-            LidoTestConfig(
-                0xDC24316b9AE028F1497c275EB9192a3Ea0f67022,
-                0,
-                1,
-                100
-            )
+            LidoTestConfig(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2 , 1)
         );
     }
 
     function getTestConfig(uint256 i) public view returns (bytes memory) {
-        return
-            abi.encode(
-                testConfigs[i].pool,
-                testConfigs[i].wEthId,
-                testConfigs[i].stEthId,
-                testConfigs[i].slippage
-            );
+        return abi.encode(testConfigs[i].asset, testConfigs[i].pid);
     }
 
     function getTestConfigLength() public view returns (uint256) {
