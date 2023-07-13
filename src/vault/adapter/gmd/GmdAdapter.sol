@@ -4,8 +4,6 @@ pragma solidity ^0.8.15;
 import "./IGmdVault.sol";
 import { AdapterBase, IERC20, IERC20Metadata, ERC20, SafeERC20, Math, IAdapter} from "../abstracts/AdapterBase.sol";
 import { WithRewards, IWithRewards } from "../abstracts/WithRewards.sol";
-import "forge-std/console.sol";
-
 
 contract GmdAdapter is AdapterBase, WithRewards {
     using SafeERC20 for IERC20;
@@ -16,9 +14,12 @@ contract GmdAdapter is AdapterBase, WithRewards {
 
     uint256 public poolId;
     IGmdVault public gmdVault;
+    IERC20 public receiptToken;
 
     error MaxLossTooHigh();
+    error NoSharesBurned();
     error InvalidPool(uint poolId);
+    error InsufficientSharesReceived();
     error AssetMismatch(uint poolId, address asset, address lpToken);
 
     /*//////////////////////////////////////////////////////////////
@@ -43,6 +44,7 @@ contract GmdAdapter is AdapterBase, WithRewards {
         gmdVault = IGmdVault(registry);
 
         IGmdVault.PoolInfo memory poolInfo = gmdVault.poolInfo(poolId);
+        receiptToken = IERC20(poolInfo.GDlptoken);
 
         if (
             !poolInfo.stakable ||
@@ -50,14 +52,8 @@ contract GmdAdapter is AdapterBase, WithRewards {
             !poolInfo.withdrawable
         ) revert InvalidPool(poolId);
 
-        (address _asset,,,,,) = abi.decode(
-            adapterInitData,
-            (address, address, address, uint256, bytes4[8], bytes)
-        );
-        console.log("poolId: ",  poolInfo.lpToken, _asset);
-
-        if(_asset != poolInfo.lpToken)
-            revert AssetMismatch(poolId, _asset, poolInfo.lpToken);
+        if(asset() != poolInfo.lpToken)
+            revert AssetMismatch(poolId, asset(), poolInfo.lpToken);
 
         IERC20(asset()).approve(address(gmdVault), type(uint256).max);
     }
@@ -105,10 +101,8 @@ contract GmdAdapter is AdapterBase, WithRewards {
 
         IGmdVault.PoolInfo memory poolInfo = gmdVault.poolInfo(poolId);
 
-        uint256 vaultcap = poolInfo.vaultcap;
-        uint256 totalStaked = poolInfo.totalStaked;
-        if (totalStaked >= vaultcap) return 0;
-        return vaultcap - totalStaked;
+        if (poolInfo.totalStaked >= poolInfo.vaultcap) return 0;
+        return poolInfo.vaultcap - poolInfo.totalStaked;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -136,13 +130,13 @@ contract GmdAdapter is AdapterBase, WithRewards {
         uint256
     ) internal virtual override {
         IGmdVault.PoolInfo memory poolInfo = gmdVault.poolInfo(poolId);
-        IERC20 receiptToken = IERC20(poolInfo.GDlptoken);
-        uint256 initialReceiptTokenBalance = receiptToken.balanceOf(address(this));
+        IERC20 receiptToken_ = receiptToken;
+
+        uint256 initialReceiptTokenBalance = receiptToken_.balanceOf(address(this));
 
         gmdVault.enter(amount, poolId);
-        uint256 sharesReceived = receiptToken.balanceOf(address(this)) - initialReceiptTokenBalance;
-        console.log("receipt tokens shares: ", sharesReceived);
-        require(sharesReceived >= 0, "Insufficient shares output");
+        uint256 sharesReceived = receiptToken_.balanceOf(address(this)) - initialReceiptTokenBalance;
+        if(sharesReceived <= 0) revert InsufficientSharesReceived();
     }
 
     /// @notice Withdraw from the beefy vault and optionally from the booster given its configured
@@ -150,9 +144,8 @@ contract GmdAdapter is AdapterBase, WithRewards {
         uint256,
         uint256 shares
     ) internal virtual override {
-        console.log("protocol withdraw: ", shares);
+        if(shares <= 0) revert NoSharesBurned();
         uint256 gmdVaultShares = convertToUnderlyingShares(0, shares);
-        console.log("gmdVaultShares: ", gmdVaultShares);
 
         gmdVault.leave(gmdVaultShares, poolId);
     }

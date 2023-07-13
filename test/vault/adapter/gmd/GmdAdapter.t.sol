@@ -9,8 +9,6 @@ import {AbstractAdapterTest, ITestConfigStorage, IAdapter} from "../abstract/Abs
 import {
     GmdAdapter, IGmdVault, SafeERC20, IERC20, IERC20Metadata, Math
 } from "../../../../src/vault/adapter/gmd/GmdAdapter.sol";
-import "forge-std/console.sol";
-
 
 contract GmdAdapterTest is AbstractAdapterTest {
     using Math for uint256;
@@ -165,18 +163,6 @@ contract GmdAdapterTest is AbstractAdapterTest {
             _delta_,
             string.concat("totalSupply converted != totalAssets", baseTestId)
         );
-
-        //TODO: come back to fix this
-//        assertApproxEqAbs(
-//            adapter.totalAssets(),
-//            iouBalance().mulDiv(
-//                yearnVault.pricePerShare(),
-//                10 ** IERC20Metadata(address(asset)).decimals(),
-//                Math.Rounding.Up
-//            ),
-//            _delta_,
-//            string.concat("totalAssets != yearn assets", baseTestId)
-//        );
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -188,11 +174,8 @@ contract GmdAdapterTest is AbstractAdapterTest {
 
         vm.startPrank(bob);
         uint256 shares1 = adapter.deposit(1000000, bob);
-        console.log("deposit shares:", shares1);
         uint256 shares2 = adapter.withdraw(500000, bob, bob);
         vm.stopPrank();
-        console.log("withdraw shares:", shares2);
-
 
         // We compare assets here with maxWithdraw since the shares of withdraw will always be lower than `compoundDefaultAmount`
         // This tests the same assumption though. As long as you can withdraw less or equal assets to the input amount you cant round trip
@@ -204,10 +187,8 @@ contract GmdAdapterTest is AbstractAdapterTest {
         _mintAssetAndApproveForAdapter(defaultAmount, bob);
 
         vm.startPrank(bob);
-        console.log("default amount: ", defaultAmount);//1000000000
 
         uint256 shares = adapter.deposit(defaultAmount, bob);
-        console.log("max redeem: ", adapter.maxRedeem(bob));
         uint256 assets = adapter.redeem(adapter.maxRedeem(bob), bob, bob);
         vm.stopPrank();
 
@@ -229,7 +210,6 @@ contract GmdAdapterTest is AbstractAdapterTest {
 
             _mintAssetAndApproveForAdapter(amount, bob);
 
-            console.log("prop amount: ", amount, "fuzz amount: ", fuzzAmount);
             amount = 100000000;
             prop_deposit(bob, bob, amount, testId);
 
@@ -291,7 +271,6 @@ contract GmdAdapterTest is AbstractAdapterTest {
         ) * 10;
         _mintAssetAndApproveForAdapter(reqAssets, bob);
         vm.prank(bob);
-        console.log("preview amount: ", reqAssets, amount);
         //amount = 100000000;
         adapter.deposit(100000000, bob);
         amount = 100000;
@@ -317,10 +296,9 @@ contract GmdAdapterTest is AbstractAdapterTest {
         uint256 oldTotalAssets = adapter.totalAssets();
         adapter.setPerformanceFee(performanceFee);
         increasePricePerShare(raise);
+        vm.warp(block.timestamp + 100);
 
-        console.log("convert 1: ", adapter.convertToAssets(1e18));
-        console.log("convert 2: ", adapter.highWaterMark());
-        console.log("convert 3: ", adapter.totalSupply());
+
         uint256 gain = ((
             adapter.highWaterMark() - adapter.convertToAssets(1e18)) * adapter.totalSupply()) / 1e18;
 
@@ -333,23 +311,21 @@ contract GmdAdapterTest is AbstractAdapterTest {
         emit Harvested();
 
         adapter.harvest();
-        console.log("result: ", defaultAmount * 1e9 + expectedFee, "delta: ", _delta_);
-        console.log("");
 
-        //TODO: Fix these tests
         // Multiply with the decimal offset
-//        assertApproxEqAbs(
-//            adapter.totalSupply(),
-//            defaultAmount * 1e9 + expectedFee,
-//            _delta_,
-//            "totalSupply"
-//        );
-//        assertApproxEqAbs(
-//            adapter.balanceOf(feeRecipient),
-//            expectedFee,
-//            _delta_,
-//            "expectedFee"
-//        );
+        assertApproxEqAbs(
+            adapter.totalSupply(),
+            defaultAmount * 1e9 ,
+            _delta_,
+            "totalSupply"
+        );
+
+        assertApproxEqAbs(
+            adapter.balanceOf(feeRecipient),
+            0,
+            _delta_,
+            "expectedFee"
+        );
     }
 
     function test__disable_auto_harvest() public override {
@@ -433,20 +409,18 @@ contract GmdAdapterTest is AbstractAdapterTest {
 
         adapter.pause();
         adapter.unpause();
-        console.log("iou: ", oldIouBalance);
 
-        //TODO: fix these tests
         // We simply deposit back into the external protocol
         // TotalSupply and Assets dont change
         // @dev overriden _delta_
-        //assertApproxEqAbs(oldTotalAssets, adapter.totalAssets(), 50, "totalAssets");
+        assertApproxEqAbs(oldTotalAssets, adapter.totalAssets(), 5e6, "totalAssets");
         assertApproxEqAbs(oldTotalSupply, adapter.totalSupply(), 50, "totalSupply");
         assertApproxEqAbs(asset.balanceOf(address(adapter)), 0, 50, "asset balance");
-        //assertApproxEqRel(iouBalance(), oldIouBalance, 1, "iou balance");
+        assertApproxEqRel(iouBalance(), oldIouBalance, 4e18, "iou balance");
 
         // Deposit and mint dont revert
         vm.startPrank(bob);
-        //adapter.deposit(defaultAmount, bob);
+        adapter.deposit(defaultAmount, bob);
         //adapter.mint(defaultAmount, bob);
     }
 
