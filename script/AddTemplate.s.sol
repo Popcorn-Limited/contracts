@@ -11,12 +11,12 @@ contract AddTemplate is Script {
     address deployer;
 
     VaultController controller =
-        VaultController(0xa199409F99bDBD998Ae1ef4FdaA58b356370837d);
+        VaultController(0x7D51BABA56C2CA79e15eEc9ECc4E92d9c0a7dbeb);
     IDeploymentController deploymentController =
         IDeploymentController(0xa8C5815f6Ea5F7A1551541B0d7F970D546126bDB);
 
     bytes32 templateCategory = "Adapter";
-    bytes32 templateId = "OusdAdapter";
+    bytes32 templateId = "YearnFactoryAdapter";
 
     bytes4[8] requiredSigs;
 
@@ -30,11 +30,11 @@ contract AddTemplate is Script {
             templateCategory,
             templateId,
             Template({
-                implementation: address(0xD3FFeD2025320453A937a77f19128DD1AcC25d32),
+                implementation: address(0xcA227F32917cEC6c579b0030920B47387e8fBD10),
                 endorsed: false,
                 metadataCid: "",
                 requiresInitData: true,
-                registry: address(0x7a33b5b57C8b235A3519e6C010027c5cebB15CB4),
+                registry: address(0x21b1FC8A52f179757bf555346130bF27c0C2A17A),
                 requiredSigs: requiredSigs
             })
         );

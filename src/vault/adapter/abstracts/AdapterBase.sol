@@ -88,6 +88,7 @@ abstract contract AdapterBase is
 
         highWaterMark = 1e9;
         lastHarvest = block.timestamp;
+        autoHarvest = true;
     }
 
     function decimals() public view override returns (uint8) {
@@ -116,7 +117,7 @@ abstract contract AdapterBase is
         _protocolDeposit(assets, shares);
         _mint(receiver, shares);
 
-        harvest();
+        if (autoHarvest) harvest();
 
         emit Deposit(caller, receiver, assets, shares);
     }
@@ -144,7 +145,7 @@ abstract contract AdapterBase is
 
         IERC20(asset()).safeTransfer(receiver, assets);
 
-        harvest();
+        if (autoHarvest) harvest();
 
         emit Withdraw(caller, receiver, owner, assets, shares);
     }
@@ -256,8 +257,10 @@ abstract contract AdapterBase is
     IStrategy public strategy;
     bytes public strategyConfig;
     uint256 public lastHarvest;
+    bool public autoHarvest;
 
     event Harvested();
+    event AutoHarvestToggled(bool oldValue, bool newValue);
 
     /**
      * @notice Execute Strategy and take fees.
@@ -278,6 +281,11 @@ abstract contract AdapterBase is
         }
 
         emit Harvested();
+    }
+
+    // @ev Exists for compatibility for flywheel systems.
+    function claimRewards() external {
+        harvest();
     }
 
     /**
@@ -313,6 +321,13 @@ abstract contract AdapterBase is
         (bool success, ) = address(strategy).delegatecall(
             abi.encodeWithSignature("setUp(bytes)", strategyConfig)
         );
+
+        if (!success) revert StrategySetupFailed();
+    }
+
+    function toggleAutoHarvest() external onlyOwner {
+        emit AutoHarvestToggled(autoHarvest, !autoHarvest);
+        autoHarvest = !autoHarvest;
     }
 
     /*//////////////////////////////////////////////////////////////

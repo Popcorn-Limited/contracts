@@ -76,7 +76,7 @@ contract Vault is
 
         adapter = adapter_;
 
-        asset_.approve(address(adapter_), type(uint256).max);
+        asset_.safeApprove(address(adapter_), type(uint256).max);
 
         _decimals = IERC20Metadata(address(asset_)).decimals() + decimalOffset; // Asset decimals + decimal offset to combat inflation attacks
 

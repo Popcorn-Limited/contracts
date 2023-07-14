@@ -7,6 +7,8 @@ import {Test} from "forge-std/Test.sol";
 
 import {PropertyTest} from "./PropertyTest.prop.sol";
 import {IAdapter, IERC4626} from "../../../../src/interfaces/vault/IAdapter.sol";
+
+import {IMetaPool, MetaPoolAdapter} from "../../../../src/vault/adapter/metapool/MetaPoolAdapter.sol";
 import {IStrategy} from "../../../../src/interfaces/vault/IStrategy.sol";
 import {IERC20Upgradeable as IERC20, IERC20MetadataUpgradeable as IERC20Metadata} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
 import {ITestConfigStorage} from "./ITestConfigStorage.sol";
@@ -306,11 +308,13 @@ contract AbstractAdapterTest is PropertyTest {
             uint256 amount = bound(uint256(fuzzAmount), minFuzz, maxShares);
 
             _mintAssetAndApproveForAdapter(adapter.previewMint(amount), bob);
+
             prop_mint(bob, bob, amount, testId);
 
             increasePricePerShare(raise);
 
             _mintAssetAndApproveForAdapter(adapter.previewMint(amount), bob);
+
             prop_mint(bob, alice, amount, testId);
         }
     }
@@ -352,6 +356,7 @@ contract AbstractAdapterTest is PropertyTest {
 
             uint256 reqAssets = adapter.previewMint(amount) * 10;
             _mintAssetAndApproveForAdapter(reqAssets, bob);
+
             vm.prank(bob);
             adapter.deposit(reqAssets, bob);
             prop_redeem(bob, bob, amount, testId);
@@ -549,17 +554,9 @@ contract AbstractAdapterTest is PropertyTest {
         adapter.setPerformanceFee(performanceFee);
         increasePricePerShare(raise);
 
-        emit log("PING");
-
-        emit log_named_uint("convertToAssets", adapter.convertToAssets(1e18));
-        emit log_named_uint("highWaterMark", adapter.highWaterMark());
-        emit log_named_uint("totalSupply", adapter.totalSupply());
-
         uint256 gain = ((adapter.convertToAssets(1e18) -
             adapter.highWaterMark()) * adapter.totalSupply()) / 1e18;
         uint256 fee = (gain * performanceFee) / 1e18;
-
-        emit log("PING1");
 
         uint256 expectedFee = adapter.convertToShares(fee);
 
@@ -582,6 +579,22 @@ contract AbstractAdapterTest is PropertyTest {
             _delta_,
             "expectedFee"
         );
+    }
+
+    function test__disable_auto_harvest() public {
+        adapter.toggleAutoHarvest();
+
+        assertFalse(adapter.autoHarvest());
+
+        uint lastHarvest = adapter.lastHarvest();
+
+        vm.warp(block.timestamp + 12);
+
+        _mintAssetAndApproveForAdapter(defaultAmount, bob);
+        vm.prank(bob);
+        adapter.deposit(defaultAmount, bob);
+
+        assertEq(lastHarvest, adapter.lastHarvest(), "should not auto harvest");
     }
 
     /*//////////////////////////////////////////////////////////////

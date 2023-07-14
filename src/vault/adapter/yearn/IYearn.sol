@@ -33,6 +33,8 @@ interface VaultAPI is IERC20 {
     function totalDebt() external view returns (uint256);
 
     function totalIdle() external view returns (uint256);
+
+    function withdrawalQueue(uint256) external view returns (address);
 }
 
 interface IYearnRegistry {
@@ -43,4 +45,12 @@ interface IVaultFactory {
     function latestStandardVaultFromGauge(
         address gauge
     ) external view returns (address);
+}
+
+interface IYearnStrategy {
+    function strategist() external view returns (address);
+
+    function harvest() external;
+
+    function tend() external;
 }

@@ -2,69 +2,26 @@
 // Docgen-SOLC: 0.8.15
 
 pragma solidity ^0.8.15;
+
 import {Test} from "forge-std/Test.sol";
 
-contract Tester is Test {
-    address usdc = address(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
-    address stg = address(0xAf5191B0De278C7286d6C7CC6ab6BB8A73bA2Cd6);
-    address asset = address(0xdf0770dF86a8034b3EFEf0A1Bb3c889B8332FF56);
+interface IAuroraStNear {
+    function wNear() external view returns (address);
 
-    address baseAsset;
-    address router = address(0x99a58482BD75cbab83b27EC03CA68fF489b5788f);
-    address[9][] toBaseAssetRoutes;
-    address[9] toAssetRoute;
-    uint256[3][4] swapParams;
-    uint256[] minTradeAmounts;
-    bytes optionalData;
-    bytes data;
+    function stNearPrice() external view returns (uint256);
+}
+
+contract Tester is Test {
+    IAuroraStNear auroraStNear =
+        IAuroraStNear(0x534BACf1126f60EA513F796a3377ff432BE62cf9);
 
     function setUp() public {
-        toBaseAssetRoutes.push(
-            [
-                stg,
-                usdc,
-                address(0),
-                address(0),
-                address(0),
-                address(0),
-                address(0),
-                address(0),
-                address(0)
-            ]
-        );
-        minTradeAmounts.push(uint256(0));
-
-        data = abi.encode(
-            baseAsset,
-            router,
-            toBaseAssetRoutes,
-            toAssetRoute,
-            swapParams,
-            minTradeAmounts,
-            optionalData
-        );
+        uint256 forkId = vm.createSelectFork(vm.rpcUrl("aurora"));
+        vm.selectFork(forkId);
     }
 
     function test_stuff() public {
-        (
-            address baseAsset,
-            address router,
-            address[9][] memory toBaseAssetRoutes,
-            address[9] memory toAssetRoute,
-            uint256[3][4] memory swapParams,
-            uint256[] memory minTradeAmounts,
-            bytes memory optionalData
-        ) = abi.decode(
-                data,
-                (
-                    address,
-                    address,
-                    address[9][],
-                    address[9],
-                    uint256[3][4],
-                    uint256[],
-                    bytes
-                )
-            );
+        emit log_address(auroraStNear.wNear());
+        emit log_uint(auroraStNear.stNearPrice());
     }
 }

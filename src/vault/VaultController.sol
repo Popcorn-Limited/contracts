@@ -952,7 +952,7 @@ contract VaultController is Owned {
     }
 
     /*//////////////////////////////////////////////////////////////
-                          HARVEST COOLDOWN LOGIC
+                            HARVEST LOGIC
     //////////////////////////////////////////////////////////////*/
 
     uint256 public harvestCooldown;
@@ -991,6 +991,22 @@ contract VaultController is Owned {
                     IAdapter.setHarvestCooldown.selector,
                     harvestCooldown
                 )
+            );
+        }
+    }
+
+    /**
+     * @notice Toggle `AutoHarvest` existing adapters. Caller must be owner.
+     * @param adapters Array of adapters to set the autoHarvest value for.
+     */
+    function toggleAdapterAutoHarvest(
+        address[] calldata adapters
+    ) external onlyOwner {
+        uint8 len = uint8(adapters.length);
+        for (uint256 i = 0; i < len; i++) {
+            adminProxy.execute(
+                adapters[i],
+                abi.encodeWithSelector(IAdapter.toggleAutoHarvest.selector)
             );
         }
     }

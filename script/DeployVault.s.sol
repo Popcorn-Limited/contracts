@@ -7,11 +7,11 @@ import {VaultController, IAdapter, VaultInitParams, VaultMetadata, IERC4626, IER
 import {IVaultController, DeploymentArgs} from "../src/interfaces/vault/IVaultController.sol";
 import {IPermissionRegistry, Permission} from "../src/interfaces/vault/IPermissionRegistry.sol";
 
-contract SetRageQuit is Script {
+contract DeployVault is Script {
     address deployer;
 
     VaultController controller =
-        VaultController(0x757D953c53aD28748aCf94AD2d59C13955E09c08);
+        VaultController(0x7D51BABA56C2CA79e15eEc9ECc4E92d9c0a7dbeb);
 
     address feeRecipient = address(0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E);
 
@@ -23,28 +23,25 @@ contract SetRageQuit is Script {
 
         vm.startBroadcast(deployerPrivateKey);
 
-        setPermission(0xFF504594eDd93E09309d5EAB775e7c35f642931B, true, false);
+        //setPermission(0xFF504594eDd93E09309d5EAB775e7c35f642931B, true, false);
 
         address adapter = controller.deployVault(
             VaultInitParams({
-                asset: IERC20(0x207AddB05C548F262219f6bFC6e11c02d0f7fDbe),
+                asset: IERC20(0xdAC17F958D2ee523a2206206994597C13D831ec7),
                 adapter: IERC4626(address(0)),
                 fees: VaultFees({
                     deposit: 0,
                     withdrawal: 0,
                     management: 0,
-                    performance: 0
+                    performance: 1e17
                 }),
                 feeRecipient: feeRecipient,
                 depositLimit: type(uint256).max,
                 owner: deployer
             }),
             DeploymentArgs({
-                id: "BeefyAdapter",
-                data: abi.encode(
-                    address(0xFF504594eDd93E09309d5EAB775e7c35f642931B),
-                    address(0)
-                )
+                id: "IdleSeniorAdapter",
+                data: abi.encode(0xc4574C60a455655864aB80fa7638561A756C5E61)
             }),
             DeploymentArgs({id: "", data: ""}),
             false,
