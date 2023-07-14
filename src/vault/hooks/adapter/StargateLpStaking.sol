@@ -36,6 +36,7 @@ contract StargateLpStaking {
     }
 
     function claimHook() external {
+        // TODO: shouldnt work if the strategy also needs to claim
         // 1. claim rewards
         // 2. adjust index for all vaults to keep track of global rewards
         // 3. adjust rewardsClaimed for vault

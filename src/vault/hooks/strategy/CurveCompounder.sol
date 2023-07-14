@@ -26,6 +26,7 @@ contract CurveCompounder {
         // 2.2. check min trade
         // 2.3 swap rewards for asset <-- would trade for all vaults using the adapter hook
         // 3. deposit asset <-- the adapter hook must report assets for the vault in this case
+        // TODO how to decide to use depositHook or strategyDepositHook?
         // 4. notify success / failure
     }
 
@@ -34,6 +35,7 @@ contract CurveCompounder {
         // 2. compound()
         // IF sufficient assets
         // 3. withdraw
+        // TODO how to decide to use withdrawHook or strategyWithdrawHook?
         // 4. save new position in adapterHook
         // 5. notify success / failure
     }
