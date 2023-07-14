@@ -6,9 +6,7 @@ pragma solidity ^0.8.15;
 import {Test} from "forge-std/Test.sol";
 import {GmdTestConfigStorage, GmdTestConfig} from "./GmdTestConfigStorage.sol";
 import {AbstractAdapterTest, ITestConfigStorage, IAdapter} from "../abstract/AbstractAdapterTest.sol";
-import {
-    GmdAdapter, IGmdVault, SafeERC20, IERC20, IERC20Metadata, Math
-} from "../../../../src/vault/adapter/gmd/GmdAdapter.sol";
+import {GmdAdapter, IGmdVault, SafeERC20, IERC20, IERC20Metadata, Math} from "../../../../src/vault/adapter/gmd/GmdAdapter.sol";
 
 contract GmdAdapterTest is AbstractAdapterTest {
     using Math for uint256;
@@ -21,7 +19,6 @@ contract GmdAdapterTest is AbstractAdapterTest {
         testConfigStorage = ITestConfigStorage(
             address(new GmdTestConfigStorage())
         );
-
 
         _setUpTest(testConfigStorage.getTestConfig(0));
     }
@@ -51,21 +48,29 @@ contract GmdAdapterTest is AbstractAdapterTest {
         vm.label(address(asset), "asset");
         vm.label(address(this), "test");
 
-        //_setDefaultAmount(1000_000000);
         adapter.initialize(
             abi.encode(asset, address(this), address(0), 0, sigs, ""),
             externalRegistry,
             abi.encode(_poolId)
         );
-        defaultAmount = 1000000000000;
+
+        defaultAmount = 10 ** IERC20Metadata(_asset).decimals();
+        minFuzz = defaultAmount;
+        minShares = defaultAmount * 1e9;
+        raise = defaultAmount;
+
+        maxAssets = defaultAmount * 10;
+        maxShares = minShares * 10;
     }
 
     /*//////////////////////////////////////////////////////////////
                          INITIALIZATION
    //////////////////////////////////////////////////////////////*/
     function test__initialization() public override {
-        ITestConfigStorage testConfigStorage = ITestConfigStorage(address(new GmdTestConfigStorage()));
-        bytes  memory testConfig = testConfigStorage.getTestConfig(0);
+        ITestConfigStorage testConfigStorage = ITestConfigStorage(
+            address(new GmdTestConfigStorage())
+        );
+        bytes memory testConfig = testConfigStorage.getTestConfig(0);
 
         (address _asset, address _vault, uint256 _poolId) = abi.decode(
             testConfig,
@@ -130,7 +135,6 @@ contract GmdAdapterTest is AbstractAdapterTest {
         );
     }
 
-
     /*//////////////////////////////////////////////////////////////
                           HELPER
     //////////////////////////////////////////////////////////////*/
@@ -168,177 +172,173 @@ contract GmdAdapterTest is AbstractAdapterTest {
                           ROUNDTRIP TESTS
     //////////////////////////////////////////////////////////////*/
     // NOTE - The yearn adapter suffers often from an off-by-one error which "steals" 1 wei from the user
-    function test__RT_deposit_withdraw() public override {
-        _mintAssetAndApproveForAdapter(minFuzz, bob);
+    // function test__RT_deposit_withdraw() public override {
+    //     _mintAssetAndApproveForAdapter(minFuzz, bob);
 
-        vm.startPrank(bob);
-        uint256 shares1 = adapter.deposit(1000000, bob);
-        uint256 shares2 = adapter.withdraw(500000, bob, bob);
-        vm.stopPrank();
+    //     vm.startPrank(bob);
+    //     uint256 shares1 = adapter.deposit(1000000, bob);
+    //     uint256 shares2 = adapter.withdraw(500000, bob, bob);
+    //     vm.stopPrank();
 
-        // We compare assets here with maxWithdraw since the shares of withdraw will always be lower than `compoundDefaultAmount`
-        // This tests the same assumption though. As long as you can withdraw less or equal assets to the input amount you cant round trip
-        //assertGe(minFuzz, adapter.maxWithdraw(bob), testId);
-    }
-
+    //     // We compare assets here with maxWithdraw since the shares of withdraw will always be lower than `compoundDefaultAmount`
+    //     // This tests the same assumption though. As long as you can withdraw less or equal assets to the input amount you cant round trip
+    //     //assertGe(minFuzz, adapter.maxWithdraw(bob), testId);
+    // }
 
     /*//////////////////////////////////////////////////////////////
                     DEPOSIT/MINT/WITHDRAW/REDEEM
     //////////////////////////////////////////////////////////////*/
-    function test__deposit(uint8 fuzzAmount) public override {
-        uint8 len = uint8(testConfigStorage.getTestConfigLength());
-        for (uint8 i; i < len; i++) {
-            if (i > 0) overrideSetup(testConfigStorage.getTestConfig(i));
-            uint256 amount = bound(uint256(fuzzAmount), minFuzz, maxAssets);
+    // function test__mint(uint8 fuzzAmount) public override {
+    //     uint8 len = uint8(testConfigStorage.getTestConfigLength());
+    //     for (uint8 i; i < len; i++) {
+    //         if (i > 0) overrideSetup(testConfigStorage.getTestConfig(i));
+    //         uint256 amount = bound(uint256(fuzzAmount), minFuzz, maxShares);
 
-            _mintAssetAndApproveForAdapter(amount, bob);
+    //         _mintAssetAndApproveForAdapter(adapter.previewMint(amount), bob);
 
-            amount = 100000000;
-            prop_deposit(bob, bob, amount, testId);
+    //         prop_mint(bob, bob, amount, testId);
 
-            increasePricePerShare(raise);
+    //         increasePricePerShare(raise);
 
-            _mintAssetAndApproveForAdapter(amount, bob);
-            prop_deposit(bob, alice, amount, testId);
-        }
-    }
+    //         _mintAssetAndApproveForAdapter(adapter.previewMint(amount), bob);
 
-    function test__withdraw(uint8 fuzzAmount) public override {
-        uint256 amount = 10000000;//1e18;
+    //         prop_mint(bob, alice, amount, testId);
+    //     }
+    // }
 
-        uint8 len = uint8(testConfigStorage.getTestConfigLength());
-        for (uint8 i; i < len; i++) {
-            if (i > 0) overrideSetup(testConfigStorage.getTestConfig(i));
+    // function test__withdraw(uint8 fuzzAmount) public override {
+    //     uint256 amount = 10000000;//1e18;
 
-            uint256 reqAssets = adapter.previewMint(
-                adapter.previewWithdraw(amount)
-            ) * 10;
-            _mintAssetAndApproveForAdapter(reqAssets, bob);
-            vm.prank(bob);
-            adapter.deposit(reqAssets, bob);
+    //     uint8 len = uint8(testConfigStorage.getTestConfigLength());
+    //     for (uint8 i; i < len; i++) {
+    //         if (i > 0) overrideSetup(testConfigStorage.getTestConfig(i));
 
-            prop_withdraw(bob, bob, amount / 10, testId);
+    //         uint256 reqAssets = adapter.previewMint(
+    //             adapter.previewWithdraw(amount)
+    //         ) * 10;
+    //         _mintAssetAndApproveForAdapter(reqAssets, bob);
+    //         vm.prank(bob);
+    //         adapter.deposit(reqAssets, bob);
 
-            _mintAssetAndApproveForAdapter(reqAssets, bob);
-            vm.prank(bob);
-            adapter.deposit(reqAssets, bob);
+    //         prop_withdraw(bob, bob, amount / 10, testId);
 
-            increasePricePerShare(raise);
+    //         _mintAssetAndApproveForAdapter(reqAssets, bob);
+    //         vm.prank(bob);
+    //         adapter.deposit(reqAssets, bob);
 
-            vm.prank(bob);
-            adapter.approve(alice, type(uint256).max);
+    //         increasePricePerShare(raise);
 
-            prop_withdraw(alice, bob, amount, testId);
-        }
-    }
+    //         vm.prank(bob);
+    //         adapter.approve(alice, type(uint256).max);
 
-    /*//////////////////////////////////////////////////////////////
-                          PREVIEW VIEWS
-    //////////////////////////////////////////////////////////////*/
-    function test__previewDeposit(uint8 fuzzAmount) public override {
-        uint256 amount = bound(uint256(fuzzAmount), minFuzz, maxAssets);
+    //         prop_withdraw(alice, bob, amount, testId);
+    //     }
+    // }
 
-        _mintAsset(maxAssets, bob);
-        vm.prank(bob);
-        asset.approve(address(adapter), maxAssets);
-        amount = 100000000;
+    // /*//////////////////////////////////////////////////////////////
+    //                       PREVIEW VIEWS
+    // //////////////////////////////////////////////////////////////*/
+    // function test__previewDeposit(uint8 fuzzAmount) public override {
+    //     uint256 amount = bound(uint256(fuzzAmount), minFuzz, maxAssets);
 
-        prop_previewDeposit(bob, bob, amount, testId);
-    }
+    //     _mintAsset(maxAssets, bob);
+    //     vm.prank(bob);
+    //     asset.approve(address(adapter), maxAssets);
+    //     amount = 100000000;
 
-    function test__previewWithdraw(uint8 fuzzAmount) public override {
-        uint256 amount = bound(uint256(fuzzAmount), minFuzz, maxAssets);
+    //     prop_previewDeposit(bob, bob, amount, testId);
+    // }
 
-        uint256 reqAssets = adapter.previewMint(
-            adapter.previewWithdraw(amount)
-        ) * 10;
-        _mintAssetAndApproveForAdapter(reqAssets, bob);
-        vm.prank(bob);
-        adapter.deposit(100000000, bob);
-        amount = 100000;
+    // function test__previewWithdraw(uint8 fuzzAmount) public override {
+    //     uint256 amount = bound(uint256(fuzzAmount), minFuzz, maxAssets);
 
-        prop_previewWithdraw(bob, bob, bob, amount, testId);
-    }
+    //     uint256 reqAssets = adapter.previewMint(
+    //         adapter.previewWithdraw(amount)
+    //     ) * 10;
+    //     _mintAssetAndApproveForAdapter(reqAssets, bob);
+    //     vm.prank(bob);
+    //     adapter.deposit(100000000, bob);
+    //     amount = 100000;
+
+    //     prop_previewWithdraw(bob, bob, bob, amount, testId);
+    // }
 
     /*//////////////////////////////////////////////////////////////
                           HARVEST
     //////////////////////////////////////////////////////////////*/
 
-    function test__harvest() public override {
-        uint256 performanceFee = 1e16;
-        uint256 hwm = 1e9;
+    // function test__harvest() public override {
+    //     uint256 performanceFee = 1e16;
+    //     uint256 hwm = 1e9;
 
-        _mintAssetAndApproveForAdapter(defaultAmount, bob);
+    //     _mintAssetAndApproveForAdapter(defaultAmount, bob);
 
-        vm.prank(bob);
-        adapter.deposit(defaultAmount, bob);
+    //     vm.prank(bob);
+    //     adapter.deposit(defaultAmount, bob);
 
-        uint256 oldTotalAssets = adapter.totalAssets();
-        adapter.setPerformanceFee(performanceFee);
-        increasePricePerShare(raise);
-        vm.warp(block.timestamp + 100);
+    //     uint256 oldTotalAssets = adapter.totalAssets();
+    //     adapter.setPerformanceFee(performanceFee);
+    //     increasePricePerShare(raise);
+    //     vm.warp(block.timestamp + 100);
 
+    //     uint256 gain = ((
+    //         adapter.highWaterMark() - adapter.convertToAssets(1e18)) * adapter.totalSupply()) / 1e18;
 
-        uint256 gain = ((
-            adapter.highWaterMark() - adapter.convertToAssets(1e18)) * adapter.totalSupply()) / 1e18;
+    //     uint256 fee = (gain * performanceFee) / 1e18;
 
-        uint256 fee = (gain * performanceFee) / 1e18;
+    //     uint256 expectedFee = adapter.convertToShares(fee);
 
-        uint256 expectedFee = adapter.convertToShares(fee);
+    //     vm.expectEmit(false, false, false, true, address(adapter));
 
-        vm.expectEmit(false, false, false, true, address(adapter));
+    //     emit Harvested();
 
-        emit Harvested();
+    //     adapter.harvest();
 
-        adapter.harvest();
+    //     // Multiply with the decimal offset
+    //     assertApproxEqAbs(
+    //         adapter.totalSupply(),
+    //         defaultAmount * 1e9 ,
+    //         _delta_,
+    //         "totalSupply"
+    //     );
 
-        // Multiply with the decimal offset
-        assertApproxEqAbs(
-            adapter.totalSupply(),
-            defaultAmount * 1e9 ,
-            _delta_,
-            "totalSupply"
-        );
-
-        assertApproxEqAbs(
-            adapter.balanceOf(feeRecipient),
-            0,
-            _delta_,
-            "expectedFee"
-        );
-    }
-
+    //     assertApproxEqAbs(
+    //         adapter.balanceOf(feeRecipient),
+    //         0,
+    //         _delta_,
+    //         "expectedFee"
+    //     );
+    // }
 
     /*//////////////////////////////////////////////////////////////
                               PAUSE
     //////////////////////////////////////////////////////////////*/
 
-    function test__unpause() public override {
-        uint defaultAmount = 1000000000;
-        _mintAssetAndApproveForAdapter(defaultAmount * 3, bob);
+    // function test__unpause() public override {
+    //     uint defaultAmount = 1000000000;
+    //     _mintAssetAndApproveForAdapter(defaultAmount * 3, bob);
 
-        vm.prank(bob);
-        adapter.deposit(defaultAmount, bob);
+    //     vm.prank(bob);
+    //     adapter.deposit(defaultAmount, bob);
 
-        uint256 oldTotalAssets = adapter.totalAssets();
-        uint256 oldTotalSupply = adapter.totalSupply();
-        uint256 oldIouBalance = iouBalance();
+    //     uint256 oldTotalAssets = adapter.totalAssets();
+    //     uint256 oldTotalSupply = adapter.totalSupply();
+    //     uint256 oldIouBalance = iouBalance();
 
-        adapter.pause();
-        adapter.unpause();
+    //     adapter.pause();
+    //     adapter.unpause();
 
-        // We simply deposit back into the external protocol
-        // TotalSupply and Assets dont change
-        // @dev overriden _delta_
-        assertApproxEqAbs(oldTotalAssets, adapter.totalAssets(), 5e6, "totalAssets");
-        assertApproxEqAbs(oldTotalSupply, adapter.totalSupply(), 50, "totalSupply");
-        assertApproxEqAbs(asset.balanceOf(address(adapter)), 0, 50, "asset balance");
-        assertApproxEqRel(iouBalance(), oldIouBalance, 4e18, "iou balance");
+    //     // We simply deposit back into the external protocol
+    //     // TotalSupply and Assets dont change
+    //     // @dev overriden _delta_
+    //     assertApproxEqAbs(oldTotalAssets, adapter.totalAssets(), 5e6, "totalAssets");
+    //     assertApproxEqAbs(oldTotalSupply, adapter.totalSupply(), 50, "totalSupply");
+    //     assertApproxEqAbs(asset.balanceOf(address(adapter)), 0, 50, "asset balance");
+    //     assertApproxEqRel(iouBalance(), oldIouBalance, 4e18, "iou balance");
 
-        // Deposit and mint dont revert
-        vm.startPrank(bob);
-        adapter.deposit(defaultAmount, bob);
-        //adapter.mint(defaultAmount, bob);
-    }
-
+    //     // Deposit and mint dont revert
+    //     vm.startPrank(bob);
+    //     adapter.deposit(defaultAmount, bob);
+    //     //adapter.mint(defaultAmount, bob);
+    // }
 }
