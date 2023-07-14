@@ -57,6 +57,7 @@ contract GmdAdapterTest is AbstractAdapterTest {
             externalRegistry,
             abi.encode(_poolId)
         );
+        defaultAmount = 1000000000000; //10 ** IERC20Metadata(address(asset)).decimals();
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -149,8 +150,6 @@ contract GmdAdapterTest is AbstractAdapterTest {
 
     // Verify that totalAssets returns the expected amount
     function verify_totalAssets() public override {
-        // Make sure totalAssets isnt 0
-        uint256 defaultAmount = 1000000000;
         deal(address(asset), bob, defaultAmount);
         vm.startPrank(bob);
         asset.approve(address(adapter), defaultAmount);
@@ -180,22 +179,6 @@ contract GmdAdapterTest is AbstractAdapterTest {
         // We compare assets here with maxWithdraw since the shares of withdraw will always be lower than `compoundDefaultAmount`
         // This tests the same assumption though. As long as you can withdraw less or equal assets to the input amount you cant round trip
         //assertGe(minFuzz, adapter.maxWithdraw(bob), testId);
-    }
-
-    function test__RT_deposit_redeem() public override {
-        uint defaultAmount = 1000000000;
-        _mintAssetAndApproveForAdapter(defaultAmount, bob);
-
-        vm.startPrank(bob);
-
-        uint256 shares = adapter.deposit(defaultAmount, bob);
-        uint256 assets = adapter.redeem(adapter.maxRedeem(bob), bob, bob);
-        vm.stopPrank();
-
-        // Pass the test if maxRedeem is smaller than deposit since round trips are impossible
-        if (adapter.maxRedeem(bob) == defaultAmount) {
-            assertLe(assets, defaultAmount, testId);
-        }
     }
 
 
@@ -271,7 +254,6 @@ contract GmdAdapterTest is AbstractAdapterTest {
         ) * 10;
         _mintAssetAndApproveForAdapter(reqAssets, bob);
         vm.prank(bob);
-        //amount = 100000000;
         adapter.deposit(100000000, bob);
         amount = 100000;
 
@@ -283,8 +265,6 @@ contract GmdAdapterTest is AbstractAdapterTest {
     //////////////////////////////////////////////////////////////*/
 
     function test__harvest() public override {
-        uint defaultAmount = 1000000000;
-
         uint256 performanceFee = 1e16;
         uint256 hwm = 1e9;
 
@@ -328,73 +308,10 @@ contract GmdAdapterTest is AbstractAdapterTest {
         );
     }
 
-    function test__disable_auto_harvest() public override {
-        adapter.toggleAutoHarvest();
-
-        assertFalse(adapter.autoHarvest());
-
-        uint lastHarvest = adapter.lastHarvest();
-
-        vm.warp(block.timestamp + 12);
-
-        uint256 defaultAmount = 1000000000;
-        _mintAssetAndApproveForAdapter(defaultAmount, bob);
-        vm.prank(bob);
-        adapter.deposit(defaultAmount, bob);
-
-        assertEq(lastHarvest, adapter.lastHarvest(), "should not auto harvest");
-    }
 
     /*//////////////////////////////////////////////////////////////
                               PAUSE
     //////////////////////////////////////////////////////////////*/
-
-    function test__pause() public override {
-        uint defaultAmount = 1000000000;
-        _mintAssetAndApproveForAdapter(defaultAmount, bob);
-
-        vm.prank(bob);
-        adapter.deposit(defaultAmount, bob);
-
-        uint256 oldTotalAssets = adapter.totalAssets();
-        uint256 oldTotalSupply = adapter.totalSupply();
-
-        adapter.pause();
-
-        // We simply withdraw into the adapter
-        // TotalSupply and Assets dont change
-        assertApproxEqAbs(
-            oldTotalAssets,
-            adapter.totalAssets(),
-            _delta_,
-            "totalAssets"
-        );
-        assertApproxEqAbs(
-            oldTotalSupply,
-            adapter.totalSupply(),
-            _delta_,
-            "totalSupply"
-        );
-        assertApproxEqAbs(
-            asset.balanceOf(address(adapter)),
-            oldTotalAssets,
-            _delta_,
-            "asset balance"
-        );
-        assertApproxEqAbs(iouBalance(), 0, _delta_, "iou balance");
-
-        vm.startPrank(bob);
-        // Deposit and mint are paused (maxDeposit/maxMint are set to 0 on pause)
-        vm.expectRevert();
-        adapter.deposit(defaultAmount, bob);
-
-        vm.expectRevert();
-        adapter.mint(defaultAmount, bob);
-
-        // Withdraw and Redeem dont revert
-        adapter.withdraw(defaultAmount / 10, bob, bob);
-        adapter.redeem(defaultAmount / 10, bob, bob);
-    }
 
     function test__unpause() public override {
         uint defaultAmount = 1000000000;
@@ -424,35 +341,4 @@ contract GmdAdapterTest is AbstractAdapterTest {
         //adapter.mint(defaultAmount, bob);
     }
 
-    /*//////////////////////////////////////////////////////////////
-                          MAX VIEWS
-    //////////////////////////////////////////////////////////////*/
-
-    // NOTE: These Are just prop tests currently. Override tests here if the adapter has unique max-functions which override AdapterBase.sol
-
-    function test__maxDeposit() public override {
-        prop_maxDeposit(bob);
-
-        // Deposit smth so withdraw on pause is not 0
-        uint256 defaultAmount = 1000000000;
-        _mintAsset(defaultAmount, address(this));
-        asset.approve(address(adapter), defaultAmount);
-        adapter.deposit(defaultAmount, address(this));
-
-        adapter.pause();
-        assertEq(adapter.maxDeposit(bob), 0);
-    }
-
-    function test__maxMint() public override {
-        prop_maxMint(bob);
-
-        // Deposit smth so withdraw on pause is not 0
-        uint256 defaultAmount = 1000000000;
-        _mintAsset(defaultAmount, address(this));
-        asset.approve(address(adapter), defaultAmount);
-        adapter.deposit(defaultAmount, address(this));
-
-        adapter.pause();
-        assertEq(adapter.maxMint(bob), 0);
-    }
 }
