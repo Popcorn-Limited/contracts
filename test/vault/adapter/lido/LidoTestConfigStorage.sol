@@ -6,7 +6,7 @@ pragma solidity ^0.8.15;
 import {ITestConfigStorage} from "../abstract/ITestConfigStorage.sol";
 
 struct LidoTestConfig {
-    address asset;
+    uint256 slippage;
     uint256 pid;
 }
 
@@ -15,12 +15,12 @@ contract LidoTestConfigStorage is ITestConfigStorage {
 
     constructor() {
         testConfigs.push(
-            LidoTestConfig(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2 , 1)
+            LidoTestConfig(1e16 , 1)
         );
     }
 
     function getTestConfig(uint256 i) public view returns (bytes memory) {
-        return abi.encode(testConfigs[i].asset, testConfigs[i].pid);
+        return abi.encode(testConfigs[i].slippage, testConfigs[i].pid);
     }
 
     function getTestConfigLength() public view returns (uint256) {

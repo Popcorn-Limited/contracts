@@ -25,8 +25,8 @@ contract LidoAdapterTest is AbstractAdapterTest {
     uint8 internal constant decimalOffset = 9;
     ICurveMetapool public constant StableSwapSTETH =
         ICurveMetapool(0xDC24316b9AE028F1497c275EB9192a3Ea0f67022);
-    uint256 public constant DENOMINATOR = 10000;
-    uint256 public slippageProtectionOut = 100; // = 100; //out of 10000. 100 = 1%
+    uint256 public constant DENOMINATOR = 1e18;
+    uint256 public slippageProtectionOut = 1e16; // = 100; //out of 10000. 100 = 1%
 
     function setUp() public {
         uint256 forkId = vm.createSelectFork(vm.rpcUrl("mainnet"));
@@ -55,10 +55,8 @@ contract LidoAdapterTest is AbstractAdapterTest {
     }
 
     function _setUpTest(bytes memory testConfig) internal {
-        (address _asset,) = abi.decode(testConfig, (address,uint256));
-
         setUpBaseTest(
-            IERC20(_asset),
+            IERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2), // WETH
             address(new LidoAdapter()),
             0x34dCd573C5dE4672C8248cd12A99f875Ca112Ad8,
             10,
@@ -223,7 +221,7 @@ contract LidoAdapterTest is AbstractAdapterTest {
         assertEq(
             IERC20Metadata(address(adapter)).name(),
             string.concat(
-                "Popcorn Lido ",
+                "VaultCraft Lido ",
                 IERC20Metadata(address(asset)).name(),
                 " Adapter"
             ),
@@ -231,7 +229,7 @@ contract LidoAdapterTest is AbstractAdapterTest {
         );
         assertEq(
             IERC20Metadata(address(adapter)).symbol(),
-            string.concat("popL-", IERC20Metadata(address(asset)).symbol()),
+            string.concat("vcLdo-", IERC20Metadata(address(asset)).symbol()),
             "symbol"
         );
 
