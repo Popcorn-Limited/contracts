@@ -57,7 +57,7 @@ contract GmdAdapterTest is AbstractAdapterTest {
             externalRegistry,
             abi.encode(_poolId)
         );
-        defaultAmount = 1000000000000; //10 ** IERC20Metadata(address(asset)).decimals();
+        defaultAmount = 1000000000000;
     }
 
     /*//////////////////////////////////////////////////////////////
