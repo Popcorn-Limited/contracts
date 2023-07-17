@@ -1,9 +1,9 @@
 pragma solidity ^0.8.15;
 
-import {VaultWithStrategy} from "./VaultWithStrategy.sol";
-import {BaseVaultInitData} from "./BaseVault.sol";
-import {IGauge, IMinter} from "./adapter/curve/ICurve.sol";
-import {ICurveRouter} from "../interfaces/external/curve/ICurveRouter.sol";
+import {VaultWithStrategy} from "../VaultWithStrategy.sol";
+import {BaseVaultInitData} from "../BaseVault.sol";
+import {IGauge, IMinter} from "../../adapter/curve/ICurve.sol";
+import {ICurveRouter} from "../../../interfaces/external/curve/ICurveRouter.sol";
 import {IERC20} from "openzeppelin-contracts/interfaces/IERC20.sol";
 import {IERC20Metadata} from "openzeppelin-contracts/interfaces/IERC20Metadata.sol";
 
