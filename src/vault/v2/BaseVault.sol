@@ -14,9 +14,9 @@ import {SafeERC20Upgradeable as SafeERC20} from
 import {ReentrancyGuardUpgradeable} from "openzeppelin-contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
 import {PausableUpgradeable} from "openzeppelin-contracts-upgradeable/security/PausableUpgradeable.sol";
-import {EIP165} from "../utils/EIP165.sol";
-import {OwnedUpgradeable} from "../utils/OwnedUpgradeable.sol";
-import {VaultFees} from "../interfaces/vault/IVault.sol";
+import {EIP165} from "../../utils/EIP165.sol";
+import {OwnedUpgradeable} from "../../utils/OwnedUpgradeable.sol";
+import {VaultFees} from "../../interfaces/vault/IVault.sol";
 
 struct BaseVaultInitData {
     address asset;
