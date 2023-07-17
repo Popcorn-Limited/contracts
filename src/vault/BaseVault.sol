@@ -74,7 +74,7 @@ abstract contract BaseVault is
      * @dev Each Adapter implementation should implement checks to make sure that the adapter is wrapping the underlying protocol correctly.
      * @dev If a strategy is provided, it will be verified to make sure it implements the required functions.
      */
-    function __BaseVault__init(BaseVaultInitData memory initData) internal onlyInitializing {
+    function __BaseVault__init(BaseVaultInitData calldata initData) internal onlyInitializing {
         __Owned_init(initData.owner);
         __Pausable_init();
         __ERC4626_init(IERC20Metadata(initData.asset));

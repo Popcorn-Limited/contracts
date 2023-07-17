@@ -47,16 +47,15 @@ contract CurveLPCompounder is VaultWithStrategy {
         _disableInitializers();
     }
 
-    function initialize(bytes calldata initData) external initializer {
+    function initialize(BaseVaultInitData calldata baseVaultInitData, bytes calldata initData) external initializer {
         // TODO: can we force the user to send BaseVaultInitData separately through the calldata?
         // The struct is the same for all the vaults. We shouldn't need to encode it
         (
-            BaseVaultInitData memory baseVaultInitData,
             address _gauge,
             address _minter,
             StrategyConfig memory _stratConfig
         ) = abi.decode(
-            initData, (BaseVaultInitData, address, address, StrategyConfig)
+            initData, (address, address, StrategyConfig)
         );
         __VaultWithStrategy__init(baseVaultInitData, _stratConfig.autoHarvest, _stratConfig.harvestCooldown);
         
