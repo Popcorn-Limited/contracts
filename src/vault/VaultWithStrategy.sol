@@ -21,7 +21,7 @@ abstract contract VaultWithStrategy is BaseVault {
         _disableInitializers();
     }
 
-    function __VaultWithStrategy__init(BaseVaultInitData memory initData, uint _autoHarvest, uint _harvestCooldown)
+    function __VaultWithStrategy__init(BaseVaultInitData calldata initData, uint _autoHarvest, uint _harvestCooldown)
         internal 
         onlyInitializing
     {
