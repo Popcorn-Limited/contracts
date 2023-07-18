@@ -28,7 +28,7 @@ contract BalancerLpCompounder is StrategyBase {
             address _vault,
             bytes32 _poolId,
             SwapKind _swapKind,
-            BatchSwapStruct[] memory _toBaseAssetPaths,
+            BatchSwapStruct[][] memory _toBaseAssetPaths,
             FundManagement memory _funds,
             address[] memory _tokens,
             bytes memory optionalData
@@ -40,14 +40,14 @@ contract BalancerLpCompounder is StrategyBase {
                     address,
                     bytes32,
                     SwapKind,
-                    BatchSwapStruct[],
+                    BatchSwapStruct[][],
                     FundManagement,
                     address[],
                     bytes
                 )
             );
 
-        _verifyRewardToken(_poolId, _baseAsset);
+        _verifyRewardToken(_toBaseAssetPaths, _baseAsset);
 
         _verifyAsset(
             _baseAsset,
@@ -63,7 +63,13 @@ contract BalancerLpCompounder is StrategyBase {
         address[] memory rewardTokens = IWithRewards(msg.sender).rewardTokens();
 
         uint256 len = rewardTokens.length;
-        for (uint256 i; i < len; i++) {}
+        for (uint256 i; i < len; i++) {
+            (IERC20[] memory tokens, , ) = IBalancerVault(_vault).getPoolTokens(
+                _toBaseAssetPaths[i].poolId
+            );
+            if (tokens[_toBaseAssetPaths[i].assetInIndex] != rewardTokens[i])
+                revert InvalidConfig();
+        }
     }
 
     function _verifyAsset(
@@ -85,7 +91,7 @@ contract BalancerLpCompounder is StrategyBase {
             address _vault,
             bytes32 _poolId,
             SwapKind _swapKind,
-            BatchSwapStruct[] memory _toBaseAssetPaths,
+            BatchSwapStruct[][] memory _toBaseAssetPaths,
             FundManagement memory _funds,
             address[] memory _tokens,
             bytes memory optionalData
@@ -97,7 +103,7 @@ contract BalancerLpCompounder is StrategyBase {
                     address,
                     bytes32,
                     SwapKind,
-                    BatchSwapStruct[],
+                    BatchSwapStruct[][],
                     FundManagement,
                     address[],
                     bytes
@@ -152,7 +158,7 @@ contract BalancerLpCompounder is StrategyBase {
             address _vault,
             bytes32 _poolId,
             SwapKind _swapKind,
-            BatchSwapStruct[][] memory _toBaseAssetPaths,
+            BatchSwapStruct[][][] memory _toBaseAssetPaths,
             FundManagement memory _funds,
             IAsset[] memory _tokens,
             bytes memory optionalData
@@ -164,7 +170,7 @@ contract BalancerLpCompounder is StrategyBase {
                     address,
                     bytes32,
                     SwapKind,
-                    BatchSwapStruct[][],
+                    BatchSwapStruct[][][],
                     FundManagement,
                     IAsset[],
                     bytes
@@ -193,7 +199,7 @@ contract BalancerLpCompounder is StrategyBase {
     function _swapToBaseAsset(
         address _vault,
         SwapKind _swapKind,
-        BatchSwapStruct[][] memory _toBaseAssetPaths,
+        BatchSwapStruct[][][] memory _toBaseAssetPaths,
         FundManagement memory _funds,
         IAsset[] memory _tokens
     ) internal {
