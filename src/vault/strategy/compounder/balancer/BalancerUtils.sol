@@ -6,6 +6,9 @@ import "src/utils/Path.sol";
 import {IERC20, IBalancerVault, SwapKind, BatchSwapStep, BatchSwapStruct, IAsset, FundManagement, JoinPoolRequest} from "../../../../interfaces/external/balancer/IBalancerVault.sol";
 import {IGauge} from "src/vault/adapter/balancer/IBalancer.sol";
 
+
+// TODO - delete this file
+
 library BalancerUtils {
     using Path for bytes;
 
@@ -30,8 +33,8 @@ library BalancerUtils {
         }
         return
             IBalancerVault(_vault).batchSwap(
-                _swapKind,
-                _swaps,
+                SwapKind.GIVEN_IN,
+                _swaps, 
                 _tokens,
                 _funds,
                 limits,
@@ -99,11 +102,6 @@ library BalancerUtils {
             userData,
             false
         );
-        IBalancerVault(_vault).joinPool(
-            _poolId,
-            address(this),
-            address(this),
-            request
-        );
+        
     }
 }

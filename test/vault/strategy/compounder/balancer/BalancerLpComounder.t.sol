@@ -9,6 +9,9 @@ import {BalancerLpCompounder, BalancerUtils, IBalancerVault, BatchSwapStruct, Sw
 import {Clones} from "openzeppelin-contracts/proxy/Clones.sol";
 import {MockStrategyClaimer} from "../../../../utils/mocks/MockStrategyClaimer.sol";
 
+
+// TODO - update test using the new BalancerLpCompounder
+
 contract BalancerLpCompounderTest is Test {
     address _vault = address(0xBA12222222228d8Ba445958a75a0704d566BF2C8);
     address _baseAsset = address(0x82aF49447D8a07e3bd95BD0d56f35241523fBab1);
