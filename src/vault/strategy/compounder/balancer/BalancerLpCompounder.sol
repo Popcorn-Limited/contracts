@@ -10,7 +10,7 @@ import {StrategyBase} from "../../StrategyBase.sol";
 import {BalancerUtils, IBalancerVault, SwapKind, BatchSwapStep, BatchSwapStruct, FundManagement, IAsset} from "./BalancerUtils.sol";
 import {IGauge, IMinter, IController} from "../../../adapter/balancer/IBalancer.sol";
 
-contract BalancerLpCompounder is StrategyBase {
+contract BalancerLpCompounder is BalancerCompounder {
     // Events
     event Harvest();
 
@@ -21,220 +21,83 @@ contract BalancerLpCompounder is StrategyBase {
                           VERIFICATION
     //////////////////////////////////////////////////////////////*/
 
-    function verifyAdapterCompatibility(bytes memory data) public override {
-        (
-            address _asset,
-            address _baseAsset,
-            address _vault,
-            bytes32 _poolId,
-            SwapKind _swapKind,
-            BatchSwapStruct[][] memory _toBaseAssetPaths,
-            FundManagement memory _funds,
-            address[] memory _tokens,
-            bytes memory optionalData
-        ) = abi.decode(
-                data,
-                (
-                    address,
-                    address,
-                    address,
-                    bytes32,
-                    SwapKind,
-                    BatchSwapStruct[][],
-                    FundManagement,
-                    address[],
-                    bytes
-                )
-            );
+    function _verifyAsset(
+        address baseAsset,
+        address asset,
+        BalancerRoute toAssetRoute,
+        bytes memory optionalData
+    ) internal virtual {
+        // Verify base asset to asset path
+        if (baseAsset != asset) {
+            // Verify that the first token in is the baseAsset
 
-        _verifyRewardToken(_toBaseAssetPaths, _baseAsset);
+            if (
+                toAssetRoute.assets[toAssetRoute.swaps[0].assetInIndex] !=
+                baseAsset
+            ) revert InvalidConfig();
 
-        _verifyAsset(
-            _baseAsset,
-            IAdapter(msg.sender).asset(),
-            _vault,
-            _poolId,
-            optionalData
-        );
-    }
-
-    function _verifyRewardToken(bytes32 _poolId, address _baseAsset) internal {
-        // Verify rewardToken + paths
-        address[] memory rewardTokens = IWithRewards(msg.sender).rewardTokens();
-
-        uint256 len = rewardTokens.length;
-        for (uint256 i; i < len; i++) {
-            (IERC20[] memory tokens, , ) = IBalancerVault(_vault).getPoolTokens(
-                _toBaseAssetPaths[i].poolId
-            );
-            if (tokens[_toBaseAssetPaths[i].assetInIndex] != rewardTokens[i])
-                revert InvalidConfig();
+            // Verify that the last token out is the asset
+            if (
+                toAssetRoute.assets[
+                    toAssetRoute
+                        .swaps[toAssetRoute.swaps.length - 1]
+                        .assetOutIndex
+                ] != asset
+            ) revert InvalidConfig();
         }
     }
-
-    function _verifyAsset(
-        address _baseAsset,
-        address _asset,
-        address _vault,
-        bytes32 _poolId,
-        bytes memory
-    ) internal virtual {}
 
     /*//////////////////////////////////////////////////////////////
                                 SETUP
     //////////////////////////////////////////////////////////////*/
 
-    function setUp(bytes memory data) public override {
-        (
-            address _asset,
-            address _baseAsset,
-            address _vault,
-            bytes32 _poolId,
-            SwapKind _swapKind,
-            BatchSwapStruct[][] memory _toBaseAssetPaths,
-            FundManagement memory _funds,
-            address[] memory _tokens,
-            bytes memory optionalData
-        ) = abi.decode(
-                data,
-                (
-                    address,
-                    address,
-                    address,
-                    bytes32,
-                    SwapKind,
-                    BatchSwapStruct[][],
-                    FundManagement,
-                    address[],
-                    bytes
-                )
-            );
-
-        _approveRewards(_vault);
-
-        _setUpAsset(
-            _baseAsset,
-            IAdapter(address(this)).asset(),
-            _vault,
-            optionalData
-        );
-    }
-
-    function _approveRewards(address router) internal {
-        // Approve all rewardsToken for trading
-        address[] memory rewardTokens = IWithRewards(address(this))
-            .rewardTokens();
-        uint256 len = rewardTokens.length;
-        for (uint256 i = 0; i < len; i++) {
-            IERC20(rewardTokens[i]).approve(router, type(uint256).max);
-        }
-    }
-
     function _setUpAsset(
-        address _baseAsset,
-        address _asset,
-        address _vault,
+        address baseAsset,
+        address asset,
+        address vault,
         bytes memory optionalData
     ) internal virtual {
-        // if (_baseAsset != _asset)
-        // IERC20(_baseAsset).approve(_vault, type(uint256).max);
-        IERC20(_baseAsset).approve(_vault, type(uint256).max);
-
-        IERC20(0x040d1EdC9569d4Bab2D15287Dc5A4F10F56a56B8).approve(
-            _vault,
-            type(uint256).max
-        );
+        if (asset != baseAsset)
+            IERC20(baseAsset).approve(vault, type(uint256).max);
     }
 
     /*//////////////////////////////////////////////////////////////
                           HARVEST LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    // Harvest rewards.
-    function harvest() public override {
-        (
-            address _asset,
-            address _baseAsset,
-            address _vault,
-            bytes32 _poolId,
-            SwapKind _swapKind,
-            BatchSwapStruct[][][] memory _toBaseAssetPaths,
-            FundManagement memory _funds,
-            IAsset[] memory _tokens,
-            bytes memory optionalData
-        ) = abi.decode(
-                IAdapter(address(this)).strategyConfig(),
-                (
-                    address,
-                    address,
-                    address,
-                    bytes32,
-                    SwapKind,
-                    BatchSwapStruct[][][],
-                    FundManagement,
-                    IAsset[],
-                    bytes
-                )
-            );
-
-        address asset = IAdapter(address(this)).asset();
-
-        uint256 balBefore = IERC20(asset).balanceOf(address(this));
-
-        IWithRewards(address(this)).claim();
-
-        _swapToBaseAsset(_vault, _swapKind, _toBaseAssetPaths, _funds, _tokens);
-
-        _getAsset(_baseAsset, _vault, _poolId);
-
-        // Deposit new assets into adapter
-        IAdapter(address(this)).strategyDeposit(
-            IERC20(asset).balanceOf(address(this)) - balBefore,
-            0
-        );
-
-        emit Harvest();
-    }
-
-    function _swapToBaseAsset(
-        address _vault,
-        SwapKind _swapKind,
-        BatchSwapStruct[][][] memory _toBaseAssetPaths,
-        FundManagement memory _funds,
-        IAsset[] memory _tokens
-    ) internal {
-        // Trade rewards for base asset
-        address[] memory rewardTokens = IWithRewards(address(this))
-            .rewardTokens();
-
-        uint256 len = rewardTokens.length;
-        for (uint256 i = 0; i < len; i++) {
-            uint256 rewardBal = IERC20(rewardTokens[i]).balanceOf(
+    function _getAsset(
+        address baseAsset,
+        address asset,
+        address vault,
+        BalancerRoute[] memory toAssetRoute,
+        bytes memory optionalData
+    ) internal virtual {
+        // Trade base asset for asset
+       
+            toAssetRoute.swaps.amount = IERC20(baseAsset).balanceOf(
                 address(this)
             );
-            if (rewardBal > 0) {
-                BatchSwapStep[] memory swaps = BalancerUtils
-                    .buildSwapStructArray(_toBaseAssetPaths[i], rewardBal);
 
-                BalancerUtils.swap(
-                    _vault,
-                    _swapKind,
-                    swaps,
-                    _tokens,
-                    _funds,
-                    int256(rewardBal)
-                );
-            }
+            JoinPoolRequest memory request = JoinPoolRequest(
+            _lpTokens,
+            amounts,
+            userData,
+            false
+        );
+
+            IBalancerVault(vault).batchSwap(
+                SwapKind.GIVEN_IN,
+                toAssetRoute.swaps,
+                toAssetRoute.assets,
+                FundManagement(
+                    address(this),
+                    false,
+                    payable(address(this)),
+                    false
+                ),
+                toAssetRoute.limits,
+                block.timestamp
+            );
         }
-    }
-
-    function _getAsset(
-        address _baseAsset,
-        address _vault,
-        bytes32 _poolId
-    ) internal virtual {
-        uint256 amountIn = IERC20(_baseAsset).balanceOf(address(this));
-
-        BalancerUtils.joinPool(_vault, _poolId, _baseAsset, amountIn);
     }
 }
