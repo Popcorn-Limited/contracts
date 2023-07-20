@@ -7,14 +7,10 @@ import {ERC4626Upgradeable as ERC4626, ERC20Upgradeable as ERC20, IERC20Upgradea
 import {IAdapter} from "../../../../interfaces/vault/IAdapter.sol";
 import {IWithRewards} from "../../../../interfaces/vault/IWithRewards.sol";
 import {StrategyBase} from "../../StrategyBase.sol";
-import {BalancerUtils, IBalancerVault, SwapKind, BatchSwapStep, BatchSwapStruct, FundManagement, IAsset} from "./BalancerUtils.sol";
-import {IGauge, IMinter, IController} from "../../../adapter/balancer/IBalancer.sol";
-
-
-// TODO - update imports
+import {IBalancerVault, SwapKind, IAsset, BatchSwapStep, FundManagement, JoinPoolRequest} from "../../../../interfaces/external/balancer/IBalancerVault.sol";
 
 struct BalancerRoute {
-    BatchSwapStruct[] swaps;
+    BatchSwapStep[] swaps;
     IAsset[] assets;
     int256[] limits;
 }
@@ -55,6 +51,7 @@ contract BalancerCompounder is StrategyBase {
         _verifyAsset(
             baseAsset,
             IAdapter(msg.sender).asset(),
+            vault,
             toAssetRoute,
             optionalData
         );
@@ -71,18 +68,22 @@ contract BalancerCompounder is StrategyBase {
         for (uint256 i; i < len; i++) {
             // Verify that the first token in is the rewardToken
             if (
-                toBaseAssetRoutes[i].assets[
-                    toBaseAssetRoutes[i].swaps[0].assetInIndex
-                ] != rewardTokens[i]
+                address(
+                    toBaseAssetRoutes[i].assets[
+                        toBaseAssetRoutes[i].swaps[0].assetInIndex
+                    ]
+                ) != rewardTokens[i]
             ) revert InvalidConfig();
 
             // Verify that the last token out is the baseAsset
             if (
-                toBaseAssetRoutes[i].assets[
-                    toBaseAssetRoutes[i]
-                        .swaps[toBaseAssetRoutes[i].swaps.length - 1]
-                        .assetOutIndex
-                ] != baseAsset
+                address(
+                    toBaseAssetRoutes[i].assets[
+                        toBaseAssetRoutes[i]
+                            .swaps[toBaseAssetRoutes[i].swaps.length - 1]
+                            .assetOutIndex
+                    ]
+                ) != baseAsset
             ) revert InvalidConfig();
         }
     }
@@ -90,7 +91,8 @@ contract BalancerCompounder is StrategyBase {
     function _verifyAsset(
         address baseAsset,
         address asset,
-        BalancerRoute toAssetRoute,
+        address,
+        BalancerRoute memory toAssetRoute,
         bytes memory optionalData
     ) internal virtual {
         // Verify base asset to asset path
@@ -98,17 +100,20 @@ contract BalancerCompounder is StrategyBase {
             // Verify that the first token in is the baseAsset
 
             if (
-                toAssetRoute.assets[toAssetRoute.swaps[0].assetInIndex] !=
-                baseAsset
+                address(
+                    toAssetRoute.assets[toAssetRoute.swaps[0].assetInIndex]
+                ) != baseAsset
             ) revert InvalidConfig();
 
             // Verify that the last token out is the asset
             if (
-                toAssetRoute.assets[
-                    toAssetRoute
-                        .swaps[toAssetRoute.swaps.length - 1]
-                        .assetOutIndex
-                ] != asset
+                address(
+                    toAssetRoute.assets[
+                        toAssetRoute
+                            .swaps[toAssetRoute.swaps.length - 1]
+                            .assetOutIndex
+                    ]
+                ) != asset
             ) revert InvalidConfig();
         }
     }
@@ -153,7 +158,7 @@ contract BalancerCompounder is StrategyBase {
             .rewardTokens();
         uint256 len = rewardTokens.length;
         for (uint256 i = 0; i < len; i++) {
-            IERC20(rewardTokens[i]).approve(router, type(uint256).max);
+            IERC20(rewardTokens[i]).approve(vault, type(uint256).max);
         }
     }
 
@@ -181,7 +186,7 @@ contract BalancerCompounder is StrategyBase {
             uint256[] memory minTradeAmounts,
             bytes memory optionalData
         ) = abi.decode(
-                data,
+                IAdapter(address(this)).strategyConfig(),
                 (
                     address,
                     address,
@@ -248,12 +253,12 @@ contract BalancerCompounder is StrategyBase {
         address baseAsset,
         address asset,
         address vault,
-        BalancerRoute[] memory toAssetRoute,
+        BalancerRoute memory toAssetRoute,
         bytes memory optionalData
     ) internal virtual {
         // Trade base asset for asset
         if (asset != baseAsset) {
-            toAssetRoute.swaps.amount = IERC20(baseAsset).balanceOf(
+            toAssetRoute.swaps[0].amount = IERC20(baseAsset).balanceOf(
                 address(this)
             );
 
