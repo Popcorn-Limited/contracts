@@ -58,7 +58,7 @@ contract BalancerLpCompounderTest is Test {
         BalancerRoute[] memory toBaseAssetRoutes = new BalancerRoute[](1);
         toBaseAssetRoutes[0] = BalancerRoute(swaps, assets, limits);
 
-        minTradeAmounts.push(uint256(0));
+        minTradeAmounts.push(uint256(100));
 
         adapter.initialize(
             abi.encode(
@@ -114,6 +114,29 @@ contract BalancerLpCompounderTest is Test {
         adapter.harvest();
 
         assertGt(adapter.totalAssets(), oldTa);
+    }
+
+    function test__should_trade_whole_balance() public {
+        // when trading, it should use all the available funds
+        vm.warp(block.timestamp + 30 days);
+
+        adapter.harvest();
+
+        assertEq(IERC20(bal).balanceOf(address(this)), 0, "should trade whole balance");
+    }
+
+    function test__should_hold_no_tokens() public {
+        // after trading, the adapter shouldn't hold any additional assets.
+        // The funds it got from the trade should be deposited.
+        // so oldBalance = newBalance for the underlying asset
+        uint oldBal = IERC20(asset).balanceOf(address(adapter));
+
+        vm.warp(block.timestamp + 30 days);
+
+        adapter.harvest();
+
+        uint newBal = IERC20(asset).balanceOf(address(adapter));
+        assertEq(oldBal, newBal, "shouldn't hold any assets in adapter");
     }
 
     function test__claim() public {
