@@ -137,7 +137,14 @@ contract LidoAdapter is AdapterBase {
     function previewRedeem(
         uint256 shares
     ) public view override returns (uint256) {
-        uint256 assets = _convertToAssets(shares, Math.Rounding.Down);
+        uint256 assets = _convertToAssets(shares, Math.Rounding.Up);
+        return assets; //+ assets.mulDiv(slippage, 1e18, Math.Rounding.Up);
+    }
+
+    function previewRedeemWithSlippage(
+        uint256 shares
+    ) public view returns (uint256) {
+        uint256 assets = _convertToAssets(shares, Math.Rounding.Up);
         return assets + assets.mulDiv(slippage, 1e18, Math.Rounding.Up);
     }
 
@@ -167,4 +174,30 @@ contract LidoAdapter is AdapterBase {
         );
         weth.deposit{value: amountRecieved}(); // get wrapped eth back
     }
+
+    function _withdraw(
+        address caller,
+        address receiver,
+        address owner,
+        uint256 assets,
+        uint256 shares
+    ) internal virtual override {
+        if (caller != owner) {
+            _spendAllowance(owner, caller, shares);
+        }
+
+        if (!paused()) {
+            _protocolWithdraw(previewRedeemWithSlippage(shares), shares);
+        }
+
+        _burn(owner, shares);
+
+        IERC20(asset()).safeTransfer(receiver, assets);
+
+        if (autoHarvest) harvest();
+
+        emit Withdraw(caller, receiver, owner, assets, shares);
+    }
+
+
 }
