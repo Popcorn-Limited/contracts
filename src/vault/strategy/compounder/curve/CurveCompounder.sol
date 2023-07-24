@@ -164,11 +164,13 @@ contract CurveCompounder is StrategyBase {
                 IAdapter(address(this)).strategyConfig(),
                 (address, address, CurveRoute[], CurveRoute, uint256[], bytes)
             );
+
         address asset = IAdapter(address(this)).asset();
 
         uint256 balBefore = IERC20(asset).balanceOf(address(this));
 
         IWithRewards(address(this)).claim();
+        
         _swapToBaseAsset(router, toBaseAssetRoutes, minTradeAmounts);
 
         // if reward token balance is < minTradeAmounts, we won't trade any reward tokens for the base asset.
