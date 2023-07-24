@@ -10,8 +10,6 @@ contract BalancerLpCompounder is BalancerCompounder {
                           VERIFICATION
     //////////////////////////////////////////////////////////////*/
 
-    event log_uint(uint256);
-
     function _verifyAsset(
         address baseAsset,
         address asset,
