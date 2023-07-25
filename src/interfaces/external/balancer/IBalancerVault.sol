@@ -7,6 +7,8 @@ enum SwapKind {
     GIVEN_OUT
 }
 
+interface IAsset {}
+
 struct BatchSwapStep {
     bytes32 poolId;
     uint256 assetInIndex;
@@ -15,23 +17,15 @@ struct BatchSwapStep {
     bytes userData;
 }
 
-struct BatchSwapStruct {
-    bytes32 poolId;
-    uint256 assetInIndex;
-    uint256 assetOutIndex;
-}
-
-interface IAsset {}
-
 struct FundManagement {
     address sender;
-    bool fromInternalBalancer;
+    bool fromInternalBalance;
     address payable recipient;
     bool toInternalBalance;
 }
 
 struct JoinPoolRequest {
-    IAsset[] assets;
+    address[] assets;
     uint256[] maxAmountsIn;
     bytes userData;
     bool fromInternalBalance;
@@ -39,11 +33,11 @@ struct JoinPoolRequest {
 
 interface IBalancerVault {
     function batchSwap(
-        SwapKind _kind,
-        BatchSwapStep[] memory _swaps,
-        IAsset[] memory _assets,
-        FundManagement memory _funds,
-        int256[] memory _limits,
+        SwapKind kind,
+        BatchSwapStep[] memory swaps,
+        IAsset[] memory assets,
+        FundManagement memory funds,
+        int256[] memory limits,
         uint256 deadline
     ) external returns (int256[] memory assetDeltas);
 
@@ -53,10 +47,14 @@ interface IBalancerVault {
         external
         view
         returns (
-            IERC20[] memory tokens,
+            address[] memory tokens,
             uint256[] memory balances,
             uint256 lastChangeBlock
         );
+
+    function getPool(
+        bytes32 poolId
+    ) external view returns (address lpToken, uint8 numTokens);
 
     function joinPool(
         bytes32 poolId,

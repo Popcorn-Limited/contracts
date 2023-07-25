@@ -35,10 +35,7 @@ contract BalancerGaugeAdapter is AdapterBase, WithRewards {
     ) external initializer {
         address _gauge = abi.decode(balancerInitData, (address));
 
-        // address controller = IMinter(registry).getGaugeController();
-        // if (!IController(controller).gauge_exists(_gauge)) revert Disabled();
-
-        // if (IGauge(_gauge).is_killed()) revert Disabled();
+        if (IGauge(_gauge).is_killed()) revert Disabled();
 
         balMinter = IMinter(registry);
         gauge = IGauge(_gauge);
