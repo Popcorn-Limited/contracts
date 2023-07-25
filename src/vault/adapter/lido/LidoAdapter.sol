@@ -129,7 +129,7 @@ contract LidoAdapter is AdapterBase {
     ) public view override returns (uint256) {
         return
             _convertToShares(
-                assets + assets.mulDiv(slippage, 1e18, Math.Rounding.Up),
+                StableSwapSTETH.get_dy(STETHID, WETHID, assets + _getSlippage(assets)),
                 Math.Rounding.Up
             );
     }
@@ -138,15 +138,15 @@ contract LidoAdapter is AdapterBase {
         uint256 shares
     ) public view override returns (uint256) {
         uint256 assets = _convertToAssets(shares, Math.Rounding.Up);
-        return assets; //+ assets.mulDiv(slippage, 1e18, Math.Rounding.Up);
+        return StableSwapSTETH.get_dy(STETHID, WETHID, assets + _getSlippage(assets));
     }
 
-    function previewRedeemWithSlippage(
-        uint256 shares
-    ) public view returns (uint256) {
-        uint256 assets = _convertToAssets(shares, Math.Rounding.Up);
-        return assets + assets.mulDiv(slippage, 1e18, Math.Rounding.Up);
-    }
+//    function previewRedeemWithSlippage(
+//        uint256 shares
+//    ) public view returns (uint256) {
+//        uint256 assets = _convertToAssets(shares, Math.Rounding.Up);
+//        return assets + assets.mulDiv(slippage, 1e18, Math.Rounding.Up);
+//    }
 
     /*//////////////////////////////////////////////////////////////
                           INTERNAL HOOKS LOGIC
@@ -170,7 +170,7 @@ contract LidoAdapter is AdapterBase {
             STETHID,
             WETHID,
             assets,
-            0
+            _getSlippage(assets)
         );
         weth.deposit{value: amountRecieved}(); // get wrapped eth back
     }
@@ -187,17 +187,19 @@ contract LidoAdapter is AdapterBase {
         }
 
         if (!paused()) {
-            _protocolWithdraw(previewRedeemWithSlippage(shares), shares);
+            _protocolWithdraw(assets, shares);
         }
 
         _burn(owner, shares);
 
-        IERC20(asset()).safeTransfer(receiver, assets);
+        IERC20(asset()).safeTransfer(receiver, StableSwapSTETH.get_dy(STETHID, WETHID, assets));
 
         if (autoHarvest) harvest();
 
         emit Withdraw(caller, receiver, owner, assets, shares);
     }
 
-
+    function _getSlippage(uint256 assets) private view returns(uint256) {
+        return assets.mulDiv(slippage, 1e18, Math.Rounding.Up);
+    }
 }

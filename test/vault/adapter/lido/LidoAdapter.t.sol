@@ -133,13 +133,20 @@ contract LidoAdapterTest is AbstractAdapterTest {
         address owner,
         uint256 assets,
         string memory testPreFix
-    ) public virtual override returns (uint256 paid, uint256 received) {
+    ) public override returns (uint256 paid, uint256 received) {
         uint256 oldReceiverAsset = IERC20(_asset_).balanceOf(caller);
         uint256 oldOwnerShare = IERC20(_vault_).balanceOf(owner);
         uint256 oldAllowance = IERC20(_vault_).allowance(owner, caller);
 
         vm.prank(caller);
         uint256 shares = IERC4626(_vault_).withdraw(assets, caller, owner);
+
+        assertTrue(
+            caller == owner ||
+            oldAllowance != 0 ||
+            (shares == 0 && assets == 0),
+            string.concat("access control", testPreFix)
+        );
 
         uint256 newReceiverAsset = IERC20(_asset_).balanceOf(caller);
         uint256 newOwnerShare = IERC20(_vault_).balanceOf(owner);
@@ -151,7 +158,6 @@ contract LidoAdapterTest is AbstractAdapterTest {
             _delta_,
             string.concat("share", testPreFix)
         );
-        // assertApproxEqAbs(newReceiverAsset, oldReceiverAsset + assets, _delta_, string.concat("asset", testPreFix)); // NOTE: this may fail if the receiver is a contract in which the asset is stored
         if (caller != owner && oldAllowance != type(uint256).max)
             assertApproxEqAbs(
                 newAllowance,
@@ -159,23 +165,23 @@ contract LidoAdapterTest is AbstractAdapterTest {
                 _delta_,
                 string.concat("allowance", testPreFix)
             );
-
         assertTrue(
             caller == owner ||
-                oldAllowance != 0 ||
-                (shares == 0 && assets == 0),
+            oldAllowance != 0 ||
+            (shares == 0 && assets == 0),
             string.concat("access control", testPreFix)
         );
 
         return (shares, assets);
     }
 
+    // Simplifing it here a little to avoid `Stack to Deep` - Caller = Receiver
     function prop_redeem(
         address caller,
         address owner,
         uint256 shares,
         string memory testPreFix
-    ) public virtual override returns (uint256 paid, uint256 received) {
+    ) public override returns (uint256 paid, uint256 received) {
         uint256 oldReceiverAsset = IERC20(_asset_).balanceOf(caller);
         uint256 oldOwnerShare = IERC20(_vault_).balanceOf(owner);
         uint256 oldAllowance = IERC20(_vault_).allowance(owner, caller);
@@ -193,7 +199,12 @@ contract LidoAdapterTest is AbstractAdapterTest {
             _delta_,
             string.concat("share", testPreFix)
         );
-        // assertApproxEqAbs(newReceiverAsset, oldReceiverAsset + assets, _delta_, string.concat("asset", testPreFix)); // NOTE: this may fail if the receiver is a contract in which the asset is stored
+        assertApproxEqAbs(
+            newReceiverAsset,
+            oldReceiverAsset + StableSwapSTETH.get_dy(STETHID, WETHID, assets),
+            _delta_,
+            string.concat("asset", testPreFix)
+        ); // NOTE: this may fail if the receiver is a contract in which the asset is stored
         if (caller != owner && oldAllowance != type(uint256).max)
             assertApproxEqAbs(
                 newAllowance,
@@ -204,8 +215,8 @@ contract LidoAdapterTest is AbstractAdapterTest {
 
         assertTrue(
             caller == owner ||
-                oldAllowance != 0 ||
-                (shares == 0 && assets == 0),
+            oldAllowance != 0 ||
+            (shares == 0 && assets == 0),
             string.concat("access control", testPreFix)
         );
 
@@ -334,5 +345,56 @@ contract LidoAdapterTest is AbstractAdapterTest {
         // Withdraw and Redeem dont revert
         adapter.withdraw(defaultAmount / 10, bob, bob);
         adapter.redeem(defaultAmount / 10, bob, bob);
+    }
+
+//    function test__RT_deposit_withdraw() public override {
+//        _mintAssetAndApproveForAdapter(defaultAmount, bob);
+//
+//        vm.startPrank(bob);
+//        uint256 shares1 = adapter.deposit(defaultAmount, bob);
+//        emit log_named_uint("defaultAmount", defaultAmount);
+//        emit log_named_uint("shares1", shares1);
+//        emit log_named_uint("maxWithdraw", adapter.maxWithdraw(bob));
+//        uint256 shares2 = adapter.withdraw(adapter.maxWithdraw(bob), bob, bob);
+//        vm.stopPrank();
+//
+//        // Pass the test if maxWithdraw is smaller than deposit since round trips are impossible
+//        if (adapter.maxWithdraw(bob) == defaultAmount) {
+//            assertGe(shares2, shares1, testId);
+//        }
+//    }
+
+    function test__my_log() public {
+        IERC20 stETH = IERC20(StableSwapSTETH.coins(1));
+        _mintAssetAndApproveForAdapter(10**20, bob);
+
+        vm.startPrank(bob);
+        adapter.deposit(10**20, bob);
+
+        uint256 stETHBefore = stETH.balanceOf(address(adapter));
+        uint256 assetsAdapterBefore = asset.balanceOf(address(adapter));
+        uint256 assetsBefore = asset.balanceOf(bob);
+        uint256 sharesBefore = adapter.balanceOf(bob);
+
+        uint256 previewWithdraw = adapter.previewWithdraw(10**18);
+        uint256 withdrawn = adapter.withdraw(10**18, bob, bob);
+
+        uint256 assetsAfter = asset.balanceOf(bob);
+        uint256 assetsAdapterAfter = asset.balanceOf(address(adapter));
+        uint256 stETHAfter = stETH.balanceOf(address(adapter));
+        uint256 sharesAfter = adapter.balanceOf(bob);
+        vm.stopPrank();
+
+        emit log_named_uint("previewWithdraw", previewWithdraw);
+        emit log_named_uint("withdrawn", withdrawn);
+        emit log_named_uint("assetsBefore", assetsBefore);
+        emit log_named_uint("assetsAfter", assetsAfter);
+//        emit log_named_uint("stETHBefore", stETHBefore);
+//        emit log_named_uint("stETHAfter", stETHAfter);
+        emit log_named_uint("assetsAdapterBefore", assetsAdapterBefore);
+        emit log_named_uint("assetsAdapterAfter", assetsAdapterAfter);
+        emit log_named_uint("sharesBefore", sharesBefore);
+        emit log_named_uint("sharesAfter", sharesAfter);
+        emit log_named_uint("decimals", adapter.decimals());
     }
 }
