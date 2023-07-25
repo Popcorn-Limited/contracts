@@ -273,7 +273,6 @@ contract AbstractAdapterTest is PropertyTest {
 
     function test__previewRedeem(uint8 fuzzAmount) public virtual {
         uint256 amount = bound(uint256(fuzzAmount), minShares, maxShares);
-
         uint256 reqAssets = adapter.previewMint(amount) * 10;
         _mintAssetAndApproveForAdapter(reqAssets, bob);
         vm.prank(bob);

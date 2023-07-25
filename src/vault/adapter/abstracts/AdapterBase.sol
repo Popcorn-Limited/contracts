@@ -155,7 +155,7 @@ abstract contract AdapterBase is
         // revert Test(assets, IERC20(asset()).balanceOf(address(this)));
 
         //// This works for RT_deposit_withdraw & RT_deposit_redeem
-        IERC20(asset()).safeTransfer(receiver, assets - 6.7e13);
+        IERC20(asset()).safeTransfer(receiver, assets);
 
         //// This works for RT_mint_withdraw & RT_mint_redeem
         // IERC20(asset()).safeTransfer(receiver, assets - 1450);

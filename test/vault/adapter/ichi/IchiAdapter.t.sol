@@ -24,6 +24,7 @@ contract IchiAdapterTest is AbstractAdapterTest {
     address public uniRouter;
     IUniV3Pool public uniPool;
     uint24 public uniSwapFee;
+    uint256 public slippage;
 
     function setUp() public {
         uint256 forkId = vm.createSelectFork(vm.rpcUrl("polygon"));
@@ -46,16 +47,19 @@ contract IchiAdapterTest is AbstractAdapterTest {
             address _depositGuard,
             address _vaultDeployer,
             address _uniRouter,
-            uint24 _uniSwapFee
+            uint24 _uniSwapFee,
+            uint256 _slippage
         ) = abi.decode(
                 testConfig,
-                (uint256, address, address, address, uint24)
+                (uint256, address, address, address, uint24, uint256)
             );
 
         pid = _pid;
         vaultDeployer = _vaultDeployer;
         uniRouter = _uniRouter;
         uniSwapFee = _uniSwapFee;
+
+        slippage = _slippage;
 
         depositGuard = IDepositGuard(_depositGuard);
         vaultFactory = IVaultFactory(depositGuard.ICHIVaultFactory());
@@ -87,6 +91,16 @@ contract IchiAdapterTest is AbstractAdapterTest {
             externalRegistry,
             testConfig
         );
+
+        defaultAmount = 1e18;
+
+        minFuzz = 1e18;
+        minShares = 1e27;
+
+        raise = defaultAmount * 100_000;
+
+        maxAssets = minFuzz * 10;
+        maxShares = minShares * 10;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -224,123 +238,133 @@ contract IchiAdapterTest is AbstractAdapterTest {
         );
     }
 
-    /*//////////////////////////////////////////////////////////////
-                          SETUP OVERRIDES
-    //////////////////////////////////////////////////////////////*/
+    function test__harvest() public override {
+        uint256 performanceFee = 1e16;
+        uint256 hwm = 1e9;
 
-    function setUpBaseTest(
-        IERC20 asset_,
-        address implementation_,
-        address externalRegistry_,
-        uint256 delta_,
-        string memory baseTestId_,
-        bool useStrategy_
-    ) public override {
-        asset = asset_;
+        _mintAssetAndApproveForAdapter(defaultAmount, bob);
 
-        implementation = implementation_;
-        adapter = IAdapter(Clones.clone(implementation_));
-        externalRegistry = externalRegistry_;
+        vm.prank(bob);
+        adapter.deposit(defaultAmount, bob);
 
-        // Setup PropertyTest
-        _vault_ = address(adapter);
-        _asset_ = address(asset_);
-        _delta_ = delta_;
+        uint256 oldTotalAssets = adapter.totalAssets();
+        adapter.setPerformanceFee(performanceFee);
 
-        defaultAmount = 10 ** IERC20Metadata(address(asset_)).decimals();
+        increasePricePerShare(raise);
+        generateUniV3Fees();
+        distributeIchiFees();
 
-        raise = defaultAmount;
-        maxAssets = defaultAmount * 100;
-        maxShares = maxAssets / 2;
+        uint256 gain = ((adapter.convertToAssets(1e18) -
+            adapter.highWaterMark()) * adapter.totalSupply()) / 1e18;
+        uint256 fee = (gain * performanceFee) / 1e18;
 
-        baseTestId = baseTestId_;
-        testId = string.concat(
-            baseTestId_,
-            IERC20Metadata(address(asset)).symbol()
+        uint256 expectedFee = adapter.convertToShares(fee);
+
+        vm.expectEmit(false, false, false, true, address(adapter));
+
+        emit Harvested();
+
+        adapter.harvest();
+
+        // Multiply with the decimal offset
+        assertApproxEqAbs(
+            adapter.totalSupply(),
+            defaultAmount * 1e9 + expectedFee,
+            _delta_,
+            "totalSupply"
         );
-
-        if (useStrategy_) strategy = IStrategy(address(new MockStrategy()));
+        assertApproxEqAbs(
+            adapter.balanceOf(feeRecipient),
+            expectedFee,
+            _delta_,
+            "expectedFee"
+        );
     }
 
-    /*//////////////////////////////////////////////////////////////
-                          TESTING OVERRIDES
-    //////////////////////////////////////////////////////////////*/
-
-    function test__RT_deposit_withdraw() public override {
+    function test__pause() public override {
         _mintAssetAndApproveForAdapter(defaultAmount, bob);
 
+        vm.prank(bob);
+        adapter.deposit(defaultAmount, bob);
+
+        uint256 oldTotalAssets = adapter.totalAssets();
+        uint256 oldTotalSupply = adapter.totalSupply();
+
+        adapter.pause();
+
+        // We simply withdraw into the adapter
+        // TotalSupply and Assets dont change
+        assertApproxEqAbs(
+            oldTotalAssets,
+            adapter.totalAssets(),
+            slippage,
+            "totalAssets"
+        );
+        assertApproxEqAbs(
+            oldTotalSupply,
+            adapter.totalSupply(),
+            slippage,
+            "totalSupply"
+        );
+        assertApproxEqAbs(
+            asset.balanceOf(address(adapter)),
+            oldTotalAssets,
+            slippage,
+            "asset balance"
+        );
+        assertApproxEqAbs(iouBalance(), 0, slippage, "iou balance");
+
         vm.startPrank(bob);
-        uint256 shares1 = adapter.deposit(defaultAmount, bob);
-        vm.stopPrank();
+        // Deposit and mint are paused (maxDeposit/maxMint are set to 0 on pause)
+        vm.expectRevert();
+        adapter.deposit(defaultAmount, bob);
 
-        generateUniV3Fees();
-        distributeIchiFees();
+        vm.expectRevert();
+        adapter.mint(defaultAmount, bob);
 
-        vm.startPrank(bob);
-        uint256 shares2 = adapter.withdraw(adapter.maxWithdraw(bob), bob, bob);
-        vm.stopPrank();
-
-        // Pass the test if maxWithdraw is smaller than deposit since round trips are impossible
-        if (adapter.maxWithdraw(bob) == defaultAmount) {
-            assertGe(shares2, shares1, testId);
-        }
+        // Withdraw and Redeem dont revert
+        adapter.withdraw(defaultAmount / 10, bob, bob);
+        adapter.redeem(defaultAmount / 10, bob, bob);
     }
 
-    function test__RT_deposit_redeem() public override {
-        _mintAssetAndApproveForAdapter(defaultAmount, bob);
+    function test__unpause() public override {
+        _mintAssetAndApproveForAdapter(defaultAmount * 3, bob);
 
+        vm.prank(bob);
+        adapter.deposit(defaultAmount, bob);
+
+        uint256 oldTotalAssets = adapter.totalAssets();
+        uint256 oldTotalSupply = adapter.totalSupply();
+        uint256 oldIouBalance = iouBalance();
+
+        adapter.pause();
+        adapter.unpause();
+
+        // We simply deposit back into the external protocol
+        // TotalSupply and Assets dont change
+        assertApproxEqAbs(
+            oldTotalAssets,
+            adapter.totalAssets(),
+            slippage,
+            "totalAssets"
+        );
+        assertApproxEqAbs(
+            oldTotalSupply,
+            adapter.totalSupply(),
+            slippage,
+            "totalSupply"
+        );
+        assertApproxEqAbs(
+            asset.balanceOf(address(adapter)),
+            0,
+            slippage,
+            "asset balance"
+        );
+        assertApproxEqAbs(iouBalance(), oldIouBalance, slippage, "iou balance");
+
+        // Deposit and mint dont revert
         vm.startPrank(bob);
-        uint256 shares = adapter.deposit(defaultAmount, bob);
-        vm.stopPrank();
-
-        generateUniV3Fees();
-        distributeIchiFees();
-
-        vm.startPrank(bob);
-        uint256 assets = adapter.redeem(adapter.maxRedeem(bob), bob, bob);
-        vm.stopPrank();
-
-        // Pass the test if maxRedeem is smaller than deposit since round trips are impossible
-        if (adapter.maxRedeem(bob) == defaultAmount) {
-            assertLe(assets, defaultAmount, testId);
-        }
-    }
-
-    function test__RT_mint_withdraw() public override {
-        _mintAssetAndApproveForAdapter(adapter.previewMint(defaultAmount), bob);
-
-        vm.startPrank(bob);
-        uint256 assets = adapter.mint(defaultAmount, bob);
-        vm.stopPrank();
-
-        generateUniV3Fees();
-        distributeIchiFees();
-
-        vm.startPrank(bob);
-        uint256 shares = adapter.withdraw(adapter.maxWithdraw(bob), bob, bob);
-        vm.stopPrank();
-
-        if (adapter.maxWithdraw(bob) == assets) {
-            assertGe(shares, defaultAmount, testId);
-        }
-    }
-
-    function test__RT_mint_redeem() public override {
-        _mintAssetAndApproveForAdapter(adapter.previewMint(defaultAmount), bob);
-
-        vm.startPrank(bob);
-        uint256 assets1 = adapter.mint(defaultAmount, bob);
-        vm.stopPrank();
-
-        generateUniV3Fees();
-        distributeIchiFees();
-
-        vm.startPrank(bob);
-        uint256 assets2 = adapter.redeem(adapter.maxRedeem(bob), bob, bob);
-        vm.stopPrank();
-
-        if (adapter.maxRedeem(bob) == defaultAmount) {
-            assertLe(assets2, assets1, testId);
-        }
+        adapter.deposit(defaultAmount, bob);
+        adapter.mint(defaultAmount * 1e9, bob);
     }
 }

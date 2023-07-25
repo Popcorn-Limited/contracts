@@ -60,7 +60,7 @@ contract IchiAdapter is AdapterBase, WithRewards {
     /// @notice Uniswap alternate token -> asset swapfee
     uint24 public uniSwapFee;
 
-    uint256 public constant SLIPPAGE = 1e15;
+    uint256 public slippage;
 
     /*//////////////////////////////////////////////////////////////
                             INITIALIZATION
@@ -87,10 +87,11 @@ contract IchiAdapter is AdapterBase, WithRewards {
             address _depositGuard,
             address _vaultDeployer,
             address _uniRouter,
-            uint24 _uniSwapFee
+            uint24 _uniSwapFee,
+            uint256 _slippage
         ) = abi.decode(
                 ichiInitData,
-                (uint256, address, address, address, uint24)
+                (uint256, address, address, address, uint24, uint256)
             );
 
         // if (!IPermissionRegistry(registry).endorsed(_gauge))
@@ -100,6 +101,8 @@ contract IchiAdapter is AdapterBase, WithRewards {
         vaultDeployer = _vaultDeployer;
         uniRouter = _uniRouter;
         uniSwapFee = _uniSwapFee;
+
+        slippage = _slippage;
 
         depositGuard = IDepositGuard(_depositGuard);
         vaultFactory = IVaultFactory(depositGuard.ICHIVaultFactory());
@@ -184,7 +187,9 @@ contract IchiAdapter is AdapterBase, WithRewards {
 
         uint256 oppositePairInAssetPairTerms = oppositePairAmount * priceRatio;
 
-        return assetPairAmount + oppositePairInAssetPairTerms;
+        uint256 tempAssets = assetPairAmount + oppositePairInAssetPairTerms;
+
+        return tempAssets - tempAssets.mulDiv(slippage, 1e18, Math.Rounding.Up);
     }
 
     function calculateUnderlyingShares(
@@ -226,6 +231,23 @@ contract IchiAdapter is AdapterBase, WithRewards {
                 );
     }
 
+    // function previewWithdraw(
+    //     uint256 assets
+    // ) public view override returns (uint256) {
+    //     return
+    //         _convertToShares(
+    //             assets + assets.mulDiv(slippage, 1e18, Math.Rounding.Up),
+    //             Math.Rounding.Up
+    //         );
+    // }
+
+    // function previewRedeem(
+    //     uint256 shares
+    // ) public view override returns (uint256) {
+    //     uint256 assets = _convertToAssets(shares, Math.Rounding.Down);
+    //     return assets - assets.mulDiv(slippage, 1e18, Math.Rounding.Up);
+    // }
+
     /*//////////////////////////////////////////////////////////////
                           INTERNAL HOOKS LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -248,30 +270,29 @@ contract IchiAdapter is AdapterBase, WithRewards {
         );
     }
 
-    event logUint(uint256);
-
-    function previewWithdraw(
-        uint256 assets
-    ) public view virtual override returns (uint256) {
-        return
-            _convertToShares(
-                assets + assets.mulDiv(SLIPPAGE, 1e18, Math.Rounding.Up),
-                Math.Rounding.Up
-            );
-    }
+    event log_named_uint(string, uint256);
 
     function _protocolWithdraw(
         uint256 amount,
         uint256 shares
     ) internal override {
         uint256 ichiShares = convertToUnderlyingShares(0, shares);
+        emit log_named_uint("ichiShares", ichiShares);
+
         (uint256 amount0, uint256 amount1) = vault.withdraw(
             ichiShares,
             address(this)
         );
+        emit log_named_uint("amount0", amount0);
+        emit log_named_uint("amount1", amount1);
 
         address oppositePair = assetIndex == 0 ? token1 : token0;
         uint256 oppositePairAmount = assetIndex == 0 ? amount1 : amount0;
+        emit log_named_uint("oppositePairAmount", oppositePairAmount);
+        emit log_named_uint(
+            "asset bal",
+            IERC20(asset()).balanceOf(address(this))
+        );
 
         if (oppositePairAmount > 0) {
             UniswapV3Utils.swap(
@@ -282,7 +303,10 @@ contract IchiAdapter is AdapterBase, WithRewards {
                 oppositePairAmount
             );
         }
-        emit logUint(IERC20(asset()).balanceOf(address(this)));
+        emit log_named_uint(
+            "asset bal2",
+            IERC20(asset()).balanceOf(address(this))
+        );
     }
 
     /*//////////////////////////////////////////////////////////////
