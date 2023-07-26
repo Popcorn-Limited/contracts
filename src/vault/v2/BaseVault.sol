@@ -224,7 +224,7 @@ abstract contract BaseVault is
     /**
      * @notice Total amount of underlying `asset` token managed by adapter through the underlying protocol.
      */
-    function _totalAssets() internal view virtual returns (uint256) {}
+    function _totalAssets() internal view virtual returns (uint256);
 
     /**
      * @notice Convert either `assets` or `shares` into underlying shares.
@@ -463,18 +463,23 @@ abstract contract BaseVault is
     }
 
     /*//////////////////////////////////////////////////////////////
+                      REWARDS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev called by strategy contract to claim reward tokens
+    function _claim() internal virtual;
+
+    function rewardTokens() public view virtual returns (address[] memory);
+
+    /*//////////////////////////////////////////////////////////////
                           INTERNAL HOOKS LOGIC
     //////////////////////////////////////////////////////////////*/
 
     /// @notice deposit into the underlying protocol.
-    function _protocolDeposit(uint256 assets, uint256 shares) internal virtual {
-        // OPTIONAL - convertIntoUnderlyingShares(assets,shares)
-    }
+    function _protocolDeposit(uint256 assets, uint256 shares) internal virtual;
 
     /// @notice Withdraw from the underlying protocol.
-    function _protocolWithdraw(uint256 assets, uint256 shares) internal virtual {
-        // OPTIONAL - convertIntoUnderlyingShares(assets,shares)
-    }
+    function _protocolWithdraw(uint256 assets, uint256 shares) internal virtual;
 
     /*//////////////////////////////////////////////////////////////
                       EIP-165 LOGIC
@@ -553,4 +558,5 @@ abstract contract BaseVault is
             )
         );
     }
+
 }

@@ -2,54 +2,40 @@ pragma solidity ^0.8.15;
 
 import {BaseVault, BaseVaultInitData} from "./BaseVault.sol";
 
-abstract contract VaultWithStrategy is BaseVault {
-    uint256 public lastHarvest;
-    uint256 public autoHarvest; // using a bool will cost more gas since we can't pack it
-    uint256 public harvestCooldown;
+abstract contract BaseStrategy is BaseVault {
+    uint128 public lastHarvest;
+    uint128 public harvestCooldown;
+    uint8 public autoHarvest;
 
     event HarvestCooldownChanged(uint256 oldCooldown, uint256 newCooldown);
 
     error InvalidHarvestCooldown(uint256 cooldown);
     error NotStrategy(address sender);
 
-    modifier onlyStrategy() {
-        if (msg.sender != address(this)) revert NotStrategy(msg.sender);
-        _;
-    }
-
-    constructor() {
-        _disableInitializers();
-    }
-
-    function __VaultWithStrategy__init(BaseVaultInitData calldata initData, uint _autoHarvest, uint _harvestCooldown)
-        internal 
-        onlyInitializing
-    {
-        __BaseVault__init(initData);
-
-        lastHarvest = block.timestamp;
+    function __BaseStrategy__init(uint128 _harvestCooldown, uint8 _autoHarvest) internal onlyInitializing {
+        lastHarvest = uint128(block.timestamp);
         autoHarvest = _autoHarvest;
-        harvestCooldown = _harvestCooldown;
+        harvestCooldown = _harvestCooldown; 
     }
 
     function _afterDeposit() internal virtual override {
-        if (autoHarvest == 1 && lastHarvest + harvestCooldown < block.timestamp) {
+        if (autoHarvest == 2 && lastHarvest + harvestCooldown < block.timestamp) {
             harvest();
         }
     }
 
     function _afterWithdrawal() internal virtual override {
-        if (autoHarvest == 1 && lastHarvest + harvestCooldown < block.timestamp) {
+        if (autoHarvest == 2 && lastHarvest + harvestCooldown < block.timestamp) {
             harvest();
         }
     }
 
-    /**
+        /**
      * @notice Set a new harvestCooldown for this adapter. Caller must be owner.
      * @param newCooldown Time in seconds that must pass before a harvest can be called again.
      * @dev Cant be longer than 1 day.
      */
-    function setHarvestCooldown(uint256 newCooldown) external onlyOwner {
+     function setHarvestCooldown(uint128 newCooldown) external onlyOwner {
         // Dont wait more than X seconds
         if (newCooldown >= 1 days) revert InvalidHarvestCooldown(newCooldown);
 
@@ -62,17 +48,20 @@ abstract contract VaultWithStrategy is BaseVault {
 
     function toggleAutoHarvest() external onlyOwner {
         uint256 _autoHarvest = autoHarvest;
-        emit AutoHarvestToggled(_autoHarvest, (_autoHarvest + 1) % 2);
-        // (0 + 1) % 2 = 1
-        // (1 + 1) % 2 = 0
-        autoHarvest = (_autoHarvest + 1) % 2;
+        /// @dev using 1 & 2 instead of 0 & 1 saves gas.
+        if (_autoHarvest == 1) {
+            emit AutoHarvestToggled(1, 2);
+            autoHarvest = 2;
+        } else {
+            emit AutoHarvestToggled(2, 1);
+            autoHarvest = 1;
+        }
     }
 
     event Harvest();
 
     function harvest() public virtual;
 
-    function rewardTokens() public view virtual returns (address[] memory);
 
     // @dev Exists for compatibility for flywheel systems.
     function claimRewards() external {
@@ -83,7 +72,7 @@ abstract contract VaultWithStrategy is BaseVault {
      * @notice Allows the strategy to deposit assets into the underlying protocol without minting new adapter shares.
      * @dev This can be used e.g. for a compounding strategy to increase the value of each adapter share.
      */
-    function strategyDeposit(uint256 amount, uint256 shares) public onlyStrategy {
+    function strategyDeposit(uint256 amount, uint256 shares) internal {
         _protocolDeposit(amount, shares);
     }
 
@@ -91,7 +80,7 @@ abstract contract VaultWithStrategy is BaseVault {
      * @notice Allows the strategy to withdraw assets from the underlying protocol without burning adapter shares.
      * @dev This can be used e.g. for a leverage strategy to reduce leverage without the need for the strategy to hold any adapter shares.
      */
-    function strategyWithdraw(uint256 amount, uint256 shares) public onlyStrategy {
+    function strategyWithdraw(uint256 amount, uint256 shares) internal {
         _protocolWithdraw(amount, shares);
     }
 }
