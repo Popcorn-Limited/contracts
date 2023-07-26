@@ -270,29 +270,19 @@ contract IchiAdapter is AdapterBase, WithRewards {
         );
     }
 
-    event log_named_uint(string, uint256);
-
     function _protocolWithdraw(
         uint256 amount,
         uint256 shares
     ) internal override {
         uint256 ichiShares = convertToUnderlyingShares(0, shares);
-        emit log_named_uint("ichiShares", ichiShares);
 
         (uint256 amount0, uint256 amount1) = vault.withdraw(
             ichiShares,
             address(this)
         );
-        emit log_named_uint("amount0", amount0);
-        emit log_named_uint("amount1", amount1);
 
         address oppositePair = assetIndex == 0 ? token1 : token0;
         uint256 oppositePairAmount = assetIndex == 0 ? amount1 : amount0;
-        emit log_named_uint("oppositePairAmount", oppositePairAmount);
-        emit log_named_uint(
-            "asset bal",
-            IERC20(asset()).balanceOf(address(this))
-        );
 
         if (oppositePairAmount > 0) {
             UniswapV3Utils.swap(
@@ -303,10 +293,6 @@ contract IchiAdapter is AdapterBase, WithRewards {
                 oppositePairAmount
             );
         }
-        emit log_named_uint(
-            "asset bal2",
-            IERC20(asset()).balanceOf(address(this))
-        );
     }
 
     /*//////////////////////////////////////////////////////////////

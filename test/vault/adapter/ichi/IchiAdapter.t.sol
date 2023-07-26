@@ -210,6 +210,11 @@ contract IchiAdapterTest is AbstractAdapterTest {
         vm.stopPrank();
     }
 
+    function increasePricePerShare(uint256 amount) public override {
+        generateUniV3Fees();
+        distributeIchiFees();
+    }
+
     /*//////////////////////////////////////////////////////////////
                           INITIALIZATION
     //////////////////////////////////////////////////////////////*/
