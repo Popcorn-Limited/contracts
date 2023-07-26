@@ -78,7 +78,25 @@ contract Y2KPremiumAdapter is AdapterBase {
     /*//////////////////////////////////////////////////////////////
                             ACCOUNTING LOGIC
     //////////////////////////////////////////////////////////////*/
-    //TODO - Fill this up
+    /// @notice The amount of y2k token shares to withdraw given an amount of adapter shares
+    function convertToUnderlyingShares(
+        uint256,
+        uint256 shares
+    ) public view override returns (uint256) {
+        uint256 marketId = marketRegistry.getMarketId();
+        address[2] memory vaults = carouselFactory.getVaults(marketId);
+
+        ICarousel carousel = ICarousel(vaults[0]);
+        uint256 epochId = carousel.epochs(carousel.getEpochsLength() - 1);
+
+        uint256 balance = carousel.balanceOf(address (this), epochId);
+
+        uint256 supply = totalSupply();
+        return
+            supply == 0
+                ? shares
+                : shares.mulDiv(balance, supply, Math.Rounding.Up);
+    }
 
     /*//////////////////////////////////////////////////////////////
                           INTERNAL HOOKS LOGIC
@@ -91,12 +109,13 @@ contract Y2KPremiumAdapter is AdapterBase {
     ) internal virtual override {
         uint256 marketId = marketRegistry.getMarketId(); //TODO: what parameter do we pass to fetch the right market?
         address[2] memory vaults = carouselFactory.getVaults(marketId);
+
         ICarousel carousel = ICarousel(vaults[0]);
-
-        uint[] memory epochs = carousel.getAllEpochs();
-        uint256 epochId = epochs[epochs.length - 1];
-
         IERC20(carousel.asset()).safeApprove(carousel, type(uint256).max);
+        uint256 epochId = carousel.epochs(carousel.getEpochsLength() - 1);
+
+//        uint[] memory epochs = carousel.getAllEpochs();
+//        uint256 epochId = epochs[epochs.length - 1];
 
         if(carousel.epochResolved(epochId)){
             //deposit into the queue with epochId 0
@@ -119,8 +138,20 @@ contract Y2KPremiumAdapter is AdapterBase {
         uint256 amount,
         uint256
     ) internal virtual override {
-        //check that amount of shares to withdraw covers withdraw amount
-        //check the deposit queue if there is some amount to withdraw
-        //check the withdraw queue for some withdraw amount if necessary
+        uint256 marketId = marketRegistry.getMarketId(); //TODO: what parameter do we pass to fetch the right market?
+        address[2] memory vaults = carouselFactory.getVaults(marketId);
+
+        ICarousel carousel = ICarousel(vaults[0]);
+        uint256 epochId = carousel.epochs(carousel.getEpochsLength() - 1);
+
+        uint256 shares = convertToShares(amount);
+        uint256 underlyingShares = convertToUnderlyingShares(0, shares);
+        carousel.withdraw(
+            epochId,
+            underlyingShares,
+            address (this),
+            address (this)
+        );
     }
+
 }

@@ -47,6 +47,8 @@ interface ICarousel {
 
     function getEpochConfig(uint256) external view returns (uint40, uint40, uint40);
 
+    function getEpochsLength() external view returns (uint256);
+
     function totalAssets(uint256) external view returns (uint256);
 
     function epochExists(uint256 _id) external view returns (bool);
@@ -68,6 +70,13 @@ interface ICarousel {
         uint256 amount,
         address receiver
     ) external;
+
+    function withdraw(
+        uint256 _id,
+        uint256 _shares,
+        address _receiver,
+        address _owner
+    ) external returns (uint256 assets);
 
     function resolveEpoch(uint256 _id) external;
 
@@ -139,10 +148,18 @@ interface ICarousel {
 
     function getAllEpochs() external view returns (uint256[] memory);
 
+    function epochs(uint256 index) external view returns (uint256);
+
     function rolloverAccounting(uint256 _epochId)
     external
     view
     returns (uint256);
+
+    function balanceOf(address account, uint256 id)
+    external
+    view
+    returns (uint256);
+
 }
 
 interface IMarketRegistry {

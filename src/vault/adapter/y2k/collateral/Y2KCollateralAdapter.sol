@@ -77,6 +77,30 @@ contract Y2KAdapter is AdapterBase {
 
 
     /*//////////////////////////////////////////////////////////////
+                            ACCOUNTING LOGIC
+    //////////////////////////////////////////////////////////////*/
+    /// @notice The amount of y2k token shares to withdraw given an amount of adapter shares
+    function convertToUnderlyingShares(
+        uint256,
+        uint256 shares
+    ) public view override returns (uint256) {
+        uint256 marketId = marketRegistry.getMarketId();
+        address[2] memory vaults = carouselFactory.getVaults(marketId);
+
+        ICarousel carousel = ICarousel(vaults[1]);
+        uint256 epochId = carousel.epochs(carousel.getEpochsLength() - 1);
+
+        uint256 balance = carousel.balanceOf(address (this), epochId);
+
+        uint256 supply = totalSupply();
+        return
+            supply == 0
+                ? shares
+                : shares.mulDiv(balance, supply, Math.Rounding.Up);
+    }
+
+
+    /*//////////////////////////////////////////////////////////////
                           INTERNAL HOOKS LOGIC
     //////////////////////////////////////////////////////////////*/
 
@@ -115,8 +139,19 @@ contract Y2KAdapter is AdapterBase {
         uint256 amount,
         uint256
     ) internal virtual override {
-        //check that amount of shares to withdraw covers withdraw amount
-        //check the deposit queue if there is some amount to withdraw
-        //check the withdraw queue for some withdraw amount if necessary
+        uint256 marketId = marketRegistry.getMarketId(); //TODO: what parameter do we pass to fetch the right market?
+        address[2] memory vaults = carouselFactory.getVaults(marketId);
+
+        ICarousel carousel = ICarousel(vaults[1]);
+        uint256 epochId = carousel.epochs(carousel.getEpochsLength() - 1);
+
+        uint256 shares = convertToShares(amount);
+        uint256 underlyingShares = convertToUnderlyingShares(0, shares);
+        carousel.withdraw(
+            epochId,
+            underlyingShares,
+            address (this),
+            address (this)
+        );
     }
 }
