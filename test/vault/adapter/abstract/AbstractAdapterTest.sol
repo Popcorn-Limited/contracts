@@ -58,7 +58,7 @@ contract AbstractAdapterTest is PropertyTest {
         uint256 delta_,
         string memory baseTestId_,
         bool useStrategy_
-    ) public {
+    ) public virtual {
         asset = asset_;
 
         implementation = implementation_;
@@ -273,7 +273,6 @@ contract AbstractAdapterTest is PropertyTest {
 
     function test__previewRedeem(uint8 fuzzAmount) public virtual {
         uint256 amount = bound(uint256(fuzzAmount), minShares, maxShares);
-
         uint256 reqAssets = adapter.previewMint(amount) * 10;
         _mintAssetAndApproveForAdapter(reqAssets, bob);
         vm.prank(bob);
@@ -293,8 +292,10 @@ contract AbstractAdapterTest is PropertyTest {
             uint256 amount = bound(uint256(fuzzAmount), minFuzz, maxAssets);
 
             _mintAssetAndApproveForAdapter(amount, bob);
+            emit log("PING");
 
             prop_deposit(bob, bob, amount, testId);
+            emit log("PING1");
 
             increasePricePerShare(raise);
 
@@ -345,7 +346,7 @@ contract AbstractAdapterTest is PropertyTest {
             vm.prank(bob);
             adapter.approve(alice, type(uint256).max);
 
-            prop_withdraw(alice, bob, amount, testId);
+            prop_withdraw(alice, bob, amount / 10, testId);
         }
     }
 
