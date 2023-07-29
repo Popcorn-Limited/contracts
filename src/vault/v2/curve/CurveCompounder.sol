@@ -28,7 +28,7 @@ abstract contract CurveCompounder is BaseStrategy {
     CurveRoute[] toBaseAssetRoutes;
     uint256[] minTradeAmounts;
 
-    function __CurveCompounder__init(StrategyConfig memory _stratConfig) internal initializer {
+    function __CurveCompounder__init(StrategyConfig memory _stratConfig) internal onlyInitializing {
         __BaseStrategy__init(_stratConfig.harvestCooldown, _stratConfig.autoHarvest);
 
         router = _stratConfig.router;
@@ -44,7 +44,7 @@ abstract contract CurveCompounder is BaseStrategy {
         minTradeAmounts = _stratConfig.minTradeAmounts;
 
 
-        address[] memory tokens = rewardTokens();
+        address[] memory tokens = rewardTokens;
         uint length = tokens.length;
         for (uint i; i < length;) {
             IERC20(tokens[i]).approve(_stratConfig.router, type(uint).max);
@@ -81,7 +81,7 @@ abstract contract CurveCompounder is BaseStrategy {
         internal
     {
         // Trade rewards for base asset
-        address[] memory tokens = rewardTokens();
+        address[] memory tokens = rewardTokens;
         uint256 len = tokens.length;
         for (uint256 i; i < len;) {
             uint256 rewardBal = IERC20(tokens[i]).balanceOf(address(this));
