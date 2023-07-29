@@ -1,6 +1,7 @@
 pragma solidity ^0.8.15;
 
 import {IERC20} from "openzeppelin-contracts/interfaces/IERC20.sol";
+import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {BaseVaultInitData} from "../BaseVault.sol";
 import {CurveCompounder, StrategyConfig, CurveRoute} from "./CurveCompounder.sol";
@@ -12,6 +13,7 @@ interface IPool {
 }
 
 contract CurveLPCompounder is CurveCompounder, CurveLP {
+    using SafeERC20 for IERC20;
 
     IPool pool;
     uint8 internal numberOfTokens;
@@ -22,7 +24,7 @@ contract CurveLPCompounder is CurveCompounder, CurveLP {
         _disableInitializers();
     }
 
-    function initialize(BaseVaultInitData calldata baseVaultInitData, bytes calldata initData) external {
+    function initialize(BaseVaultInitData calldata baseVaultInitData, bytes calldata initData) public initializer {
         (
             address _gauge,
             address _minter,
@@ -34,10 +36,10 @@ contract CurveLPCompounder is CurveCompounder, CurveLP {
             initData, (address, address, address, uint8, uint, StrategyConfig)
         );
 
-        __CurveCompounder__init(_stratConfig);
         __CurveLP__init(baseVaultInitData, _gauge, _minter, baseVaultInitData.asset);
+        __CurveCompounder__init(_stratConfig);
 
-        IERC20(baseAsset).approve(_pool, type(uint).max);
+        IERC20(baseAsset).safeApprove(_pool, type(uint).max);
         pool = IPool(_pool);
 
         numberOfTokens = _numberOfTokens;

@@ -171,7 +171,6 @@ abstract contract BaseVault is
         internal
         virtual
         override
-        nonReentrant
     {
         IERC20(asset()).safeTransferFrom(caller, address(this), assets);
 
@@ -469,7 +468,9 @@ abstract contract BaseVault is
     /// @dev called by strategy contract to claim reward tokens
     function _claim() internal virtual;
 
-    function rewardTokens() public view virtual returns (address[] memory);
+    address[] public rewardTokens;
+
+    function updateRewardTokens() external virtual;
 
     /*//////////////////////////////////////////////////////////////
                           INTERNAL HOOKS LOGIC
