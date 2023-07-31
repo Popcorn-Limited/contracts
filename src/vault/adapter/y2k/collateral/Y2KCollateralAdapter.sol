@@ -15,7 +15,6 @@ import {
 } from "../../abstracts/AdapterBase.sol";
 import {
     ICarousel,
-    IMarketRegistry,
     IVaultFactoryV2 as ICarouselFactory
 } from "../IY2k.sol";
 
@@ -27,8 +26,10 @@ contract Y2KAdapter is AdapterBase {
     string internal _name;
     string internal _symbol;
 
-    IMarketRegistry public marketRegistry;
+    ICarousel public carousel;
     ICarouselFactory public carouselFactory;
+
+    error InvalidPremiumVault();
 
     /**
      * @notice Initialize a new Y2k Adapter.
@@ -45,10 +46,17 @@ contract Y2KAdapter is AdapterBase {
     ) external virtual initializer {
         __AdapterBase_init(adapterInitData);
 
-        address _carouselFactory = abi.decode(y2kInitData, (address));
-
-        marketRegistry = IMarketRegistry(registry);
+        //TODO: should we check the carousel factory in registry to ensure it's not deprecated?
+        (address _carouselFactory, uint256 _marketId) = abi.decode(y2kInitData, (address, uint256));
         carouselFactory = ICarouselFactory(_carouselFactory);
+
+        address[2] memory vaults = carouselFactory.getVaults(_marketId);
+        if(vaults[1] == address(0)){
+            revert InvalidPremiumVault();
+        }
+        carousel = ICarousel(vaults[1]);
+
+        IERC20(carousel.asset()).safeApprove(address(carousel), type(uint256).max); //todo: double check the asset()
 
         _name = string.concat(
             "VaultCraft Y2k Collateral ",
@@ -84,14 +92,10 @@ contract Y2KAdapter is AdapterBase {
         uint256,
         uint256 shares
     ) public view override returns (uint256) {
-        uint256 marketId = marketRegistry.getMarketId();
-        address[2] memory vaults = carouselFactory.getVaults(marketId);
-
-        ICarousel carousel = ICarousel(vaults[1]);
-        uint256 epochId = carousel.epochs(carousel.getEpochsLength() - 1);
+        ICarousel _carousel = carousel;
+        uint256 epochId = _carousel.epochs(_carousel.getEpochsLength() - 1);
 
         uint256 balance = carousel.balanceOf(address (this), epochId);
-
         uint256 supply = totalSupply();
         return
             supply == 0
@@ -109,24 +113,18 @@ contract Y2KAdapter is AdapterBase {
         uint256 amount,
         uint256
     ) internal virtual override {
-        uint256 marketId = marketRegistry.getMarketId(); //TODO: what parameter do we pass to fetch the right market?
-        address[2] memory vaults = carouselFactory.getVaults(marketId);
-        ICarousel carousel = ICarousel(vaults[1]);
+        ICarousel _carousel = carousel;
+        uint256 epochId = _carousel.epochs(_carousel.getEpochsLength() - 1);
 
-        uint[] memory epochs = carousel.getAllEpochs();
-        uint256 epochId = epochs[epochs.length - 1];
-
-        IERC20(carousel.asset()).safeApprove(carousel, type(uint256).max);
-
-        if(carousel.epochResolved(epochId)){
+        if(_carousel.epochResolved(epochId)){
             //deposit into the queue with epochId 0
-            carousel.deposit(
+            _carousel.deposit(
                 0,
                 amount,
                 address (this)
             );
         } else {
-            carousel.deposit(
+            _carousel.deposit(
                 epochId,
                 amount,
                 address (this)
@@ -139,15 +137,12 @@ contract Y2KAdapter is AdapterBase {
         uint256 amount,
         uint256
     ) internal virtual override {
-        uint256 marketId = marketRegistry.getMarketId(); //TODO: what parameter do we pass to fetch the right market?
-        address[2] memory vaults = carouselFactory.getVaults(marketId);
-
-        ICarousel carousel = ICarousel(vaults[1]);
-        uint256 epochId = carousel.epochs(carousel.getEpochsLength() - 1);
+        ICarousel _carousel = carousel;
+        uint256 epochId = _carousel.epochs(_carousel.getEpochsLength() - 1);
 
         uint256 shares = convertToShares(amount);
         uint256 underlyingShares = convertToUnderlyingShares(0, shares);
-        carousel.withdraw(
+        _carousel.withdraw(
             epochId,
             underlyingShares,
             address (this),

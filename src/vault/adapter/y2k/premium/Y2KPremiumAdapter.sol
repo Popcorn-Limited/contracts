@@ -15,20 +15,22 @@ import {
 } from "../../abstracts/AdapterBase.sol";
 import {
     ICarousel,
-    IMarketRegistry,
     IVaultFactoryV2 as ICarouselFactory
 } from "../IY2k.sol";
 
+import "forge-std/console.sol";
 
-contract Y2KPremiumAdapter is AdapterBase {
+contract Y2KPremiumAdapter is AdapterBase { //TODO: Implement ERC1155 receiver
     using SafeERC20 for IERC20;
     using Math for uint256;
 
     string internal _name;
     string internal _symbol;
 
-    IMarketRegistry public marketRegistry;
+    ICarousel public carousel;
     ICarouselFactory public carouselFactory;
+
+    error InvalidPremiumVault();
 
     /**
      * @notice Initialize a new Y2k Adapter.
@@ -45,10 +47,17 @@ contract Y2KPremiumAdapter is AdapterBase {
     ) external virtual initializer {
         __AdapterBase_init(adapterInitData);
 
-        address _carouselFactory = abi.decode(y2kInitData, (address));
-
-        marketRegistry = IMarketRegistry(registry);
+        //TODO: should we check the carousel factory in registry to ensure it's not deprecated?
+        (address _carouselFactory, uint256 _marketId) = abi.decode(y2kInitData, (address, uint256));
         carouselFactory = ICarouselFactory(_carouselFactory);
+
+        address[2] memory vaults = carouselFactory.getVaults(_marketId);
+        if(vaults[0] == address(0)){
+            revert InvalidPremiumVault();
+        }
+        carousel = ICarousel(vaults[0]);
+
+        IERC20(carousel.asset()).safeApprove(address(carousel), type(uint256).max); //todo: double check the asset()
 
         _name = string.concat(
             "VaultCraft Y2k Premium ",
@@ -75,22 +84,30 @@ contract Y2KPremiumAdapter is AdapterBase {
         return _symbol;
     }
 
+
     /*//////////////////////////////////////////////////////////////
                             ACCOUNTING LOGIC
     //////////////////////////////////////////////////////////////*/
+    /// @notice Emulate yearns total asset calculation to return the total assets of the vault.
+    uint256 private totalDeposits;
+    function _totalAssets() internal view override returns (uint256) {
+        console.log("stored deposits: ", totalDeposits);
+        return totalDeposits;
+    }
+//    function _totalAssets() internal view virtual override returns (uint256) {
+//        console.log("touch here!");
+//        return 10000000000000000000;//_shareValue(yVault.balanceOf(address(this))); //TODO: fix this
+//    }
+
     /// @notice The amount of y2k token shares to withdraw given an amount of adapter shares
     function convertToUnderlyingShares(
         uint256,
         uint256 shares
     ) public view override returns (uint256) {
-        uint256 marketId = marketRegistry.getMarketId();
-        address[2] memory vaults = carouselFactory.getVaults(marketId);
-
-        ICarousel carousel = ICarousel(vaults[0]);
-        uint256 epochId = carousel.epochs(carousel.getEpochsLength() - 1);
+        ICarousel _carousel = carousel;
+        uint256 epochId = _carousel.epochs(_carousel.getEpochsLength() - 1);
 
         uint256 balance = carousel.balanceOf(address (this), epochId);
-
         uint256 supply = totalSupply();
         return
             supply == 0
@@ -107,25 +124,27 @@ contract Y2KPremiumAdapter is AdapterBase {
         uint256 amount,
         uint256
     ) internal virtual override {
-        uint256 marketId = marketRegistry.getMarketId(); //TODO: what parameter do we pass to fetch the right market?
-        address[2] memory vaults = carouselFactory.getVaults(marketId);
+        totalDeposits += amount;
+        //TODO: enlist shares in rollover queue
+        ICarousel _carousel = carousel;
+        console.log("y2k deposit: ", amount);
+        if(amount < _carousel.minQueueDeposit()) return;
 
-        ICarousel carousel = ICarousel(vaults[0]);
-        IERC20(carousel.asset()).safeApprove(carousel, type(uint256).max);
-        uint256 epochId = carousel.epochs(carousel.getEpochsLength() - 1);
-
-//        uint[] memory epochs = carousel.getAllEpochs();
-//        uint256 epochId = epochs[epochs.length - 1];
-
-        if(carousel.epochResolved(epochId)){
+        uint256 epochId = _carousel.epochs(_carousel.getEpochsLength() - 1);
+        console.log("epoch-id: ", epochId);
+        (uint40 _epochBegin, , ) = _carousel.getEpochConfig(epochId);
+        bool epochHasStarted = block.timestamp > _epochBegin;
+        if(epochHasStarted){
+            console.log("y2k epoch started");
             //deposit into the queue with epochId 0
-            carousel.deposit(
+            _carousel.deposit(
                 0,
                 amount,
                 address (this)
             );
         } else {
-            carousel.deposit(
+            console.log("y2k epoch not started");
+            _carousel.deposit(
                 epochId,
                 amount,
                 address (this)
@@ -138,20 +157,25 @@ contract Y2KPremiumAdapter is AdapterBase {
         uint256 amount,
         uint256
     ) internal virtual override {
-        uint256 marketId = marketRegistry.getMarketId(); //TODO: what parameter do we pass to fetch the right market?
-        address[2] memory vaults = carouselFactory.getVaults(marketId);
+        ICarousel _carousel = carousel;
+        uint256 epochId = _carousel.epochs(_carousel.getEpochsLength() - 1);
 
-        ICarousel carousel = ICarousel(vaults[0]);
-        uint256 epochId = carousel.epochs(carousel.getEpochsLength() - 1);
-
-        uint256 shares = convertToShares(amount);
+        uint256 shares = convertToShares(_totalAssets());
         uint256 underlyingShares = convertToUnderlyingShares(0, shares);
-        carousel.withdraw(
-            epochId,
-            underlyingShares,
-            address (this),
-            address (this)
-        );
+        console.log("shares: ", shares, underlyingShares);
+        //TODO check that epoch has ended before withdrawing
+        if(_carousel.epochResolved(epochId)) {
+            _carousel.withdraw(
+                epochId,
+                underlyingShares,
+                address (this),
+                address (this)
+            );
+        } else {
+            console.log("epoch is not resolved: ", epochId);
+            //TODO: do what?
+            //  delist from rollover, store the epochId of the withdraw request and make them withdraw again)
+        }
     }
 
 }

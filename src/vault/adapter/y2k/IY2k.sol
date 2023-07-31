@@ -37,6 +37,8 @@ interface ICarousel {
     // function symbol() external view  returns (string memory);
     function asset() external view  returns (address);
 
+    function minQueueDeposit() external view  returns (uint256);
+
     function token() external view returns (address);
 
     function strike() external view returns (uint256);
@@ -161,8 +163,3 @@ interface ICarousel {
     returns (uint256);
 
 }
-
-interface IMarketRegistry {
-    function getMarketId(/*some_param*/) external view returns (uint256);
-}
-
