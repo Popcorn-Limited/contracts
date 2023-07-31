@@ -33,7 +33,7 @@ contract SommelierAdapterTest is AbstractAdapterTest {
     function _setUpTest(bytes memory testConfig) internal {
         address _vault = abi.decode(testConfig, (address));
 
-        IVault vault = IVault(_vault);
+        vault = IVault(_vault);
         asset = IERC20(address(vault.asset()));
 
         permissionRegistry = IPermissionRegistry(
@@ -122,4 +122,25 @@ contract SommelierAdapterTest is AbstractAdapterTest {
             "symbol"
         );
     }
+
+    /*//////////////////////////////////////////////////////////////
+                          INITIALIZATION
+    //////////////////////////////////////////////////////////////*/
+
+    // function test__RT_deposit_withdraw() public override {
+    //     _mintAssetAndApproveForAdapter(defaultAmount, bob);
+
+    //     vm.startPrank(bob);
+    //     uint256 shares1 = adapter.deposit(defaultAmount, bob);
+
+    //     vm.warp(block.timestamp + 1200000);
+
+    //     uint256 shares2 = adapter.withdraw(adapter.maxWithdraw(bob), bob, bob);
+    //     vm.stopPrank();
+
+    //     // Pass the test if maxWithdraw is smaller than deposit since round trips are impossible
+    //     if (adapter.maxWithdraw(bob) == defaultAmount) {
+    //         assertGe(shares2, shares1, testId);
+    //     }
+    // }
 }

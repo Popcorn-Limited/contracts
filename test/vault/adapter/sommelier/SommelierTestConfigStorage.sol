@@ -13,9 +13,9 @@ contract SommelierTestConfigStorage is ITestConfigStorage {
     SommelierTestConfig[] internal testConfigs;
 
     constructor() {
-        // Mainnet - wETH
+        // Mainnet - wBTC
         testConfigs.push(
-            SommelierTestConfig(0x84674cFFB6146D19b986fC88EC70a441b570A45B)
+            SommelierTestConfig(0x0274a704a6D9129F90A62dDC6f6024b33EcDad36)
         );
     }
 

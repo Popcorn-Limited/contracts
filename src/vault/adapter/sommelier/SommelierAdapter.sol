@@ -46,7 +46,7 @@ contract SommelierAdapter is AdapterBase, WithRewards {
 
         address _vault = abi.decode(sommelierInitData, (address));
 
-        IVault vault = IVault(_vault);
+        vault = IVault(_vault);
 
         if (vault.asset() != asset()) revert InvalidAsset();
 
@@ -81,25 +81,31 @@ contract SommelierAdapter is AdapterBase, WithRewards {
     /*//////////////////////////////////////////////////////////////
                             ACCOUNTING LOGIC
     //////////////////////////////////////////////////////////////*/
+    error PING(uint256 x, uint256 y);
 
     /// @notice Calculates the total amount of underlying tokens the Vault holds.
     /// @return The total amount of underlying tokens the Vault holds.
 
     function _totalAssets() internal view override returns (uint256) {
         uint256 shares = vault.balanceOf(address(this));
-        return vault.convertToAssets(shares);
+        uint256 assets = vault.convertToAssets(shares);
+        return assets;
     }
 
     /*//////////////////////////////////////////////////////////////
                           INTERNAL HOOKS LOGIC
     //////////////////////////////////////////////////////////////*/
-
     function _protocolDeposit(uint256 amount, uint256) internal override {
         vault.deposit(amount, address(this));
     }
 
+    error DING();
+
     function _protocolWithdraw(uint256 amount, uint256) internal override {
         uint256 shares = vault.convertToShares(amount);
+
+        // revert PING(amount, shares);
+
         vault.redeem(shares, address(this), address(this));
     }
 
