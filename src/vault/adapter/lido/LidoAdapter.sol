@@ -129,8 +129,8 @@ contract LidoAdapter is AdapterBase {
     ) public view override returns (uint256) {
         return
             _convertToShares(
-                StableSwapSTETH.get_dy(STETHID, WETHID, assets + _getSlippage(assets)),
-                Math.Rounding.Up
+                StableSwapSTETH.get_dy(STETHID, WETHID, assets),
+                Math.Rounding.Down
             );
     }
 
@@ -138,7 +138,7 @@ contract LidoAdapter is AdapterBase {
         uint256 shares
     ) public view override returns (uint256) {
         uint256 assets = _convertToAssets(shares, Math.Rounding.Up);
-        return StableSwapSTETH.get_dy(STETHID, WETHID, assets + _getSlippage(assets));
+        return assets;
     }
 
 //    function previewRedeemWithSlippage(
@@ -186,13 +186,15 @@ contract LidoAdapter is AdapterBase {
             _spendAllowance(owner, caller, shares);
         }
 
+        uint256 toTransfer = StableSwapSTETH.get_dy(STETHID, WETHID, assets);
+
         if (!paused()) {
             _protocolWithdraw(assets, shares);
         }
 
         _burn(owner, shares);
 
-        IERC20(asset()).safeTransfer(receiver, StableSwapSTETH.get_dy(STETHID, WETHID, assets));
+        IERC20(asset()).safeTransfer(receiver, toTransfer);
 
         if (autoHarvest) harvest();
 

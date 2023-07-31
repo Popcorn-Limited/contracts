@@ -30,6 +30,7 @@ contract LidoAdapterTest is AbstractAdapterTest {
 
     function setUp() public {
         uint256 forkId = vm.createSelectFork(vm.rpcUrl("mainnet"));
+//        vm.rollFork(16812240);
         vm.selectFork(forkId);
 
         testConfigStorage = ITestConfigStorage(
@@ -182,10 +183,9 @@ contract LidoAdapterTest is AbstractAdapterTest {
         uint256 shares,
         string memory testPreFix
     ) public override returns (uint256 paid, uint256 received) {
-        uint256 oldReceiverAsset = IERC20(_asset_).balanceOf(caller);
+        uint256 oldReceiverAsset = IERC20(_asset_).balanceOf(caller) + StableSwapSTETH.get_dy(STETHID, WETHID, adapter.previewRedeem(shares));
         uint256 oldOwnerShare = IERC20(_vault_).balanceOf(owner);
         uint256 oldAllowance = IERC20(_vault_).allowance(owner, caller);
-
         vm.prank(caller);
         uint256 assets = IERC4626(_vault_).redeem(shares, caller, owner);
 
@@ -201,7 +201,7 @@ contract LidoAdapterTest is AbstractAdapterTest {
         );
         assertApproxEqAbs(
             newReceiverAsset,
-            oldReceiverAsset + StableSwapSTETH.get_dy(STETHID, WETHID, assets),
+            oldReceiverAsset,
             _delta_,
             string.concat("asset", testPreFix)
         ); // NOTE: this may fail if the receiver is a contract in which the asset is stored
