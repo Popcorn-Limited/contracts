@@ -30,6 +30,7 @@ contract LidoAdapterTest is AbstractAdapterTest {
 
     function setUp() public {
         uint256 forkId = vm.createSelectFork(vm.rpcUrl("mainnet"));
+//        vm.rollFork(16812240);
         vm.selectFork(forkId);
 
         testConfigStorage = ITestConfigStorage(
@@ -133,13 +134,20 @@ contract LidoAdapterTest is AbstractAdapterTest {
         address owner,
         uint256 assets,
         string memory testPreFix
-    ) public virtual override returns (uint256 paid, uint256 received) {
+    ) public override returns (uint256 paid, uint256 received) {
         uint256 oldReceiverAsset = IERC20(_asset_).balanceOf(caller);
         uint256 oldOwnerShare = IERC20(_vault_).balanceOf(owner);
         uint256 oldAllowance = IERC20(_vault_).allowance(owner, caller);
 
         vm.prank(caller);
         uint256 shares = IERC4626(_vault_).withdraw(assets, caller, owner);
+
+        assertTrue(
+            caller == owner ||
+            oldAllowance != 0 ||
+            (shares == 0 && assets == 0),
+            string.concat("access control", testPreFix)
+        );
 
         uint256 newReceiverAsset = IERC20(_asset_).balanceOf(caller);
         uint256 newOwnerShare = IERC20(_vault_).balanceOf(owner);
@@ -151,7 +159,6 @@ contract LidoAdapterTest is AbstractAdapterTest {
             _delta_,
             string.concat("share", testPreFix)
         );
-        // assertApproxEqAbs(newReceiverAsset, oldReceiverAsset + assets, _delta_, string.concat("asset", testPreFix)); // NOTE: this may fail if the receiver is a contract in which the asset is stored
         if (caller != owner && oldAllowance != type(uint256).max)
             assertApproxEqAbs(
                 newAllowance,
@@ -159,27 +166,26 @@ contract LidoAdapterTest is AbstractAdapterTest {
                 _delta_,
                 string.concat("allowance", testPreFix)
             );
-
         assertTrue(
             caller == owner ||
-                oldAllowance != 0 ||
-                (shares == 0 && assets == 0),
+            oldAllowance != 0 ||
+            (shares == 0 && assets == 0),
             string.concat("access control", testPreFix)
         );
 
         return (shares, assets);
     }
 
+    // Simplifing it here a little to avoid `Stack to Deep` - Caller = Receiver
     function prop_redeem(
         address caller,
         address owner,
         uint256 shares,
         string memory testPreFix
-    ) public virtual override returns (uint256 paid, uint256 received) {
-        uint256 oldReceiverAsset = IERC20(_asset_).balanceOf(caller);
+    ) public override returns (uint256 paid, uint256 received) {
+        uint256 oldReceiverAsset = IERC20(_asset_).balanceOf(caller) + StableSwapSTETH.get_dy(STETHID, WETHID, adapter.previewRedeem(shares));
         uint256 oldOwnerShare = IERC20(_vault_).balanceOf(owner);
         uint256 oldAllowance = IERC20(_vault_).allowance(owner, caller);
-
         vm.prank(caller);
         uint256 assets = IERC4626(_vault_).redeem(shares, caller, owner);
 
@@ -193,7 +199,12 @@ contract LidoAdapterTest is AbstractAdapterTest {
             _delta_,
             string.concat("share", testPreFix)
         );
-        // assertApproxEqAbs(newReceiverAsset, oldReceiverAsset + assets, _delta_, string.concat("asset", testPreFix)); // NOTE: this may fail if the receiver is a contract in which the asset is stored
+        assertApproxEqAbs(
+            newReceiverAsset,
+            oldReceiverAsset,
+            _delta_,
+            string.concat("asset", testPreFix)
+        ); // NOTE: this may fail if the receiver is a contract in which the asset is stored
         if (caller != owner && oldAllowance != type(uint256).max)
             assertApproxEqAbs(
                 newAllowance,
@@ -204,8 +215,8 @@ contract LidoAdapterTest is AbstractAdapterTest {
 
         assertTrue(
             caller == owner ||
-                oldAllowance != 0 ||
-                (shares == 0 && assets == 0),
+            oldAllowance != 0 ||
+            (shares == 0 && assets == 0),
             string.concat("access control", testPreFix)
         );
 

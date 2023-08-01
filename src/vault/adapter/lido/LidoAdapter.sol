@@ -129,17 +129,24 @@ contract LidoAdapter is AdapterBase {
     ) public view override returns (uint256) {
         return
             _convertToShares(
-                assets + assets.mulDiv(slippage, 1e18, Math.Rounding.Up),
-                Math.Rounding.Up
+                StableSwapSTETH.get_dy(STETHID, WETHID, assets),
+                Math.Rounding.Down
             );
     }
 
     function previewRedeem(
         uint256 shares
     ) public view override returns (uint256) {
-        uint256 assets = _convertToAssets(shares, Math.Rounding.Down);
-        return assets + assets.mulDiv(slippage, 1e18, Math.Rounding.Up);
+        uint256 assets = _convertToAssets(shares, Math.Rounding.Up);
+        return assets;
     }
+
+//    function previewRedeemWithSlippage(
+//        uint256 shares
+//    ) public view returns (uint256) {
+//        uint256 assets = _convertToAssets(shares, Math.Rounding.Up);
+//        return assets + assets.mulDiv(slippage, 1e18, Math.Rounding.Up);
+//    }
 
     /*//////////////////////////////////////////////////////////////
                           INTERNAL HOOKS LOGIC
@@ -163,8 +170,38 @@ contract LidoAdapter is AdapterBase {
             STETHID,
             WETHID,
             assets,
-            0
+            _getSlippage(assets)
         );
         weth.deposit{value: amountRecieved}(); // get wrapped eth back
+    }
+
+    function _withdraw(
+        address caller,
+        address receiver,
+        address owner,
+        uint256 assets,
+        uint256 shares
+    ) internal virtual override {
+        if (caller != owner) {
+            _spendAllowance(owner, caller, shares);
+        }
+
+        uint256 toTransfer = StableSwapSTETH.get_dy(STETHID, WETHID, assets);
+
+        if (!paused()) {
+            _protocolWithdraw(assets, shares);
+        }
+
+        _burn(owner, shares);
+
+        IERC20(asset()).safeTransfer(receiver, toTransfer);
+
+        if (autoHarvest) harvest();
+
+        emit Withdraw(caller, receiver, owner, assets, shares);
+    }
+
+    function _getSlippage(uint256 assets) private view returns(uint256) {
+        return assets.mulDiv(slippage, 1e18, Math.Rounding.Up);
     }
 }
