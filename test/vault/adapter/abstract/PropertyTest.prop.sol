@@ -166,7 +166,7 @@ contract PropertyTest is EnhancedTest {
         address receiver,
         uint256 assets,
         string memory testPreFix
-    ) public returns (uint256 paid, uint256 received) {
+    ) public virtual returns (uint256 paid, uint256 received) {
         uint256 oldCallerAsset = IERC20(_asset_).balanceOf(caller);
         uint256 oldReceiverShare = IERC20(_vault_).balanceOf(receiver);
         uint256 oldAllowance = IERC20(_asset_).allowance(caller, _vault_);
@@ -206,7 +206,7 @@ contract PropertyTest is EnhancedTest {
         address receiver,
         uint256 shares,
         string memory testPreFix
-    ) public returns (uint256 paid, uint256 received) {
+    ) public virtual returns (uint256 paid, uint256 received) {
         uint256 oldCallerAsset = IERC20(_asset_).balanceOf(caller);
         uint256 oldReceiverShare = IERC20(_vault_).balanceOf(receiver);
         uint256 oldAllowance = IERC20(_asset_).allowance(caller, _vault_);
@@ -247,7 +247,7 @@ contract PropertyTest is EnhancedTest {
         address owner,
         uint256 assets,
         string memory testPreFix
-    ) public returns (uint256 paid, uint256 received) {
+    ) public virtual returns (uint256 paid, uint256 received) {
         uint256 oldReceiverAsset = IERC20(_asset_).balanceOf(caller);
         uint256 oldOwnerShare = IERC20(_vault_).balanceOf(owner);
         uint256 oldAllowance = IERC20(_vault_).allowance(owner, caller);
@@ -296,7 +296,7 @@ contract PropertyTest is EnhancedTest {
         address owner,
         uint256 shares,
         string memory testPreFix
-    ) public returns (uint256 paid, uint256 received) {
+    ) public virtual returns (uint256 paid, uint256 received) {
         uint256 oldReceiverAsset = IERC20(_asset_).balanceOf(caller);
         uint256 oldOwnerShare = IERC20(_vault_).balanceOf(owner);
         uint256 oldAllowance = IERC20(_vault_).allowance(owner, caller);
