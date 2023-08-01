@@ -89,9 +89,13 @@ contract Y2KPremiumAdapter is AdapterBase { //TODO: Implement ERC1155 receiver
     /*//////////////////////////////////////////////////////////////
                             ACCOUNTING LOGIC
     //////////////////////////////////////////////////////////////*/
-    /// @notice Emulate yearns total asset calculation to return the total assets of the vault.
+    /// @notice Emulate y2k total asset calculation to return the total assets of the vault.
     function _totalAssets() internal view override returns (uint256) {
-        return totalDeposits;
+        //implemented based on deposit into the y2k open epoch not into deposit queue
+        ICarousel _carousel = carousel;
+        uint256 epochId = _getLatestEpochId(_carousel);
+        return _carousel.balanceOf(address (this), epochId);
+        return totalAssets;
     }
 
     /// @notice The amount of y2k token shares to withdraw given an amount of adapter shares
@@ -100,7 +104,7 @@ contract Y2KPremiumAdapter is AdapterBase { //TODO: Implement ERC1155 receiver
         uint256 shares
     ) public view override returns (uint256) {
         ICarousel _carousel = carousel;
-        uint256 epochId = _getLatestEpochId(_carousel);//_carousel.epochs(_carousel.getEpochsLength() - 1);
+        uint256 epochId = _getLatestEpochId(_carousel);
 
         uint256 balance = _carousel.balanceOf(address (this), epochId);
         uint256 supply = totalSupply();
