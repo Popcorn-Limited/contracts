@@ -187,9 +187,9 @@ contract IchiAdapter is AdapterBase, WithRewards {
 
         uint256 oppositePairInAssetPairTerms = oppositePairAmount * priceRatio;
 
-        uint256 tempAssets = assetPairAmount + oppositePairInAssetPairTerms;
+        uint256 assets = assetPairAmount + oppositePairInAssetPairTerms;
 
-        return tempAssets - tempAssets.mulDiv(slippage, 1e18, Math.Rounding.Up);
+        return assets - assets.mulDiv(slippage, 1e18, Math.Rounding.Up);
     }
 
     function calculateUnderlyingShares(
@@ -230,23 +230,6 @@ contract IchiAdapter is AdapterBase, WithRewards {
                     Math.Rounding.Up
                 );
     }
-
-    // function previewWithdraw(
-    //     uint256 assets
-    // ) public view override returns (uint256) {
-    //     return
-    //         _convertToShares(
-    //             assets + assets.mulDiv(slippage, 1e18, Math.Rounding.Up),
-    //             Math.Rounding.Up
-    //         );
-    // }
-
-    // function previewRedeem(
-    //     uint256 shares
-    // ) public view override returns (uint256) {
-    //     uint256 assets = _convertToAssets(shares, Math.Rounding.Down);
-    //     return assets - assets.mulDiv(slippage, 1e18, Math.Rounding.Up);
-    // }
 
     /*//////////////////////////////////////////////////////////////
                           INTERNAL HOOKS LOGIC
