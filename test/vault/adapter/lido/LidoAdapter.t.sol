@@ -30,7 +30,7 @@ contract LidoAdapterTest is AbstractAdapterTest {
 
     function setUp() public {
         uint256 forkId = vm.createSelectFork(vm.rpcUrl("mainnet"));
-//        vm.rollFork(16812240);
+        //        vm.rollFork(16812240);
         vm.selectFork(forkId);
 
         testConfigStorage = ITestConfigStorage(
@@ -142,13 +142,6 @@ contract LidoAdapterTest is AbstractAdapterTest {
         vm.prank(caller);
         uint256 shares = IERC4626(_vault_).withdraw(assets, caller, owner);
 
-        assertTrue(
-            caller == owner ||
-            oldAllowance != 0 ||
-            (shares == 0 && assets == 0),
-            string.concat("access control", testPreFix)
-        );
-
         uint256 newReceiverAsset = IERC20(_asset_).balanceOf(caller);
         uint256 newOwnerShare = IERC20(_vault_).balanceOf(owner);
         uint256 newAllowance = IERC20(_vault_).allowance(owner, caller);
@@ -159,6 +152,12 @@ contract LidoAdapterTest is AbstractAdapterTest {
             _delta_,
             string.concat("share", testPreFix)
         );
+        assertApproxEqAbs(
+            newReceiverAsset,
+            oldReceiverAsset + assets,
+            LidoAdapter(payable(_vault_)).slippage(), // Check if the asset change is in acceptable slippage range
+            string.concat("asset", testPreFix)
+        ); // NOTE: this may fail if the receiver is a contract in which the asset is stored
         if (caller != owner && oldAllowance != type(uint256).max)
             assertApproxEqAbs(
                 newAllowance,
@@ -166,10 +165,11 @@ contract LidoAdapterTest is AbstractAdapterTest {
                 _delta_,
                 string.concat("allowance", testPreFix)
             );
+
         assertTrue(
             caller == owner ||
-            oldAllowance != 0 ||
-            (shares == 0 && assets == 0),
+                oldAllowance != 0 ||
+                (shares == 0 && assets == 0),
             string.concat("access control", testPreFix)
         );
 
@@ -183,9 +183,10 @@ contract LidoAdapterTest is AbstractAdapterTest {
         uint256 shares,
         string memory testPreFix
     ) public override returns (uint256 paid, uint256 received) {
-        uint256 oldReceiverAsset = IERC20(_asset_).balanceOf(caller) + StableSwapSTETH.get_dy(STETHID, WETHID, adapter.previewRedeem(shares));
+        uint256 oldReceiverAsset = IERC20(_asset_).balanceOf(caller);
         uint256 oldOwnerShare = IERC20(_vault_).balanceOf(owner);
         uint256 oldAllowance = IERC20(_vault_).allowance(owner, caller);
+
         vm.prank(caller);
         uint256 assets = IERC4626(_vault_).redeem(shares, caller, owner);
 
@@ -201,8 +202,8 @@ contract LidoAdapterTest is AbstractAdapterTest {
         );
         assertApproxEqAbs(
             newReceiverAsset,
-            oldReceiverAsset,
-            _delta_,
+            oldReceiverAsset + assets,
+            LidoAdapter(payable(_vault_)).slippage(), // Check if the asset change is in acceptable slippage range
             string.concat("asset", testPreFix)
         ); // NOTE: this may fail if the receiver is a contract in which the asset is stored
         if (caller != owner && oldAllowance != type(uint256).max)
@@ -215,8 +216,8 @@ contract LidoAdapterTest is AbstractAdapterTest {
 
         assertTrue(
             caller == owner ||
-            oldAllowance != 0 ||
-            (shares == 0 && assets == 0),
+                oldAllowance != 0 ||
+                (shares == 0 && assets == 0),
             string.concat("access control", testPreFix)
         );
 
@@ -256,7 +257,7 @@ contract LidoAdapterTest is AbstractAdapterTest {
     //////////////////////////////////////////////////////////////*/
 
     // Because withdrawing loses some tokens due to slippage when swapping StEth for Weth
-    
+
     function test__unpause() public override {
         _mintAssetAndApproveForAdapter(defaultAmount * 3, bob);
 
@@ -267,7 +268,7 @@ contract LidoAdapterTest is AbstractAdapterTest {
         uint256 oldTotalSupply = adapter.totalSupply();
         uint256 oldIouBalance = iouBalance();
         uint256 dy = StableSwapSTETH.get_dy(STETHID, WETHID, oldTotalAssets);
-        
+
         adapter.pause();
         adapter.unpause();
 
@@ -309,7 +310,7 @@ contract LidoAdapterTest is AbstractAdapterTest {
         uint256 oldTotalSupply = adapter.totalSupply();
         uint256 oldBalance = asset.balanceOf(address(adapter));
         uint256 dy = StableSwapSTETH.get_dy(STETHID, WETHID, oldTotalAssets);
-        
+
         adapter.pause();
 
         // We simply withdraw into the adapter
