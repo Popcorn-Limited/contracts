@@ -26,6 +26,7 @@ contract Y2KPremiumAdapter is AdapterBase { //TODO: Implement ERC1155 receiver
 
     string internal _name;
     string internal _symbol;
+    uint256 private totalDeposits;
 
     ICarousel public carousel;
     ICarouselFactory public carouselFactory;
@@ -89,15 +90,9 @@ contract Y2KPremiumAdapter is AdapterBase { //TODO: Implement ERC1155 receiver
                             ACCOUNTING LOGIC
     //////////////////////////////////////////////////////////////*/
     /// @notice Emulate yearns total asset calculation to return the total assets of the vault.
-    uint256 private totalDeposits;
     function _totalAssets() internal view override returns (uint256) {
-        console.log("stored deposits: ", totalDeposits);
         return totalDeposits;
     }
-//    function _totalAssets() internal view virtual override returns (uint256) {
-//        console.log("touch here!");
-//        return 10000000000000000000;//_shareValue(yVault.balanceOf(address(this))); //TODO: fix this
-//    }
 
     /// @notice The amount of y2k token shares to withdraw given an amount of adapter shares
     function convertToUnderlyingShares(
@@ -105,14 +100,14 @@ contract Y2KPremiumAdapter is AdapterBase { //TODO: Implement ERC1155 receiver
         uint256 shares
     ) public view override returns (uint256) {
         ICarousel _carousel = carousel;
-        uint256 epochId = _carousel.epochs(_carousel.getEpochsLength() - 1);
+        uint256 epochId = _getLatestEpochId(_carousel);//_carousel.epochs(_carousel.getEpochsLength() - 1);
 
-        uint256 balance = carousel.balanceOf(address (this), epochId);
+        uint256 balance = _carousel.balanceOf(address (this), epochId);
         uint256 supply = totalSupply();
         return
             supply == 0
                 ? shares
-                : shares.mulDiv(balance, supply, Math.Rounding.Up);
+                : shares.mulDiv(balance, supply, Math.Rounding.Down);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -127,15 +122,12 @@ contract Y2KPremiumAdapter is AdapterBase { //TODO: Implement ERC1155 receiver
         totalDeposits += amount;
         //TODO: enlist shares in rollover queue
         ICarousel _carousel = carousel;
-        console.log("y2k deposit: ", amount);
         if(amount < _carousel.minQueueDeposit()) return;
 
-        uint256 epochId = _carousel.epochs(_carousel.getEpochsLength() - 1);
-        console.log("epoch-id: ", epochId);
+        uint256 epochId = _getLatestEpochId(_carousel);
         (uint40 _epochBegin, , ) = _carousel.getEpochConfig(epochId);
         bool epochHasStarted = block.timestamp > _epochBegin;
         if(epochHasStarted){
-            console.log("y2k epoch started");
             //deposit into the queue with epochId 0
             _carousel.deposit(
                 0,
@@ -143,7 +135,6 @@ contract Y2KPremiumAdapter is AdapterBase { //TODO: Implement ERC1155 receiver
                 address (this)
             );
         } else {
-            console.log("y2k epoch not started");
             _carousel.deposit(
                 epochId,
                 amount,
@@ -158,12 +149,11 @@ contract Y2KPremiumAdapter is AdapterBase { //TODO: Implement ERC1155 receiver
         uint256
     ) internal virtual override {
         ICarousel _carousel = carousel;
-        uint256 epochId = _carousel.epochs(_carousel.getEpochsLength() - 1);
+        uint256 epochId = _getLatestEpochId(_carousel);
 
         uint256 shares = convertToShares(_totalAssets());
         uint256 underlyingShares = convertToUnderlyingShares(0, shares);
-        console.log("shares: ", shares, underlyingShares);
-        //TODO check that epoch has ended before withdrawing
+
         if(_carousel.epochResolved(epochId)) {
             _carousel.withdraw(
                 epochId,
@@ -172,10 +162,12 @@ contract Y2KPremiumAdapter is AdapterBase { //TODO: Implement ERC1155 receiver
                 address (this)
             );
         } else {
-            console.log("epoch is not resolved: ", epochId);
             //TODO: do what?
             //  delist from rollover, store the epochId of the withdraw request and make them withdraw again)
         }
     }
 
+    function _getLatestEpochId(ICarousel _carousel) internal view returns(uint256 epochId) {
+        epochId = _carousel.epochs(_carousel.getEpochsLength() - 1);
+    }
 }
