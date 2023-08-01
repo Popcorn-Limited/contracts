@@ -12,7 +12,7 @@ import {ILido, VaultAPI} from "./ILido.sol";
 import {SafeMath} from "openzeppelin-contracts/utils/math/SafeMath.sol";
 
 /// @title LidoAdapter
-/// @author zefram.eth
+/// @author RedVeil
 /// @notice ERC4626 wrapper for Lido stETH
 /// @dev Uses stETH's internal shares accounting instead of using regular vault accounting
 /// since this prevents attackers from atomically increasing the vault's share value
@@ -116,47 +116,32 @@ contract LidoAdapter is AdapterBase {
                             ACCOUNTING LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function _underlyingBalance() internal view returns (uint256) {
-        return lido.sharesOf(address(this));
-    }
-
     function _totalAssets() internal view override returns (uint256) {
-        return lido.balanceOf(address(this)); // this can be higher than the total assets deposited due to staking rewards
+        uint256 assets = lido.balanceOf(address(this));
+        return assets - assets.mulDiv(slippage, 1e18, Math.Rounding.Up);
     }
 
-    function previewWithdraw(
-        uint256 assets
-    ) public view override returns (uint256) {
-        return
-            _convertToShares(
-                StableSwapSTETH.get_dy(STETHID, WETHID, assets),
-                Math.Rounding.Down
-            );
-    }
-
-    function previewRedeem(
+    function convertToUnderlyingShares(
+        uint256,
         uint256 shares
     ) public view override returns (uint256) {
-        uint256 assets = _convertToAssets(shares, Math.Rounding.Up);
-        return assets;
+        uint256 supply = totalSupply();
+        return
+            supply == 0
+                ? shares
+                : shares.mulDiv(
+                    lido.balanceOf(address(this)),
+                    supply,
+                    Math.Rounding.Up
+                );
     }
-
-//    function previewRedeemWithSlippage(
-//        uint256 shares
-//    ) public view returns (uint256) {
-//        uint256 assets = _convertToAssets(shares, Math.Rounding.Up);
-//        return assets + assets.mulDiv(slippage, 1e18, Math.Rounding.Up);
-//    }
 
     /*//////////////////////////////////////////////////////////////
                           INTERNAL HOOKS LOGIC
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Deposit into LIDO pool
-    function _protocolDeposit(
-        uint256 assets,
-        uint256
-    ) internal override {
+    function _protocolDeposit(uint256 assets, uint256) internal override {
         weth.withdraw(assets); // Grab native Eth from Weth contract
         lido.submit{value: assets}(FEE_RECIPIENT); // Submit to Lido Contract
     }
@@ -164,44 +149,14 @@ contract LidoAdapter is AdapterBase {
     /// @notice Withdraw from LIDO pool
     function _protocolWithdraw(
         uint256 assets,
-        uint256
+        uint256 shares
     ) internal override {
         uint256 amountRecieved = StableSwapSTETH.exchange(
             STETHID,
             WETHID,
-            assets,
-            _getSlippage(assets)
+            convertToUnderlyingShares(assets, shares),
+            0
         );
         weth.deposit{value: amountRecieved}(); // get wrapped eth back
-    }
-
-    function _withdraw(
-        address caller,
-        address receiver,
-        address owner,
-        uint256 assets,
-        uint256 shares
-    ) internal virtual override {
-        if (caller != owner) {
-            _spendAllowance(owner, caller, shares);
-        }
-
-        uint256 toTransfer = StableSwapSTETH.get_dy(STETHID, WETHID, assets);
-
-        if (!paused()) {
-            _protocolWithdraw(assets, shares);
-        }
-
-        _burn(owner, shares);
-
-        IERC20(asset()).safeTransfer(receiver, toTransfer);
-
-        if (autoHarvest) harvest();
-
-        emit Withdraw(caller, receiver, owner, assets, shares);
-    }
-
-    function _getSlippage(uint256 assets) private view returns(uint256) {
-        return assets.mulDiv(slippage, 1e18, Math.Rounding.Up);
     }
 }

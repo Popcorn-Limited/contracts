@@ -15,7 +15,7 @@ contract LidoTestConfigStorage is ITestConfigStorage {
 
     constructor() {
         testConfigs.push(
-            LidoTestConfig(1e16 , 1)
+            LidoTestConfig(1e15 , 1) // 10 BPS
         );
     }
 

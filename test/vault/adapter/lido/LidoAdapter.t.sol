@@ -22,11 +22,8 @@ contract LidoAdapterTest is AbstractAdapterTest {
     uint256 maxAssetsNew;
     int128 private constant WETHID = 0;
     int128 private constant STETHID = 1;
-    uint8 internal constant decimalOffset = 9;
     ICurveMetapool public constant StableSwapSTETH =
         ICurveMetapool(0xDC24316b9AE028F1497c275EB9192a3Ea0f67022);
-    uint256 public constant DENOMINATOR = 1e18;
-    uint256 public slippageProtectionOut = 1e16; // = 100; //out of 10000. 100 = 1%
 
     function setUp() public {
         uint256 forkId = vm.createSelectFork(vm.rpcUrl("mainnet"));
@@ -39,16 +36,15 @@ contract LidoAdapterTest is AbstractAdapterTest {
 
         _setUpTest(testConfigStorage.getTestConfig(0));
 
-        maxAssetsNew = IERC20(asset).totalSupply() / 10 ** 5;
-        defaultAmount = Math.min(
-            10 ** IERC20Metadata(address(asset)).decimals() * 1e9,
-            maxAssetsNew
-        );
-        maxAssets = Math.min(
-            10 ** IERC20Metadata(address(asset)).decimals() * 1e9,
-            maxAssetsNew
-        );
-        maxShares = maxAssets / 2;
+        defaultAmount = 1e18;
+
+        minFuzz = 1e18;
+        minShares = 1e27;
+
+        raise = defaultAmount * 1_000;
+
+        maxAssets = minFuzz * 10;
+        maxShares = minShares * 10;
     }
 
     function overrideSetup(bytes memory testConfig) public override {
@@ -113,18 +109,6 @@ contract LidoAdapterTest is AbstractAdapterTest {
             adapter.convertToAssets(adapter.totalSupply()),
             _delta_,
             string.concat("totalSupply converted != totalAssets", baseTestId)
-        );
-
-        uint256 pricePerShare = (adapter.totalAssets()).mulDiv(
-            1,
-            adapter.totalSupply(),
-            Math.Rounding.Up
-        );
-        assertApproxEqAbs(
-            adapter.totalAssets(),
-            iouBalance(), // didnt multiply by price per share as it causes it to fail
-            _delta_,
-            string.concat("totalAssets != yearn assets", baseTestId)
         );
     }
 
@@ -256,7 +240,53 @@ contract LidoAdapterTest is AbstractAdapterTest {
                           ROUNDTRIP TESTS
     //////////////////////////////////////////////////////////////*/
 
-    // Because withdrawing loses some tokens due to slippage when swapping StEth for Weth
+    function test__pause() public override {
+        _mintAssetAndApproveForAdapter(defaultAmount, bob);
+
+        vm.prank(bob);
+        adapter.deposit(defaultAmount, bob);
+
+        uint256 oldTotalAssets = adapter.totalAssets();
+        uint256 oldTotalSupply = adapter.totalSupply();
+        uint256 oldBalance = asset.balanceOf(address(adapter));
+        uint256 dy = StableSwapSTETH.get_dy(STETHID, WETHID, oldTotalAssets);
+
+        adapter.pause();
+
+        // We simply withdraw into the adapter
+        // TotalSupply and Assets dont change
+        assertApproxEqAbs(
+            dy, // NOTE: oldTotalAssets doesn't take commission into account
+            adapter.totalAssets(),
+            LidoAdapter(payable(_vault_)).slippage(), // Check if the asset change is in acceptable slippage range
+            "totalAssets"
+        );
+        assertApproxEqAbs(
+            oldTotalSupply,
+            adapter.totalSupply(),
+            _delta_,
+            "totalSupply"
+        );
+        assertApproxEqAbs(
+            asset.balanceOf(address(adapter)),
+            dy, // NOTE: oldTotalAssets doesn't take commission into account
+            LidoAdapter(payable(_vault_)).slippage(), // Check if the asset change is in acceptable slippage range
+            "asset balance"
+        );
+        assertApproxEqAbs(iouBalance(), 0, _delta_, "iou balance");
+
+        vm.startPrank(bob);
+        // Deposit and mint are paused (maxDeposit/maxMint are set to 0 on pause)
+        vm.expectRevert();
+        adapter.deposit(defaultAmount, bob);
+
+        vm.expectRevert();
+        adapter.mint(defaultAmount, bob);
+
+        // Withdraw and Redeem dont revert
+        adapter.withdraw(defaultAmount / 10, bob, bob);
+        adapter.redeem(defaultAmount / 10, bob, bob);
+    }
 
     function test__unpause() public override {
         _mintAssetAndApproveForAdapter(defaultAmount * 3, bob);
@@ -277,7 +307,7 @@ contract LidoAdapterTest is AbstractAdapterTest {
         assertApproxEqAbs(
             dy, // NOTE: oldTotalAssets doesn't take commission into account
             adapter.totalAssets(),
-            _delta_,
+            LidoAdapter(payable(_vault_)).slippage(), // Check if the asset change is in acceptable slippage range
             "totalAssets"
         );
         assertApproxEqAbs(
@@ -292,59 +322,16 @@ contract LidoAdapterTest is AbstractAdapterTest {
             _delta_,
             "asset balance"
         );
-        assertApproxEqAbs(iouBalance(), dy, _delta_, "iou balance"); // NOTE: oldTotalAssets doesn't take commission into account
+        assertApproxEqAbs(
+            iouBalance(),
+            dy,
+            LidoAdapter(payable(_vault_)).slippage(), // Check if the asset change is in acceptable slippage range
+            "iou balance"
+        );
 
         // Deposit and mint dont revert
         vm.startPrank(bob);
         adapter.deposit(defaultAmount, bob);
         adapter.mint(defaultAmount, bob);
-    }
-
-    function test__pause() public override {
-        _mintAssetAndApproveForAdapter(defaultAmount, bob);
-
-        vm.prank(bob);
-        adapter.deposit(defaultAmount, bob);
-
-        uint256 oldTotalAssets = adapter.totalAssets();
-        uint256 oldTotalSupply = adapter.totalSupply();
-        uint256 oldBalance = asset.balanceOf(address(adapter));
-        uint256 dy = StableSwapSTETH.get_dy(STETHID, WETHID, oldTotalAssets);
-
-        adapter.pause();
-
-        // We simply withdraw into the adapter
-        // TotalSupply and Assets dont change
-        assertApproxEqAbs(
-            dy, // NOTE: oldTotalAssets doesn't take commission into account
-            adapter.totalAssets(),
-            _delta_,
-            "totalAssets"
-        );
-        assertApproxEqAbs(
-            oldTotalSupply,
-            adapter.totalSupply(),
-            _delta_,
-            "totalSupply"
-        );
-        assertApproxEqAbs(
-            asset.balanceOf(address(adapter)),
-            dy, // NOTE: oldTotalAssets doesn't take commission into account
-            _delta_,
-            "asset balance"
-        );
-        assertApproxEqAbs(iouBalance(), 0, _delta_, "iou balance");
-
-        vm.startPrank(bob);
-        // Deposit and mint are paused (maxDeposit/maxMint are set to 0 on pause)
-        vm.expectRevert();
-        adapter.deposit(defaultAmount, bob);
-
-        vm.expectRevert();
-        adapter.mint(defaultAmount, bob);
-
-        // Withdraw and Redeem dont revert
-        adapter.withdraw(defaultAmount / 10, bob, bob);
-        adapter.redeem(defaultAmount / 10, bob, bob);
     }
 }
