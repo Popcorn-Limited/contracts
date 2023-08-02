@@ -20,17 +20,17 @@ import {
 
 import "forge-std/console.sol";
 
-contract Y2KPremiumAdapter is AdapterBase { //TODO: Implement ERC1155 receiver
+contract Y2KPremiumAdapter is AdapterBase {
     using SafeERC20 for IERC20;
     using Math for uint256;
 
     string internal _name;
     string internal _symbol;
-    uint256 private totalDeposits;
 
     ICarousel public carousel;
     ICarouselFactory public carouselFactory;
 
+    error EpochNotResolved();
     error InvalidPremiumVault();
 
     /**
@@ -48,7 +48,6 @@ contract Y2KPremiumAdapter is AdapterBase { //TODO: Implement ERC1155 receiver
     ) external virtual initializer {
         __AdapterBase_init(adapterInitData);
 
-        //TODO: should we check the carousel factory in registry to ensure it's not deprecated?
         (address _carouselFactory, uint256 _marketId) = abi.decode(y2kInitData, (address, uint256));
         carouselFactory = ICarouselFactory(_carouselFactory);
 
@@ -58,7 +57,7 @@ contract Y2KPremiumAdapter is AdapterBase { //TODO: Implement ERC1155 receiver
         }
         carousel = ICarousel(vaults[0]);
 
-        IERC20(carousel.asset()).safeApprove(address(carousel), type(uint256).max); //todo: double check the asset()
+        IERC20(carousel.asset()).safeApprove(address(carousel), type(uint256).max);
 
         _name = string.concat(
             "VaultCraft Y2k Premium ",
@@ -92,10 +91,10 @@ contract Y2KPremiumAdapter is AdapterBase { //TODO: Implement ERC1155 receiver
     /// @notice Emulate y2k total asset calculation to return the total assets of the vault.
     function _totalAssets() internal view override returns (uint256) {
         //implemented based on deposit into the y2k open epoch not into deposit queue
+        //this is also equivalent to the shares of the vault in the y2k adapter.
         ICarousel _carousel = carousel;
         uint256 epochId = _getLatestEpochId(_carousel);
         return _carousel.balanceOf(address (this), epochId);
-        return totalAssets;
     }
 
     /// @notice The amount of y2k token shares to withdraw given an amount of adapter shares
@@ -123,8 +122,6 @@ contract Y2KPremiumAdapter is AdapterBase { //TODO: Implement ERC1155 receiver
         uint256 amount,
         uint256
     ) internal virtual override {
-        totalDeposits += amount;
-        //TODO: enlist shares in rollover queue
         ICarousel _carousel = carousel;
         if(amount < _carousel.minQueueDeposit()) return;
 
@@ -133,6 +130,7 @@ contract Y2KPremiumAdapter is AdapterBase { //TODO: Implement ERC1155 receiver
         bool epochHasStarted = block.timestamp > _epochBegin;
         if(epochHasStarted){
             //deposit into the queue with epochId 0
+            //TODO: we cannot deposit into a queue unless we implement ERC1155 receiver
             _carousel.deposit(
                 0,
                 amount,
@@ -145,6 +143,7 @@ contract Y2KPremiumAdapter is AdapterBase { //TODO: Implement ERC1155 receiver
                 address (this)
             );
         }
+        _carousel.enListInRollover(_totalAssets(), epochId, address(this));
     }
 
     /// @notice Withdraw from the premium wallet
@@ -152,23 +151,24 @@ contract Y2KPremiumAdapter is AdapterBase { //TODO: Implement ERC1155 receiver
         uint256 amount,
         uint256
     ) internal virtual override {
+        //during withdraw the amount of shares passed in will be previewed for a gain or a loss before asset transfer
+
         ICarousel _carousel = carousel;
         uint256 epochId = _getLatestEpochId(_carousel);
 
         uint256 shares = convertToShares(_totalAssets());
         uint256 underlyingShares = convertToUnderlyingShares(0, shares);
 
-        if(_carousel.epochResolved(epochId)) {
-            _carousel.withdraw(
-                epochId,
-                underlyingShares,
-                address (this),
-                address (this)
-            );
-        } else {
-            //TODO: do what?
-            //  delist from rollover, store the epochId of the withdraw request and make them withdraw again)
-        }
+        if(!_carousel.epochResolved(epochId)) revert EpochNotResolved();
+
+        _carousel.deListInRollover(address (this));
+        _carousel.withdraw(
+            epochId,
+            underlyingShares,
+            address (this),
+            address (this)
+        );
+        _carousel.enListInRollover(_totalAssets(), epochId, address(this));
     }
 
     function _getLatestEpochId(ICarousel _carousel) internal view returns(uint256 epochId) {
