@@ -113,6 +113,18 @@ contract Y2KAdapter is AdapterBase {
     }
 
     /*//////////////////////////////////////////////////////////////
+                   DEPOSIT/WITHDRAWAL LIMIT LOGIC
+   //////////////////////////////////////////////////////////////*/
+    /// @dev When epoch is active return 0, else return amount
+    function maxWithdraw(address owner) public view override returns (uint256) {
+        ICarousel _carousel = carousel;
+        uint256 epochId = _getLatestEpochId(_carousel);
+        if (!_carousel.epochResolved(epochId)) return 0;
+
+        return convertToAssets(balanceOf(owner));
+    }
+
+    /*//////////////////////////////////////////////////////////////
                           INTERNAL HOOKS LOGIC
     //////////////////////////////////////////////////////////////*/
 
