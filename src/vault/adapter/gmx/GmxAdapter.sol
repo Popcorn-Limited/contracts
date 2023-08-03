@@ -29,7 +29,7 @@ contract GmxAdapter is AdapterBase {
         gmx = IERC20(router.gmx());
 
         _name = string.concat(
-            "VaultCraft GMX ",
+            "VaultCraft ",
             IERC20Metadata(address(gmx)).name(),
             " Adapter"
         );
@@ -42,6 +42,29 @@ contract GmxAdapter is AdapterBase {
             address(router),
             type(uint256).max
         );
+
+        gmx.approve(
+            router.stakedGmxTracker(),
+            type(uint256).max
+        );
+    }
+
+    function name()
+    public
+    view
+    override(IERC20Metadata, ERC20)
+    returns (string memory)
+    {
+        return _name;
+    }
+
+    function symbol()
+    public
+    view
+    override(IERC20Metadata, ERC20)
+    returns (string memory)
+    {
+        return _symbol;
     }
 
     /*//////////////////////////////////////////////////////////////

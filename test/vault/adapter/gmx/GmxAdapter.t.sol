@@ -68,26 +68,51 @@ contract GmxAdapterTest is AbstractAdapterTest {
         vm.label(address(adapter), "adapter");
     }
 
-    function test__deposit(uint8 fuzzAmount) public override {
-        uint8 len = uint8(testConfigStorage.getTestConfigLength());
-        for (uint8 i; i < len; i++) {
-            if (i > 0) overrideSetup(testConfigStorage.getTestConfig(i));
-            uint256 amount = bound(uint256(fuzzAmount), minFuzz, maxAssets);
-
-            emit log_named_uint("balance bob", asset.balanceOf(bob));
-
-            _mintAssetAndApproveForAdapter(amount, bob);
-
-            emit log_named_uint("balance bob", asset.balanceOf(bob));
-            emit log("PING");
-
-            prop_deposit(bob, bob, amount, testId);
-            emit log("PING1");
-
-            increasePricePerShare(raise);
-
-            _mintAssetAndApproveForAdapter(amount, bob);
-            prop_deposit(bob, alice, amount, testId);
-        }
+    function increasePricePerShare(uint256 amount) public override {
+        deal(address(asset), address (rewardTracker), asset.balanceOf(address(rewardTracker)) + amount);
     }
+
+    function iouBalance() public view override returns (uint256) {
+        return rewardTracker.depositBalances(address(adapter), address(asset));
+    }
+
+    function verify_totalAssets() public override {
+        deal(address(asset), bob, defaultAmount);
+        vm.startPrank(bob);
+        asset.approve(address(adapter), defaultAmount);
+        adapter.deposit(defaultAmount, bob);
+        vm.stopPrank();
+
+        assertApproxEqAbs(
+            adapter.totalAssets(),
+            adapter.convertToAssets(adapter.totalSupply()),
+            _delta_,
+            string.concat("totalSupply converted != totalAssets", baseTestId)
+        );
+    }
+
+    function verify_adapterInit() public override {
+        assertEq(adapter.asset(), address (asset), "asset");
+        assertEq(
+            IERC20Metadata(address(adapter)).name(),
+            string.concat(
+                "VaultCraft ",
+                IERC20Metadata(address(asset)).name(),
+                " Adapter"
+            ),
+            "name"
+        );
+        assertEq(
+            IERC20Metadata(address(adapter)).symbol(),
+            string.concat("vcGmx-", IERC20Metadata(address(asset)).symbol()),
+            "symbol"
+        );
+
+        assertEq(
+            asset.allowance(address(adapter), address(rewardTracker)),
+            type(uint256).max,
+            "allowance"
+        );
+    }
+
 }
