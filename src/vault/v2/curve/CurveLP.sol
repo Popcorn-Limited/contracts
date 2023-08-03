@@ -4,25 +4,35 @@ import {BaseVaultInitData, BaseVault} from "../BaseVault.sol";
 import {IGauge, IMinter} from "../../adapter/curve/ICurve.sol";
 import {IERC20} from "openzeppelin-contracts/interfaces/IERC20.sol";
 import {IERC20Metadata} from "openzeppelin-contracts/interfaces/IERC20Metadata.sol";
+import "openzeppelin-contracts-upgradeable/proxy/utils/Initializable.sol";
 
-abstract contract CurveLP is BaseVault {
+abstract contract CurveLP {
     address crv;
+    IERC20 asset;
     IGauge gauge;
     IMinter minter;
+    address vault;
 
-    function __CurveLP__init(BaseVaultInitData calldata initData, address _gauge, address _minter, address _asset) internal onlyInitializing {
-        __BaseVault__init(initData);
+    modifier onlyVault() {
+        require(msg.sender == vault);
+        _;
+    }
+
+    function __CurveLP__init(address _vault, address _gauge, address _minter, address _asset) internal onlyInitializing {
         gauge = IGauge(_gauge);
         minter = IMinter(_minter);
         crv = IMinter(_minter).token();
 
+        vault = _vault;
+
         IERC20(_asset).approve(_gauge, type(uint).max);
+        asset = IERC20(_asset);
 
         updateRewardTokens();
     }
 
 
-    function _claim() internal override {
+    function _claim() internal {
         minter.mint(address(gauge));
     }
     
@@ -63,12 +73,17 @@ abstract contract CurveLP is BaseVault {
         }
     }
     
-    function _protocolDeposit(uint amount, uint) internal override {
+    function deposit(uint amount) external onlyVault {
+        _deposit(amount);
+    }
+
+    function _deposit(uint amount) internal {
         gauge.deposit(amount);
     }
 
-    function _protocolWithdraw(uint amount, uint) internal override {
+    function withdraw(address to, uint amount) external onlyVault {
         gauge.withdraw(amount);
+        asset.safeTransfer(to, amount);
     }
 
     function _totalAssets() internal view override returns (uint) {

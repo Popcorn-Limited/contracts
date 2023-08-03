@@ -3,13 +3,17 @@ pragma solidity ^0.8.15;
 import {IERC20} from "openzeppelin-contracts/interfaces/IERC20.sol";
 import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {BaseVaultInitData} from "../BaseVault.sol";
 import {CurveCompounder, StrategyConfig, CurveRoute} from "./CurveCompounder.sol";
 import {CurveLP} from "./CurveLP.sol";
 
 interface IPool {
-    // TODO: add remaining functions for different number of coins
+    function add_liquidity(uint[2] memory amounts, uint minOut) external;
     function add_liquidity(uint[3] memory amounts, uint minOut) external;
+    function add_liquidity(uint[4] memory amounts, uint minOut) external;
+    function add_liquidity(uint[5] memory amounts, uint minOut) external;
+    function add_liquidity(uint[6] memory amounts, uint minOut) external;
+    function add_liquidity(uint[7] memory amounts, uint minOut) external;
+    function add_liquidity(uint[8] memory amounts, uint minOut) external;
 }
 
 contract CurveLPCompounder is CurveCompounder, CurveLP {
@@ -18,14 +22,20 @@ contract CurveLPCompounder is CurveCompounder, CurveLP {
     IPool pool;
     uint8 internal numberOfTokens;
     uint baseAssetIndex; // the index is used in add_liquidity
-    /// @dev number of tokens in the curve pool
 
     constructor() {
         _disableInitializers();
     }
 
-    function initialize(BaseVaultInitData calldata baseVaultInitData, bytes calldata initData) public initializer {
+    function harvest() external {
+        _claim();
+        _compound();
+        _deposit(IERC20(asset()).balanceOf(address(this)));
+    }
+
+    function initialize(bytes calldata initData) public initializer {
         (
+            address _vault,
             address _gauge,
             address _minter,
             address _pool,
@@ -33,10 +43,10 @@ contract CurveLPCompounder is CurveCompounder, CurveLP {
             uint _baseAssetIndex,
             StrategyConfig memory _stratConfig
         ) = abi.decode(
-            initData, (address, address, address, uint8, uint, StrategyConfig)
+            initData, (address, address, address, address, uint8, uint, StrategyConfig)
         );
 
-        __CurveLP__init(baseVaultInitData, _gauge, _minter, baseVaultInitData.asset);
+        __CurveLP__init(_vault, _gauge, _minter, baseVaultInitData.asset);
         __CurveCompounder__init(_stratConfig);
 
         IERC20(baseAsset).safeApprove(_pool, type(uint).max);
@@ -50,7 +60,7 @@ contract CurveLPCompounder is CurveCompounder, CurveLP {
     /// know how to get from the reward tokens to the vault's asset.
     /// For example, the CurveLPCompounder needs to deposit token X into a Curve pool to receive the LP token (vault's asset).
     /// A different Vault would maybe trade the reward tokens directly for the vault's asset instead.
-    /// To keep the strategy contract universal, we move the `_getAsset()` function into the vault contract.
+    /// To keep the strategy contract universal, we move the `_getAsset()` function into the top-level contract.
     function _getAsset() internal override {
         // Curve's `add_liquidity` expects a fixed-size array as the first argument.
         // The size of the array depends on the pool.
@@ -82,39 +92,35 @@ contract CurveLPCompounder is CurveCompounder, CurveLP {
 
         uint amount = IERC20(baseAsset).balanceOf(address(this));
 
-        // if (_numberOfTokens == 2) {
-        //     uint[2] memory amounts = [uint(0), 0];
-        //     amounts[baseAssetIndex] = amount;
-        //     pool.add_liquidity(amounts, 0);
-        // } else if (_numberOfTokens == 3) {
-        //     uint[3] memory amounts = [uint(0), 0, 0];
-        //     amounts[baseAssetIndex] = amount;
-        //     pool.add_liquidity(amounts, 0);
-        // } else if (_numberOfTokens == 4) {
-        //     uint[4] memory amounts = [uint(0), 0, 0, 0];
-        //     amounts[baseAssetIndex] = amount;
-        //     pool.add_liquidity(amounts, 0);
-        // } else if (_numberOfTokens == 5) {
-        //     uint[5] memory amounts = [uint(0), 0, 0, 0, 0];
-        //     amounts[baseAssetIndex] = amount;
-        //     pool.add_liquidity(amounts, 0);
-        // } else if (_numberOfTokens == 6) {
-        //     uint[6] memory amounts = [uint(0), 0, 0, 0, 0, 0];
-        //     amounts[baseAssetIndex] = amount;
-        //     pool.add_liquidity(amounts, 0);
-        // } else if (_numberOfTokens == 7) {
-        //     uint[7] memory amounts = [uint(0), 0, 0, 0, 0, 0, 0];
-        //     amounts[baseAssetIndex] = amount;
-        //     pool.add_liquidity(amounts, 0);
-        // } else if (_numberOfTokens == 8) {
-        //     // 8 seems to be the max. amount of tokens in a pool
-        //     uint[8] memory amounts = [uint(0), 0, 0, 0, 0, 0, 0, 0];
-        //     amounts[baseAssetIndex] = amount;
-        //     pool.add_liquidity(amounts, 0);
-        // }
-        
-        uint[3] memory amounts = [uint(0), 0, 0];
-        amounts[baseAssetIndex] = amount;
-        pool.add_liquidity(amounts, 0);
+        if (_numberOfTokens == 2) {
+            uint[2] memory amounts = [uint(0), 0];
+            amounts[baseAssetIndex] = amount;
+            pool.add_liquidity(amounts, 0);
+        } else if (_numberOfTokens == 3) {
+            uint[3] memory amounts = [uint(0), 0, 0];
+            amounts[baseAssetIndex] = amount;
+            pool.add_liquidity(amounts, 0);
+        } else if (_numberOfTokens == 4) {
+            uint[4] memory amounts = [uint(0), 0, 0, 0];
+            amounts[baseAssetIndex] = amount;
+            pool.add_liquidity(amounts, 0);
+        } else if (_numberOfTokens == 5) {
+            uint[5] memory amounts = [uint(0), 0, 0, 0, 0];
+            amounts[baseAssetIndex] = amount;
+            pool.add_liquidity(amounts, 0);
+        } else if (_numberOfTokens == 6) {
+            uint[6] memory amounts = [uint(0), 0, 0, 0, 0, 0];
+            amounts[baseAssetIndex] = amount;
+            pool.add_liquidity(amounts, 0);
+        } else if (_numberOfTokens == 7) {
+            uint[7] memory amounts = [uint(0), 0, 0, 0, 0, 0, 0];
+            amounts[baseAssetIndex] = amount;
+            pool.add_liquidity(amounts, 0);
+        } else if (_numberOfTokens == 8) {
+            // 8 seems to be the max. amount of tokens in a pool
+            uint[8] memory amounts = [uint(0), 0, 0, 0, 0, 0, 0, 0];
+            amounts[baseAssetIndex] = amount;
+            pool.add_liquidity(amounts, 0);
+        }
     }
 }

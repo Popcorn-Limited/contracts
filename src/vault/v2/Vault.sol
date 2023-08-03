@@ -18,7 +18,7 @@ import {EIP165} from "../../utils/EIP165.sol";
 import {OwnedUpgradeable} from "../../utils/OwnedUpgradeable.sol";
 import {VaultFees} from "../../interfaces/vault/IVault.sol";
 
-struct BaseVaultInitData {
+struct VaultInitData {
     address asset;
     string name;
     string symbol;
@@ -26,6 +26,18 @@ struct BaseVaultInitData {
     VaultFees fees;
     address feeRecipient;
     uint depositLimit;
+    uint128 harvestCooldown;
+    uint8 autoHarvest;
+}
+
+struct Strategy {
+    address addr;
+    uint96 weight;
+}
+
+interface IStrategy {
+    function deposit(uint amount) external;
+    function withdraw(address to, uint amount) external;
 }
 
 /**
@@ -38,7 +50,7 @@ struct BaseVaultInitData {
  * All specific interactions for the underlying protocol need to be overriden in the actual implementation.
  * The adapter can be initialized with a strategy that can perform additional operations. (Leverage, Compounding, etc.)
  */
-abstract contract BaseVault is
+contract Vault is
     ERC4626Upgradeable,
     PausableUpgradeable,
     OwnedUpgradeable,
@@ -50,9 +62,14 @@ abstract contract BaseVault is
 
     uint8 internal _decimals;
     uint8 public constant decimalOffset = 9;
+    uint8 public autoHarvest;
+    uint128 harvestCooldown;
+    uint128 lastHarvest;
 
     uint depositLimit;
     bytes32 contractName;
+
+    Strategy[] strategies;
 
     event VaultInitialized(bytes32 contractName, address indexed asset);
 
@@ -74,7 +91,7 @@ abstract contract BaseVault is
      * @dev Each Adapter implementation should implement checks to make sure that the adapter is wrapping the underlying protocol correctly.
      * @dev If a strategy is provided, it will be verified to make sure it implements the required functions.
      */
-    function __BaseVault__init(BaseVaultInitData calldata initData) internal onlyInitializing {
+    function initialize(VaultInitData calldata initData) internal initializer {
         __Owned_init(initData.owner);
         __Pausable_init();
         __ERC4626_init(IERC20Metadata(initData.asset));
@@ -99,18 +116,35 @@ abstract contract BaseVault is
 
         quitPeriod = 3 days;
 
+        lastHarvest = uint128(block.timestamp);
+        autoHarvest = initData.autoHarvest;
+        harvestCooldown = initData.harvestCooldown;
+
         emit VaultInitialized(contractName, address(initData.asset));
     }
     function decimals() public view override returns (uint8) {
         return _decimals;
     }
 
+    function updateStrategies(Strategy[] calldata _strategies) external onlyOwner {
+        // it's easier to update the whole array instead of adding and removing individual strats
+
+        // TODO: add deallocate function
+        deallocate();
+
+        delete strategies;
+
+        for (uint i; i < _strategies.length;) {
+            strategies.push(_strategies[i]);
+            unchecked {++i;}
+        }
+    
+        allocate();
+    }
+
     /*//////////////////////////////////////////////////////////////
                         DEPOSIT/WITHDRAWAL LOGIC
     //////////////////////////////////////////////////////////////*/
-
-    function _afterDeposit() internal virtual;
-    function _afterWithdrawal() internal virtual;
 
     error MaxError(uint256 amount);
     error ZeroAmount();
@@ -121,6 +155,7 @@ abstract contract BaseVault is
         /// @dev Inititalize account for managementFee on first deposit
         if (totalSupply() == 0) feesUpdatedAt = block.timestamp;
 
+        // TODO: are we ever going to use deposit fees? Removing them will reduce gas costs of the main user flow
         uint feeShares = _convertToShares(
             assets.mulDiv(uint256(fees.deposit), 1e18, Math.Rounding.Down),
             Math.Rounding.Down
@@ -174,7 +209,6 @@ abstract contract BaseVault is
     {
         IERC20(asset()).safeTransferFrom(caller, address(this), assets);
 
-        _protocolDeposit(assets, shares);
         _mint(receiver, shares);
 
         _afterDeposit();
@@ -196,17 +230,40 @@ abstract contract BaseVault is
         }
 
         if (!paused()) {
-            _protocolWithdraw(assets, shares);
+            // TODO: need to implement a withdrawal queue to pull funds from the strategies.
+            // See Tribe's contract for that
         }
 
         _burn(owner, shares);
-
-        IERC20(asset()).safeTransfer(receiver, assets);
 
         _afterWithdrawal();
 
         emit Withdraw(caller, receiver, owner, assets, shares);
     }
+
+    function allocate() external {
+        IERC20 asset = IERC20(asset());
+        uint balance = asset.balanceOf(address(this));
+
+        uint len = strategies.length;
+        for (uint i; i < len;) {
+            uint amount = 1e5 * balance / uint(strategies[i].weight);
+            asset.safeTransfer(strategies[i].addr, amount);
+            IStrategy(strategies[i].addr).deposit(amount);
+            unchecked {++i;}
+        }
+    }
+
+    function _afterDeposit() internal {
+        // TODO: add harvest stuff
+    }
+
+    function _afterWithdrawal() internal {
+
+    }
+
+    // TODO: add `totalAssets()`.
+    // need to loop over all the strats for that
 
     /*//////////////////////////////////////////////////////////////
                             ACCOUNTING LOGIC
@@ -460,17 +517,6 @@ abstract contract BaseVault is
 
         emit QuitPeriodSet(quitPeriod);
     }
-
-    /*//////////////////////////////////////////////////////////////
-                      REWARDS
-    //////////////////////////////////////////////////////////////*/
-
-    /// @dev called by strategy contract to claim reward tokens
-    function _claim() internal virtual;
-
-    address[] public rewardTokens;
-
-    function updateRewardTokens() external virtual;
 
     /*//////////////////////////////////////////////////////////////
                           INTERNAL HOOKS LOGIC
