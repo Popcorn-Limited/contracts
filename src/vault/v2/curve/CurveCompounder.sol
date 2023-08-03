@@ -1,16 +1,13 @@
 pragma solidity ^0.8.15;
 
 import {IERC20} from "openzeppelin-contracts/interfaces/IERC20.sol";
-import {BaseStrategy} from "../BaseStrategy.sol";
 import {ICurveRouter} from "../../../interfaces/external/curve/ICurveRouter.sol";
-import {Initializable} from "openzeppelin-contracts-upgradeable/proxy/utils/Initializable.sol";
+import "openzeppelin-contracts-upgradeable/proxy/utils/Initializable.sol";
 
 struct CurveRoute {
     address[9] route;
     uint256[3][4] swapParams;
 }
-
-
 
 struct StrategyConfig {
     address router;
@@ -21,7 +18,7 @@ struct StrategyConfig {
     uint256[] minTradeAmounts;
 }
 
-abstract contract CurveCompounder is BaseStrategy {
+abstract contract CurveCompounder {
 
     address router;
     address baseAsset;
@@ -29,7 +26,6 @@ abstract contract CurveCompounder is BaseStrategy {
     uint256[] minTradeAmounts;
 
     function __CurveCompounder__init(StrategyConfig memory _stratConfig) internal onlyInitializing {
-        __BaseStrategy__init(_stratConfig.harvestCooldown, _stratConfig.autoHarvest);
 
         router = _stratConfig.router;
         baseAsset = _stratConfig.baseAsset;
@@ -53,17 +49,7 @@ abstract contract CurveCompounder is BaseStrategy {
             }
         }
     }
-
-    function harvest() public override {
-        lastHarvest = uint128(block.timestamp);
-
-        // cache for gas savings
-        IERC20 _asset = IERC20(asset());
-
-        uint balBefore = _asset.balanceOf(address(this));
-        
-        _claim();
-        
+    function _compound() internal {
         _swapToBaseAsset();
 
         if (IERC20(baseAsset).balanceOf(address(this)) == 0) {
@@ -72,8 +58,6 @@ abstract contract CurveCompounder is BaseStrategy {
         }
 
         _getAsset();
-
-        strategyDeposit(_asset.balanceOf(address(this)) - balBefore, 0);
     }
 
 
