@@ -14,6 +14,7 @@ import {
     ERC4626Upgradeable as ERC4626
 } from "../../abstracts/AdapterBase.sol";
 import {
+    QueueItem,
     ICarousel,
     IVaultFactoryV2 as ICarouselFactory
 } from "../IY2k.sol";
@@ -117,6 +118,8 @@ contract Y2KAdapter is AdapterBase {
    //////////////////////////////////////////////////////////////*/
     /// @dev When epoch is active return 0, else return amount
     function maxWithdraw(address owner) public view override returns (uint256) {
+        if (paused()) return 0;
+
         ICarousel _carousel = carousel;
         uint256 epochId = _getLatestEpochId(_carousel);
         if (!_carousel.epochResolved(epochId)) return 0;
@@ -141,7 +144,6 @@ contract Y2KAdapter is AdapterBase {
         bool epochHasStarted = block.timestamp > _epochBegin;
         if(epochHasStarted){
             //deposit into the queue with epochId 0
-            //TODO: we cannot deposit into a queue unless we implement ERC1155 receiver
             _carousel.deposit(
                 0,
                 amount,
@@ -154,7 +156,7 @@ contract Y2KAdapter is AdapterBase {
                 address (this)
             );
         }
-        _carousel.enListInRollover(_totalAssets(), epochId, address(this));
+        //_carousel.enListInRollover(_totalAssets(), epochId, address(this));
     }
 
     /// @notice Withdraw from the premium wallet
@@ -163,6 +165,7 @@ contract Y2KAdapter is AdapterBase {
         uint256
     ) internal virtual override {
         //during withdraw the amount of shares passed in will be previewed for a gain or a loss before asset transfer
+        if(_totalAssets() == 0) return;
 
         ICarousel _carousel = carousel;
         uint256 epochId = _getLatestEpochId(_carousel);
@@ -172,14 +175,13 @@ contract Y2KAdapter is AdapterBase {
 
         if(!_carousel.epochResolved(epochId)) revert EpochNotResolved();
 
-        _carousel.deListInRollover(address (this));
+        //_carousel.deListInRollover(address (this));
         _carousel.withdraw(
             epochId,
             underlyingShares,
             address (this),
             address (this)
         );
-        _carousel.enListInRollover(_totalAssets(), epochId, address(this));
     }
 
     function _getLatestEpochId(ICarousel _carousel) internal view returns(uint256 epochId) {

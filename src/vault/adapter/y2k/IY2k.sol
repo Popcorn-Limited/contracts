@@ -3,6 +3,12 @@
 
 pragma solidity ^0.8.15;
 
+struct QueueItem {
+    uint256 shares;
+    address receiver;
+    uint256 epochId;
+}
+
 interface IVaultFactoryV2 {
     function createNewMarket(
         uint256 fee,
@@ -104,10 +110,15 @@ interface ICarousel {
     returns (bool);
 
     function enListInRollover(
-        uint256 _assets,
         uint256 _epochId,
+        uint256 _assets,
         address _receiver
     ) external;
+
+    function depositQueue(uint256 index)
+    external
+    view
+    returns (QueueItem memory);
 
     function deListInRollover(address _receiver) external;
 

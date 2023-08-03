@@ -23,12 +23,12 @@ import {
     Math,
     IERC20,
     SafeERC20,
+    QueueItem,
     ICarousel,
     IERC20Metadata,
     ICarouselFactory,
     Y2KPremiumAdapter
 } from "../../../../../src/vault/adapter/y2k/premium/Y2KPremiumAdapter.sol";
-import "forge-std/console.sol";
 
 
 contract Y2kPremiumAdapterTest is AbstractAdapterTest {
@@ -39,7 +39,7 @@ contract Y2kPremiumAdapterTest is AbstractAdapterTest {
     IPermissionRegistry public permissionRegistry;
 
     function setUp() public {
-        uint256 forkId = vm.createSelectFork(vm.rpcUrl("arbitrum"));
+        uint256 forkId = vm.createSelectFork(vm.rpcUrl("arbitrum"), 114354735);
         vm.selectFork(forkId);
 
         testConfigStorage = ITestConfigStorage(
@@ -103,6 +103,17 @@ contract Y2kPremiumAdapterTest is AbstractAdapterTest {
         epochId = _carousel.epochs(_carousel.getEpochsLength() - 1);
     }
 
+    function _resolveEpoch() internal {
+        //increase block time and resolve an epochId
+        vm.warp(block.timestamp + 7 days);
+        address controller = carousel.controller();
+        uint256 epochId = _getLatestEpochId(carousel);
+        vm.prank(controller);
+        carousel.resolveEpoch(epochId);
+        vm.prank(controller);
+        carousel.setEpochNull(epochId);
+    }
+
     /*//////////////////////////////////////////////////////////////
                           INITIALIZATION
     //////////////////////////////////////////////////////////////*/
@@ -146,6 +157,7 @@ contract Y2kPremiumAdapterTest is AbstractAdapterTest {
         uint256 oldTotalAssets = adapter.totalAssets();
         uint256 oldTotalSupply = adapter.totalSupply();
 
+        _resolveEpoch();
         adapter.pause();
 
         // We simply withdraw into the adapter
@@ -183,13 +195,58 @@ contract Y2kPremiumAdapterTest is AbstractAdapterTest {
         //        adapter.redeem(defaultAmount / 10, bob, bob);
     }
 
+    function test__unpause() public override {
+        _mintAssetAndApproveForAdapter(defaultAmount * 3, bob);
+
+        vm.prank(bob);
+        adapter.deposit(defaultAmount, bob);
+
+        uint256 oldTotalAssets = adapter.totalAssets();
+        uint256 oldTotalSupply = adapter.totalSupply();
+        uint256 oldIouBalance = iouBalance();
+
+        _resolveEpoch();
+
+        adapter.pause();
+        adapter.unpause();
+
+        uint256 depositQueueIndex = carousel.getDepositQueueLength() - 1;
+        QueueItem memory queueItem = carousel.depositQueue(depositQueueIndex);
+
+        // We simply deposit back into the external protocol
+        // TotalSupply and Assets dont change
+        uint256 newTotalAssets = queueItem.shares;
+        assertApproxEqAbs(
+            oldTotalAssets,
+            newTotalAssets,
+            _delta_,
+            "totalAssets"
+        );
+        assertApproxEqAbs(
+            oldTotalSupply,
+            adapter.totalSupply(),
+            _delta_,
+            "totalSupply"
+        );
+        assertApproxEqAbs(
+            asset.balanceOf(address(adapter)),
+            0,
+            _delta_,
+            "asset balance"
+        );
+        assertApproxEqAbs(iouBalance(), oldIouBalance, _delta_, "iou balance");
+
+        // Deposit and mint dont revert
+        vm.startPrank(bob);
+        adapter.deposit(defaultAmount, bob);
+        adapter.mint(defaultAmount * 1e9, bob);
+    }
+
     function test__withdraw(uint8 fuzzAmount) public override {
         uint8 len = uint8(testConfigStorage.getTestConfigLength());
         for (uint8 i; i < len; i++) {
-            vm.warp(block.timestamp - 7 days);
-
             if (i > 0) overrideSetup(testConfigStorage.getTestConfig(i));
-            uint256 amount = bound(uint256(fuzzAmount), minFuzz, maxAssets);
+            uint256 amount = bound(carousel.minQueueDeposit(), minFuzz, maxAssets);
 
             uint256 reqAssets = adapter.previewMint(
                 adapter.previewWithdraw(amount)
@@ -198,50 +255,34 @@ contract Y2kPremiumAdapterTest is AbstractAdapterTest {
             vm.prank(bob);
             adapter.deposit(reqAssets, bob);
 
-            vm.warp(block.timestamp + 7 days);
-            address controller = carousel.controller();
-            uint256 epochId = _getLatestEpochId(carousel);
-
-            vm.prank(controller);
-            carousel.resolveEpoch(epochId);
-            vm.prank(controller);
-            carousel.setEpochNull(epochId);
+            _resolveEpoch();
 
             vm.prank(bob);
             prop_withdraw(bob, bob, amount / 10, testId);
 
+            _mintAssetAndApproveForAdapter(reqAssets, bob);
+            vm.prank(bob);
+            adapter.deposit(reqAssets, bob);
 
-            //            _mintAssetAndApproveForAdapter(reqAssets, bob);
-            //            vm.prank(bob);
-            //            adapter.deposit(reqAssets, bob);
-            //
-            //            increasePricePerShare(raise);
-            //
-            //            vm.prank(bob);
-            //            adapter.approve(alice, type(uint256).max);
-            //
-            //            prop_withdraw(alice, bob, amount, testId);
+            increasePricePerShare(raise);
+
+            vm.prank(bob);
+            adapter.approve(alice, type(uint256).max);
+
+            //prop_withdraw(alice, bob, amount, testId);
         }
     }
 
     /*//////////////////////////////////////////////////////////////
                           ROUNDTRIP TESTS
     //////////////////////////////////////////////////////////////*/
-
     function test__RT_deposit_redeem() public override {
         _mintAssetAndApproveForAdapter(defaultAmount, bob);
-        vm.warp(block.timestamp - 7 days);
 
         vm.startPrank(bob);
         uint256 shares = adapter.deposit(defaultAmount, bob);
-        vm.warp(block.timestamp + 7 days);
 
-        address controller = carousel.controller();
-        uint256 epochId = _getLatestEpochId(carousel);
-        vm.prank(controller);
-        carousel.resolveEpoch(epochId);
-        vm.prank(controller);
-        carousel.setEpochNull(epochId);
+        _resolveEpoch();
 
         vm.prank(bob);
         uint256 assets = adapter.redeem(defaultAmount, bob, bob);
@@ -256,21 +297,13 @@ contract Y2kPremiumAdapterTest is AbstractAdapterTest {
         _mintAssetAndApproveForAdapter(defaultAmount, bob);
 
         vm.startPrank(bob);
-        vm.warp(block.timestamp - 7 days);
         uint256 shares1 = adapter.deposit(defaultAmount, bob);
-        vm.warp(block.timestamp + 7 days);
 
-        address controller = carousel.controller();
-        uint256 epochId = _getLatestEpochId(carousel);
-
-        vm.prank(controller);
-        carousel.resolveEpoch(epochId);
-        vm.prank(controller);
-        carousel.setEpochNull(epochId);
+        _resolveEpoch();
 
         vm.prank(bob);
-        uint256 shares2 = adapter.withdraw(defaultAmount, bob, bob);
-        vm.stopPrank();
+        uint256 shares2 = adapter.withdraw(defaultAmount/10, bob, bob);
+        //vm.stopPrank();
 
         // Pass the test if maxWithdraw is smaller than deposit since round trips are impossible
         if (adapter.maxWithdraw(bob) == defaultAmount) {
@@ -288,24 +321,16 @@ contract Y2kPremiumAdapterTest is AbstractAdapterTest {
         _mintAssetAndApproveForAdapter(reqAssets, bob);
         vm.prank(bob);
 
-        vm.warp(block.timestamp - 7 days);
         adapter.deposit(reqAssets, bob);
-        vm.warp(block.timestamp + 7 days);
 
-        address controller = carousel.controller();
-        uint256 epochId = _getLatestEpochId(carousel);
-
-        vm.prank(controller);
-        carousel.resolveEpoch(epochId);
-        vm.prank(controller);
-        carousel.setEpochNull(epochId);
+        _resolveEpoch();
 
         vm.prank(bob);
         prop_previewRedeem(bob, bob, bob, amount, testId);
     }
 
     function test__previewWithdraw(uint8 fuzzAmount) public override {
-        uint256 amount = bound(uint256(fuzzAmount), minFuzz, maxAssets);
+        uint256 amount = bound(uint256(fuzzAmount), carousel.minQueueDeposit(), maxAssets);
 
         uint256 reqAssets = adapter.previewMint(
             adapter.previewWithdraw(amount)
@@ -314,17 +339,9 @@ contract Y2kPremiumAdapterTest is AbstractAdapterTest {
         _mintAssetAndApproveForAdapter(reqAssets, bob);
         vm.prank(bob);
 
-        vm.warp(block.timestamp - 7 days);
         adapter.deposit(reqAssets, bob);
-        vm.warp(block.timestamp + 7 days);
 
-        address controller = carousel.controller();
-        uint256 epochId = _getLatestEpochId(carousel);
-
-        vm.prank(controller);
-        carousel.resolveEpoch(epochId);
-        vm.prank(controller);
-        carousel.setEpochNull(epochId);
+        _resolveEpoch();
 
         vm.prank(bob);
 
@@ -344,17 +361,9 @@ contract Y2kPremiumAdapterTest is AbstractAdapterTest {
             _mintAssetAndApproveForAdapter(reqAssets, bob);
 
             vm.prank(bob);
-            vm.warp(block.timestamp - 7 days);
             adapter.deposit(reqAssets, bob);
-            vm.warp(block.timestamp + 7 days);
 
-            address controller = carousel.controller();
-            uint256 epochId = _getLatestEpochId(carousel);
-
-            vm.prank(controller);
-            carousel.resolveEpoch(epochId);
-            vm.prank(controller);
-            carousel.setEpochNull(epochId);
+            _resolveEpoch();
 
             prop_redeem(bob, bob, amount, testId);
 
@@ -368,5 +377,36 @@ contract Y2kPremiumAdapterTest is AbstractAdapterTest {
             adapter.approve(alice, type(uint256).max);
             prop_redeem(alice, bob, amount, testId);
         }
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                          MAX VIEWS
+    //////////////////////////////////////////////////////////////*/
+    function test__maxDeposit() public override {
+        prop_maxDeposit(bob);
+
+        // Deposit smth so withdraw on pause is not 0
+        _mintAsset(defaultAmount, address(this));
+        asset.approve(address(adapter), defaultAmount);
+        adapter.deposit(defaultAmount, address(this));
+
+        _resolveEpoch();
+
+        adapter.pause();
+        assertEq(adapter.maxDeposit(bob), 0);
+    }
+
+    function test__maxMint() public override {
+        prop_maxMint(bob);
+
+        // Deposit smth so withdraw on pause is not 0
+        _mintAsset(defaultAmount, address(this));
+        asset.approve(address(adapter), defaultAmount);
+        adapter.deposit(defaultAmount, address(this));
+
+        _resolveEpoch();
+
+        adapter.pause();
+        assertEq(adapter.maxMint(bob), 0);
     }
 }

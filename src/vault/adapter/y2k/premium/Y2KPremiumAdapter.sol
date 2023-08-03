@@ -14,6 +14,7 @@ import {
     ERC4626Upgradeable as ERC4626
 } from "../../abstracts/AdapterBase.sol";
 import {
+    QueueItem,
     ICarousel,
     IVaultFactoryV2 as ICarouselFactory
 } from "../IY2k.sol";
@@ -118,10 +119,13 @@ contract Y2KPremiumAdapter is AdapterBase {
     //////////////////////////////////////////////////////////////*/
     /// @dev When epoch is active return 0, else return amount
     function maxWithdraw(address owner) public view override returns (uint256) {
+        if (paused()) return 0;
+
         ICarousel _carousel = carousel;
         uint256 epochId = _getLatestEpochId(_carousel);
         if (!_carousel.epochResolved(epochId)) return 0;
 
+        console.log("tries to convert: ", convertToAssets(balanceOf(owner)));
         return convertToAssets(balanceOf(owner));
     }
 
@@ -135,6 +139,7 @@ contract Y2KPremiumAdapter is AdapterBase {
         uint256
     ) internal virtual override {
         ICarousel _carousel = carousel;
+        console.log("before deposit: ", amount, _carousel.minQueueDeposit());
         if(amount < _carousel.minQueueDeposit()) return;
 
         uint256 epochId = _getLatestEpochId(_carousel);
@@ -143,19 +148,24 @@ contract Y2KPremiumAdapter is AdapterBase {
         if(epochHasStarted){
             //deposit into the queue with epochId 0
             //TODO: we cannot deposit into a queue unless we implement ERC1155 receiver
+            console.log("start deposit into queue");
             _carousel.deposit(
                 0,
                 amount,
                 address (this)
             );
+            console.log("done deposit into queue");
         } else {
+            console.log("start deposit into epoch");
             _carousel.deposit(
                 epochId,
                 amount,
                 address (this)
             );
+            console.log("done deposit into epoch");
+            //_carousel.enListInRollover(epochId, amount, address(this));
         }
-        _carousel.enListInRollover(_totalAssets(), epochId, address(this));
+
     }
 
     /// @notice Withdraw from the premium wallet
@@ -164,6 +174,7 @@ contract Y2KPremiumAdapter is AdapterBase {
         uint256
     ) internal virtual override {
         //during withdraw the amount of shares passed in will be previewed for a gain or a loss before asset transfer
+        if(_totalAssets() == 0) return;
 
         ICarousel _carousel = carousel;
         uint256 epochId = _getLatestEpochId(_carousel);
@@ -173,7 +184,7 @@ contract Y2KPremiumAdapter is AdapterBase {
 
         if(!_carousel.epochResolved(epochId)) revert EpochNotResolved();
 
-        _carousel.deListInRollover(address (this));
+        //_carousel.deListInRollover(address (this));
         _carousel.withdraw(
             epochId,
             underlyingShares,
