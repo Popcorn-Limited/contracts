@@ -30,7 +30,7 @@ contract CurveLPCompounder is CurveCompounder, CurveLP {
     function harvest() external {
         _claim();
         _compound();
-        _deposit(IERC20(asset()).balanceOf(address(this)));
+        _deposit(IERC20(asset).balanceOf(address(this)));
     }
 
     function initialize(bytes calldata initData) public initializer {
@@ -46,7 +46,7 @@ contract CurveLPCompounder is CurveCompounder, CurveLP {
             initData, (address, address, address, address, uint8, uint, StrategyConfig)
         );
 
-        __CurveLP__init(_vault, _gauge, _minter, baseVaultInitData.asset);
+        __CurveLP__init(_vault, _gauge, _minter);
         __CurveCompounder__init(_stratConfig);
 
         IERC20(baseAsset).safeApprove(_pool, type(uint).max);
@@ -122,5 +122,9 @@ contract CurveLPCompounder is CurveCompounder, CurveLP {
             amounts[baseAssetIndex] = amount;
             pool.add_liquidity(amounts, 0);
         }
+    }
+
+    function getRewardTokens() public override returns (address[] memory) {
+        return rewardTokens;
     }
 }

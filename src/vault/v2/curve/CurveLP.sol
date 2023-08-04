@@ -4,28 +4,34 @@ import {IGauge, IMinter} from "../../adapter/curve/ICurve.sol";
 import {IERC20} from "openzeppelin-contracts/interfaces/IERC20.sol";
 import {IERC20Metadata} from "openzeppelin-contracts/interfaces/IERC20Metadata.sol";
 import {Initializable} from "openzeppelin-contracts-upgradeable/proxy/utils/Initializable.sol";
+import { IERC4626Upgradeable as IERC4626 } from "openzeppelin-contracts-upgradeable/interfaces/IERC4626Upgradeable.sol";
+import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 
 abstract contract CurveLP is Initializable {
+    using SafeERC20 for IERC20;
+
     address crv;
     IERC20 asset;
     IGauge gauge;
     IMinter minter;
     address vault;
 
+    address[] internal rewardTokens;
+
     modifier onlyVault() {
         require(msg.sender == vault);
         _;
     }
 
-    function __CurveLP__init(address _vault, address _gauge, address _minter, address _asset) internal onlyInitializing {
+    function __CurveLP__init(address _vault, address _gauge, address _minter) internal onlyInitializing {
         gauge = IGauge(_gauge);
         minter = IMinter(_minter);
         crv = IMinter(_minter).token();
 
         vault = _vault;
 
-        IERC20(_asset).approve(_gauge, type(uint).max);
-        asset = IERC20(_asset);
+        asset = IERC20(IERC4626(_vault).asset());
+        IERC20(asset).approve(_gauge, type(uint).max);
 
         updateRewardTokens();
     }
@@ -37,7 +43,7 @@ abstract contract CurveLP is Initializable {
     
     /// @dev used to retrieve the current reward tokens in case they've changed.
     /// callable by anyone
-    function updateRewardTokens() public override {
+    function updateRewardTokens() public {
         delete rewardTokens;
 
         // we don't know the exact number of reward tokens. So we brute force it
@@ -85,7 +91,7 @@ abstract contract CurveLP is Initializable {
         asset.safeTransfer(to, amount);
     }
 
-    function totalAssets() external returns (uint) {
+    function totalAssets() external view returns (uint) {
         return gauge.balanceOf(address(this));
     }
 }
