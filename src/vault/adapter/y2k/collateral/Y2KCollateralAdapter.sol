@@ -20,7 +20,7 @@ import {
 } from "../IY2k.sol";
 
 
-contract Y2KAdapter is AdapterBase {
+contract Y2KCollateralAdapter is AdapterBase {
     using SafeERC20 for IERC20;
     using Math for uint256;
 
