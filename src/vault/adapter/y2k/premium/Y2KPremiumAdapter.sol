@@ -19,8 +19,6 @@ import {
     IVaultFactoryV2 as ICarouselFactory
 } from "../IY2k.sol";
 
-import "forge-std/console.sol";
-
 contract Y2KPremiumAdapter is AdapterBase {
     using SafeERC20 for IERC20;
     using Math for uint256;
@@ -125,7 +123,6 @@ contract Y2KPremiumAdapter is AdapterBase {
         uint256 epochId = _getLatestEpochId(_carousel);
         if (!_carousel.epochResolved(epochId)) return 0;
 
-        console.log("tries to convert: ", convertToAssets(balanceOf(owner)));
         return convertToAssets(balanceOf(owner));
     }
 
@@ -139,7 +136,6 @@ contract Y2KPremiumAdapter is AdapterBase {
         uint256
     ) internal virtual override {
         ICarousel _carousel = carousel;
-        console.log("before deposit: ", amount, _carousel.minQueueDeposit());
         if(amount < _carousel.minQueueDeposit()) return;
 
         uint256 epochId = _getLatestEpochId(_carousel);
@@ -148,21 +144,17 @@ contract Y2KPremiumAdapter is AdapterBase {
         if(epochHasStarted){
             //deposit into the queue with epochId 0
             //TODO: we cannot deposit into a queue unless we implement ERC1155 receiver
-            console.log("start deposit into queue");
             _carousel.deposit(
                 0,
                 amount,
                 address (this)
             );
-            console.log("done deposit into queue");
         } else {
-            console.log("start deposit into epoch");
             _carousel.deposit(
                 epochId,
                 amount,
                 address (this)
             );
-            console.log("done deposit into epoch");
             //_carousel.enListInRollover(epochId, amount, address(this));
         }
 

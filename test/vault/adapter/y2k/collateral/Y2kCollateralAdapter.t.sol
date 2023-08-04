@@ -29,7 +29,7 @@ import {
     ICarouselFactory,
     Y2KCollateralAdapter
 } from "../../../../../src/vault/adapter/y2k/collateral/Y2KCollateralAdapter.sol";
-import "forge-std/console.sol";
+
 
 contract Y2kCollateralAdapterTest is AbstractAdapterTest {
     using Math for uint256;
@@ -112,8 +112,6 @@ contract Y2kCollateralAdapterTest is AbstractAdapterTest {
         carousel.resolveEpoch(epochId);
         vm.prank(controller);
         carousel.setEpochNull(epochId);
-
-        console.log("epoch resolved: ", carousel.epochResolved(epochId), epochId);
     }
 
     /*//////////////////////////////////////////////////////////////
