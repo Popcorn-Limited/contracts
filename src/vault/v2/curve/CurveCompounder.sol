@@ -2,7 +2,7 @@ pragma solidity ^0.8.15;
 
 import {IERC20} from "openzeppelin-contracts/interfaces/IERC20.sol";
 import {ICurveRouter} from "../../../interfaces/external/curve/ICurveRouter.sol";
-import "openzeppelin-contracts-upgradeable/proxy/utils/Initializable.sol";
+import {Initializable} from "openzeppelin-contracts-upgradeable/proxy/utils/Initializable.sol";
 
 struct CurveRoute {
     address[9] route;
@@ -18,8 +18,7 @@ struct StrategyConfig {
     uint256[] minTradeAmounts;
 }
 
-abstract contract CurveCompounder {
-
+abstract contract CurveCompounder is Initializable {
     address router;
     address baseAsset;
     CurveRoute[] toBaseAssetRoutes;

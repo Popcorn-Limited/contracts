@@ -1,12 +1,11 @@
 pragma solidity ^0.8.15;
 
-import {BaseVaultInitData, BaseVault} from "../BaseVault.sol";
 import {IGauge, IMinter} from "../../adapter/curve/ICurve.sol";
 import {IERC20} from "openzeppelin-contracts/interfaces/IERC20.sol";
 import {IERC20Metadata} from "openzeppelin-contracts/interfaces/IERC20Metadata.sol";
-import "openzeppelin-contracts-upgradeable/proxy/utils/Initializable.sol";
+import {Initializable} from "openzeppelin-contracts-upgradeable/proxy/utils/Initializable.sol";
 
-abstract contract CurveLP {
+abstract contract CurveLP is Initializable {
     address crv;
     IERC20 asset;
     IGauge gauge;
@@ -86,7 +85,7 @@ abstract contract CurveLP {
         asset.safeTransfer(to, amount);
     }
 
-    function _totalAssets() internal view override returns (uint) {
+    function totalAssets() external returns (uint) {
         return gauge.balanceOf(address(this));
     }
 }
