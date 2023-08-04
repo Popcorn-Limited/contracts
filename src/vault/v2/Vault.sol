@@ -38,6 +38,7 @@ struct Strategy {
 interface IStrategy {
     function deposit(uint amount) external;
     function withdraw(address to, uint amount) external;
+    function totalAssets() external returns (uint);
 }
 
 /**
@@ -129,8 +130,7 @@ contract Vault is
     function updateStrategies(Strategy[] calldata _strategies) external onlyOwner {
         // it's easier to update the whole array instead of adding and removing individual strats
 
-        // TODO: add deallocate function
-        deallocate();
+        _deallocate();
 
         delete strategies;
 
@@ -229,6 +229,8 @@ contract Vault is
             _spendAllowance(owner, caller, shares);
         }
 
+
+
         if (!paused()) {
             // TODO: need to implement a withdrawal queue to pull funds from the strategies.
             // See Tribe's contract for that
@@ -236,12 +238,15 @@ contract Vault is
 
         _burn(owner, shares);
 
+        _withdrawFunds(receiver, assets);
+
         _afterWithdrawal();
 
         emit Withdraw(caller, receiver, owner, assets, shares);
     }
 
-    function allocate() external {
+    // shouldn't be called in case of a pause since we want to leave funds in the vault
+    function allocate() public whenNotPaused {
         IERC20 asset = IERC20(asset());
         uint balance = asset.balanceOf(address(this));
 
@@ -254,6 +259,42 @@ contract Vault is
         }
     }
 
+    function _deallocate() internal {
+        uint len = strategies.length;
+        for (uint i; i < len;) {
+            IStrategy strat = IStrategy(strategies[i].addr);
+            strat.withdraw(address(this), strat.totalAssets());
+            unchecked {++i;}
+        }
+    }
+
+    function _withdrawFunds(address to, uint amount) internal {
+        IERC20 token = IERC20(asset());
+        uint idleFunds = token.balanceOf(address(this));
+        if (idleFunds < amount) {
+            uint toPull = amount - idleFunds;
+
+            uint len = strategies.length;
+            for (uint i; i < len;) {
+                IStrategy strat = IStrategy(strategies[i].addr);
+                uint stratBal = strat.totalAssets();
+                if (toPull > stratBal) {
+                    // if the strat doesn't have enough funds, we pull everything it has
+                    // and continue with the next strategy
+                    strat.withdraw(to, stratBal);
+                    toPull -= stratBal;
+                } else {
+                    strat.withdraw(to, toPull);
+                    break;
+                }
+                unchecked {++i;}
+            }
+        }
+
+        // we only send idle funds because the rest was already sent to the user by the strategy
+        token.safeTransfer(to, idleFunds);
+    }
+
     function _afterDeposit() internal {
         // TODO: add harvest stuff
     }
@@ -262,12 +303,12 @@ contract Vault is
 
     }
 
-    // TODO: add `totalAssets()`.
-    // need to loop over all the strats for that
-
     /*//////////////////////////////////////////////////////////////
                             ACCOUNTING LOGIC
     //////////////////////////////////////////////////////////////*/
+
+    // TODO: on pause we have to remove all funds from the strategies and put
+    // them in the vault
 
     /**
      * @notice Total amount of underlying `asset` token managed by adapter.
@@ -280,7 +321,16 @@ contract Vault is
     /**
      * @notice Total amount of underlying `asset` token managed by adapter through the underlying protocol.
      */
-    function _totalAssets() internal view virtual returns (uint256);
+    function _totalAssets() internal view returns (uint256 total) {
+        // vault could hold funds that haven't been allocated yet
+        total = IERC20(asset()).balanceOf(address(this));
+
+        uint len = strategies.length;
+        for (uint i; i < len;) {
+            total += IStrategy(strategies[i].addr).totalAssets();
+            unchecked {++i;}
+        }
+    }
 
     /**
      * @notice Convert either `assets` or `shares` into underlying shares.
@@ -482,14 +532,14 @@ contract Vault is
 
     /// @notice Pause Deposits and withdraw all funds from the underlying protocol. Caller must be owner.
     function pause() external onlyOwner {
-        _protocolWithdraw(totalAssets(), totalSupply());
+        _deallocate();
         _pause();
     }
 
     /// @notice Unpause Deposits and deposit all funds into the underlying protocol. Caller must be owner.
     function unpause() external onlyOwner {
-        _protocolDeposit(totalAssets(), totalSupply());
         _unpause();
+        allocate();
     }
 
     /*//////////////////////////////////////////////////////////////
