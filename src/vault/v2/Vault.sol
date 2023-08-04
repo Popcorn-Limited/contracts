@@ -38,7 +38,7 @@ struct Strategy {
 interface IStrategy {
     function deposit(uint amount) external;
     function withdraw(address to, uint amount) external;
-    function totalAssets() external returns (uint);
+    function totalAssets() external view returns (uint);
 }
 
 /**
@@ -567,16 +567,6 @@ contract Vault is
 
         emit QuitPeriodSet(quitPeriod);
     }
-
-    /*//////////////////////////////////////////////////////////////
-                          INTERNAL HOOKS LOGIC
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice deposit into the underlying protocol.
-    function _protocolDeposit(uint256 assets, uint256 shares) internal virtual;
-
-    /// @notice Withdraw from the underlying protocol.
-    function _protocolWithdraw(uint256 assets, uint256 shares) internal virtual;
 
     /*//////////////////////////////////////////////////////////////
                       EIP-165 LOGIC

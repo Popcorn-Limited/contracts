@@ -39,7 +39,7 @@ abstract contract CurveCompounder is Initializable {
         minTradeAmounts = _stratConfig.minTradeAmounts;
 
 
-        address[] memory tokens = rewardTokens;
+        address[] memory tokens = getRewardTokens();
         uint length = tokens.length;
         for (uint i; i < length;) {
             IERC20(tokens[i]).approve(_stratConfig.router, type(uint).max);
@@ -52,7 +52,6 @@ abstract contract CurveCompounder is Initializable {
         _swapToBaseAsset();
 
         if (IERC20(baseAsset).balanceOf(address(this)) == 0) {
-            emit Harvest();
             return;
         }
 
@@ -64,7 +63,7 @@ abstract contract CurveCompounder is Initializable {
         internal
     {
         // Trade rewards for base asset
-        address[] memory tokens = rewardTokens;
+        address[] memory tokens = getRewardTokens();
         uint256 len = tokens.length;
         for (uint256 i; i < len;) {
             uint256 rewardBal = IERC20(tokens[i]).balanceOf(address(this));
@@ -80,4 +79,5 @@ abstract contract CurveCompounder is Initializable {
     }
 
     function _getAsset() internal virtual;
+    function getRewardTokens() public virtual returns (address[] memory);
 }
