@@ -39,6 +39,8 @@ interface IStrategy {
     function deposit(uint amount) external;
     function withdraw(address to, uint amount) external;
     function totalAssets() external view returns (uint);
+    function harvest() external;
+    function getRewardTokens() external view returns (address[] memory);
 }
 
 /**
@@ -149,7 +151,7 @@ contract Vault is
     error MaxError(uint256 amount);
     error ZeroAmount();
 
-    function deposit(uint assets, address receiver) public override nonReentrant whenNotPaused returns (uint shares) {
+    function deposit(uint assets, address receiver) public virtual override nonReentrant whenNotPaused returns (uint shares) {
         if (assets > maxDeposit(receiver)) revert MaxError(assets);
     
         /// @dev Inititalize account for managementFee on first deposit
@@ -178,7 +180,7 @@ contract Vault is
     function mint(
         uint256 shares,
         address receiver
-    ) public override nonReentrant whenNotPaused returns (uint256 assets) {
+    ) public virtual override nonReentrant whenNotPaused returns (uint256 assets) {
         if (shares > maxMint(receiver)) revert MaxError(assets);
 
         // Inititalize account for managementFee on first deposit
@@ -227,13 +229,6 @@ contract Vault is
     {
         if (caller != owner) {
             _spendAllowance(owner, caller, shares);
-        }
-
-
-
-        if (!paused()) {
-            // TODO: need to implement a withdrawal queue to pull funds from the strategies.
-            // See Tribe's contract for that
         }
 
         _burn(owner, shares);
@@ -567,6 +562,21 @@ contract Vault is
 
         emit QuitPeriodSet(quitPeriod);
     }
+
+    /*//////////////////////////////////////////////////////////////
+                        HARVEST LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    function harvest() public {
+        // TODO: should accrue rewards here and on every deposit/withdrawal.
+        // see MultiRewardStaking 
+        uint len = strategies.length;
+        for (uint i; i < len;) {
+            IStrategy(strategies[i].addr).harvest();
+            unchecked {++i;}
+        }
+    }
+
 
     /*//////////////////////////////////////////////////////////////
                       EIP-165 LOGIC
