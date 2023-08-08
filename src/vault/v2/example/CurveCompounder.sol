@@ -8,21 +8,10 @@ import {BaseStrategy} from "../base/BaseStrategy.sol";
 
 contract CurveCompounder is BaseStrategy {
     function __CurveCompounder_init(
-        IERC20 _underlying,
-        IERC20 _lpToken,
-        address _vault,
-        bool _useLpToken,
         bool _autoHarvest,
         bytes memory _harvestData
     ) internal onlyInitializing {
-        __BaseStrategy_init(
-            _underlying,
-            _lpToken,
-            _vault,
-            _useLpToken,
-            _autoHarvest,
-            _harvestData
-        );
+        __BaseStrategy_init(_autoHarvest, _harvestData);
     }
 
     function _swapToBaseAsset() internal override {
