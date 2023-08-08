@@ -5,7 +5,7 @@ pragma solidity ^0.8.15;
 
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 
-contract BaseAdapter {
+abstract contract BaseAdapter is Initializable {
     IERC20 public underlying;
     IERC20 public lpToken;
     address public vault;
@@ -16,7 +16,17 @@ contract BaseAdapter {
         _;
     }
 
-    function initialize() internal initializer {}
+    function __BaseAdapter_init(
+        IERC20 _underlying,
+        IERC20 _lpToken,
+        address _vault,
+        bool _useLpToken
+    ) internal onlyInitializing {
+        underlying = _underlying;
+        lpToken = _lpToken;
+        vault = _vault;
+        useLpToken = _useLpToken;
+    }
 
     /**
      * @notice Deposit Asset into the wrapped farm
@@ -85,12 +95,7 @@ contract BaseAdapter {
     function rewardToken() external view virtual returns (address[] memory) {}
 
     /**
-     * @notice Claims rewards & executes the strategy
-     */
-    function harvest(bytes optionalData) external view virtual {}
-
-    /**
      * @notice Claims rewards
      */
-    function _claim() internal virtual {}
+    function _claimRewards() internal virtual {}
 }
