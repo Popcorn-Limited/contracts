@@ -21,4 +21,6 @@ interface ILpToken {
     function token0() external view returns (address);
 
     function token1() external view returns (address);
+
+    function stable() external view returns (bool);
 }
