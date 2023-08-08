@@ -11,8 +11,11 @@ contract StargateCompounder is StargateAdapter, CurveCompounder {
         IERC20 _underlying,
         IERC20 _lpToken,
         address _vault,
-        bool _useLpToken
+        bool _useLpToken,
+        bool _autoHarvest,
+        bytes memory _harvestData
     ) internal onlyInitializing {
         __StargateAdapter_init(_underlying, _lpToken, _vault, _useLpToken);
+        __CurveCompounder_init(_autoHarvest, _harvestData);
     }
 }
