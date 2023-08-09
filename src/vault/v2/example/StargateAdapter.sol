@@ -18,7 +18,7 @@ contract StargateAdapter is BaseAdapter {
 
     error StakingIdOutOfBounds();
     error DifferentAssets();
-    
+
     function __StargateAdapter_init(
         IERC20 _underlying,
         IERC20 _lpToken,
@@ -50,6 +50,31 @@ contract StargateAdapter is BaseAdapter {
         _underlying.approve(_stargateRouter, type(uint256).max);
     }
 
+    /*//////////////////////////////////////////////////////////////
+                            ACCOUNTING LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice Returns the total amount of underlying assets.
+     * @dev This function must be overriden. If the farm requires the usage of lpToken than this function must convert lpToken balance into underlying balance
+     */
+    function _totalUnderlying() internal view override returns (uint256) {
+        return sToken.amountLPtoLD(_totalLP());
+    }
+
+    /**
+     * @notice Returns the total amount of lpToken
+     * @dev This function is optional. Some farms might require the user to deposit lpTokens directly into the farm
+     */
+    function _totalLP() internal view override returns (uint256) {
+        (uint256 stake, ) = stargateStaking.userInfo(stakingPid, address(this));
+        return stake;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            DEPOSIT LOGIC
+    //////////////////////////////////////////////////////////////*/
+
     /**
      * @notice Deposits underlying asset and converts it if necessary into an lpToken before depositing
      * @dev This function must be overriden. Some farms require the user to into an lpToken before depositing others might use the underlying directly
@@ -66,6 +91,10 @@ contract StargateAdapter is BaseAdapter {
     function _depositLP(uint256 amount) internal override {
         stargateStaking.deposit(stakingPid, amount);
     }
+
+    /*//////////////////////////////////////////////////////////////
+                            WITHDRAWAL LOGIC
+    //////////////////////////////////////////////////////////////*/
 
     /**
      * @notice Withdraws underlying asset. If necessary it converts the lpToken into underlying before withdrawing
@@ -89,22 +118,9 @@ contract StargateAdapter is BaseAdapter {
         stargateStaking.withdraw(stakingPid, amount);
     }
 
-    /**
-     * @notice Returns the total amount of underlying assets.
-     * @dev This function must be overriden. If the farm requires the usage of lpToken than this function must convert lpToken balance into underlying balance
-     */
-    function _totalUnderlying() internal view override returns (uint256) {
-        return sToken.amountLPtoLD(_totalLP());
-    }
-
-    /**
-     * @notice Returns the total amount of lpToken
-     * @dev This function is optional. Some farms might require the user to deposit lpTokens directly into the farm
-     */
-    function _totalLP() internal view override returns (uint256) {
-        (uint256 stake, ) = stargateStaking.userInfo(stakingPid, address(this));
-        return stake;
-    }
+    /*//////////////////////////////////////////////////////////////
+                            CLAIM LOGIC
+    //////////////////////////////////////////////////////////////*/
 
     /**
      * @notice Claims rewards

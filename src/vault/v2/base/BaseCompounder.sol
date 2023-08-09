@@ -12,7 +12,7 @@ abstract contract BaseCompounder is BaseStrategy {
     uint256[] internal minTradeAmounts;
     bool internal depositLpToken;
 
-    // TODO allow owner to change minTradeAmounts, harvestCooldown, autoHarvest?
+    // TODO allow owner to change minTradeAmounts, autoHarvest?
 
     function __BaseCompounder_init(
         bool _autoHarvest,
@@ -45,16 +45,21 @@ abstract contract BaseCompounder is BaseStrategy {
     }
 
     function _compound(bytes memory optionalData) internal {
+        // Claim Rewards from Adapter
         IBaseAdapter(address(this))._claimRewards();
 
+        // Swap Rewards to BaseAsset (which can but must not be the underlying asset)
         _swapToBaseAsset(optionalData);
 
+        // Stop compounding if the trades were not successful
         if (baseAsset.balanceOf(address(this)) == 0) {
             return;
         }
 
+        // Get the underlying asset if the baseAsset is not the underlying asset
         _getAsset(optionalData);
 
+        // Deposit the underlying asset into the adapter
         depositLpToken
             ? IBaseAdapter(address(this))._depositLP(
                 IERC20(IBaseAdapter(address(this)).lpToken()).balanceOf(
