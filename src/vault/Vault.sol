@@ -133,12 +133,7 @@ contract Vault is
         return _symbol;
     }
 
-    function decimals()
-        public
-        view
-        override
-        returns (uint8)
-    {
+    function decimals() public view override returns (uint8) {
         return _decimals;
     }
 

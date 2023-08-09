@@ -4,15 +4,22 @@
 pragma solidity ^0.8.15;
 
 import {Test} from "forge-std/Test.sol";
-import {MockERC20} from "../utils/mocks/MockERC20.sol";
-import {MockERC4626} from "../utils/mocks/MockERC4626.sol";
-import {Vault} from "../../src/vault/Vault.sol";
+import {MockERC20} from "../../utils/mocks/MockERC20.sol";
+import {MockERC4626} from "../../utils/mocks/MockERC4626.sol";
+import {Vault, VaultInitData} from "../../../src/vault/v2/Vault.sol";
 import {IERC4626Upgradeable as IERC4626, IERC20Upgradeable as IERC20} from "openzeppelin-contracts-upgradeable/interfaces/IERC4626Upgradeable.sol";
-import {VaultFees} from "../../src/interfaces/vault/IVault.sol";
+import {VaultFees} from "../../../src/interfaces/vault/IVault.sol";
 import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
 import {Clones} from "openzeppelin-contracts/proxy/Clones.sol";
 
-contract VaultTest is Test {
+// TestVault needed to expose internal initialize function.
+contract TestVault is Vault {
+    function testInitialize(VaultInitData calldata initData) public {
+        initialize(initData);
+    }
+}
+
+contract VaultV2Test is Test {
     using FixedPointMathLib for uint256;
 
     bytes32 constant PERMIT_TYPEHASH =
@@ -61,19 +68,28 @@ contract VaultTest is Test {
         vault = Vault(vaultAddress);
         vm.label(vaultAddress, "vault");
 
-        vault.initialize(
-            IERC20(address(asset)),
-            IERC4626(address(adapter)),
-            VaultFees({
-                deposit: 0,
-                withdrawal: 0,
-                management: 0,
-                performance: 0
-            }),
-            feeRecipient,
+        TestVault testVault = new TestVault(); // Test Vault needed to test internal initalize by exposing function.
+
+        VaultFees memory vaultFees = VaultFees({
+            deposit: 100,
+            withdrawal: 100,
+            management: 100,
+            performance: 100
+        });
+
+        VaultInitData memory vaultData = VaultInitData(
+            address(asset),
+            asset.name(),
+            asset.symbol(),
+            bob,
+            vaultFees,
+            bob,
             type(uint256).max,
-            address(this)
+            21600,
+            0
         );
+
+        testVault.testInitialize(vaultData);
     }
 
     /*//////////////////////////////////////////////////////////////

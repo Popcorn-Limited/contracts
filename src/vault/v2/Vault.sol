@@ -3,14 +3,8 @@
 
 pragma solidity ^0.8.15;
 
-import {
-    ERC4626Upgradeable,
-    IERC20Upgradeable as IERC20,
-    IERC20MetadataUpgradeable as IERC20Metadata,
-    ERC20Upgradeable as ERC20
-} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
-import {SafeERC20Upgradeable as SafeERC20} from
-    "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
+import {ERC4626Upgradeable, IERC20Upgradeable as IERC20, IERC20MetadataUpgradeable as IERC20Metadata, ERC20Upgradeable as ERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
+import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "openzeppelin-contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
 import {PausableUpgradeable} from "openzeppelin-contracts-upgradeable/security/PausableUpgradeable.sol";
@@ -37,9 +31,13 @@ struct Strategy {
 
 interface IStrategy {
     function deposit(uint amount) external;
+
     function withdraw(address to, uint amount) external;
+
     function totalAssets() external view returns (uint);
+
     function harvest() external;
+
     function getRewardTokens() external view returns (address[] memory);
 }
 
@@ -107,7 +105,7 @@ contract Vault is
 
         fees = initData.fees;
         feeRecipient = initData.feeRecipient;
-    
+
         depositLimit = initData.depositLimit;
 
         // _name = initData.name;
@@ -115,7 +113,7 @@ contract Vault is
 
         contractName = keccak256(
             abi.encodePacked("Popcorn", initData.name, block.timestamp, "Vault")
-        ); 
+        );
 
         quitPeriod = 3 days;
 
@@ -125,22 +123,27 @@ contract Vault is
 
         emit VaultInitialized(contractName, address(initData.asset));
     }
+
     function decimals() public view override returns (uint8) {
         return _decimals;
     }
 
-    function updateStrategies(Strategy[] calldata _strategies) external onlyOwner {
+    function updateStrategies(
+        Strategy[] calldata _strategies
+    ) external onlyOwner {
         // it's easier to update the whole array instead of adding and removing individual strats
 
         _deallocate();
 
         delete strategies;
 
-        for (uint i; i < _strategies.length;) {
+        for (uint i; i < _strategies.length; ) {
             strategies.push(_strategies[i]);
-            unchecked {++i;}
+            unchecked {
+                ++i;
+            }
         }
-    
+
         allocate();
     }
 
@@ -151,9 +154,12 @@ contract Vault is
     error MaxError(uint256 amount);
     error ZeroAmount();
 
-    function deposit(uint assets, address receiver) public virtual override nonReentrant whenNotPaused returns (uint shares) {
+    function deposit(
+        uint assets,
+        address receiver
+    ) public virtual override nonReentrant whenNotPaused returns (uint shares) {
         if (assets > maxDeposit(receiver)) revert MaxError(assets);
-    
+
         /// @dev Inititalize account for managementFee on first deposit
         if (totalSupply() == 0) feesUpdatedAt = block.timestamp;
 
@@ -168,7 +174,7 @@ contract Vault is
 
         if (feeShares > 0) _mint(feeRecipient, feeShares);
 
-        _deposit(msg.sender, receiver, assets, shares); 
+        _deposit(msg.sender, receiver, assets, shares);
     }
 
     /**
@@ -180,7 +186,14 @@ contract Vault is
     function mint(
         uint256 shares,
         address receiver
-    ) public virtual override nonReentrant whenNotPaused returns (uint256 assets) {
+    )
+        public
+        virtual
+        override
+        nonReentrant
+        whenNotPaused
+        returns (uint256 assets)
+    {
         if (shares > maxMint(receiver)) revert MaxError(assets);
 
         // Inititalize account for managementFee on first deposit
@@ -195,20 +208,20 @@ contract Vault is
         assets = _convertToAssets(shares + feeShares, Math.Rounding.Up);
 
         if (feeShares > 0) _mint(feeRecipient, feeShares);
-    
+
         _deposit(msg.sender, receiver, assets, shares);
     }
-
 
     /**
      * @notice Deposit `assets` into the underlying protocol and mints vault shares to `receiver`.
      * @dev Executes harvest if `harvestCooldown` is passed since last invocation.
      */
-    function _deposit(address caller, address receiver, uint256 assets, uint256 shares)
-        internal
-        virtual
-        override
-    {
+    function _deposit(
+        address caller,
+        address receiver,
+        uint256 assets,
+        uint256 shares
+    ) internal virtual override {
         IERC20(asset()).safeTransferFrom(caller, address(this), assets);
 
         _mint(receiver, shares);
@@ -222,11 +235,13 @@ contract Vault is
      * @notice Withdraws `assets` from the underlying protocol and burns vault shares from `owner`.
      * @dev Executes harvest if `harvestCooldown` is passed since last invocation.
      */
-    function _withdraw(address caller, address receiver, address owner, uint256 assets, uint256 shares)
-        internal
-        virtual
-        override
-    {
+    function _withdraw(
+        address caller,
+        address receiver,
+        address owner,
+        uint256 assets,
+        uint256 shares
+    ) internal virtual override {
         if (caller != owner) {
             _spendAllowance(owner, caller, shares);
         }
@@ -246,20 +261,24 @@ contract Vault is
         uint balance = asset.balanceOf(address(this));
 
         uint len = strategies.length;
-        for (uint i; i < len;) {
-            uint amount = 1e5 * balance / uint(strategies[i].weight);
+        for (uint i; i < len; ) {
+            uint amount = (1e5 * balance) / uint(strategies[i].weight);
             asset.safeTransfer(strategies[i].addr, amount);
             IStrategy(strategies[i].addr).deposit(amount);
-            unchecked {++i;}
+            unchecked {
+                ++i;
+            }
         }
     }
 
     function _deallocate() internal {
         uint len = strategies.length;
-        for (uint i; i < len;) {
+        for (uint i; i < len; ) {
             IStrategy strat = IStrategy(strategies[i].addr);
             strat.withdraw(address(this), strat.totalAssets());
-            unchecked {++i;}
+            unchecked {
+                ++i;
+            }
         }
     }
 
@@ -270,7 +289,7 @@ contract Vault is
             uint toPull = amount - idleFunds;
 
             uint len = strategies.length;
-            for (uint i; i < len;) {
+            for (uint i; i < len; ) {
                 IStrategy strat = IStrategy(strategies[i].addr);
                 uint stratBal = strat.totalAssets();
                 if (toPull > stratBal) {
@@ -282,7 +301,9 @@ contract Vault is
                     strat.withdraw(to, toPull);
                     break;
                 }
-                unchecked {++i;}
+                unchecked {
+                    ++i;
+                }
             }
         }
 
@@ -294,9 +315,7 @@ contract Vault is
         // TODO: add harvest stuff
     }
 
-    function _afterWithdrawal() internal {
-
-    }
+    function _afterWithdrawal() internal {}
 
     /*//////////////////////////////////////////////////////////////
                             ACCOUNTING LOGIC
@@ -310,7 +329,10 @@ contract Vault is
      * @dev Return assets held by adapter if paused.
      */
     function totalAssets() public view override returns (uint256) {
-        return paused() ? IERC20(asset()).balanceOf(address(this)) : _totalAssets();
+        return
+            paused()
+                ? IERC20(asset()).balanceOf(address(this))
+                : _totalAssets();
     }
 
     /**
@@ -321,9 +343,11 @@ contract Vault is
         total = IERC20(asset()).balanceOf(address(this));
 
         uint len = strategies.length;
-        for (uint i; i < len;) {
+        for (uint i; i < len; ) {
             total += IStrategy(strategies[i].addr).totalAssets();
-            unchecked {++i;}
+            unchecked {
+                ++i;
+            }
         }
     }
 
@@ -332,14 +356,19 @@ contract Vault is
      * @dev This is an optional function for underlying protocols that require deposit/withdrawal amounts in their shares.
      * @dev Returns shares if totalSupply is 0.
      */
-    function convertToUnderlyingShares(uint256 assets, uint256 shares) public view virtual returns (uint256) {}
+    function convertToUnderlyingShares(
+        uint256 assets,
+        uint256 shares
+    ) public view virtual returns (uint256) {}
 
     /**
      * @notice Simulate the effects of a deposit at the current block, given current on-chain conditions.
      * @dev Return 0 if paused since no further deposits are allowed.
      * @dev Override this function if the underlying protocol has a unique deposit logic and/or deposit fees.
      */
-    function previewDeposit(uint256 assets) public view virtual override returns (uint256) {
+    function previewDeposit(
+        uint256 assets
+    ) public view virtual override returns (uint256) {
         return paused() ? 0 : _convertToShares(assets, Math.Rounding.Down);
     }
 
@@ -348,36 +377,41 @@ contract Vault is
      * @dev Return 0 if paused since no further deposits are allowed.
      * @dev Override this function if the underlying protocol has a unique deposit logic and/or deposit fees.
      */
-    function previewMint(uint256 shares) public view virtual override returns (uint256) {
+    function previewMint(
+        uint256 shares
+    ) public view virtual override returns (uint256) {
         return paused() ? 0 : _convertToAssets(shares, Math.Rounding.Up);
     }
 
-    function _convertToShares(uint256 assets, Math.Rounding rounding)
-        internal
-        view
-        virtual
-        override
-        returns (uint256 shares)
-    {
-        return assets.mulDiv(totalSupply() + 10 ** decimalOffset, totalAssets() + 1, rounding);
+    function _convertToShares(
+        uint256 assets,
+        Math.Rounding rounding
+    ) internal view virtual override returns (uint256 shares) {
+        return
+            assets.mulDiv(
+                totalSupply() + 10 ** decimalOffset,
+                totalAssets() + 1,
+                rounding
+            );
     }
 
-    function _convertToAssets(uint256 shares, Math.Rounding rounding)
-        internal
-        view
-        virtual
-        override
-        returns (uint256)
-    {
-        return shares.mulDiv(totalAssets() + 1, totalSupply() + 10 ** decimalOffset, rounding);
+    function _convertToAssets(
+        uint256 shares,
+        Math.Rounding rounding
+    ) internal view virtual override returns (uint256) {
+        return
+            shares.mulDiv(
+                totalAssets() + 1,
+                totalSupply() + 10 ** decimalOffset,
+                rounding
+            );
     }
 
     /*//////////////////////////////////////////////////////////////
                      DEPOSIT/WITHDRAWAL LIMIT LOGIC
     //////////////////////////////////////////////////////////////*/
 
-
-    /// @return Maximum amount of underlying `asset` token that may be deposited for a given address. 
+    /// @return Maximum amount of underlying `asset` token that may be deposited for a given address.
     function maxDeposit(address) public view override returns (uint256) {
         uint256 assets = totalAssets();
         uint256 depositLimit_ = depositLimit;
@@ -385,7 +419,7 @@ contract Vault is
         return depositLimit_ - assets;
     }
 
-    /// @return Maximum amount of vault shares that may be minted to given address. 
+    /// @return Maximum amount of vault shares that may be minted to given address.
     function maxMint(address) public view override returns (uint256) {
         uint256 assets = totalAssets();
         uint256 depositLimit_ = depositLimit;
@@ -401,7 +435,8 @@ contract Vault is
     uint256 public highWaterMark;
     uint public feesUpdatedAt;
 
-    address public constant FEE_RECIPIENT = address(0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E);
+    address public constant FEE_RECIPIENT =
+        address(0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E);
 
     event PerformanceFeeChanged(uint256 oldFee, uint256 newFee);
 
@@ -418,9 +453,14 @@ contract Vault is
         uint256 shareValue = convertToAssets(1e18);
         uint256 performanceFee_ = performanceFee;
 
-        return performanceFee_ > 0 && shareValue > highWaterMark_
-            ? performanceFee_.mulDiv((shareValue - highWaterMark_) * totalSupply(), 1e36, Math.Rounding.Down)
-            : 0;
+        return
+            performanceFee_ > 0 && shareValue > highWaterMark_
+                ? performanceFee_.mulDiv(
+                    (shareValue - highWaterMark_) * totalSupply(),
+                    1e36,
+                    Math.Rounding.Down
+                )
+                : 0;
     }
 
     /// @notice Minimal function to call `takeFees` modifier.
@@ -474,52 +514,52 @@ contract Vault is
     error NotPassedQuitPeriod(uint256 quitPeriod);
 
     /**
-    * @notice Propose new fees for this vault. Caller must be owner.
-    * @param newFees Fees for depositing, withdrawal, management and performance in 1e18.
-    * @dev Fees can be 0 but never 1e18 (1e18 = 100%, 1e14 = 1 BPS)
-    */
-   function proposeFees(VaultFees calldata newFees) external onlyOwner {
-       if (
-           newFees.deposit >= 1e18 ||
-           newFees.withdrawal >= 1e18 ||
-           newFees.management >= 1e18 ||
-           newFees.performance >= 1e18
-       ) revert InvalidVaultFees();
+     * @notice Propose new fees for this vault. Caller must be owner.
+     * @param newFees Fees for depositing, withdrawal, management and performance in 1e18.
+     * @dev Fees can be 0 but never 1e18 (1e18 = 100%, 1e14 = 1 BPS)
+     */
+    function proposeFees(VaultFees calldata newFees) external onlyOwner {
+        if (
+            newFees.deposit >= 1e18 ||
+            newFees.withdrawal >= 1e18 ||
+            newFees.management >= 1e18 ||
+            newFees.performance >= 1e18
+        ) revert InvalidVaultFees();
 
-       proposedFees = newFees;
-       proposedFeeTime = block.timestamp;
+        proposedFees = newFees;
+        proposedFeeTime = block.timestamp;
 
-       emit NewFeesProposed(newFees, block.timestamp);
-   }
+        emit NewFeesProposed(newFees, block.timestamp);
+    }
 
-   /// @notice Change fees to the previously proposed fees after the quit period has passed.
-   function changeFees() external takeFees {
-       if (
-           proposedFeeTime == 0 ||
-           block.timestamp < proposedFeeTime + quitPeriod
-       ) revert NotPassedQuitPeriod(quitPeriod);
+    /// @notice Change fees to the previously proposed fees after the quit period has passed.
+    function changeFees() external takeFees {
+        if (
+            proposedFeeTime == 0 ||
+            block.timestamp < proposedFeeTime + quitPeriod
+        ) revert NotPassedQuitPeriod(quitPeriod);
 
-       emit ChangedFees(fees, proposedFees);
+        emit ChangedFees(fees, proposedFees);
 
-       fees = proposedFees;
-       feesUpdatedAt = block.timestamp;
+        fees = proposedFees;
+        feesUpdatedAt = block.timestamp;
 
-       delete proposedFees;
-       delete proposedFeeTime;
-   }
+        delete proposedFees;
+        delete proposedFeeTime;
+    }
 
-   /**
-    * @notice Change `feeRecipient`. Caller must be Owner.
-    * @param _feeRecipient The new fee recipient.
-    * @dev Accrued fees wont be transferred to the new feeRecipient.
-    */
-   function setFeeRecipient(address _feeRecipient) external onlyOwner {
-       if (_feeRecipient == address(0)) revert InvalidFeeRecipient();
+    /**
+     * @notice Change `feeRecipient`. Caller must be Owner.
+     * @param _feeRecipient The new fee recipient.
+     * @dev Accrued fees wont be transferred to the new feeRecipient.
+     */
+    function setFeeRecipient(address _feeRecipient) external onlyOwner {
+        if (_feeRecipient == address(0)) revert InvalidFeeRecipient();
 
-       emit FeeRecipientUpdated(feeRecipient, _feeRecipient);
+        emit FeeRecipientUpdated(feeRecipient, _feeRecipient);
 
-       feeRecipient = _feeRecipient;
-   }
+        feeRecipient = _feeRecipient;
+    }
 
     /*//////////////////////////////////////////////////////////////
                       PAUSING LOGIC
@@ -552,9 +592,8 @@ contract Vault is
      * @param _quitPeriod Time to rage quit after proposal.
      */
     function setQuitPeriod(uint256 _quitPeriod) external onlyOwner {
-        if (
-            block.timestamp < proposedFeeTime + quitPeriod
-        ) revert NotPassedQuitPeriod(quitPeriod);
+        if (block.timestamp < proposedFeeTime + quitPeriod)
+            revert NotPassedQuitPeriod(quitPeriod);
         if (_quitPeriod < 1 days || _quitPeriod > 7 days)
             revert InvalidQuitPeriod();
 
@@ -569,20 +608,23 @@ contract Vault is
 
     function harvest() public {
         // TODO: should accrue rewards here and on every deposit/withdrawal.
-        // see MultiRewardStaking 
+        // see MultiRewardStaking
         uint len = strategies.length;
-        for (uint i; i < len;) {
+        for (uint i; i < len; ) {
             IStrategy(strategies[i].addr).harvest();
-            unchecked {++i;}
+            unchecked {
+                ++i;
+            }
         }
     }
-
 
     /*//////////////////////////////////////////////////////////////
                       EIP-165 LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function supportsInterface(bytes4 interfaceId) public view virtual override returns (bool) {
+    function supportsInterface(
+        bytes4 interfaceId
+    ) public view virtual override returns (bool) {
         // TODO: need to add this
         return false;
     }
@@ -599,10 +641,15 @@ contract Vault is
     error PermitDeadlineExpired(uint256 deadline);
     error InvalidSigner(address signer);
 
-    function permit(address owner, address spender, uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s)
-        public
-        virtual
-    {
+    function permit(
+        address owner,
+        address spender,
+        uint256 value,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) public virtual {
         if (deadline < block.timestamp) revert PermitDeadlineExpired(deadline);
 
         // Unchecked because the only math done is incrementing
@@ -641,19 +688,24 @@ contract Vault is
     }
 
     function DOMAIN_SEPARATOR() public view virtual returns (bytes32) {
-        return block.chainid == INITIAL_CHAIN_ID ? INITIAL_DOMAIN_SEPARATOR : computeDomainSeparator();
+        return
+            block.chainid == INITIAL_CHAIN_ID
+                ? INITIAL_DOMAIN_SEPARATOR
+                : computeDomainSeparator();
     }
 
     function computeDomainSeparator() internal view virtual returns (bytes32) {
-        return keccak256(
-            abi.encode(
-                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
-                keccak256(bytes(name())),
-                keccak256("1"),
-                block.chainid,
-                address(this)
-            )
-        );
+        return
+            keccak256(
+                abi.encode(
+                    keccak256(
+                        "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+                    ),
+                    keccak256(bytes(name())),
+                    keccak256("1"),
+                    block.chainid,
+                    address(this)
+                )
+            );
     }
-
 }
