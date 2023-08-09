@@ -24,15 +24,15 @@ contract AaveV3Adapter is BaseAdapter {
     function __AaveV3Adapter_init(
         IERC20 _underlying,
         IERC20 _lpToken,
-        address _vault,
         bool _useLpToken,
+        IERC20[] memory _rewardTokens,
         bytes memory adapterInitData,
         address aaveDataProvider,
         bytes memory
     ) internal onlyInitializing {
         if (_useLpToken) revert LpTokenNotSupported();
 
-        __BaseAdapter_init(_underlying, _lpToken, _vault, false);
+        __BaseAdapter_init(_underlying, _lpToken, false, _rewardTokens);
 
         (address _aToken, , ) = IProtocolDataProvider(aaveDataProvider)
             .getReserveTokensAddresses(address(_underlying));
