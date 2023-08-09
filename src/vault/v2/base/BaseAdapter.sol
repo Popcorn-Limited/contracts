@@ -3,29 +3,46 @@
 
 pragma solidity ^0.8.15;
 
-import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+import {IERC20Upgradeable as IERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
-abstract contract BaseAdapter is Initializable {
+import {OwnedUpgradeable} from "../../../utils/OwnedUpgradeable.sol";
+
+import {IBaseStrategy} from "./interfaces/IBaseStrategy.sol";
+
+abstract contract BaseAdapter is OwnedUpgradeable {
+    using SafeERC20 for IERC20;
+
     IERC20 public underlying;
     IERC20 public lpToken;
-    address public vault;
+
     bool public useLpToken;
 
+    mapping(address => bool) public isVault;
+
+    IERC20[] public rewardTokens;
+
     modifier onlyVault() {
-        require(msg.sender == vault, "Only vault");
+        require(isVault[msg.sender], "Only vault");
         _;
     }
+
+    // TODO Add pausing
+    // TODO Who can call which functions? (who is Owner?)
+    // TODO move performance fees into vaults or adapter?
 
     function __BaseAdapter_init(
         IERC20 _underlying,
         IERC20 _lpToken,
-        address _vault,
-        bool _useLpToken
-    ) internal onlyInitializing {
+        bool _useLpToken,
+        IERC20[] memory _rewardTokens
+    ) internal {
+        __Owned_init(msg.sender);
+
         underlying = _underlying;
         lpToken = _lpToken;
-        vault = _vault;
         useLpToken = _useLpToken;
+        rewardTokens = _rewardTokens;
     }
 
     /**
@@ -34,7 +51,19 @@ abstract contract BaseAdapter is Initializable {
      * @dev Only callable by the vault
      **/
     function deposit(uint256 amount) external virtual onlyVault {
-        useLpToken ? _depositLP(amount) : _depositUnderlying(amount);
+        if (IBaseStrategy(address(this)).autoHarvest())
+            IBaseStrategy(address(this))._harvest(
+                IBaseStrategy(address(this)).harvestData()
+            );
+
+        // TODO could we move this check into the vault and combine meta and none meta strategies?
+        if (useLpToken) {
+            lpToken.safeTransferFrom(msg.sender, address(this), amount);
+            _depositLP(amount);
+        } else {
+            underlying.safeTransferFrom(msg.sender, address(this), amount);
+            _depositUnderlying(amount);
+        }
     }
 
     /**
@@ -55,7 +84,17 @@ abstract contract BaseAdapter is Initializable {
      * @dev Only callable by the vault
      **/
     function withdraw(uint256 amount) external virtual onlyVault {
-        useLpToken ? _withdrawLP(amount) : _withdrawUnderlying(amount);
+        if (IBaseStrategy(address(this)).autoHarvest())
+            IBaseStrategy(address(this))._harvest(
+                IBaseStrategy(address(this)).harvestData()
+            );
+        if (useLpToken) {
+            _withdrawLP(amount);
+            lpToken.safeTransfer(msg.sender, amount);
+        } else {
+            _withdrawUnderlying(amount);
+            underlying.safeTransfer(msg.sender, amount);
+        }
     }
 
     /**
@@ -90,12 +129,18 @@ abstract contract BaseAdapter is Initializable {
     function _totalLP() internal view virtual returns (uint256) {}
 
     /**
-     * @notice Returns the strategy’s reward tokens
-     */
-    function rewardToken() external view virtual returns (address[] memory) {}
-
-    /**
      * @notice Claims rewards
      */
     function _claimRewards() internal virtual {}
+
+    /// @dev This function needs to be called by a trusted contract on initialization of a new vault that wants to use this strategy
+    function addVault(address _vault) external onlyOwner {
+        isVault[_vault] = true;
+    }
+
+    /// @dev RewardTokens get set manually instead of fetched to allow the trusted party to ignore certain rewards if they choose to
+    /// @dev This function should be called by a trusted strategist / the DAO
+    function setRewardsToken(IERC20[] memory _rewardTokens) external onlyOwner {
+        rewardTokens = _rewardTokens;
+    }
 }
