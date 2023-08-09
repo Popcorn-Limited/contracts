@@ -3,16 +3,41 @@
 
 pragma solidity ^0.8.15;
 
-import {BaseAdapter} from "../base/BaseAdapter.sol";
+import {BaseAdapter, IERC20} from "../base/BaseAdapter.sol";
+import {ILendingPool, IAaveIncentives, IAToken, IProtocolDataProvider} from "../../adapter/aave/aaveV3/IAaveV3.sol";
 
 contract AaveV3Adapter is BaseAdapter {
+    /// @notice The Aave aToken contract
+    IAToken public aToken;
+
+    /// @notice The Aave liquidity mining contract
+    IAaveIncentives public aaveIncentives;
+
+    /// @notice Check to see if Aave liquidity mining is active
+    bool public isActiveIncentives;
+
+    /// @notice The Aave LendingPool contract
+    ILendingPool public lendingPool;
+
     function __AaveV3Adapter_init(
         IERC20 _underlying,
         IERC20 _lpToken,
         address _vault,
-        bool _useLpToken
+        bool _useLpToken,
+        bytes memory adapterInitData,
+        address aaveDataProvider,
+        bytes memory
     ) internal onlyInitializing {
         __BaseAdapter_init(_underlying, _lpToken, _vault, _useLpToken);
+
+        (address _aToken, , ) = IProtocolDataProvider(aaveDataProvider)
+            .getReserveTokensAddresses(address(_underlying));
+        aToken = IAToken(_aToken);
+
+        lendingPool = ILendingPool(aToken.POOL());
+        aaveIncentives = IAaveIncentives(aToken.getIncentivesController());
+
+        _underlying.approve(address(lendingPool), type(uint256).max);
     }
 
     /**
@@ -20,7 +45,7 @@ contract AaveV3Adapter is BaseAdapter {
      * @dev This function must be overriden. Some farms require the user to into an lpToken before depositing others might use the underlying directly
      **/
     function _depositUnderlying(uint256 amount) internal override {
-        lendingPool.supply(asset(), amount, address(this), 0);
+        lendingPool.supply(address(underlying), amount, address(this), 0);
     }
 
     /**
@@ -28,7 +53,7 @@ contract AaveV3Adapter is BaseAdapter {
      * @dev This function must be overriden. Some farms require the user to into an lpToken before depositing others might use the underlying directly
      **/
     function _withdrawUnderlying(uint256 amount) internal override {
-        lendingPool.withdraw(asset(), amount, address(this));
+        lendingPool.withdraw(address(underlying), amount, address(this));
     }
 
     /**
@@ -37,13 +62,6 @@ contract AaveV3Adapter is BaseAdapter {
      */
     function _totalUnderlying() internal view override returns (uint256) {
         return aToken.balanceOf(address(this));
-    }
-
-    /**
-     * @notice Returns the strategy’s reward tokens
-     */
-    function rewardToken() external view override returns (address[] memory) {
-         return aaveIncentives.getRewardsByAsset(asset());
     }
 
     /**
@@ -61,8 +79,6 @@ contract AaveV3Adapter is BaseAdapter {
                 address(this),
                 address(this)
             )
-        {
-            success = true;
-        } catch {}
+        {} catch {}
     }
 }

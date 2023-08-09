@@ -3,51 +3,31 @@
 
 pragma solidity ^0.8.15;
 
-import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
-
-contract BaseStrategy {
-    bool public autoHarvest;
-    bytes public harvestData;
+abstract contract BaseStrategy {
+    /// @dev autoHarvest is defined in the strategy but called by the BaseAdapter on each deposit/withdraw
+    bool internal autoHarvest;
+    /// @dev HarvestData is optionalData for the harvest function
+    bytes internal harvestData;
 
     function __BaseStrategy_init(
         bool _autoHarvest,
         bytes memory _harvestData
-    ) internal onlyInitializing {
+    ) internal {
         autoHarvest = _autoHarvest;
         harvestData = _harvestData;
     }
 
-    // TODO how do we differentiate between strategy deposit and adapter deposit since we cant have two times the same base inheritance
-    /**
-     * @notice Deposit Asset into the wrapped farm
-     * @dev Uses either `_depositUnderlying` or `_depositLP`
-     * @dev Only callable by the vault
-     **/
-    function deposit(uint256 amount) external virtual override onlyVault {
-        if (autoHarvest) _harvest(harvestData);
-        useLpToken ? _depositLP(amount) : _depositUnderlying(amount);
-    }
-
-    // TODO how do we differentiate between strategy withdraw and adapter withdraw since we cant have two times the same base inheritance
-    /**
-     * @notice Withdraws Asset from the wrapped farm
-     * @dev Uses either `_withdrawUnderlying` or `_withdrawLP`
-     * @dev Only callable by the vault
-     **/
-    function withdraw(uint256 amount) external virtual override onlyVault {
-        if (autoHarvest) _harvest(harvestData);
-        useLpToken ? _withdrawLP(amount) : _withdrawUnderlying(amount);
-    }
-
     /**
      * @notice Claims rewards & executes the strategy
+     * @dev harvest should be overriden to receive custom access control depending on each strategy. 
+            Some might be purely permissionless others might have access control.
      */
-    function harvest(bytes optionalData) external view virtual {
+    function harvest(bytes memory optionalData) external virtual {
         _harvest(optionalData);
     }
 
     /**
      * @notice Claims rewards & executes the strategy
      */
-    function _harvest(bytes optionalData) internal view virtual {}
+    function _harvest(bytes memory optionalData) internal virtual {}
 }
