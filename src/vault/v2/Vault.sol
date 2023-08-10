@@ -61,6 +61,8 @@ contract Vault is
     using SafeERC20 for IERC20;
     using Math for uint256;
 
+    uint256 internal constant SECONDS_PER_YEAR = 365.25 days;
+
     uint8 internal _decimals;
     uint8 public constant decimalOffset = 9;
     uint8 public autoHarvest;
@@ -441,6 +443,25 @@ contract Vault is
     event PerformanceFeeChanged(uint256 oldFee, uint256 newFee);
 
     error InvalidPerformanceFee(uint256 fee);
+
+    /**
+     * @notice Management fee that has accrued since last fee harvest.
+     * @return Accrued management fee in underlying `asset` token.
+     * @dev Management fee is annualized per minute, based on 525,600 minutes per year. Total assets are calculated using
+     *  the average of their current value and the value at the previous fee harvest checkpoint. This method is similar to
+     *  calculating a definite integral using the trapezoid rule.
+     */
+    function accruedManagementFee() public view returns (uint256) {
+        uint256 managementFee = fees.management;
+        return
+            managementFee > 0
+                ? managementFee.mulDiv(
+                    totalAssets() * (block.timestamp - feesUpdatedAt),
+                    SECONDS_PER_YEAR,
+                    Math.Rounding.Down
+                ) / 1e18
+                : 0;
+    }
 
     /**
      * @notice Performance fee that has accrued since last fee harvest.
