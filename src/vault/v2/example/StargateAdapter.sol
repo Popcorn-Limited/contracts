@@ -3,10 +3,13 @@
 
 pragma solidity ^0.8.15;
 
+import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import {BaseAdapter, IERC20} from "../base/BaseAdapter.sol";
 import {ISToken, IStargateStaking, IStargateRouter} from "../../adapter/stargate/IStargate.sol";
 
 contract StargateAdapter is BaseAdapter {
+    using SafeERC20 for IERC20;
+
     uint256 internal stakingPid;
 
     /// @notice The Stargate LpStaking contract
@@ -75,6 +78,16 @@ contract StargateAdapter is BaseAdapter {
                             DEPOSIT LOGIC
     //////////////////////////////////////////////////////////////*/
 
+    function _deposit(uint256 amount) internal override {
+        if (useLpToken) {
+            lpToken.safeTransferFrom(msg.sender, address(this), amount);
+            _depositLP(amount);
+        } else {
+            underlying.safeTransferFrom(msg.sender, address(this), amount);
+            _depositUnderlying(amount);
+        }
+    }
+
     /**
      * @notice Deposits underlying asset and converts it if necessary into an lpToken before depositing
      * @dev This function must be overriden. Some farms require the user to into an lpToken before depositing others might use the underlying directly
@@ -95,6 +108,15 @@ contract StargateAdapter is BaseAdapter {
     /*//////////////////////////////////////////////////////////////
                             WITHDRAWAL LOGIC
     //////////////////////////////////////////////////////////////*/
+    function _withdraw(uint256 amount) internal override {
+        if (useLpToken) {
+            if (!paused()) _withdrawLP(amount);
+            lpToken.safeTransfer(msg.sender, amount);
+        } else {
+            if (!paused()) _withdrawUnderlying(amount);
+            underlying.safeTransfer(msg.sender, amount);
+        }
+    }
 
     /**
      * @notice Withdraws underlying asset. If necessary it converts the lpToken into underlying before withdrawing

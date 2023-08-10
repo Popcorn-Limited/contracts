@@ -3,10 +3,10 @@
 
 pragma solidity ^0.8.15;
 
-import {StargateAdapter, IERC20} from "./StargateAdapter.sol";
+import {BeefyAdapter, IERC20} from "./BeefyAdapter.sol";
 import {CurveCompounder, CurveRoute} from "./CurveCompounder.sol";
 
-contract StargateCompounder is StargateAdapter, CurveCompounder {
+contract BeefyCompounder is BeefyAdapter, CurveCompounder {
     // TODO pack these variables better
     function initialize(
         IERC20 _underlying,
@@ -14,7 +14,7 @@ contract StargateCompounder is StargateAdapter, CurveCompounder {
         bool _useLpToken,
         IERC20[] memory _rewardTokens,
         address _registry,
-        bytes memory _stargateInitData,
+        bytes memory _beefyInitData,
         bool _autoHarvest,
         bytes memory _harvestData,
         IERC20 _baseAsset,
@@ -24,13 +24,13 @@ contract StargateCompounder is StargateAdapter, CurveCompounder {
         CurveRoute memory _toAssetRoute,
         address _router
     ) external onlyInitializing {
-        __StargateAdapter_init(
+        __BeefyAdapter_init(
             _underlying,
             _lpToken,
             _useLpToken,
             _rewardTokens,
             _registry,
-            _stargateInitData
+            _beefyInitData
         );
         __CurveCompounder_init(
             _autoHarvest,

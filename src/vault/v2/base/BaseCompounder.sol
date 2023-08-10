@@ -4,15 +4,13 @@
 pragma solidity ^0.8.15;
 
 import {IERC20Upgradeable as IERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
-import {BaseStrategy} from "./BaseStrategy.sol";
+import {BaseStrategy, IOwned} from "./BaseStrategy.sol";
 import {IBaseAdapter} from "./interfaces/IBaseAdapter.sol";
 
 abstract contract BaseCompounder is BaseStrategy {
     IERC20 internal baseAsset;
     uint256[] internal minTradeAmounts;
     bool internal depositLpToken;
-
-    // TODO allow owner to change minTradeAmounts, autoHarvest?
 
     function __BaseCompounder_init(
         bool _autoHarvest,
@@ -28,6 +26,14 @@ abstract contract BaseCompounder is BaseStrategy {
         depositLpToken = _depositLpToken;
     }
 
+    function setMinTradeAmounts(uint256[] memory _minTradeAmounts) external {
+        require(
+            msg.sender == IOwned(address(this)).owner(),
+            "Only the contract owner may perform this action"
+        );
+        minTradeAmounts = _minTradeAmounts;
+    }
+
     /**
      * @notice Claims rewards & executes the strategy
      */
@@ -38,47 +44,50 @@ abstract contract BaseCompounder is BaseStrategy {
     /**
      * @notice Claims rewards & executes the strategy
      */
-    function _harvest(
-        bytes memory optionalData
-    ) internal virtual override {
+    function _harvest(bytes memory optionalData) internal virtual override {
         _compound(optionalData);
     }
 
-    function _compound(bytes memory optionalData) internal {
-        // Claim Rewards from Adapter
-        IBaseAdapter(address(this))._claimRewards();
+    function _compound(bytes memory optionalData) internal virtual {}
 
-        // Swap Rewards to BaseAsset (which can but must not be the underlying asset)
-        _swapToBaseAsset(optionalData);
+    // function _compound(bytes memory optionalData) internal {
+    //     // Claim Rewards from Adapter
+    //     IBaseAdapter(address(this))._claimRewards();
 
-        // Stop compounding if the trades were not successful
-        if (baseAsset.balanceOf(address(this)) == 0) {
-            return;
-        }
+    //     // Swap Rewards to BaseAsset (which can but must not be the underlying asset)
+    //     _swapToBaseAsset(optionalData);
 
-        // Get the underlying asset if the baseAsset is not the underlying asset
-        _getAsset(optionalData);
+    //     // Stop compounding if the trades were not successful
+    //     if (baseAsset.balanceOf(address(this)) == 0) {
+    //         return;
+    //     }
 
-        // Deposit the underlying asset into the adapter
-        depositLpToken
-            ? IBaseAdapter(address(this))._depositLP(
-                IERC20(IBaseAdapter(address(this)).lpToken()).balanceOf(
-                    address(this)
-                )
-            )
-            : IBaseAdapter(address(this))._depositUnderlying(
-                IERC20(IBaseAdapter(address(this)).underlying()).balanceOf(
-                    address(this)
-                )
-            );
-    }
+    //     // Get the underlying asset if the baseAsset is not the underlying asset
+    //     _getAsset(optionalData);
 
-    /// @dev This function gets called for each rewardToken to trade it to a base asset. 
+    //     // Deposit the underlying asset into the adapter
+    //     depositLpToken
+    //         ? IBaseAdapter(address(this))._depositLP(
+    //             IERC20(IBaseAdapter(address(this)).lpToken()).balanceOf(
+    //                 address(this)
+    //             )
+    //         )
+    //         : IBaseAdapter(address(this))._depositUnderlying(
+    //             IERC20(IBaseAdapter(address(this)).underlying()).balanceOf(
+    //                 address(this)
+    //             )
+    //         );
+    // }
+
+    /// @dev This function gets called for each rewardToken to trade it to a base asset.
     /// @dev The base asset can be the underlying token but can also be an unrelated token.
     /// @dev The differentiation between baseAsset and asset exists to allow for more efficient trade paths
     ///      (reward1 -> baseAsset, reward2 -> baseAsset, baseAsset -> asset) instead of (reward1 -> baseAsset -> asset, reward2 -> baseAsset -> asset)
-    function _swapToBaseAsset(bytes memory optionalData) internal virtual {}
-    
+    function _swapToBaseAsset(
+        IERC20[] memory rewardTokens,
+        bytes memory optionalData
+    ) internal virtual {}
+
     /// @dev This function trades the baseAsset for the underlying asset if the baseAsset is not the underlying asset.
     function _getAsset(bytes memory optionalData) internal virtual {}
 }
