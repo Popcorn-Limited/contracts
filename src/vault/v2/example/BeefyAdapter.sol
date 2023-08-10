@@ -3,12 +3,14 @@
 
 pragma solidity ^0.8.15;
 
-import {BaseAdapter, IERC20} from "../base/BaseAdapter.sol";
 import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
+import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
+import {BaseAdapter, IERC20} from "../base/BaseAdapter.sol";
 import {IBeefyVault, IBeefyBooster, IBeefyBalanceCheck, IBeefyStrat} from "../../adapter/beefy/IBeefy.sol";
 import {IPermissionRegistry} from "../../../interfaces/vault/IPermissionRegistry.sol";
 
 contract BeefyAdapter is BaseAdapter {
+    using SafeERC20 for IERC20;
     using Math for uint256;
 
     IBeefyVault public beefyVault;
@@ -27,23 +29,23 @@ contract BeefyAdapter is BaseAdapter {
         IERC20 _lpToken,
         bool _useLpToken,
         IERC20[] memory _rewardTokens,
-        address registry,
-        bytes memory beefyInitData
+        address _registry,
+        bytes memory _beefyInitData
     ) internal onlyInitializing {
         if (_useLpToken) revert LpTokenNotSupported();
 
         __BaseAdapter_init(_underlying, _lpToken, false, _rewardTokens);
 
         (address _beefyVault, address _beefyBooster) = abi.decode(
-            beefyInitData,
+            _beefyInitData,
             (address, address)
         );
 
-        if (!IPermissionRegistry(registry).endorsed(_beefyVault))
+        if (!IPermissionRegistry(_registry).endorsed(_beefyVault))
             revert NotEndorsed(_beefyVault);
         if (
             _beefyBooster != address(0) &&
-            !IPermissionRegistry(registry).endorsed(_beefyBooster)
+            !IPermissionRegistry(_registry).endorsed(_beefyBooster)
         ) revert NotEndorsed(_beefyBooster);
         if (IBeefyVault(_beefyVault).want() != address(_underlying))
             revert InvalidBeefyVault(_beefyVault);
@@ -99,6 +101,11 @@ contract BeefyAdapter is BaseAdapter {
                             DEPOSIT LOGIC
     //////////////////////////////////////////////////////////////*/
 
+    function _deposit(uint256 amount) internal override {
+        underlying.safeTransferFrom(msg.sender, address(this), amount);
+        _depositUnderlying(amount);
+    }
+
     /**
      * @notice Deposits underlying asset and converts it if necessary into an lpToken before depositing
      * @dev This function must be overriden. Some farms require the user to into an lpToken before depositing others might use the underlying directly
@@ -112,6 +119,11 @@ contract BeefyAdapter is BaseAdapter {
     /*//////////////////////////////////////////////////////////////
                             WITHDRAWAL LOGIC
     //////////////////////////////////////////////////////////////*/
+
+    function _withdraw(uint256 amount) internal override {
+        _withdrawUnderlying(amount);
+        underlying.safeTransfer(msg.sender, amount);
+    }
 
     /**
      * @notice Withdraws underlying asset. If necessary it converts the lpToken into underlying before withdrawing

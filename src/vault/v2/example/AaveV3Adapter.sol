@@ -3,10 +3,13 @@
 
 pragma solidity ^0.8.15;
 
+import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import {BaseAdapter, IERC20} from "../base/BaseAdapter.sol";
 import {ILendingPool, IAaveIncentives, IAToken, IProtocolDataProvider} from "../../adapter/aave/aaveV3/IAaveV3.sol";
 
 contract AaveV3Adapter is BaseAdapter {
+    using SafeERC20 for IERC20;
+
     /// @notice The Aave aToken contract
     IAToken public aToken;
 
@@ -26,7 +29,6 @@ contract AaveV3Adapter is BaseAdapter {
         IERC20 _lpToken,
         bool _useLpToken,
         IERC20[] memory _rewardTokens,
-        bytes memory adapterInitData,
         address aaveDataProvider,
         bytes memory
     ) internal onlyInitializing {
@@ -60,6 +62,11 @@ contract AaveV3Adapter is BaseAdapter {
                             DEPOSIT LOGIC
     //////////////////////////////////////////////////////////////*/
 
+    function _deposit(uint256 amount) internal override {
+        underlying.safeTransferFrom(msg.sender, address(this), amount);
+        _depositUnderlying(amount);
+    }
+
     /**
      * @notice Deposits underlying asset and converts it if necessary into an lpToken before depositing
      * @dev This function must be overriden. Some farms require the user to into an lpToken before depositing others might use the underlying directly
@@ -71,6 +78,11 @@ contract AaveV3Adapter is BaseAdapter {
     /*//////////////////////////////////////////////////////////////
                             WITHDRAWAL LOGIC
     //////////////////////////////////////////////////////////////*/
+
+    function _withdraw(uint256 amount) internal override {
+        _withdrawUnderlying(amount);
+        underlying.safeTransfer(msg.sender, amount);
+    }
 
     /**
      * @notice Withdraws underlying asset. If necessary it converts the lpToken into underlying before withdrawing

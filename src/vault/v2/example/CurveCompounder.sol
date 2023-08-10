@@ -35,20 +35,21 @@ contract CurveCompounder is BaseCompounder {
             _depositLpToken
         );
 
-        toBaseAssetRoutes = _toBaseAssetRoutes;
+        for(uint256 i; i < _toBaseAssetRoutes.length; i++) {
+            toBaseAssetRoutes.push(_toBaseAssetRoutes[i]);
+        }
         toAssetRoute = _toAssetRoute;
     }
 
-    function _swapToBaseAsset(bytes memory optionalData) internal override {
-        address[] memory rewardTokens = IBaseAdapter(address(this))
-            .rewardTokens();
+    function _swapToBaseAsset(
+        IERC20[] memory rewardTokens,
+        bytes memory optionalData
+    ) internal override {
         CurveRoute[] memory _toBaseAssetRoutes = toBaseAssetRoutes;
 
         uint256 len = rewardTokens.length;
         for (uint256 i = 0; i < len; i++) {
-            uint256 rewardBal = IERC20(rewardTokens[i]).balanceOf(
-                address(this)
-            );
+            uint256 rewardBal = rewardTokens[i].balanceOf(address(this));
             if (rewardBal >= minTradeAmounts[i])
                 ICurveRouter(router).exchange_multiple(
                     _toBaseAssetRoutes[i].route,

@@ -4,14 +4,11 @@
 pragma solidity ^0.8.15;
 
 import {IERC20Upgradeable as IERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
-import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import {OwnedUpgradeable} from "../../../utils/OwnedUpgradeable.sol";
 import {PausableUpgradeable} from "openzeppelin-contracts-upgradeable/security/PausableUpgradeable.sol";
 import {IBaseStrategy} from "./interfaces/IBaseStrategy.sol";
 
 abstract contract BaseAdapter is OwnedUpgradeable, PausableUpgradeable {
-    using SafeERC20 for IERC20;
-
     IERC20 public underlying;
     IERC20 public lpToken;
 
@@ -26,10 +23,7 @@ abstract contract BaseAdapter is OwnedUpgradeable, PausableUpgradeable {
         _;
     }
 
-    // TODO Who can call which functions? (who is Owner?)
     // TODO move performance fees into vaults or adapter?
-    // TODO how to deal with limits, fees and potential slippage? They should get communicated to the Vault
-    //      we could work with previews or other view functions or simply reduce those from totalAssets
     function __BaseAdapter_init(
         IERC20 _underlying,
         IERC20 _lpToken,
@@ -56,8 +50,8 @@ abstract contract BaseAdapter is OwnedUpgradeable, PausableUpgradeable {
         if (paused())
             return
                 useLpToken
-                    ? IERC20(lpToken).balanceOf(address(this))
-                    : IERC20(underlying).balanceOf(address(this));
+                    ? lpToken.balanceOf(address(this))
+                    : underlying.balanceOf(address(this));
 
         return useLpToken ? _totalLP() : _totalUnderlying();
     }
@@ -91,21 +85,11 @@ abstract contract BaseAdapter is OwnedUpgradeable, PausableUpgradeable {
      * @dev Uses either `_depositUnderlying` or `_depositLP`
      * @dev Only callable by the vault
      **/
-    function deposit(uint256 amount) public virtual onlyVault whenNotPaused {
-        if (IBaseStrategy(address(this)).autoHarvest())
-            IBaseStrategy(address(this))._harvest(
-                IBaseStrategy(address(this)).harvestData()
-            );
-
-        // TODO could we move this check into the vault and combine meta and none meta strategies?
-        if (useLpToken) {
-            lpToken.safeTransferFrom(msg.sender, address(this), amount);
-            _depositLP(amount);
-        } else {
-            underlying.safeTransferFrom(msg.sender, address(this), amount);
-            _depositUnderlying(amount);
-        }
+    function deposit(uint256 amount) external virtual onlyVault whenNotPaused {
+        _deposit(amount);
     }
+
+    function _deposit(uint256 amount) internal virtual {}
 
     /**
      * @notice Deposits underlying asset and converts it if necessary into an lpToken before depositing
@@ -128,19 +112,11 @@ abstract contract BaseAdapter is OwnedUpgradeable, PausableUpgradeable {
      * @dev Uses either `_withdrawUnderlying` or `_withdrawLP`
      * @dev Only callable by the vault
      **/
-    function withdraw(uint256 amount) public virtual onlyVault {
-        if (!paused() && IBaseStrategy(address(this)).autoHarvest())
-            IBaseStrategy(address(this))._harvest(
-                IBaseStrategy(address(this)).harvestData()
-            );
-        if (useLpToken) {
-            if (!paused()) _withdrawLP(amount);
-            lpToken.safeTransfer(msg.sender, amount);
-        } else {
-            if (!paused()) _withdrawUnderlying(amount);
-            underlying.safeTransfer(msg.sender, amount);
-        }
+    function withdraw(uint256 amount) external virtual onlyVault {
+        _withdraw(amount);
     }
+
+    function _withdraw(uint256 amount) internal virtual {}
 
     /**
      * @notice Withdraws underlying asset. If necessary it converts the lpToken into underlying before withdrawing
@@ -184,13 +160,13 @@ abstract contract BaseAdapter is OwnedUpgradeable, PausableUpgradeable {
 
     /// @notice Pause Deposits and withdraw all funds from the underlying protocol. Caller must be owner.
     function pause() external onlyOwner {
-        withdraw(totalAssets());
+        _withdraw(totalAssets());
         _pause();
     }
 
     /// @notice Unpause Deposits and deposit all funds into the underlying protocol. Caller must be owner.
     function unpause() external onlyOwner {
-        deposit(totalAssets());
+        _deposit(totalAssets());
         _unpause();
     }
 }
