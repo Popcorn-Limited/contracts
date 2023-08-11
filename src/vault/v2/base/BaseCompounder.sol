@@ -4,7 +4,7 @@
 pragma solidity ^0.8.15;
 
 import {IERC20Upgradeable as IERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
-import {BaseStrategy, IOwned, HarvestConfig} from "./BaseStrategy.sol";
+import {BaseHelper, IOwned, HarvestConfig} from "./BaseHelper.sol";
 import {IBaseAdapter} from "./interfaces/IBaseAdapter.sol";
 
 struct CompounderConfig {
@@ -13,14 +13,14 @@ struct CompounderConfig {
     bool depositLpToken;
 }
 
-abstract contract BaseCompounder is BaseStrategy {
+abstract contract BaseCompounder is BaseHelper {
     CompounderConfig internal compounderConfig;
 
     function __BaseCompounder_init(
         HarvestConfig memory _harvestConfig,
         CompounderConfig memory _compounderConfig
     ) internal {
-        __BaseStrategy_init(_harvestConfig);
+        __BaseHelper_init(_harvestConfig);
 
         compounderConfig = _compounderConfig;
     }
