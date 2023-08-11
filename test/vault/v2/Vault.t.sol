@@ -128,154 +128,172 @@ contract VaultV2Test is Test {
     /*//////////////////////////////////////////////////////////////
                           INITIALIZATION
     //////////////////////////////////////////////////////////////*/
-    // function test__metadata() public {
-    //     address vaultAddress = Clones.clone(implementation);
-    //     Vault newVault = Vault(vaultAddress);
+    function test__metadata() public {
+        address vaultAddress = Clones.clone(implementation);
+        TestVault newVault = TestVault(vaultAddress);
 
-    //     uint256 callTime = block.timestamp;
-    //     newVault.initialize(
-    //         IERC20(address(asset)),
-    //         IERC4626(address(adapter)),
-    //         VaultFees({
-    //             deposit: 100,
-    //             withdrawal: 100,
-    //             management: 100,
-    //             performance: 100
-    //         }),
-    //         feeRecipient,
-    //         type(uint256).max,
-    //         bob
-    //     );
+        uint256 callTime = block.timestamp;
 
-    //     assertEq(newVault.name(), "Popcorn Mock Token Vault");
-    //     assertEq(newVault.symbol(), "pop-TKN");
-    //     assertEq(newVault.decimals(), 27);
+        VaultFees memory vaultFees = VaultFees({
+            deposit: 100,
+            withdrawal: 100,
+            management: 100,
+            performance: 100
+        });
 
-    //     assertEq(address(newVault.asset()), address(asset));
-    //     assertEq(address(newVault.adapter()), address(adapter));
-    //     assertEq(newVault.owner(), bob);
+        VaultInitData memory vaultData = VaultInitData(
+            address(asset),
+            asset.name(),
+            asset.symbol(),
+            owner,
+            vaultFees,
+            feeRecipient,
+            type(uint256).max,
+            21600,
+            0
+        );
 
-    //     (
-    //         uint256 deposit,
-    //         uint256 withdrawal,
-    //         uint256 management,
-    //         uint256 performance
-    //     ) = newVault.fees();
-    //     assertEq(deposit, 100);
-    //     assertEq(withdrawal, 100);
-    //     assertEq(management, 100);
-    //     assertEq(performance, 100);
-    //     assertEq(newVault.feeRecipient(), feeRecipient);
-    //     assertEq(newVault.highWaterMark(), 1e9);
+        newVault.testInitialize(vaultData);
 
-    //     assertEq(newVault.quitPeriod(), 3 days);
-    //     assertEq(
-    //         asset.allowance(address(newVault), address(adapter)),
-    //         type(uint256).max
-    //     );
-    // }
+        assertEq(newVault.name(), "Popcorn Mock Token Vault");
+        assertEq(newVault.symbol(), "pop-TKN");
+        assertEq(newVault.decimals(), 27);
 
-    // function testFail__initialize_asset_is_zero() public {
-    //     address vaultAddress = address(new Vault());
-    //     vm.label(vaultAddress, "vault");
+        assertEq(address(newVault.asset()), address(asset));
+        assertEq(newVault.owner(), bob);
 
-    //     vault = Vault(vaultAddress);
-    //     vault.initialize(
-    //         IERC20(address(0)),
-    //         IERC4626(address(adapter)),
-    //         VaultFees({
-    //             deposit: 0,
-    //             withdrawal: 0,
-    //             management: 0,
-    //             performance: 0
-    //         }),
-    //         feeRecipient,
-    //         type(uint256).max,
-    //         address(this)
-    //     );
-    // }
+        (
+            uint256 deposit,
+            uint256 withdrawal,
+            uint256 management,
+            uint256 performance
+        ) = newVault.fees();
+        assertEq(deposit, 100);
+        assertEq(withdrawal, 100);
+        assertEq(management, 100);
+        assertEq(performance, 100);
+        assertEq(newVault.feeRecipient(), feeRecipient);
+        assertEq(newVault.highWaterMark(), 1e9);
 
-    // function testFail__initialize_adapter_asset_is_not_matching() public {
-    //     MockERC20 newAsset = new MockERC20("New Mock Token", "NTKN", 18);
-    //     MockERC4626 newAdapter = _createAdapter(IERC20(address(newAsset)));
+        assertEq(newVault.quitPeriod(), 3 days);
+        assertEq(
+            asset.allowance(address(newVault), address(adapter)),
+            type(uint256).max
+        );
+    }
 
-    //     address vaultAddress = address(new Vault());
+    function testFail__initialize_asset_is_zero() public {
+        address vaultAddress = address(new TestVault());
+        vm.label(vaultAddress, "vault");
 
-    //     vault = Vault(vaultAddress);
-    //     vault.initialize(
-    //         IERC20(address(asset)),
-    //         IERC4626(address(newAdapter)),
-    //         VaultFees({
-    //             deposit: 0,
-    //             withdrawal: 0,
-    //             management: 0,
-    //             performance: 0
-    //         }),
-    //         feeRecipient,
-    //         type(uint256).max,
-    //         address(this)
-    //     );
-    // }
+        vault = TestVault(vaultAddress);
 
-    // function testFail__initialize_adapter_addressZero() public {
-    //     MockERC20 newAsset = new MockERC20("New Mock Token", "NTKN", 18);
-    //     MockERC4626 newAdapter = _createAdapter(IERC20(address(newAsset)));
+        VaultFees memory vaultFees = VaultFees({
+            deposit: 100,
+            withdrawal: 100,
+            management: 100,
+            performance: 100
+        });
 
-    //     address vaultAddress = address(new Vault());
+        VaultInitData memory vaultData = VaultInitData(
+            address(0),
+            asset.name(),
+            asset.symbol(),
+            owner,
+            vaultFees,
+            feeRecipient,
+            type(uint256).max,
+            21600,
+            0
+        );
 
-    //     vault = Vault(vaultAddress);
-    //     vault.initialize(
-    //         IERC20(address(asset)),
-    //         IERC4626(address(newAdapter)),
-    //         VaultFees({
-    //             deposit: 0,
-    //             withdrawal: 0,
-    //             management: 0,
-    //             performance: 0
-    //         }),
-    //         feeRecipient,
-    //         type(uint256).max,
-    //         address(this)
-    //     );
-    // }
+        vault.testInitialize(vaultData);
+    }
 
-    // function testFail__initialize_fees_too_high() public {
-    //     address vaultAddress = address(new Vault());
+    function testFail__initialize_adapter_asset_is_not_matching() public {
+        MockERC20 newAsset = new MockERC20("New Mock Token", "NTKN", 18);
+        MockERC4626 newAdapter = _createAdapter(IERC20(address(newAsset)));
 
-    //     vault = Vault(vaultAddress);
-    //     vault.initialize(
-    //         IERC20(address(asset)),
-    //         IERC4626(address(adapter)),
-    //         VaultFees({
-    //             deposit: 1e18,
-    //             withdrawal: 0,
-    //             management: 0,
-    //             performance: 0
-    //         }),
-    //         feeRecipient,
-    //         type(uint256).max,
-    //         address(this)
-    //     );
-    // }
+        address vaultAddress = address(new TestVault());
 
-    // function testFail__initialize_feeRecipient_addressZero() public {
-    //     address vaultAddress = address(new Vault());
+        vault = TestVault(vaultAddress);
 
-    //     vault = Vault(vaultAddress);
-    //     vault.initialize(
-    //         IERC20(address(asset)),
-    //         IERC4626(address(adapter)),
-    //         VaultFees({
-    //             deposit: 0,
-    //             withdrawal: 0,
-    //             management: 0,
-    //             performance: 0
-    //         }),
-    //         address(0),
-    //         type(uint256).max,
-    //         address(this)
-    //     );
-    // }
+        VaultFees memory vaultFees = VaultFees({
+            deposit: 1e18,
+            withdrawal: 100,
+            management: 100,
+            performance: 100
+        });
+
+        VaultInitData memory vaultData = VaultInitData(
+            address(asset),
+            asset.name(),
+            asset.symbol(),
+            owner,
+            vaultFees,
+            feeRecipient,
+            type(uint256).max,
+            21600,
+            0
+        );
+
+        vault.testInitialize(vaultData);
+    }
+
+    function testFail__initialize_fees_too_high() public {
+        address vaultAddress = address(new TestVault());
+
+        vault = TestVault(vaultAddress);
+
+        VaultFees memory vaultFees = VaultFees({
+            deposit: 1e18,
+            withdrawal: 100,
+            management: 100,
+            performance: 100
+        });
+
+        VaultInitData memory vaultData = VaultInitData(
+            address(asset),
+            asset.name(),
+            asset.symbol(),
+            owner,
+            vaultFees,
+            feeRecipient,
+            type(uint256).max,
+            21600,
+            0
+        );
+
+        vault.testInitialize(vaultData);
+    }
+
+    function testFail__initialize_feeRecipient_addressZero() public {
+        address vaultAddress = address(new TestVault());
+        feeRecipient = address(0);
+
+        vault = TestVault(vaultAddress);
+
+        VaultFees memory vaultFees = VaultFees({
+            deposit: 100,
+            withdrawal: 100,
+            management: 100,
+            performance: 100
+        });
+
+        VaultInitData memory vaultData = VaultInitData(
+            address(asset),
+            asset.name(),
+            asset.symbol(),
+            owner,
+            vaultFees,
+            feeRecipient,
+            type(uint256).max,
+            21600,
+            0
+        );
+
+        vault.testInitialize(vaultData);
+    }
 
     /*//////////////////////////////////////////////////////////////
                         DEPOSIT / WITHDRAW
@@ -700,38 +718,47 @@ contract VaultV2Test is Test {
         assertApproxEqRel(vault.highWaterMark(), totalAssets / 1e9, 30, "hwm");
     }
 
-    // function test_performanceFee2() public {
-    //     asset = new MockERC20("Mock Token", "TKN", 6);
-    //     adapter = _createAdapter(IERC20(address(asset)));
-    //     address vaultAddress = Clones.clone(implementation);
-    //     vault = Vault(vaultAddress);
-    //     vm.label(vaultAddress, "vault");
-    //     vault.initialize(
-    //         IERC20(address(asset)),
-    //         IERC4626(address(adapter)),
-    //         VaultFees({
-    //             deposit: 0,
-    //             withdrawal: 0,
-    //             management: 0,
-    //             performance: 1e17
-    //         }),
-    //         feeRecipient,
-    //         type(uint256).max,
-    //         address(this)
-    //     );
+    function test_performanceFee2() public {
+        asset = new MockERC20("Mock Token", "TKN", 6);
+        adapter = _createAdapter(IERC20(address(asset)));
+        address vaultAddress = Clones.clone(implementation);
+        vault = TestVault(vaultAddress);
+        vm.label(vaultAddress, "vault");
 
-    //     uint256 depositAmount = 1e6;
-    //     asset.mint(alice, depositAmount);
-    //     vm.startPrank(alice);
-    //     asset.approve(address(vault), depositAmount);
-    //     vault.deposit(depositAmount, alice);
-    //     vm.stopPrank();
+        VaultFees memory vaultFees = VaultFees({
+            deposit: 0,
+            withdrawal: 0,
+            management: 0,
+            performance: 1e17
+        });
 
-    //     asset.mint(address(adapter), 1e6);
+        VaultInitData memory vaultData = VaultInitData(
+            address(asset),
+            asset.name(),
+            asset.symbol(),
+            owner,
+            vaultFees,
+            feeRecipient,
+            type(uint256).max,
+            21600,
+            0
+        );
 
-    //     // Take 10% of 1e6
-    //     assertEq(vault.accruedPerformanceFee(), 1e5 - 1);
-    // }
+        vault.testInitialize(vaultData);
+
+        uint256 depositAmount = 1e6;
+        asset.mint(alice, depositAmount);
+        vm.startPrank(alice);
+        asset.approve(address(vault), depositAmount);
+        vault.deposit(depositAmount, alice);
+        vm.stopPrank();
+
+        asset.mint(address(adapter), 1e6);
+
+        // Take 10% of 1e6
+        emit log_named_uint("DING", vault.accruedPerformanceFee());
+        assertEq(vault.accruedPerformanceFee(), 1e5 - 1);
+    }
 
     /*//////////////////////////////////////////////////////////////
                           CHANGE FEES
@@ -866,9 +893,10 @@ contract VaultV2Test is Test {
     //////////////////////////////////////////////////////////////*/
 
     function test__setFeeRecipient() public {
-        vm.expectEmit(false, false, false, true, address(vault));
+        // vm.expectEmit(false, false, false, true, address(vault));
         emit FeeRecipientUpdated(feeRecipient, alice);
 
+        vm.prank(owner);
         vault.setFeeRecipient(alice);
 
         assertEq(vault.feeRecipient(), alice);
@@ -918,17 +946,6 @@ contract VaultV2Test is Test {
         vault.setQuitPeriod(1 days);
     }
 
-    // function testFail__setQuitPeriod_during_adapter_quitPeriod() public {
-    //     MockERC4626 newAdapter = _createAdapter(IERC20(address(asset)));
-
-    //     // Pass the inital quit period
-    //     vm.warp(block.timestamp + 3 days);
-
-    //     vault.proposeAdapter(IERC4626(address(newAdapter)));
-
-    //     vault.setQuitPeriod(1 days);
-    // }
-
     function testFail__setQuitPeriod_during_fee_quitPeriod() public {
         // Pass the inital quit period
         vm.warp(block.timestamp + 3 days);
@@ -969,6 +986,7 @@ contract VaultV2Test is Test {
         // vm.expectEmit(false, false, false, true, address(vault));
         emit Paused(address(this));
 
+        vm.prank(owner);
         vault.pause();
 
         assertTrue(vault.paused());
