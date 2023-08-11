@@ -3,7 +3,7 @@
 
 pragma solidity ^0.8.15;
 
-interface IBaseStrategy {
+interface IBaseHelper {
     /**
      * @notice Claims rewards & executes the strategy
      */

@@ -12,10 +12,10 @@ struct HarvestConfig {
     bytes harvestData;
 }
 
-abstract contract BaseStrategy {
+abstract contract BaseHelper {
     HarvestConfig internal harvestConfig;
 
-    function __BaseStrategy_init(HarvestConfig memory _harvestConfig) internal {
+    function __BaseHelper_init(HarvestConfig memory _harvestConfig) internal {
         harvestConfig = _harvestConfig;
     }
 
