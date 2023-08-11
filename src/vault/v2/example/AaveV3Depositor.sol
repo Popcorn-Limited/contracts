@@ -3,14 +3,14 @@
 
 pragma solidity ^0.8.15;
 
-import {BeefyAdapter, IERC20, AdapterConfig, ProtocolConfig} from "./BeefyAdapter.sol";
+import {AaveV3Adapter, IERC20, AdapterConfig, ProtocolConfig} from "./AaveV3Adapter.sol";
 
-contract BeefyDepositor is BeefyAdapter {
+contract AaveV3Depositor is AaveV3Adapter {
     function initialize(
         AdapterConfig memory _adapterConfig,
         ProtocolConfig memory _protocolConfig
     ) external initializer {
-        __BeefyAdapter_init(_adapterConfig, _protocolConfig);
+        __AaveV3Adapter_init(_adapterConfig, _protocolConfig);
     }
 
     function deposit(uint256 amount) external override onlyVault whenNotPaused {

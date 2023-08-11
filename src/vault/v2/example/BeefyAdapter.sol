@@ -5,7 +5,7 @@ pragma solidity ^0.8.15;
 
 import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
-import {BaseAdapter, IERC20} from "../base/BaseAdapter.sol";
+import {BaseAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../base/BaseAdapter.sol";
 import {IBeefyVault, IBeefyBooster, IBeefyBalanceCheck, IBeefyStrat} from "../../adapter/beefy/IBeefy.sol";
 import {IPermissionRegistry} from "../../../interfaces/vault/IPermissionRegistry.sol";
 
@@ -25,29 +25,25 @@ contract BeefyAdapter is BaseAdapter {
     error LpTokenNotSupported();
 
     function __BeefyAdapter_init(
-        IERC20 _underlying,
-        IERC20 _lpToken,
-        bool _useLpToken,
-        IERC20[] memory _rewardTokens,
-        address _registry,
-        bytes memory _beefyInitData
+        AdapterConfig memory _adapterConfig,
+        ProtocolConfig memory _protocolConfig
     ) internal onlyInitializing {
-        if (_useLpToken) revert LpTokenNotSupported();
+        if (_adapterConfig.useLpToken) revert LpTokenNotSupported();
 
-        __BaseAdapter_init(_underlying, _lpToken, false, _rewardTokens);
+        __BaseAdapter_init(_adapterConfig);
 
         (address _beefyVault, address _beefyBooster) = abi.decode(
-            _beefyInitData,
+            _protocolConfig.protocolInitData,
             (address, address)
         );
 
-        if (!IPermissionRegistry(_registry).endorsed(_beefyVault))
+        if (!IPermissionRegistry(_protocolConfig.registry).endorsed(_beefyVault))
             revert NotEndorsed(_beefyVault);
         if (
             _beefyBooster != address(0) &&
-            !IPermissionRegistry(_registry).endorsed(_beefyBooster)
+            !IPermissionRegistry(_protocolConfig.registry).endorsed(_beefyBooster)
         ) revert NotEndorsed(_beefyBooster);
-        if (IBeefyVault(_beefyVault).want() != address(_underlying))
+        if (IBeefyVault(_beefyVault).want() != address(_adapterConfig.underlying))
             revert InvalidBeefyVault(_beefyVault);
         if (
             _beefyBooster != address(0) &&
@@ -61,7 +57,7 @@ contract BeefyAdapter is BaseAdapter {
             _beefyBooster == address(0) ? _beefyVault : _beefyBooster
         );
 
-        _underlying.approve(_beefyVault, type(uint256).max);
+        _adapterConfig.underlying.approve(_beefyVault, type(uint256).max);
 
         if (_beefyBooster != address(0))
             IERC20(_beefyVault).approve(_beefyBooster, type(uint256).max);
@@ -141,7 +137,7 @@ contract BeefyAdapter is BaseAdapter {
     /**
      * @notice Claims rewards
      */
-    function _claimRewards() internal override {
+    function _claim() internal override {
         if (address(beefyBooster) == address(0)) return;
 
         try beefyBooster.getReward() {} catch {}

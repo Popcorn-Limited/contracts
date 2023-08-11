@@ -8,15 +8,27 @@ import {OwnedUpgradeable} from "../../../utils/OwnedUpgradeable.sol";
 import {PausableUpgradeable} from "openzeppelin-contracts-upgradeable/security/PausableUpgradeable.sol";
 import {IBaseStrategy} from "./interfaces/IBaseStrategy.sol";
 
+struct AdapterConfig {
+    IERC20 underlying;
+    IERC20 lpToken;
+    bool useLpToken;
+    IERC20[] rewardTokens;
+}
+
+struct ProtocolConfig {
+    address registry;
+    bytes protocolInitData;
+}
+
 abstract contract BaseAdapter is OwnedUpgradeable, PausableUpgradeable {
     IERC20 public underlying;
     IERC20 public lpToken;
 
     bool public useLpToken;
 
-    mapping(address => bool) public isVault;
-
     IERC20[] public rewardTokens;
+
+    mapping(address => bool) public isVault;
 
     modifier onlyVault() {
         require(isVault[msg.sender], "Only vault");
@@ -24,19 +36,14 @@ abstract contract BaseAdapter is OwnedUpgradeable, PausableUpgradeable {
     }
 
     // TODO move performance fees into vaults or adapter?
-    function __BaseAdapter_init(
-        IERC20 _underlying,
-        IERC20 _lpToken,
-        bool _useLpToken,
-        IERC20[] memory _rewardTokens
-    ) internal {
+    function __BaseAdapter_init(AdapterConfig memory adapterConfig) internal {
         __Owned_init(msg.sender);
         __Pausable_init();
 
-        underlying = _underlying;
-        lpToken = _lpToken;
-        useLpToken = _useLpToken;
-        rewardTokens = _rewardTokens;
+        underlying = adapterConfig.underlying;
+        lpToken = adapterConfig.lpToken;
+        useLpToken = adapterConfig.useLpToken;
+        rewardTokens = adapterConfig.rewardTokens;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -137,7 +144,7 @@ abstract contract BaseAdapter is OwnedUpgradeable, PausableUpgradeable {
     /**
      * @notice Claims rewards
      */
-    function _claimRewards() internal virtual {}
+    function _claim() internal virtual {}
 
     /*//////////////////////////////////////////////////////////////
                             MANAGEMENT LOGIC
