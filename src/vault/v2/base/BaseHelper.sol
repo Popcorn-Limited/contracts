@@ -19,6 +19,10 @@ abstract contract BaseHelper {
         harvestConfig = _harvestConfig;
     }
 
+    /*//////////////////////////////////////////////////////////////
+                            HARVEST LOGIC
+    //////////////////////////////////////////////////////////////*/
+
     /**
      * @notice Claims rewards & executes the strategy
      * @dev harvest should be overriden to receive custom access control depending on each strategy. 
@@ -32,6 +36,10 @@ abstract contract BaseHelper {
      * @notice Claims rewards & executes the strategy
      */
     function _harvest(bytes memory optionalData) internal virtual {}
+
+    /*//////////////////////////////////////////////////////////////
+                            MANAGEMENT LOGIC
+    //////////////////////////////////////////////////////////////*/
 
     function setHarvestConfig(HarvestConfig memory _harvestConfig) external {
         require(

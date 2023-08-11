@@ -7,7 +7,7 @@ import {BeefyAdapter, IERC20, AdapterConfig, ProtocolConfig} from "./BeefyAdapte
 import {CurveCompounder, CurveRoute, HarvestConfig, CompounderConfig} from "./CurveCompounder.sol";
 
 contract BeefyCompounder is BeefyAdapter, CurveCompounder {
-    // TODO pack these variables better
+    
     function initialize(
         AdapterConfig memory _adapterConfig,
         ProtocolConfig memory _protocolConfig,

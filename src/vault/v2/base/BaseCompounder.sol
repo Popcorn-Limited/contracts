@@ -25,13 +25,9 @@ abstract contract BaseCompounder is BaseHelper {
         compounderConfig = _compounderConfig;
     }
 
-    function setMinTradeAmounts(uint256[] memory _minTradeAmounts) external {
-        require(
-            msg.sender == IOwned(address(this)).owner(),
-            "Only the contract owner may perform this action"
-        );
-        compounderConfig.minTradeAmounts = _minTradeAmounts;
-    }
+    /*//////////////////////////////////////////////////////////////
+                            HARVEST LOGIC
+    //////////////////////////////////////////////////////////////*/
 
     /**
      * @notice Claims rewards & executes the strategy
@@ -65,6 +61,10 @@ abstract contract BaseCompounder is BaseHelper {
         _depositIntoAdapter();
     }
 
+    /*//////////////////////////////////////////////////////////////
+                        FUNCTIONS TO OVERRIDE
+    //////////////////////////////////////////////////////////////*/
+
     function _claimRewards() internal virtual {}
 
     function _depositIntoAdapter() internal virtual {}
@@ -87,4 +87,16 @@ abstract contract BaseCompounder is BaseHelper {
 
     /// @dev This function trades the baseAsset for the underlying asset if the baseAsset is not the underlying asset.
     function _getAsset(bytes memory optionalData) internal virtual {}
+
+    /*//////////////////////////////////////////////////////////////
+                            MANAGEMENT LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    function setMinTradeAmounts(uint256[] memory _minTradeAmounts) external {
+        require(
+            msg.sender == IOwned(address(this)).owner(),
+            "Only the contract owner may perform this action"
+        );
+        compounderConfig.minTradeAmounts = _minTradeAmounts;
+    }
 }
