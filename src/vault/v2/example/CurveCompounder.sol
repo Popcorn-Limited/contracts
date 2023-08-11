@@ -3,7 +3,7 @@
 
 pragma solidity ^0.8.15;
 
-import {BaseCompounder, IERC20} from "../base/BaseCompounder.sol";
+import {BaseCompounder, IERC20, HarvestConfig, CompounderConfig} from "../base/BaseCompounder.sol";
 import {IBaseAdapter} from "../base/interfaces/IBaseAdapter.sol";
 import {ICurveRouter} from "../../../interfaces/external/curve/ICurveRouter.sol";
 
@@ -18,37 +18,30 @@ contract CurveCompounder is BaseCompounder {
     CurveRoute internal toAssetRoute;
 
     function __CurveCompounder_init(
-        bool _autoHarvest,
-        bytes memory _harvestData,
-        IERC20 _baseAsset,
-        uint256[] memory _minTradeAmounts,
-        bool _depositLpToken,
+        HarvestConfig memory _harvestConfig,
+        CompounderConfig memory _compounderConfig,
+        address _router,
         CurveRoute[] memory _toBaseAssetRoutes,
-        CurveRoute memory _toAssetRoute,
-        address _router
+        CurveRoute memory _toAssetRoute
     ) internal {
-        __BaseCompounder_init(
-            _autoHarvest,
-            _harvestData,
-            _baseAsset,
-            _minTradeAmounts,
-            _depositLpToken
-        );
+        __BaseCompounder_init(_harvestConfig, _compounderConfig);
 
-        for(uint256 i; i < _toBaseAssetRoutes.length; i++) {
+        for (uint256 i; i < _toBaseAssetRoutes.length; i++) {
             toBaseAssetRoutes.push(_toBaseAssetRoutes[i]);
         }
         toAssetRoute = _toAssetRoute;
+        router = _router;
     }
 
     function _swapToBaseAsset(
         IERC20[] memory rewardTokens,
-        bytes memory optionalData
+        bytes memory
     ) internal override {
         CurveRoute[] memory _toBaseAssetRoutes = toBaseAssetRoutes;
+        uint256[] memory minTradeAmounts = compounderConfig.minTradeAmounts;
 
         uint256 len = rewardTokens.length;
-        for (uint256 i = 0; i < len; i++) {
+        for (uint256 i; i < len; i++) {
             uint256 rewardBal = rewardTokens[i].balanceOf(address(this));
             if (rewardBal >= minTradeAmounts[i])
                 ICurveRouter(router).exchange_multiple(
@@ -60,14 +53,14 @@ contract CurveCompounder is BaseCompounder {
         }
     }
 
-    function _getAsset(bytes memory optionalData) internal override {
+    function _getAsset(bytes memory) internal override {
         CurveRoute memory _toAssetRoute = toAssetRoute;
 
         if (_toAssetRoute.route[0] != address(0)) {
             ICurveRouter(router).exchange_multiple(
                 _toAssetRoute.route,
                 _toAssetRoute.swapParams,
-                IERC20(baseAsset).balanceOf(address(this)),
+                compounderConfig.baseAsset.balanceOf(address(this)),
                 0
             );
         }

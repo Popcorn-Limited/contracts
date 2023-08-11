@@ -4,26 +4,25 @@
 pragma solidity ^0.8.15;
 
 import {IERC20Upgradeable as IERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
-import {BaseStrategy, IOwned} from "./BaseStrategy.sol";
+import {BaseStrategy, IOwned, HarvestConfig} from "./BaseStrategy.sol";
 import {IBaseAdapter} from "./interfaces/IBaseAdapter.sol";
 
+struct CompounderConfig {
+    IERC20 baseAsset;
+    uint256[] minTradeAmounts;
+    bool depositLpToken;
+}
+
 abstract contract BaseCompounder is BaseStrategy {
-    IERC20 internal baseAsset;
-    uint256[] internal minTradeAmounts;
-    bool internal depositLpToken;
+    CompounderConfig internal compounderConfig;
 
     function __BaseCompounder_init(
-        bool _autoHarvest,
-        bytes memory _harvestData,
-        IERC20 _baseAsset,
-        uint256[] memory _minTradeAmounts,
-        bool _depositLpToken
+        HarvestConfig memory _harvestConfig,
+        CompounderConfig memory _compounderConfig
     ) internal {
-        __BaseStrategy_init(_autoHarvest, _harvestData);
+        __BaseStrategy_init(_harvestConfig);
 
-        baseAsset = _baseAsset;
-        minTradeAmounts = _minTradeAmounts;
-        depositLpToken = _depositLpToken;
+        compounderConfig = _compounderConfig;
     }
 
     function setMinTradeAmounts(uint256[] memory _minTradeAmounts) external {
@@ -31,7 +30,7 @@ abstract contract BaseCompounder is BaseStrategy {
             msg.sender == IOwned(address(this)).owner(),
             "Only the contract owner may perform this action"
         );
-        minTradeAmounts = _minTradeAmounts;
+        compounderConfig.minTradeAmounts = _minTradeAmounts;
     }
 
     /**
@@ -48,36 +47,34 @@ abstract contract BaseCompounder is BaseStrategy {
         _compound(optionalData);
     }
 
-    function _compound(bytes memory optionalData) internal virtual {}
+    function _compound(bytes memory optionalData) internal {
+        // Claim Rewards from Adapter
+        _claimRewards();
 
-    // function _compound(bytes memory optionalData) internal {
-    //     // Claim Rewards from Adapter
-    //     IBaseAdapter(address(this))._claimRewards();
+        // Swap Rewards to BaseAsset (which can but must not be the underlying asset)
+        _swapToBaseAsset(_getRewardTokens(), optionalData);
 
-    //     // Swap Rewards to BaseAsset (which can but must not be the underlying asset)
-    //     _swapToBaseAsset(optionalData);
+        // Stop compounding if the trades were not successful
+        if (compounderConfig.baseAsset.balanceOf(address(this)) == 0) {
+            return;
+        }
 
-    //     // Stop compounding if the trades were not successful
-    //     if (baseAsset.balanceOf(address(this)) == 0) {
-    //         return;
-    //     }
+        // Get the underlying asset if the baseAsset is not the underlying asset
+        _getAsset(optionalData);
 
-    //     // Get the underlying asset if the baseAsset is not the underlying asset
-    //     _getAsset(optionalData);
+        _depositIntoAdapter();
+    }
 
-    //     // Deposit the underlying asset into the adapter
-    //     depositLpToken
-    //         ? IBaseAdapter(address(this))._depositLP(
-    //             IERC20(IBaseAdapter(address(this)).lpToken()).balanceOf(
-    //                 address(this)
-    //             )
-    //         )
-    //         : IBaseAdapter(address(this))._depositUnderlying(
-    //             IERC20(IBaseAdapter(address(this)).underlying()).balanceOf(
-    //                 address(this)
-    //             )
-    //         );
-    // }
+    function _claimRewards() internal virtual {}
+
+    function _depositIntoAdapter() internal virtual {}
+
+    function _getRewardTokens()
+        internal
+        view
+        virtual
+        returns (IERC20[] memory)
+    {}
 
     /// @dev This function gets called for each rewardToken to trade it to a base asset.
     /// @dev The base asset can be the underlying token but can also be an unrelated token.

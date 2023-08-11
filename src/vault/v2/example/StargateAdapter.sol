@@ -4,7 +4,7 @@
 pragma solidity ^0.8.15;
 
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
-import {BaseAdapter, IERC20} from "../base/BaseAdapter.sol";
+import {BaseAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../base/BaseAdapter.sol";
 import {ISToken, IStargateStaking, IStargateRouter} from "../../adapter/stargate/IStargate.sol";
 
 contract StargateAdapter is BaseAdapter {
@@ -23,21 +23,17 @@ contract StargateAdapter is BaseAdapter {
     error DifferentAssets();
 
     function __StargateAdapter_init(
-        IERC20 _underlying,
-        IERC20 _lpToken,
-        bool _useLpToken,
-        IERC20[] memory _rewardTokens,
-        address registry,
-        bytes memory stargateInitData
+        AdapterConfig memory _adapterConfig,
+        ProtocolConfig memory _protocolConfig
     ) internal onlyInitializing {
-        __BaseAdapter_init(_underlying, _lpToken, _useLpToken, _rewardTokens);
+        __BaseAdapter_init(_adapterConfig);
 
         (uint256 _stakingPid, address _stargateRouter) = abi.decode(
-            stargateInitData,
+            _protocolConfig.protocolInitData,
             (uint256, address)
         );
 
-        stargateStaking = IStargateStaking(registry);
+        stargateStaking = IStargateStaking(_protocolConfig.registry);
         if (_stakingPid >= stargateStaking.poolLength())
             revert StakingIdOutOfBounds();
 
@@ -45,12 +41,12 @@ contract StargateAdapter is BaseAdapter {
         stargateRouter = IStargateRouter(_stargateRouter);
 
         (address _sToken, , , ) = stargateStaking.poolInfo(_stakingPid);
-        if (_sToken != address(_lpToken)) revert DifferentAssets();
+        if (_sToken != address(_adapterConfig.lpToken)) revert DifferentAssets();
 
         sToken = ISToken(_sToken);
 
-        _lpToken.approve(address(stargateStaking), type(uint256).max);
-        _underlying.approve(_stargateRouter, type(uint256).max);
+        _adapterConfig.lpToken.approve(address(stargateStaking), type(uint256).max);
+        _adapterConfig.underlying.approve(_stargateRouter, type(uint256).max);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -147,7 +143,7 @@ contract StargateAdapter is BaseAdapter {
     /**
      * @notice Claims rewards
      */
-    function _claimRewards() internal override {
+    function _claim() internal override {
         try stargateStaking.deposit(stakingPid, 0) {} catch {}
     }
 }
