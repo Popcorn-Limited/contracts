@@ -8,8 +8,8 @@ import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradea
 import {ReentrancyGuardUpgradeable} from "openzeppelin-contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import {PausableUpgradeable} from "openzeppelin-contracts-upgradeable/security/PausableUpgradeable.sol";
 import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
-import {OwnedUpgradeable} from "../utils/OwnedUpgradeable.sol";
-import {VaultFees, IERC4626, IERC20} from "../interfaces/vault/IVault.sol";
+import {OwnedUpgradeable} from "../../../utils/OwnedUpgradeable.sol";
+import {VaultFees, IERC4626, IERC20} from "../../../interfaces/vault/IVault.sol";
 
 /**
  * @title   Vault
@@ -21,7 +21,7 @@ import {VaultFees, IERC4626, IERC20} from "../interfaces/vault/IVault.sol";
  * It allows for multiple type of fees which are taken by issuing new vault shares.
  * Adapter and fees can be changed by the owner after a ragequit time.
  */
-contract Vault is
+abstract contract BaseVault is
     ERC4626Upgradeable,
     ReentrancyGuardUpgradeable,
     PausableUpgradeable,
@@ -60,23 +60,21 @@ contract Vault is
      * @dev This function is called by the factory contract when deploying a new vault.
      * @dev Usually the adapter should already be pre configured. Otherwise a new one can only be added after a ragequit time.
      */
-    function initialize(
+    function __BaseVault__init(
         IERC20 asset_,
-        IERC4626 adapter_,
         VaultFees calldata fees_,
         address feeRecipient_,
         uint256 depositLimit_,
-        address owner
-    ) external initializer {
+        address owner,
+        address protocolOwner,
+        string name_
+    ) internal onlyInitializing {
         __ERC4626_init(IERC20Metadata(address(asset_)));
         __Owned_init(owner);
 
+        // TODO cleanup init
+
         if (address(asset_) == address(0)) revert InvalidAsset();
-        if (address(asset_) != adapter_.asset()) revert InvalidAdapter();
-
-        adapter = adapter_;
-
-        asset_.safeApprove(address(adapter_), type(uint256).max);
 
         _decimals = IERC20Metadata(address(asset_)).decimals() + decimalOffset; // Asset decimals + decimal offset to combat inflation attacks
 
@@ -95,20 +93,18 @@ contract Vault is
         feeRecipient = feeRecipient_;
 
         contractName = keccak256(
-            abi.encodePacked("Popcorn", name(), block.timestamp, "Vault")
+            abi.encodePacked("VaultCraft", name(), block.timestamp, " Vault")
         );
 
         highWaterMark = 1e9;
         quitPeriod = 3 days;
         depositLimit = depositLimit_;
 
+        PROTOCOL_OWNER = protocolOwner;
+
         emit VaultInitialized(contractName, address(asset_));
 
-        _name = string.concat(
-            "Popcorn ",
-            IERC20Metadata(address(asset_)).name(),
-            " Vault"
-        );
+        _name = name_;
         _symbol = string.concat(
             "pop-",
             IERC20Metadata(address(asset_)).symbol()
@@ -179,7 +175,7 @@ contract Vault is
 
         IERC20(asset()).safeTransferFrom(msg.sender, address(this), assets);
 
-        adapter.deposit(assets, address(this));
+        _strategyDeposit(assets, shares);
 
         emit Deposit(msg.sender, receiver, assets, shares);
     }
@@ -222,10 +218,15 @@ contract Vault is
 
         IERC20(asset()).safeTransferFrom(msg.sender, address(this), assets);
 
-        adapter.deposit(assets, address(this));
+        _strategyDeposit(assets, shares);
 
         emit Deposit(msg.sender, receiver, assets, shares);
     }
+
+    function _strategyDeposit(
+        uint256 assets,
+        uint256 shares
+    ) internal virtual {}
 
     function withdraw(uint256 assets) public returns (uint256) {
         return withdraw(assets, msg.sender, msg.sender);
@@ -266,7 +267,7 @@ contract Vault is
 
         if (feeShares > 0) _mint(feeRecipient, feeShares);
 
-        _protocolWithdraw(assets, shares, receiver);
+        _strategyWithdraw(assets, shares, receiver);
 
         emit Withdraw(msg.sender, receiver, owner, assets, shares);
     }
@@ -306,10 +307,16 @@ contract Vault is
 
         if (feeShares > 0) _mint(feeRecipient, feeShares);
 
-        _protocolWithdraw(assets, shares, receiver);
+        _strategyWithdraw(assets, shares, receiver);
 
         emit Withdraw(msg.sender, receiver, owner, assets, shares);
     }
+
+    function _strategyWithdraw(
+        uint256 assets,
+        uint256 shares,
+        address receiver
+    ) internal virtual {}
 
     /*//////////////////////////////////////////////////////////////
                             ACCOUNTING LOGIC
@@ -319,6 +326,9 @@ contract Vault is
     function totalAssets() public view override returns (uint256) {
         return _totalAssets();
     }
+
+    // TODO Does total assets work if multiple vaults use the same strategy?
+    function _totalAssets() internal view virtual returns (uint256) {}
 
     /**
      * @notice Simulate the effects of a deposit at the current block, given current on-chain conditions.
@@ -399,31 +409,42 @@ contract Vault is
     //////////////////////////////////////////////////////////////*/
 
     /// @return Maximum amount of underlying `asset` token that may be deposited for a given address. Delegates to adapter.
-    function maxDeposit(address) public view override returns (uint256) {
+    function maxDeposit(address user) public view override returns (uint256) {
         uint256 assets = totalAssets();
         uint256 depositLimit_ = depositLimit;
         if (paused() || assets >= depositLimit_) return 0;
-        return
-            Math.min(depositLimit_ - assets, adapter.maxDeposit(address(this)));
+        return Math.min(depositLimit_ - assets, _maxDeposit(user));
     }
+
+    function _maxDeposit(
+        address user
+    ) internal view virtual returns (uint256) {}
 
     /// @return Maximum amount of vault shares that may be minted to given address. Delegates to adapter.
-    function maxMint(address) public view override returns (uint256) {
+    function maxMint(address user) public view override returns (uint256) {
         uint256 assets = totalAssets();
         uint256 depositLimit_ = depositLimit;
         if (paused() || assets >= depositLimit_) return 0;
-        return Math.min(depositLimit_ - assets, adapter.maxMint(address(this)));
+        return Math.min(depositLimit_ - assets, _maxMint(user));
     }
+
+    function _maxMint(address user) internal view virtual returns (uint256) {}
 
     /// @return Maximum amount of underlying `asset` token that can be withdrawn by `caller` address. Delegates to adapter.
-    function maxWithdraw(address) public view override returns (uint256) {
-        return adapter.maxWithdraw(address(this));
+    function maxWithdraw(address user) public view override returns (uint256) {
+        return _maxWithdraw(user);
     }
 
+    function _maxWithdraw(
+        address user
+    ) internal view virtual returns (uint256) {}
+
     /// @return Maximum amount of shares that may be redeemed by `caller` address. Delegates to adapter.
-    function maxRedeem(address) public view override returns (uint256) {
-        return adapter.maxRedeem(address(this));
+    function maxRedeem(address user) public view override returns (uint256) {
+        return _maxRedeem(user);
     }
+
+    function _maxRedeem(address user) internal view virtual returns (uint256) {}
 
     /*//////////////////////////////////////////////////////////////
                         FEE ACCOUNTING LOGIC
@@ -436,7 +457,7 @@ contract Vault is
      *  the average of their current value and the value at the previous fee harvest checkpoint. This method is similar to
      *  calculating a definite integral using the trapezoid rule.
      */
-    function accruedManagementFee() public view returns (uint256) {
+    function accruedManagementFee() internal view returns (uint256) {
         uint256 managementFee = fees.management;
         return
             managementFee > 0
@@ -454,10 +475,11 @@ contract Vault is
      * @dev Performance fee is based on a high water mark value. If vault share value has increased above the
      *   HWM in a fee period, issue fee shares to the vault equal to the performance fee.
      */
-    function accruedPerformanceFee() public view returns (uint256) {
+    function accruedPerformanceFee(
+        uint256 performanceFee
+    ) internal view returns (uint256) {
         uint256 highWaterMark_ = highWaterMark;
         uint256 shareValue = convertToAssets(1e18);
-        uint256 performanceFee = fees.performance;
 
         return
             performanceFee > 0 && shareValue > highWaterMark_
@@ -488,26 +510,43 @@ contract Vault is
 
     /// @notice Collect management and performance fees and update vault share high water mark.
     modifier takeFees() {
-        uint256 totalFee = accruedManagementFee() + accruedPerformanceFee();
+        uint256 totalFee = accruedManagementFee() +
+            accruedPerformanceFee(fees.performance);
+        uint256 protocolFee = accruedPerformanceFee(performanceFee);
         uint256 currentAssets = totalAssets();
         uint256 shareValue = convertToAssets(1e18);
 
         if (shareValue > highWaterMark) highWaterMark = shareValue;
 
-        if (totalFee > 0 && currentAssets > 0) {
+        if (currentAssets > totalFee + protocolFee) {
             uint256 supply = totalSupply();
-            uint256 feeInShare = supply == 0
-                ? totalFee
-                : totalFee.mulDiv(
-                    supply,
-                    currentAssets - totalFee,
-                    Math.Rounding.Down
+
+            if (protocolFee > 0)
+                _mint(
+                    PROTOCOL_FEE_RECIPIENT,
+                    supply == 0
+                        ? totalFee
+                        : totalFee.mulDiv(
+                            supply,
+                            currentAssets - protocolFee,
+                            Math.Rounding.Down
+                        )
                 );
-            _mint(feeRecipient, feeInShare);
+
+            if (totalFee > 0)
+                _mint(
+                    feeRecipient,
+                    supply == 0
+                        ? totalFee
+                        : totalFee.mulDiv(
+                            supply,
+                            currentAssets - totalFee,
+                            Math.Rounding.Down
+                        )
+                );
         }
 
         feesUpdatedAt = block.timestamp;
-
         _;
     }
 
@@ -522,13 +561,21 @@ contract Vault is
 
     address public feeRecipient;
 
+    uint256 public performanceFee;
+    address public constant PROTOCOL_FEE_RECIPIENT =
+        address(0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E);
+    address public PROTOCOL_OWNER;
+
     event NewFeesProposed(VaultFees newFees, uint256 timestamp);
     event ChangedFees(VaultFees oldFees, VaultFees newFees);
     event FeeRecipientUpdated(address oldFeeRecipient, address newFeeRecipient);
+    event PerformanceFeeChanged(uint256 oldFee, uint256 newFee);
 
     error InvalidVaultFees();
     error InvalidFeeRecipient();
     error NotPassedQuitPeriod(uint256 quitPeriod);
+    error InvalidPerformanceFee(uint256 fee);
+    error Unauthorized();
 
     /**
      * @notice Propose new fees for this vault. Caller must be owner.
@@ -566,6 +613,21 @@ contract Vault is
     }
 
     /**
+     * @notice Set a new performance fee for this adapter. Caller must be owner.
+     * @param newFee performance fee in 1e18.
+     * @dev Fees can be 0 but never more than 2e17 (1e18 = 100%, 1e14 = 1 BPS)
+     */
+    function setProtocolFee(uint256 newFee) external {
+        if (msg.sender != PROTOCOL_OWNER) revert Unauthorized();
+        // Dont take more than 20% performanceFee
+        if (newFee > 2e17) revert InvalidPerformanceFee(newFee);
+
+        emit PerformanceFeeChanged(performanceFee, newFee);
+
+        performanceFee = newFee;
+    }
+
+    /**
      * @notice Change `feeRecipient`. Caller must be Owner.
      * @param _feeRecipient The new fee recipient.
      * @dev Accrued fees wont be transferred to the new feeRecipient.
@@ -579,93 +641,31 @@ contract Vault is
     }
 
     /*//////////////////////////////////////////////////////////////
-                          ADAPTER LOGIC
-    //////////////////////////////////////////////////////////////*/
-
-    // IERC4626 public adapter;
-    // IERC4626 public proposedAdapter;
-    // uint256 public proposedAdapterTime;
-
-    // event NewAdapterProposed(IERC4626 newAdapter, uint256 timestamp);
-    // event ChangedAdapter(IERC4626 oldAdapter, IERC4626 newAdapter);
-
-    // error VaultAssetMismatchNewAdapterAsset();
-
-    // /**
-    //  * @notice Propose a new adapter for this vault. Caller must be Owner.
-    //  * @param newAdapter A new ERC4626 that should be used as a yield adapter for this asset.
-    //  */
-    // function proposeAdapter(IERC4626 newAdapter) external onlyOwner {
-    //     if (newAdapter.asset() != asset())
-    //         revert VaultAssetMismatchNewAdapterAsset();
-
-    //     proposedAdapter = newAdapter;
-    //     proposedAdapterTime = block.timestamp;
-
-    //     emit NewAdapterProposed(newAdapter, block.timestamp);
-    // }
-
-    // /**
-    //  * @notice Set a new Adapter for this Vault after the quit period has passed.
-    //  * @dev This migration function will remove all assets from the old Vault and move them into the new vault
-    //  * @dev Additionally it will zero old allowances and set new ones
-    //  * @dev Last we update HWM and assetsCheckpoint for fees to make sure they adjust to the new adapter
-    //  */
-    // function changeAdapter() external takeFees {
-    //     if (
-    //         proposedAdapterTime == 0 ||
-    //         block.timestamp < proposedAdapterTime + quitPeriod
-    //     ) revert NotPassedQuitPeriod(quitPeriod);
-
-    //     adapter.redeem(
-    //         adapter.balanceOf(address(this)),
-    //         address(this),
-    //         address(this)
-    //     );
-
-    //     IERC20(asset()).approve(address(adapter), 0);
-
-    //     emit ChangedAdapter(adapter, proposedAdapter);
-
-    //     adapter = proposedAdapter;
-
-    //     IERC20(asset()).approve(address(adapter), type(uint256).max);
-
-    //     adapter.deposit(
-    //         IERC20(asset()).balanceOf(address(this)),
-    //         address(this)
-    //     );
-
-    //     delete proposedAdapterTime;
-    //     delete proposedAdapter;
-    // }
-
-    /*//////////////////////////////////////////////////////////////
                           RAGE QUIT LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    // uint256 public quitPeriod;
+    uint256 public quitPeriod;
 
-    // event QuitPeriodSet(uint256 quitPeriod);
+    event QuitPeriodSet(uint256 quitPeriod);
 
-    // error InvalidQuitPeriod();
+    error InvalidQuitPeriod();
 
-    // /**
-    //  * @notice Set a quitPeriod for rage quitting after new adapter or fees are proposed. Caller must be Owner.
-    //  * @param _quitPeriod Time to rage quit after proposal.
-    //  */
-    // function setQuitPeriod(uint256 _quitPeriod) external onlyOwner {
-    //     if (
-    //         block.timestamp < proposedAdapterTime + quitPeriod ||
-    //         block.timestamp < proposedFeeTime + quitPeriod
-    //     ) revert NotPassedQuitPeriod(quitPeriod);
-    //     if (_quitPeriod < 1 days || _quitPeriod > 7 days)
-    //         revert InvalidQuitPeriod();
+    /**
+     * @notice Set a quitPeriod for rage quitting after new adapter or fees are proposed. Caller must be Owner.
+     * @param _quitPeriod Time to rage quit after proposal.
+     */
+    function setQuitPeriod(uint256 _quitPeriod) external onlyOwner {
+        if (
+            block.timestamp < proposedAdapterTime + quitPeriod ||
+            block.timestamp < proposedFeeTime + quitPeriod
+        ) revert NotPassedQuitPeriod(quitPeriod);
+        if (_quitPeriod < 1 days || _quitPeriod > 7 days)
+            revert InvalidQuitPeriod();
 
-    //     quitPeriod = _quitPeriod;
+        quitPeriod = _quitPeriod;
 
-    //     emit QuitPeriodSet(quitPeriod);
-    // }
+        emit QuitPeriodSet(quitPeriod);
+    }
 
     /*//////////////////////////////////////////////////////////////
                           DEPOSIT LIMIT LOGIC

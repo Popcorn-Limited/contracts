@@ -13,6 +13,7 @@ struct AdapterConfig {
     IERC20 lpToken;
     bool useLpToken;
     IERC20[] rewardTokens;
+    address owner;
 }
 
 struct ProtocolConfig {
@@ -31,7 +32,7 @@ abstract contract BaseAdapter is OwnedUpgradeable, PausableUpgradeable {
     }
 
     function __BaseAdapter_init(AdapterConfig memory adapterConfig) internal {
-        __Owned_init(msg.sender);
+        __Owned_init(adapterConfig.owner);
         __Pausable_init();
 
         underlying = adapterConfig.underlying;
