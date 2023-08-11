@@ -6,10 +6,19 @@ pragma solidity ^0.8.15;
 import {ERC4626Upgradeable, IERC20MetadataUpgradeable as IERC20Metadata, ERC20Upgradeable as ERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "openzeppelin-contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
-import {PausableUpgradeable} from "openzeppelin-contracts-upgradeable/security/PausableUpgradeable.sol";
 import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
 import {OwnedUpgradeable} from "../../../utils/OwnedUpgradeable.sol";
 import {VaultFees, IERC4626, IERC20} from "../../../interfaces/vault/IVault.sol";
+
+struct BaseVaultConfig {
+    IERC20 asset_;
+    VaultFees fees;
+    address feeRecipient;
+    uint256 depositLimit;
+    address owner;
+    address protocolOwner;
+    string name;
+}
 
 /**
  * @title   Vault
@@ -24,7 +33,6 @@ import {VaultFees, IERC4626, IERC20} from "../../../interfaces/vault/IVault.sol"
 abstract contract BaseVault is
     ERC4626Upgradeable,
     ReentrancyGuardUpgradeable,
-    PausableUpgradeable,
     OwnedUpgradeable
 {
     using SafeERC20 for IERC20;
@@ -61,36 +69,30 @@ abstract contract BaseVault is
      * @dev Usually the adapter should already be pre configured. Otherwise a new one can only be added after a ragequit time.
      */
     function __BaseVault__init(
-        IERC20 asset_,
-        VaultFees calldata fees_,
-        address feeRecipient_,
-        uint256 depositLimit_,
-        address owner,
-        address protocolOwner,
-        string name_
+        BaseVaultConfig memory vaultConfig
     ) internal onlyInitializing {
-        __ERC4626_init(IERC20Metadata(address(asset_)));
-        __Owned_init(owner);
+        __ERC4626_init(IERC20Metadata(address(vaultConfig.asset)));
+        __Owned_init(vaultConfig.owner);
 
         // TODO cleanup init
 
-        if (address(asset_) == address(0)) revert InvalidAsset();
+        if (address(vaultConfig.asset) == address(0)) revert InvalidAsset();
 
-        _decimals = IERC20Metadata(address(asset_)).decimals() + decimalOffset; // Asset decimals + decimal offset to combat inflation attacks
+        _decimals = IERC20Metadata(address(vaultConfig.asset)).decimals() + decimalOffset; // Asset decimals + decimal offset to combat inflation attacks
 
         INITIAL_CHAIN_ID = block.chainid;
         INITIAL_DOMAIN_SEPARATOR = computeDomainSeparator();
 
         if (
-            fees_.deposit >= 1e18 ||
-            fees_.withdrawal >= 1e18 ||
-            fees_.management >= 1e18 ||
-            fees_.performance >= 1e18
+            vaultConfig.fees.deposit >= 1e18 ||
+            vaultConfig.fees.withdrawal >= 1e18 ||
+            vaultConfig.fees.management >= 1e18 ||
+            vaultConfig.fees.performance >= 1e18
         ) revert InvalidVaultFees();
-        fees = fees_;
+        fees = vaultConfig.fees;
 
-        if (feeRecipient_ == address(0)) revert InvalidFeeRecipient();
-        feeRecipient = feeRecipient_;
+        if (vaultConfig.feeRecipient_ == address(0)) revert InvalidFeeRecipient();
+        feeRecipient = vaultConfig.feeRecipient;
 
         contractName = keccak256(
             abi.encodePacked("VaultCraft", name(), block.timestamp, " Vault")
@@ -98,16 +100,16 @@ abstract contract BaseVault is
 
         highWaterMark = 1e9;
         quitPeriod = 3 days;
-        depositLimit = depositLimit_;
+        depositLimit = vaultConfig.depositLimit;
 
-        PROTOCOL_OWNER = protocolOwner;
+        PROTOCOL_OWNER = vaultConfig.protocolOwner;
 
-        emit VaultInitialized(contractName, address(asset_));
+        emit VaultInitialized(contractName, address(vaultConfig.asset));
 
-        _name = name_;
+        _name = vaultConfig.name;
         _symbol = string.concat(
-            "pop-",
-            IERC20Metadata(address(asset_)).symbol()
+            "vc-",
+            IERC20Metadata(address(vaultConfig.asset)).symbol()
         );
     }
 
@@ -686,20 +688,6 @@ abstract contract BaseVault is
     }
 
     /*//////////////////////////////////////////////////////////////
-                          PAUSING LOGIC
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice Pause deposits. Caller must be Owner.
-    function pause() external onlyOwner {
-        _pause();
-    }
-
-    /// @notice Unpause deposits. Caller must be Owner.
-    function unpause() external onlyOwner {
-        _unpause();
-    }
-
-    /*//////////////////////////////////////////////////////////////
                       EIP-2612 LOGIC
   //////////////////////////////////////////////////////////////*/
 
@@ -719,7 +707,7 @@ abstract contract BaseVault is
         uint8 v,
         bytes32 r,
         bytes32 s
-    ) public virtual {
+    ) public {
         if (deadline < block.timestamp) revert PermitDeadlineExpired(deadline);
 
         // Unchecked because the only math done is incrementing
@@ -763,7 +751,7 @@ abstract contract BaseVault is
                 : computeDomainSeparator();
     }
 
-    function computeDomainSeparator() internal view virtual returns (bytes32) {
+    function computeDomainSeparator() internal view returns (bytes32) {
         return
             keccak256(
                 abi.encode(

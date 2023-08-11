@@ -9,11 +9,6 @@ interface IBaseHelper {
      */
     function harvest(bytes memory optionalData) external;
 
-    /**
-     * @notice Claims rewards & executes the strategy
-     */
-    function _harvest(bytes memory memoryoptionalData) external;
-
     function autoHarvest() external view returns (bool);
 
     function harvestData() external view returns (bytes memory);
