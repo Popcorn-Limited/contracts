@@ -26,16 +26,10 @@ abstract contract BaseAdapter is OwnedUpgradeable, PausableUpgradeable {
 
     bool public useLpToken;
 
-    IERC20[] public rewardTokens;
-
-    mapping(address => bool) public isVault;
-
-    modifier onlyVault() {
-        require(isVault[msg.sender], "Only vault");
-        _;
+    constructor() {
+        _disableInitializers();
     }
 
-    // TODO move performance fees into vaults or adapter?
     function __BaseAdapter_init(AdapterConfig memory adapterConfig) internal {
         __Owned_init(msg.sender);
         __Pausable_init();
@@ -53,7 +47,11 @@ abstract contract BaseAdapter is OwnedUpgradeable, PausableUpgradeable {
     /**
      * @notice Returns the total amount of assets
      */
-    function totalAssets() public view virtual returns (uint256) {
+    function totalAssets() public view returns (uint256) {
+        return _totalAssets() - lockedFees;
+    }
+
+    function _totalAssets() internal view virtual returns (uint256) {
         if (paused())
             return
                 useLpToken
@@ -92,7 +90,9 @@ abstract contract BaseAdapter is OwnedUpgradeable, PausableUpgradeable {
      * @dev Uses either `_depositUnderlying` or `_depositLP`
      * @dev Only callable by the vault
      **/
-    function deposit(uint256 amount) external virtual onlyVault whenNotPaused {
+    function deposit(
+        uint256 amount
+    ) external virtual onlyVault whenNotPaused {
         _deposit(amount);
     }
 
@@ -150,16 +150,78 @@ abstract contract BaseAdapter is OwnedUpgradeable, PausableUpgradeable {
                             MANAGEMENT LOGIC
     //////////////////////////////////////////////////////////////*/
 
+    mapping(address => bool) public isVault;
+
+    modifier onlyVault() {
+        require(isVault[msg.sender], "Only vault");
+        _;
+    }
+
     /// @dev This function needs to be called by a trusted contract on initialization of a new vault that wants to use this strategy
     function addVault(address _vault) external onlyOwner {
         isVault[_vault] = true;
     }
+
+    IERC20[] public rewardTokens;
 
     /// @dev RewardTokens get set manually instead of fetched to allow the trusted party to ignore certain rewards if they choose to
     /// @dev This function should be called by a trusted strategist / the DAO
     function setRewardsToken(IERC20[] memory _rewardTokens) external onlyOwner {
         rewardTokens = _rewardTokens;
     }
+
+    /*//////////////////////////////////////////////////////////////
+                            FEE LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    // struct ProposedFees {
+    //     uint128 fee;
+    //     uint128 timestamp;
+    // }
+
+    // uint256 public lockedFees;
+    // uint256 public highWaterMark;
+
+    // ProposedFees public proposedFee;
+    // uint256 public performanceFee; // Fees in BPS
+
+    // uint256 public quitPeriod;
+
+    // @dev We would need to account for deposits and withdrawals to only take fees on the gains
+    // modifier takeFees() {
+    //     uint256 assets = _totalAssets();
+    //     uint256 hwm = highWaterMark;
+    //     if (assets > hwm) {
+    //         uint256 gain = assets - hwm;
+    //         lockedFees += (gain * performanceFee) / 10_000;
+    //     }
+    // }
+
+    // function proposeFees(uint128 fee) external onlyOwner {
+    //     if (fee) revert InvalidVaultFees();
+
+    //     proposedFee = ProposedFees({
+    //         proposedPerformanceFee: fee,
+    //         proposedFeeTime: uint128(block.timestamp)
+    //     });
+
+    //     emit NewFeesProposed(fee, block.timestamp);
+    // }
+
+    // /// @notice Change fees to the previously proposed fees after the quit period has passed.
+    // function changeFees() external takeFees {
+    //     ProposedFees memory _proposedFee = proposedFee;
+    //     if (
+    //         _proposedFee.timestamp == 0 ||
+    //         block.timestamp < uint256(_proposedFee.timestamp) + quitPeriod
+    //     ) revert NotPassedQuitPeriod(quitPeriod);
+
+    //     emit ChangedFees(fees, proposedFees);
+
+    //     performanceFee = _proposedFee.fee;
+
+    //     delete proposedFee;
+    // }
 
     /*//////////////////////////////////////////////////////////////
                             PAUSING LOGIC

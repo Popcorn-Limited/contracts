@@ -7,7 +7,7 @@ import {StargateAdapter, IERC20, AdapterConfig, ProtocolConfig} from "./Stargate
 import {CurveCompounder, CurveRoute, HarvestConfig, CompounderConfig} from "./CurveCompounder.sol";
 
 contract StargateCompounder is StargateAdapter, CurveCompounder {
-    // TODO pack these variables better
+    
     function initialize(
         AdapterConfig memory _adapterConfig,
         ProtocolConfig memory _protocolConfig,
