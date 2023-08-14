@@ -63,10 +63,10 @@ contract VaultV2Test is Test {
         vm.label(vaultAddress, "vault");
 
         VaultFees memory vaultFees = VaultFees({
-            deposit: 100,
-            withdrawal: 100,
-            management: 100,
-            performance: 100
+            deposit: 0,
+            withdrawal: 0,
+            management: 0,
+            performance: 0
         });
 
         VaultInitData memory vaultData = VaultInitData(
