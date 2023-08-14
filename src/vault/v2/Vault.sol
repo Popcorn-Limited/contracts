@@ -69,6 +69,9 @@ contract Vault is
     uint128 harvestCooldown;
     uint128 lastHarvest;
 
+    string internal _name;
+    string internal _symbol;
+
     uint depositLimit;
     bytes32 contractName;
 
@@ -110,8 +113,8 @@ contract Vault is
 
         depositLimit = initData.depositLimit;
 
-        // _name = initData.name;
-        // _symbol = initData.symbol;
+        _name = initData.name;
+        _symbol = initData.symbol;
 
         contractName = keccak256(
             abi.encodePacked("Popcorn", initData.name, block.timestamp, "Vault")
