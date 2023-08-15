@@ -156,7 +156,7 @@ abstract contract BaseVault is
     function deposit(
         uint256 assets,
         address receiver
-    ) public override nonReentrant whenNotPaused returns (uint256 shares) {
+    ) public override nonReentrant returns (uint256 shares) {
         if (receiver == address(0)) revert InvalidReceiver();
         if (assets > maxDeposit(receiver)) revert MaxError(assets);
 
@@ -195,7 +195,7 @@ abstract contract BaseVault is
     function mint(
         uint256 shares,
         address receiver
-    ) public override nonReentrant whenNotPaused returns (uint256 assets) {
+    ) public override nonReentrant returns (uint256 assets) {
         if (receiver == address(0)) revert InvalidReceiver();
         if (shares == 0) revert ZeroAmount();
 

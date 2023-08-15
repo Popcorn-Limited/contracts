@@ -34,8 +34,6 @@ contract SingleStrategyVault is BaseVault {
                             ACCOUNTING LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    // TODO finish these implementations
-
     function _totalAssets() internal view override returns (uint256) {
         return strategy.totalAssets();
     }
