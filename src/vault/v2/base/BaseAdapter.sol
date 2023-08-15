@@ -49,7 +49,7 @@ abstract contract BaseAdapter is OwnedUpgradeable, PausableUpgradeable {
      * @notice Returns the total amount of assets
      */
     function totalAssets() public view returns (uint256) {
-        return _totalAssets() - lockedFees;
+        return _totalAssets();
     }
 
     function _totalAssets() internal view virtual returns (uint256) {
@@ -91,9 +91,7 @@ abstract contract BaseAdapter is OwnedUpgradeable, PausableUpgradeable {
      * @dev Uses either `_depositUnderlying` or `_depositLP`
      * @dev Only callable by the vault
      **/
-    function deposit(
-        uint256 amount
-    ) external virtual onlyVault whenNotPaused {
+    function deposit(uint256 amount) external virtual onlyVault whenNotPaused {
         _deposit(amount);
     }
 
@@ -170,59 +168,6 @@ abstract contract BaseAdapter is OwnedUpgradeable, PausableUpgradeable {
     function setRewardsToken(IERC20[] memory _rewardTokens) external onlyOwner {
         rewardTokens = _rewardTokens;
     }
-
-    /*//////////////////////////////////////////////////////////////
-                            FEE LOGIC
-    //////////////////////////////////////////////////////////////*/
-
-    // struct ProposedFees {
-    //     uint128 fee;
-    //     uint128 timestamp;
-    // }
-
-    // uint256 public lockedFees;
-    // uint256 public highWaterMark;
-
-    // ProposedFees public proposedFee;
-    // uint256 public performanceFee; // Fees in BPS
-
-    // uint256 public quitPeriod;
-
-    // @dev We would need to account for deposits and withdrawals to only take fees on the gains
-    // modifier takeFees() {
-    //     uint256 assets = _totalAssets();
-    //     uint256 hwm = highWaterMark;
-    //     if (assets > hwm) {
-    //         uint256 gain = assets - hwm;
-    //         lockedFees += (gain * performanceFee) / 10_000;
-    //     }
-    // }
-
-    // function proposeFees(uint128 fee) external onlyOwner {
-    //     if (fee) revert InvalidVaultFees();
-
-    //     proposedFee = ProposedFees({
-    //         proposedPerformanceFee: fee,
-    //         proposedFeeTime: uint128(block.timestamp)
-    //     });
-
-    //     emit NewFeesProposed(fee, block.timestamp);
-    // }
-
-    // /// @notice Change fees to the previously proposed fees after the quit period has passed.
-    // function changeFees() external takeFees {
-    //     ProposedFees memory _proposedFee = proposedFee;
-    //     if (
-    //         _proposedFee.timestamp == 0 ||
-    //         block.timestamp < uint256(_proposedFee.timestamp) + quitPeriod
-    //     ) revert NotPassedQuitPeriod(quitPeriod);
-
-    //     emit ChangedFees(fees, proposedFees);
-
-    //     performanceFee = _proposedFee.fee;
-
-    //     delete proposedFee;
-    // }
 
     /*//////////////////////////////////////////////////////////////
                             PAUSING LOGIC

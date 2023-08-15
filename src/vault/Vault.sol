@@ -266,7 +266,7 @@ contract Vault is
 
         if (feeShares > 0) _mint(feeRecipient, feeShares);
 
-        _protocolWithdraw(assets, shares, receiver);
+        adapter.withdraw(assets, receiver, address(this));
 
         emit Withdraw(msg.sender, receiver, owner, assets, shares);
     }
@@ -306,7 +306,7 @@ contract Vault is
 
         if (feeShares > 0) _mint(feeRecipient, feeShares);
 
-        _protocolWithdraw(assets, shares, receiver);
+        adapter.withdraw(assets, receiver, address(this));
 
         emit Withdraw(msg.sender, receiver, owner, assets, shares);
     }
@@ -317,7 +317,7 @@ contract Vault is
 
     /// @return Total amount of underlying `asset` token managed by vault. Delegates to adapter.
     function totalAssets() public view override returns (uint256) {
-        return _totalAssets();
+        return adapter.convertToAssets(adapter.balanceOf(address(this)));
     }
 
     /**
@@ -329,10 +329,9 @@ contract Vault is
     function previewDeposit(
         uint256 assets
     ) public view override returns (uint256 shares) {
-        shares = _convertToShares(
+        shares = adapter.previewDeposit(
             assets -
-                assets.mulDiv(uint256(fees.deposit), 1e18, Math.Rounding.Down),
-            Math.Rounding.Down
+                assets.mulDiv(uint256(fees.deposit), 1e18, Math.Rounding.Down)
         );
     }
 
@@ -353,7 +352,7 @@ contract Vault is
             Math.Rounding.Up
         );
 
-        assets = _convertToAssets(shares, Math.Rounding.Up);
+        assets = adapter.previewMint(shares);
     }
 
     /**
@@ -373,7 +372,7 @@ contract Vault is
             Math.Rounding.Up
         );
 
-        shares = _convertToShares(assets, Math.Rounding.Up);
+        shares = adapter.previewWithdraw(assets);
     }
 
     /**
@@ -385,13 +384,37 @@ contract Vault is
     function previewRedeem(
         uint256 shares
     ) public view override returns (uint256 assets) {
-        assets = _convertToAssets(shares, Math.Rounding.Down);
+        assets = adapter.previewRedeem(shares);
 
         assets -= assets.mulDiv(
             uint256(fees.withdrawal),
             1e18,
             Math.Rounding.Down
         );
+    }
+
+    function _convertToShares(
+        uint256 assets,
+        Math.Rounding rounding
+    ) internal view virtual override returns (uint256 shares) {
+        return
+            assets.mulDiv(
+                totalSupply() + 10 ** decimalOffset,
+                totalAssets() + 1,
+                rounding
+            );
+    }
+
+    function _convertToAssets(
+        uint256 shares,
+        Math.Rounding rounding
+    ) internal view virtual override returns (uint256) {
+        return
+            shares.mulDiv(
+                totalAssets() + 1,
+                totalSupply() + 10 ** decimalOffset,
+                rounding
+            );
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -582,90 +605,90 @@ contract Vault is
                           ADAPTER LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    // IERC4626 public adapter;
-    // IERC4626 public proposedAdapter;
-    // uint256 public proposedAdapterTime;
+    IERC4626 public adapter;
+    IERC4626 public proposedAdapter;
+    uint256 public proposedAdapterTime;
 
-    // event NewAdapterProposed(IERC4626 newAdapter, uint256 timestamp);
-    // event ChangedAdapter(IERC4626 oldAdapter, IERC4626 newAdapter);
+    event NewAdapterProposed(IERC4626 newAdapter, uint256 timestamp);
+    event ChangedAdapter(IERC4626 oldAdapter, IERC4626 newAdapter);
 
-    // error VaultAssetMismatchNewAdapterAsset();
+    error VaultAssetMismatchNewAdapterAsset();
 
-    // /**
-    //  * @notice Propose a new adapter for this vault. Caller must be Owner.
-    //  * @param newAdapter A new ERC4626 that should be used as a yield adapter for this asset.
-    //  */
-    // function proposeAdapter(IERC4626 newAdapter) external onlyOwner {
-    //     if (newAdapter.asset() != asset())
-    //         revert VaultAssetMismatchNewAdapterAsset();
+    /**
+     * @notice Propose a new adapter for this vault. Caller must be Owner.
+     * @param newAdapter A new ERC4626 that should be used as a yield adapter for this asset.
+     */
+    function proposeAdapter(IERC4626 newAdapter) external onlyOwner {
+        if (newAdapter.asset() != asset())
+            revert VaultAssetMismatchNewAdapterAsset();
 
-    //     proposedAdapter = newAdapter;
-    //     proposedAdapterTime = block.timestamp;
+        proposedAdapter = newAdapter;
+        proposedAdapterTime = block.timestamp;
 
-    //     emit NewAdapterProposed(newAdapter, block.timestamp);
-    // }
+        emit NewAdapterProposed(newAdapter, block.timestamp);
+    }
 
-    // /**
-    //  * @notice Set a new Adapter for this Vault after the quit period has passed.
-    //  * @dev This migration function will remove all assets from the old Vault and move them into the new vault
-    //  * @dev Additionally it will zero old allowances and set new ones
-    //  * @dev Last we update HWM and assetsCheckpoint for fees to make sure they adjust to the new adapter
-    //  */
-    // function changeAdapter() external takeFees {
-    //     if (
-    //         proposedAdapterTime == 0 ||
-    //         block.timestamp < proposedAdapterTime + quitPeriod
-    //     ) revert NotPassedQuitPeriod(quitPeriod);
+    /**
+     * @notice Set a new Adapter for this Vault after the quit period has passed.
+     * @dev This migration function will remove all assets from the old Vault and move them into the new vault
+     * @dev Additionally it will zero old allowances and set new ones
+     * @dev Last we update HWM and assetsCheckpoint for fees to make sure they adjust to the new adapter
+     */
+    function changeAdapter() external takeFees {
+        if (
+            proposedAdapterTime == 0 ||
+            block.timestamp < proposedAdapterTime + quitPeriod
+        ) revert NotPassedQuitPeriod(quitPeriod);
 
-    //     adapter.redeem(
-    //         adapter.balanceOf(address(this)),
-    //         address(this),
-    //         address(this)
-    //     );
+        adapter.redeem(
+            adapter.balanceOf(address(this)),
+            address(this),
+            address(this)
+        );
 
-    //     IERC20(asset()).approve(address(adapter), 0);
+        IERC20(asset()).approve(address(adapter), 0);
 
-    //     emit ChangedAdapter(adapter, proposedAdapter);
+        emit ChangedAdapter(adapter, proposedAdapter);
 
-    //     adapter = proposedAdapter;
+        adapter = proposedAdapter;
 
-    //     IERC20(asset()).approve(address(adapter), type(uint256).max);
+        IERC20(asset()).approve(address(adapter), type(uint256).max);
 
-    //     adapter.deposit(
-    //         IERC20(asset()).balanceOf(address(this)),
-    //         address(this)
-    //     );
+        adapter.deposit(
+            IERC20(asset()).balanceOf(address(this)),
+            address(this)
+        );
 
-    //     delete proposedAdapterTime;
-    //     delete proposedAdapter;
-    // }
+        delete proposedAdapterTime;
+        delete proposedAdapter;
+    }
 
     /*//////////////////////////////////////////////////////////////
                           RAGE QUIT LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    // uint256 public quitPeriod;
+    uint256 public quitPeriod;
 
-    // event QuitPeriodSet(uint256 quitPeriod);
+    event QuitPeriodSet(uint256 quitPeriod);
 
-    // error InvalidQuitPeriod();
+    error InvalidQuitPeriod();
 
-    // /**
-    //  * @notice Set a quitPeriod for rage quitting after new adapter or fees are proposed. Caller must be Owner.
-    //  * @param _quitPeriod Time to rage quit after proposal.
-    //  */
-    // function setQuitPeriod(uint256 _quitPeriod) external onlyOwner {
-    //     if (
-    //         block.timestamp < proposedAdapterTime + quitPeriod ||
-    //         block.timestamp < proposedFeeTime + quitPeriod
-    //     ) revert NotPassedQuitPeriod(quitPeriod);
-    //     if (_quitPeriod < 1 days || _quitPeriod > 7 days)
-    //         revert InvalidQuitPeriod();
+    /**
+     * @notice Set a quitPeriod for rage quitting after new adapter or fees are proposed. Caller must be Owner.
+     * @param _quitPeriod Time to rage quit after proposal.
+     */
+    function setQuitPeriod(uint256 _quitPeriod) external onlyOwner {
+        if (
+            block.timestamp < proposedAdapterTime + quitPeriod ||
+            block.timestamp < proposedFeeTime + quitPeriod
+        ) revert NotPassedQuitPeriod(quitPeriod);
+        if (_quitPeriod < 1 days || _quitPeriod > 7 days)
+            revert InvalidQuitPeriod();
 
-    //     quitPeriod = _quitPeriod;
+        quitPeriod = _quitPeriod;
 
-    //     emit QuitPeriodSet(quitPeriod);
-    // }
+        emit QuitPeriodSet(quitPeriod);
+    }
 
     /*//////////////////////////////////////////////////////////////
                           DEPOSIT LIMIT LOGIC
