@@ -749,7 +749,7 @@ contract VaultV2Test is Test {
 
         vm.warp(block.timestamp + 3 days);
 
-        // vm.expectEmit(false, false, false, true, address(vault));
+        vm.expectEmit(false, false, false, true, address(vault));
         emit ChangedFees(
             VaultFees({
                 deposit: 0,
@@ -812,7 +812,7 @@ contract VaultV2Test is Test {
     //////////////////////////////////////////////////////////////*/
 
     function test__setFeeRecipient() public {
-        // vm.expectEmit(false, false, false, true, address(vault));
+        vm.expectEmit(false, false, false, true, address(vault));
         emit FeeRecipientUpdated(feeRecipient, alice);
 
         vm.prank(owner);
@@ -839,7 +839,7 @@ contract VaultV2Test is Test {
         vm.warp(block.timestamp + 3 days);
 
         uint256 newQuitPeriod = 1 days;
-        // vm.expectEmit(false, false, false, true, address(vault));
+        vm.expectEmit(false, false, false, true, address(vault));
         emit QuitPeriodSet(newQuitPeriod);
 
         vm.prank(owner);
