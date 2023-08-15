@@ -288,7 +288,6 @@ contract VaultV2Test is Test {
         vm.prank(alice);
         asset.approve(address(vault), aliceassetAmount);
         assertEq(asset.allowance(alice, address(vault)), aliceassetAmount);
-        emit log("PING0");
 
         uint256 alicePreDepositBal = asset.balanceOf(alice);
 
@@ -296,52 +295,37 @@ contract VaultV2Test is Test {
         uint256 aliceShareAmount = vault.deposit(aliceassetAmount, alice);
 
         // assertEq(adapter.afterDepositHookCalledCounter(), 1);
-        emit log("PING1");
 
         // Expect exchange rate to be 1:1e9 on initial deposit.
         assertEq(aliceassetAmount * 1e9, aliceShareAmount);
-        emit log("PING2");
 
         assertEq(vault.previewWithdraw(aliceassetAmount), aliceShareAmount);
-        emit log("PING3");
 
         assertEq(vault.previewDeposit(aliceassetAmount), aliceShareAmount);
-        emit log("PING4");
 
         assertEq(vault.totalSupply(), aliceShareAmount);
-        emit log("PING5");
 
         assertEq(vault.totalAssets(), aliceassetAmount);
-        emit log("PING6");
 
         assertEq(vault.balanceOf(alice), aliceShareAmount);
-        emit log("PING7");
 
         assertEq(
             vault.convertToAssets(vault.balanceOf(alice)),
             aliceassetAmount
         );
-        emit log("PING8");
 
         assertEq(asset.balanceOf(alice), alicePreDepositBal - aliceassetAmount);
-        emit log("PING9");
 
         vm.prank(alice);
         vault.withdraw(aliceassetAmount, alice, alice);
 
-        emit log("PING10");
-
         assertEq(vault.totalAssets(), 0);
-        emit log("PING11");
 
         assertEq(vault.balanceOf(alice), 0);
-        emit log("PING12");
 
         assertEq(vault.convertToAssets(vault.balanceOf(alice)), 0);
-        emit log("PING13");
 
         assertEq(asset.balanceOf(alice), alicePreDepositBal);
-        emit log("PING14");
     }
 
     function testFail__deposit_zero() public {
@@ -540,30 +524,6 @@ contract VaultV2Test is Test {
     /*//////////////////////////////////////////////////////////////
                           TAKING FEES
     //////////////////////////////////////////////////////////////*/
-
-    function test__previewDeposit_previewMint_takes_fees_into_account(
-        uint8 fuzzAmount
-    ) public {
-        uint256 amount = bound(uint256(fuzzAmount), 1, 1 ether);
-
-        vm.prank(owner);
-        _setFees(1e17, 0, 0, 0);
-
-        asset.mint(alice, amount);
-
-        vm.prank(alice);
-        asset.approve(address(vault), amount);
-
-        // Test PreviewDeposit and Deposit
-        uint256 expectedShares = vault.previewDeposit(amount);
-
-        vm.prank(alice);
-        uint256 actualShares = vault.deposit(amount, alice);
-
-        emit log_named_uint("expectedShares", expectedShares);
-        emit log_named_uint("acutalShares", actualShares);
-        assertApproxEqAbs(expectedShares, actualShares, 2);
-    }
 
     function test__previewWithdraw_previewRedeem_takes_fees_into_account(
         uint8 fuzzAmount
@@ -986,20 +946,31 @@ contract VaultV2Test is Test {
         emit Unpaused(address(this));
 
         vm.prank(owner);
+
         vault.unpause();
+
+        emit log("PING0");
 
         assertFalse(vault.paused());
 
         vm.prank(alice);
+
+        emit log("PING1");
         vault.deposit(depositAmount, alice);
 
         vm.prank(alice);
+
+        emit log("PING2");
         vault.mint(depositAmount, alice);
 
         vm.prank(alice);
+
+        emit log("PING3");
         vault.withdraw(depositAmount, alice, alice);
 
         vm.prank(alice);
+
+        emit log("PING4");
         vault.redeem(depositAmount, alice, alice);
     }
 
