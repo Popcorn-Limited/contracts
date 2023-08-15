@@ -3,11 +3,9 @@
 
 pragma solidity ^0.8.15;
 import "./BaseHelper.sol";
-import {IStrategy} from "../Vault.sol";
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {SafeCast} from "openzeppelin-contracts/utils/math/SafeCast.sol";
 import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
-import "../../../interfaces/vault/IStrategy.sol";
 
 abstract contract BaseRewardClaimer is BaseHelper {
     using Math for uint256;
