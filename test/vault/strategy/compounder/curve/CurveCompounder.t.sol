@@ -5,11 +5,11 @@ pragma solidity ^0.8.15;
 
 import {Test} from "forge-std/Test.sol";
 import {ConvexAdapter, IConvexBooster, IConvexRewards, SafeERC20, IERC20, IERC20Metadata, Math} from "../../../../../src/vault/adapter/convex/ConvexAdapter.sol";
-import {CurveLpCompounder, CurveRoute} from "../../../../../src/vault/strategy/compounder/curve/CurveLpCompounder.sol";
+import {CurveCompounder, CurveRoute} from "../../../../../src/vault/strategy/compounder/curve/CurveCompounder.sol";
 import {CurveCompounder} from "../../../../../src/vault/strategy/compounder/curve/CurveCompounder.sol";
 import {Clones} from "openzeppelin-contracts/proxy/Clones.sol";
 
-contract CurveLpCompounderTest is Test {
+contract CurveCompounderTest is Test {
     IConvexBooster convexBooster =
         IConvexBooster(0xF403C135812408BFbE8713b5A23a04b3D48AAE31);
     address usdc = address(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
@@ -104,7 +104,7 @@ contract CurveLpCompounderTest is Test {
             curveRoutes,
             CurveRoute({route: toBaseAssetRoute, swapParams: swapParams}),
             minTradeAmounts,
-            abi.encode(pool, 1)
+            ""
         );
 
         address impl = address(new ConvexAdapter());
@@ -114,7 +114,7 @@ contract CurveLpCompounderTest is Test {
             abi.encode(
                 asset,
                 address(this),
-                new CurveLpCompounder(),
+                new CurveCompounder(),
                 0,
                 sigs,
                 stratData
@@ -219,7 +219,7 @@ contract CurveLpCompounderTest is Test {
 
         // need to do this before the call to initalize because expectRevert
         // would try to catch this call otherwise
-        CurveLpCompounder compounder = new CurveLpCompounder();
+        CurveCompounder compounder = new CurveCompounder();
         vm.expectRevert(CurveCompounder.InvalidConfig.selector);
         _adapter.initialize(
             abi.encode(
