@@ -3,7 +3,7 @@
 
 pragma solidity ^0.8.15;
 
-import {StargateAdapter, IERC20, AdapterConfig, ProtocolConfig} from "./StargateAdapter.sol";
+import {StargateAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../adapter/stargate/StargateAdapter.sol";
 import {CurveCompounder, CurveRoute, HarvestConfig, CompounderConfig} from "./CurveCompounder.sol";
 
 contract StargateCompounder is StargateAdapter, CurveCompounder {

@@ -4,8 +4,8 @@
 pragma solidity ^0.8.15;
 
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
-import {BaseAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../base/BaseAdapter.sol";
-import {IAcrossHop, IAcceleratingDistributor} from "../../adapter/across/IAcross.sol";
+import {BaseAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../../base/BaseAdapter.sol";
+import {IAcrossHop, IAcceleratingDistributor} from "./IAcross.sol";
 
 
 contract AcrossAdapter is BaseAdapter {

@@ -4,8 +4,8 @@
 pragma solidity ^0.8.15;
 
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
-import {BaseVault, IERC20, BaseVaultConfig} from "../base/BaseVault.sol";
-import {IBaseAdapter} from "../base/interfaces/IBaseAdapter.sol";
+import {BaseVault, IERC20, BaseVaultConfig} from "./base/BaseVault.sol";
+import {IBaseAdapter} from "./base/interfaces/IBaseAdapter.sol";
 
 contract SingleStrategyVault is BaseVault {
     IBaseAdapter public strategy;
