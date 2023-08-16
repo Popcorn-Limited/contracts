@@ -7,13 +7,14 @@ import {Test} from "forge-std/Test.sol";
 import {MockERC20} from "../../utils/mocks/MockERC20.sol";
 import {MockERC4626} from "../../utils/mocks/MockERC4626.sol";
 import {Vault, VaultInitData} from "../../../src/vault/v2/Vault.sol";
+import {SingleStrategyVault} from "../../../src/vault/v2/example/SingleStrategyVault.sol";
 import {IERC4626Upgradeable as IERC4626, IERC20Upgradeable as IERC20} from "openzeppelin-contracts-upgradeable/interfaces/IERC4626Upgradeable.sol";
 import {VaultFees} from "../../../src/interfaces/vault/IVault.sol";
 import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
 import {Clones} from "openzeppelin-contracts/proxy/Clones.sol";
 
 // TestVault needed to expose internal initialize function.
-contract TestVault is Vault {
+contract TestVault is SingleStrategyVault {
     function testInitialize(VaultInitData calldata initData) public {
         initialize(initData);
     }

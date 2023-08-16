@@ -4,6 +4,7 @@
 pragma solidity ^0.8.15;
 import "./BaseHelper.sol";
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
+import {Math} from "openzeppelin-contracts/utils/math/Math.sol";
 import {SafeCast} from "openzeppelin-contracts/utils/math/SafeCast.sol";
 import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -19,7 +20,10 @@ abstract contract BaseRewardClaimer is BaseHelper {
     // vault => rewardToken -> accruedRewards
     mapping(address => mapping(IERC20 => uint256)) public accruedVaultRewards;
 
-    function _accrueStrategyReward(IERC20 rewardToken, uint256 reward) internal {
+    function _accrueStrategyReward(
+        IERC20 rewardToken,
+        uint256 reward
+    ) internal {
         //todo: this function has to be triggered by the reward holder
         //totalAssetDeposited is the total amount of lp tokens or whatever tokens deposited into the strategy
         //reward is shared to all deposits by dividing it by totalAssetDeposited
@@ -27,12 +31,14 @@ abstract contract BaseRewardClaimer is BaseHelper {
         uint totalAssetDeposited = totalAssets();
         uint256 rewardIndex;
 
-        if(totalAssetDeposited != 0) {
-            rewardIndex = reward.mulDiv(
-                uint256(10 ** decimals()),
-                totalAssetDeposited,
-                Math.Rounding.Down
-            ).toUint128();
+        if (totalAssetDeposited != 0) {
+            rewardIndex = reward
+                .mulDiv(
+                    uint256(10 ** decimals()),
+                    totalAssetDeposited,
+                    Math.Rounding.Down
+                )
+                .toUint128();
         }
 
         strategyRewardIndex[rewardToken] += rewardIndex;
@@ -47,8 +53,8 @@ abstract contract BaseRewardClaimer is BaseHelper {
 
         for (uint i; i < _tokens.length; ) {
             IERC20 _rewardToken = IERC20(_tokens[i]);
-            uint256 rewardIndexDelta =
-                strategyRewardIndex[_rewardToken] - vaultRewardIndex[vault][_rewardToken];
+            uint256 rewardIndexDelta = strategyRewardIndex[_rewardToken] -
+                vaultRewardIndex[vault][_rewardToken];
             if (rewardIndexDelta == 0) continue;
 
             uint256 rewardEarned = balanceOf(vault).mulDiv(
@@ -58,9 +64,13 @@ abstract contract BaseRewardClaimer is BaseHelper {
             );
 
             accruedVaultRewards[vault][_rewardToken] += rewardEarned;
-            vaultRewardIndex[vault][_rewardToken] = strategyRewardIndex[_rewardToken];
+            vaultRewardIndex[vault][_rewardToken] = strategyRewardIndex[
+                _rewardToken
+            ];
 
-            unchecked {++i;}
+            unchecked {
+                ++i;
+            }
         }
     }
 
@@ -72,12 +82,14 @@ abstract contract BaseRewardClaimer is BaseHelper {
             IERC20 _rewardToken = IERC20(_tokens[i]);
             uint256 vaultReward = accruedVaultRewards[msg.sender][_rewardToken];
 
-            if(vaultReward > 0){
+            if (vaultReward > 0) {
                 accruedVaultRewards[msg.sender][_rewardToken] = 0;
                 _rewardToken.transfer(msg.sender, vaultReward);
             }
 
-            unchecked {++i;}
+            unchecked {
+                ++i;
+            }
         }
     }
 }
