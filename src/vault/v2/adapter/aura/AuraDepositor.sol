@@ -5,7 +5,7 @@ pragma solidity ^0.8.15;
 
 import {AuraAdapter, IERC20, AdapterConfig, ProtocolConfig} from "./AuraAdapter.sol";
 
-contract AuraDepositor is AcrossAdapter {
+contract AuraDepositor is AuraAdapter {
     function initialize(
         AdapterConfig memory _adapterConfig,
         ProtocolConfig memory _protocolConfig

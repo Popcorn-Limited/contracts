@@ -5,9 +5,9 @@ pragma solidity ^0.8.15;
 
 import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
-import {BaseAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../base/BaseAdapter.sol";
-import {IBeefyVault, IBeefyBooster, IBeefyBalanceCheck, IBeefyStrat} from "../../adapter/beefy/IBeefy.sol";
-import {IPermissionRegistry} from "../../../interfaces/vault/IPermissionRegistry.sol";
+import {BaseAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../../base/BaseAdapter.sol";
+import {IBeefyVault, IBeefyBooster, IBeefyBalanceCheck, IBeefyStrat} from "./IBeefy.sol";
+import {IPermissionRegistry} from "../../../../interfaces/vault/IPermissionRegistry.sol";
 
 contract BeefyAdapter is BaseAdapter {
     using SafeERC20 for IERC20;

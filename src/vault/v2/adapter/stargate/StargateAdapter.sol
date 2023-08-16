@@ -4,8 +4,8 @@
 pragma solidity ^0.8.15;
 
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
-import {BaseAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../base/BaseAdapter.sol";
-import {ISToken, IStargateStaking, IStargateRouter} from "../../adapter/stargate/IStargate.sol";
+import {BaseAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../../base/BaseAdapter.sol";
+import {ISToken, IStargateStaking, IStargateRouter} from "./IStargate.sol";
 
 contract StargateAdapter is BaseAdapter {
     using SafeERC20 for IERC20;
