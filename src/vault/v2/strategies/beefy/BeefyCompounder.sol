@@ -33,11 +33,11 @@ contract BeefyCompounder is BeefyAdapter, CurveCompounder {
         _deposit(amount);
     }
 
-    function withdraw(uint256 amount) external override onlyVault {
+    function withdraw(uint256 amount, address receiver) external override onlyVault {
         HarvestConfig memory _harvestConfig = harvestConfig;
         if (!paused() && _harvestConfig.autoHarvest)
             _harvest(_harvestConfig.harvestData);
-        _withdraw(amount);
+        _withdraw(amount, receiver);
     }
 
     function _claimRewards() internal override {

@@ -6,7 +6,7 @@ pragma solidity ^0.8.15;
 interface IBaseAdapter {
     function deposit(uint256 amount) external;
 
-    function withdraw(uint256 amount) external;
+    function withdraw(uint256 amount, address receiver) external;
 
     function totalAssets() external view returns (uint256);
 
@@ -17,4 +17,8 @@ interface IBaseAdapter {
     function lpToken() external view returns (address);
 
     function useLpToken() external view returns (bool);
+
+    function maxDeposit() external view virtual returns (uint256);
+
+    function maxWithdraw() external view virtual returns (uint256);
 }

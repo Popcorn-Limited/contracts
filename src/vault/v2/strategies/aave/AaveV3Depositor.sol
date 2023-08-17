@@ -17,7 +17,7 @@ contract AaveV3Depositor is AaveV3Adapter {
         _deposit(amount);
     }
 
-    function withdraw(uint256 amount) external override onlyVault {
-        _withdraw(amount);
+    function withdraw(uint256 amount, address receiver) external override onlyVault {
+        _withdraw(amount, receiver);
     }
 }

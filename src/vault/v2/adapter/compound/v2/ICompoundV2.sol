@@ -26,6 +26,9 @@ interface ICToken {
 
     function redeem(uint256) external;
 
+    function redeemUnderlying(uint) external returns (uint);
+
+
     /**
      * @dev Returns exchange rate from the underlying to the cToken.
      **/

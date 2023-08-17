@@ -8,8 +8,6 @@ import {BaseAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../../../base/
 import {ICToken, IComptroller} from "./ICompoundV2.sol";
 import {LibCompound} from "./LibCompound.sol";
 
-//import "../../../../adapter/compound/compoundV2/LibCompound.sol";
-
 contract CompoundV2Adapter is BaseAdapter {
     using SafeERC20 for IERC20;
 
@@ -44,8 +42,8 @@ contract CompoundV2Adapter is BaseAdapter {
             keccak256(abi.encode(cToken.symbol())) != 
             keccak256(abi.encode("cETH"))
         ) {
-            if (cToken.underlying() != asset()) // TODO asset() should either be AdapterConfig.underlying or AdapterConfig.lpToken depending on AdapterConfig.useLpToken
-                revert DifferentAssets(cToken.underlying(), asset());
+            if (cToken.underlying() != address(_adapterConfig.underlying))
+                revert DifferentAssets(cToken.underlying(), address(_adapterConfig.underlying));
         }
 
         (bool isListed, , ) = comptroller.markets(address(cToken));
@@ -60,11 +58,10 @@ contract CompoundV2Adapter is BaseAdapter {
 
     /**
      * @notice Returns the total amount of underlying assets.
-     * @dev This function must be overriden. If the farm requires the usage of lpToken than this function must convert lpToken balance into underlying balance
+     * @dev This function must be overridden. If the farm requires the usage of lpToken than this function must convert lpToken balance into underlying balance
      */
     function _totalUnderlying() internal view override returns (uint256) {
-        ICToken token = ICToken(token);
-        return LibCompound.viewUnderlyingBalanceOf(token, address(this));
+        return LibCompound.viewUnderlyingBalanceOf(cToken, address(this));
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -88,9 +85,9 @@ contract CompoundV2Adapter is BaseAdapter {
                             WITHDRAWAL LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function _withdraw(uint256 amount) internal override {
+    function _withdraw(uint256 amount, address receiver) internal override {
         _withdrawUnderlying(amount);
-        underlying.safeTransfer(msg.sender, amount);
+        underlying.safeTransfer(receiver, amount);
     }
 
     /**
@@ -98,12 +95,7 @@ contract CompoundV2Adapter is BaseAdapter {
      * @dev This function must be overriden. Some farms require the user to into an lpToken before depositing others might use the underlying directly
      **/
     function _withdrawUnderlying(uint256 amount) internal override {
-        uint256 compoundShares = LibCompound.convertToUnderlyingShares(
-            amount,
-            totalSupply(), // TODO totalSupply doesnt exist. The function just gets an amount in underlying assets and should return that amount
-            cToken.balanceOf(address(this))
-        );
-        cToken.redeem(compoundShares);
+        cToken.redeemUnderlying(amount);
     }
 
     /*//////////////////////////////////////////////////////////////

@@ -48,15 +48,14 @@ library LibCompound {
         uint256 shares,
         uint256 totalSupply,
         uint256 adapterCTokenBalance
-    ) public view override returns (uint256) {
+    ) public pure returns (uint256) {
 
         return
             totalSupply == 0
                 ? shares
                 : shares.mulDivUp(
                 adapterCTokenBalance,
-                totalSupply,
-                Math.Rounding.Up
+                totalSupply
             );
     }
 }

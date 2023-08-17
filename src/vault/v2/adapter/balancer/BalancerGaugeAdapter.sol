@@ -62,9 +62,9 @@ contract BalancerGaugeAdapter is BaseAdapter {
                             WITHDRAWAL LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function _withdraw(uint256 amount) internal override {
+    function _withdraw(uint256 amount, address receiver) internal override {
         _withdrawUnderlying(amount);
-        underlying.safeTransfer(msg.sender, amount);
+        underlying.safeTransfer(receiver, amount);
     }
 
     /**
