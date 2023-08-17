@@ -36,8 +36,11 @@ contract CompoundV3Adapter is BaseAdapter {
         cometRewarder = ICometRewarder(_cometRewarder);
         cometConfigurator = ICometConfigurator(_protocolConfig.registry);
 
-        address configuratorBaseToken = cometConfigurator.getConfiguration(address(cToken)).baseToken;
-        if (asset() != configuratorBaseToken) revert InvalidAsset(configuratorBaseToken);
+        address configuratorBaseToken = cometConfigurator
+            .getConfiguration(address(cToken))
+            .baseToken;
+        if (asset() != configuratorBaseToken)
+            revert InvalidAsset(configuratorBaseToken); // TODO asset() should either be AdapterConfig.underlying or AdapterConfig.lpToken depending on AdapterConfig.useLpToken
 
         _adapterConfig.underlying.approve(address(cToken), type(uint256).max);
     }
@@ -70,7 +73,7 @@ contract CompoundV3Adapter is BaseAdapter {
      **/
     function _depositUnderlying(uint256 amount) internal override {
         if (cToken.isSupplyPaused() == true) revert SupplyPaused();
-        cToken.supply(asset(), amount);
+        cToken.supply(asset(), amount); // TODO asset() should either be AdapterConfig.underlying
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -89,7 +92,7 @@ contract CompoundV3Adapter is BaseAdapter {
      **/
     function _withdrawUnderlying(uint256 amount) internal override {
         if (cToken.isWithdrawPaused() == true) revert WithdrawPaused();
-        cToken.withdraw(asset(), amount);
+        cToken.withdraw(asset(), amount); // TODO asset() should either be AdapterConfig.underlying
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -100,8 +103,8 @@ contract CompoundV3Adapter is BaseAdapter {
      * @notice Claims rewards
      */
     function _claim() internal override {
-        try cometRewarder.claim(address(cToken), address(this), true) {
-            success = true;
-        } catch {}
+        try
+            cometRewarder.claim(address(cToken), address(this), true)
+        {} catch {}
     }
 }

@@ -7,6 +7,7 @@ import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradea
 import {BaseAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../../../base/BaseAdapter.sol";
 import {ICToken, IComptroller} from "./ICompoundV2.sol";
 import {LibCompound} from "./LibCompound.sol";
+
 //import "../../../../adapter/compound/compoundV2/LibCompound.sol";
 
 contract CompoundV2Adapter is BaseAdapter {
@@ -31,16 +32,19 @@ contract CompoundV2Adapter is BaseAdapter {
     ) internal onlyInitializing {
         __BaseAdapter_init(_adapterConfig);
 
-        (address _cToken, address _comptroller) = abi.decode(_protocolConfig.protocolInitData, (address, address ));
+        (address _cToken, address _comptroller) = abi.decode(
+            _protocolConfig.protocolInitData,
+            (address, address)
+        );
 
         cToken = ICToken(_cToken);
-        comptroller = IComptroller(comptroller_);
+        comptroller = IComptroller(_comptroller);
 
         if (
-            keccak256(abi.encode(cToken.symbol())) !=
+            keccak256(abi.encode(cToken.symbol())) != 
             keccak256(abi.encode("cETH"))
         ) {
-            if (cToken.underlying() != asset())
+            if (cToken.underlying() != asset()) // TODO asset() should either be AdapterConfig.underlying or AdapterConfig.lpToken depending on AdapterConfig.useLpToken
                 revert DifferentAssets(cToken.underlying(), asset());
         }
 
@@ -60,7 +64,7 @@ contract CompoundV2Adapter is BaseAdapter {
      */
     function _totalUnderlying() internal view override returns (uint256) {
         ICToken token = ICToken(token);
-        return LibCompound.viewUnderlyingBalanceOf(token, user);
+        return LibCompound.viewUnderlyingBalanceOf(token, address(this));
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -96,7 +100,7 @@ contract CompoundV2Adapter is BaseAdapter {
     function _withdrawUnderlying(uint256 amount) internal override {
         uint256 compoundShares = LibCompound.convertToUnderlyingShares(
             amount,
-            totalSupply(),
+            totalSupply(), // TODO totalSupply doesnt exist. The function just gets an amount in underlying assets and should return that amount
             cToken.balanceOf(address(this))
         );
         cToken.redeem(compoundShares);
@@ -110,8 +114,6 @@ contract CompoundV2Adapter is BaseAdapter {
      * @notice Claims rewards
      */
     function _claim() internal override {
-        try comptroller.claimComp(address(this)) {
-            success = true;
-        } catch {}
+        try comptroller.claimComp(address(this)) {} catch {}
     }
 }

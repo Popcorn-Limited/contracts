@@ -3,14 +3,16 @@
 
 pragma solidity ^0.8.15;
 
-import {AuraAdapter, IERC20, AdapterConfig, ProtocolConfig} from "./AuraAdapter.sol";
+import {
+    BalancerGaugeAdapter, IERC20, AdapterConfig, ProtocolConfig
+} from "../../adapter/balancer/BalancerGaugeAdapter.sol";
 
-contract AuraDepositor is AuraAdapter {
+contract BalanceDepositor is BalancerGaugeAdapter {
     function initialize(
         AdapterConfig memory _adapterConfig,
         ProtocolConfig memory _protocolConfig
     ) external initializer {
-        __AuraAdapter_init(_adapterConfig, _protocolConfig);
+        __BalanceGaugeAdapter_init(_adapterConfig, _protocolConfig);
     }
 
     function deposit(uint256 amount) external override onlyVault whenNotPaused {

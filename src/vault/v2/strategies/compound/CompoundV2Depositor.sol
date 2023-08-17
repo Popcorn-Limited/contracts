@@ -3,14 +3,14 @@
 
 pragma solidity ^0.8.15;
 
-import {AcrossAdapter, IERC20, AdapterConfig, ProtocolConfig} from "./AcrossAdapter.sol";
+import {CompoundV2Adapter, IERC20, AdapterConfig, ProtocolConfig} from "../../adapter/compound/v2/CompoundV2Adapter.sol";
 
-contract AcrossDepositor is AcrossAdapter {
+contract CompoundV2Depositor is AuraAdapter {
     function initialize(
         AdapterConfig memory _adapterConfig,
         ProtocolConfig memory _protocolConfig
     ) external initializer {
-        __AcrossAdapter_init(_adapterConfig, _protocolConfig);
+        __CompoundV2Adapter_init(_adapterConfig, _protocolConfig);
     }
 
     function deposit(uint256 amount) external override onlyVault whenNotPaused {
