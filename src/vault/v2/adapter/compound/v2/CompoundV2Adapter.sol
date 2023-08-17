@@ -61,7 +61,6 @@ contract CompoundV2Adapter is BaseAdapter {
      * @dev This function must be overridden. If the farm requires the usage of lpToken than this function must convert lpToken balance into underlying balance
      */
     function _totalUnderlying() internal view override returns (uint256) {
-        //ICToken token = ICToken(token);
         return LibCompound.viewUnderlyingBalanceOf(cToken, address(this));
     }
 
