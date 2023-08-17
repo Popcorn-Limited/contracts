@@ -3,7 +3,7 @@
 
 pragma solidity ^0.8.15;
 
-import {BeefyAdapter, IERC20, AdapterConfig, ProtocolConfig} from "./BeefyAdapter.sol";
+import {BeefyAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../../adapter/beefy/BeefyAdapter.sol";
 
 contract BeefyDepositor is BeefyAdapter {
     function initialize(

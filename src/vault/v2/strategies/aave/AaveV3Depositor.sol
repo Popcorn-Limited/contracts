@@ -3,7 +3,7 @@
 
 pragma solidity ^0.8.15;
 
-import {AaveV3Adapter, IERC20, AdapterConfig, ProtocolConfig} from "./AaveV3Adapter.sol";
+import {AaveV3Adapter, IERC20, AdapterConfig, ProtocolConfig} from "../../adapter/aave/v3/AaveV3Adapter.sol";
 
 contract AaveV3Depositor is AaveV3Adapter {
     function initialize(

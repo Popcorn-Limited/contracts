@@ -22,8 +22,7 @@ contract BalancerGaugeAdapter is BaseAdapter {
     ) internal onlyInitializing {
         __BaseAdapter_init(_adapterConfig);
 
-
-        address _gauge = abi.decode(balancerInitData, (address));
+        address _gauge = abi.decode(_protocolConfig.protocolInitData, (address));
         balMinter = IMinter(_protocolConfig.registry);
         gauge = IGauge(_gauge);
 
@@ -84,8 +83,6 @@ contract BalancerGaugeAdapter is BaseAdapter {
      * @notice Claims rewards
      */
     function _claim() internal override {
-        try balMinter.mint(address(gauge)) {
-            success = true;
-        } catch {}
+        try balMinter.mint(address(gauge)) {} catch {}
     }
 }

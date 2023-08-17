@@ -57,17 +57,7 @@ abstract contract BaseVault is
         _disableInitializers();
     }
 
-    /**
-     * @notice Initialize a new Vault.
-     * @param asset_ Underlying Asset which users will deposit.
-     * @param adapter_ Adapter which will be used to interact with the wrapped protocol.
-     * @param fees_ Desired fees in 1e18. (1e18 = 100%, 1e14 = 1 BPS)
-     * @param feeRecipient_ Recipient of all vault fees. (Must not be zero address)
-     * @param depositLimit_ Maximum amount of assets which can be deposited.
-     * @param owner Owner of the contract. Controls management functions.
-     * @dev This function is called by the factory contract when deploying a new vault.
-     * @dev Usually the adapter should already be pre configured. Otherwise a new one can only be added after a ragequit time.
-     */
+
     function __BaseVault__init(
         BaseVaultConfig memory vaultConfig
     ) internal onlyInitializing {

@@ -3,10 +3,10 @@
 
 pragma solidity ^0.8.15;
 
-import {StargateAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../adapter/stargate/StargateAdapter.sol";
-import {CurveCompounder, CurveRoute, HarvestConfig, CompounderConfig} from "./CurveCompounder.sol";
+import {BeefyAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../../adapter/beefy/BeefyAdapter.sol";
+import {CurveCompounder, CurveRoute, HarvestConfig, CompounderConfig} from "../../helper/CurveCompounder.sol";
 
-contract StargateCompounder is StargateAdapter, CurveCompounder {
+contract BeefyCompounder is BeefyAdapter, CurveCompounder {
     
     function initialize(
         AdapterConfig memory _adapterConfig,
@@ -17,7 +17,7 @@ contract StargateCompounder is StargateAdapter, CurveCompounder {
         CurveRoute[] memory _toBaseAssetRoutes,
         CurveRoute memory _toAssetRoute
     ) external initializer {
-        __StargateAdapter_init(_adapterConfig, _protocolConfig);
+        __BeefyAdapter_init(_adapterConfig, _protocolConfig);
         __CurveCompounder_init(
             _harvestConfig,
             _compounderConfig,
@@ -35,7 +35,8 @@ contract StargateCompounder is StargateAdapter, CurveCompounder {
 
     function withdraw(uint256 amount) external override onlyVault {
         HarvestConfig memory _harvestConfig = harvestConfig;
-        if (_harvestConfig.autoHarvest) _harvest(_harvestConfig.harvestData);
+        if (!paused() && _harvestConfig.autoHarvest)
+            _harvest(_harvestConfig.harvestData);
         _withdraw(amount);
     }
 

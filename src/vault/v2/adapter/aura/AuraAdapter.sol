@@ -28,7 +28,8 @@ contract AuraAdapter is BaseAdapter {
         pid = abi.decode(_protocolConfig.protocolInitData, (uint256));
         auraBooster = IAuraBooster(_protocolConfig.registry);
 
-        (address balancerLpToken, , , address _auraRewards, , ) = auraBooster.poolInfo(pid);
+        (address balancerLpToken, , , address _auraRewards, , ) = auraBooster
+            .poolInfo(pid);
         auraRewards = IAuraRewards(_auraRewards);
 
         _adapterConfig.lpToken.approve(address(auraBooster), type(uint256).max);
@@ -88,8 +89,6 @@ contract AuraAdapter is BaseAdapter {
      * @notice Claims rewards
      */
     function _claim() internal override {
-        try auraRewards.getReward() {
-            success = true;
-        } catch {}
+        try auraRewards.getReward() {} catch {}
     }
 }
