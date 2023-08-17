@@ -39,8 +39,8 @@ contract CompoundV3Adapter is BaseAdapter {
         address configuratorBaseToken = cometConfigurator
             .getConfiguration(address(cToken))
             .baseToken;
-        if (asset() != configuratorBaseToken)
-            revert InvalidAsset(configuratorBaseToken); // TODO asset() should either be AdapterConfig.underlying or AdapterConfig.lpToken depending on AdapterConfig.useLpToken
+        if (address(_adapterConfig.underlying) != configuratorBaseToken)
+            revert InvalidAsset(configuratorBaseToken);
 
         _adapterConfig.underlying.approve(address(cToken), type(uint256).max);
     }
@@ -73,7 +73,7 @@ contract CompoundV3Adapter is BaseAdapter {
      **/
     function _depositUnderlying(uint256 amount) internal override {
         if (cToken.isSupplyPaused() == true) revert SupplyPaused();
-        cToken.supply(asset(), amount); // TODO asset() should either be AdapterConfig.underlying
+        cToken.supply(address(underlying), amount);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -81,9 +81,9 @@ contract CompoundV3Adapter is BaseAdapter {
     //////////////////////////////////////////////////////////////*/
     error WithdrawPaused();
 
-    function _withdraw(uint256 amount) internal override {
+    function _withdraw(uint256 amount, address receiver) internal override {
         _withdrawUnderlying(amount);
-        underlying.safeTransfer(msg.sender, amount);
+        underlying.safeTransfer(receiver, amount);
     }
 
     /**
@@ -92,7 +92,7 @@ contract CompoundV3Adapter is BaseAdapter {
      **/
     function _withdrawUnderlying(uint256 amount) internal override {
         if (cToken.isWithdrawPaused() == true) revert WithdrawPaused();
-        cToken.withdraw(asset(), amount); // TODO asset() should either be AdapterConfig.underlying
+        cToken.withdraw(address(underlying), amount);
     }
 
     /*//////////////////////////////////////////////////////////////

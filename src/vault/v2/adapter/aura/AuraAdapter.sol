@@ -68,9 +68,9 @@ contract AuraAdapter is BaseAdapter {
                             WITHDRAWAL LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function _withdraw(uint256 amount) internal override {
+    function _withdraw(uint256 amount, address receiver) internal override {
         _withdrawLP(amount);
-        lpToken.safeTransfer(msg.sender, amount);
+        lpToken.safeTransfer(receiver, amount);
     }
 
     /**
