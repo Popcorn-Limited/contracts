@@ -5,7 +5,7 @@ pragma solidity ^0.8.15;
 
 import {CompoundV2Adapter, IERC20, AdapterConfig, ProtocolConfig} from "../../adapter/compound/v2/CompoundV2Adapter.sol";
 
-contract CompoundV2Depositor is AuraAdapter {
+contract CompoundV2Depositor is CompoundV2Adapter {
     function initialize(
         AdapterConfig memory _adapterConfig,
         ProtocolConfig memory _protocolConfig
@@ -17,7 +17,7 @@ contract CompoundV2Depositor is AuraAdapter {
         _deposit(amount);
     }
 
-    function withdraw(uint256 amount) external override onlyVault {
-        _withdraw(amount);
+    function withdraw(uint256 amount, address receiver) external override onlyVault {
+        _withdraw(amount, receiver);
     }
 }

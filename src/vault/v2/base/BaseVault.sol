@@ -52,6 +52,7 @@ abstract contract BaseVault is
 
     error InvalidAsset();
     error InvalidAdapter();
+    error InvalidStrategy(address strategy);
 
     constructor() {
         _disableInitializers();
@@ -61,14 +62,14 @@ abstract contract BaseVault is
     function __BaseVault__init(
         BaseVaultConfig memory vaultConfig
     ) internal onlyInitializing {
-        __ERC4626_init(IERC20Metadata(address(vaultConfig.asset)));
+        __ERC4626_init(IERC20Metadata(address(vaultConfig.asset_)));
         __Owned_init(vaultConfig.owner);
 
         // TODO cleanup init
 
-        if (address(vaultConfig.asset) == address(0)) revert InvalidAsset();
+        if (address(vaultConfig.asset_) == address(0)) revert InvalidAsset();
 
-        _decimals = IERC20Metadata(address(vaultConfig.asset)).decimals() + decimalOffset; // Asset decimals + decimal offset to combat inflation attacks
+        _decimals = IERC20Metadata(address(vaultConfig.asset_)).decimals() + decimalOffset; // Asset decimals + decimal offset to combat inflation attacks
 
         INITIAL_CHAIN_ID = block.chainid;
         INITIAL_DOMAIN_SEPARATOR = computeDomainSeparator();
@@ -81,7 +82,7 @@ abstract contract BaseVault is
         ) revert InvalidVaultFees();
         fees = vaultConfig.fees;
 
-        if (vaultConfig.feeRecipient_ == address(0)) revert InvalidFeeRecipient();
+        if (vaultConfig.feeRecipient == address(0)) revert InvalidFeeRecipient();
         feeRecipient = vaultConfig.feeRecipient;
 
         contractName = keccak256(
@@ -94,12 +95,12 @@ abstract contract BaseVault is
 
         PROTOCOL_OWNER = vaultConfig.protocolOwner;
 
-        emit VaultInitialized(contractName, address(vaultConfig.asset));
+        emit VaultInitialized(contractName, address(vaultConfig.asset_));
 
         _name = vaultConfig.name;
         _symbol = string.concat(
             "vc-",
-            IERC20Metadata(address(vaultConfig.asset)).symbol()
+            IERC20Metadata(address(vaultConfig.asset_)).symbol()
         );
     }
 
@@ -404,7 +405,7 @@ abstract contract BaseVault is
     function maxDeposit(address user) public view override returns (uint256) {
         uint256 assets = totalAssets();
         uint256 depositLimit_ = depositLimit;
-        if (paused() || assets >= depositLimit_) return 0;
+        //if (paused() || assets >= depositLimit_) return 0; //TODO: paused() is not defined and makes the build fail
         return Math.min(depositLimit_ - assets, _maxDeposit(user));
     }
 
@@ -416,7 +417,7 @@ abstract contract BaseVault is
     function maxMint(address user) public view override returns (uint256) {
         uint256 assets = totalAssets();
         uint256 depositLimit_ = depositLimit;
-        if (paused() || assets >= depositLimit_) return 0;
+        //if (paused() || assets >= depositLimit_) return 0; //TODO: paused() is not defined and makes the build fail
         return Math.min(depositLimit_ - assets, _maxMint(user));
     }
 
@@ -647,6 +648,7 @@ abstract contract BaseVault is
      * @param _quitPeriod Time to rage quit after proposal.
      */
     function setQuitPeriod(uint256 _quitPeriod) external onlyOwner {
+        uint256 proposedAdapterTime; //TODO: this value was unset and makes the build fail, please initialise
         if (
             block.timestamp < proposedAdapterTime + quitPeriod ||
             block.timestamp < proposedFeeTime + quitPeriod

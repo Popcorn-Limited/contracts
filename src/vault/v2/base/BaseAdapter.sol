@@ -118,11 +118,11 @@ abstract contract BaseAdapter is OwnedUpgradeable, PausableUpgradeable {
      * @dev Uses either `_withdrawUnderlying` or `_withdrawLP`
      * @dev Only callable by the vault
      **/
-    function withdraw(uint256 amount) external virtual onlyVault {
-        _withdraw(amount);
+    function withdraw(uint256 amount, address receiver) external virtual onlyVault {
+        _withdraw(amount, receiver);
     }
 
-    function _withdraw(uint256 amount) internal virtual {}
+    function _withdraw(uint256 amount, address receiver) internal virtual {}
 
     /**
      * @notice Withdraws underlying asset. If necessary it converts the lpToken into underlying before withdrawing
@@ -175,7 +175,7 @@ abstract contract BaseAdapter is OwnedUpgradeable, PausableUpgradeable {
 
     /// @notice Pause Deposits and withdraw all funds from the underlying protocol. Caller must be owner.
     function pause() external onlyOwner {
-        _withdraw(totalAssets());
+        _withdraw(totalAssets(), address(this));
         _pause();
     }
 
