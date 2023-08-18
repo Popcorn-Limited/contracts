@@ -526,7 +526,7 @@ abstract contract AbstractAdapterTest is PropertyTest {
         // Deposit and mint dont revert
         vm.startPrank(bob);
         adapter.deposit(defaultAmount, bob);
-        adapter.mint(defaultAmount * 1e9, bob);
+        adapter.mint(defaultAmount, bob);
     }
 
     function testFail__unpause_nonOwner() public virtual {
