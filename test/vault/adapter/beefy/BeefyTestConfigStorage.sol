@@ -9,6 +9,7 @@ struct BeefyTestConfig {
   address beefyVault;
   address beefyBooster;
   string network;
+  uint blockNumber;
 }
 
 contract BeefyTestConfigStorage is ITestConfigStorage {
@@ -17,15 +18,15 @@ contract BeefyTestConfigStorage is ITestConfigStorage {
   constructor() {
     // Polygon - MaticX-​bbaWMATIC vault
     testConfigs.push(
-      BeefyTestConfig(0x4C98CB046c3eb7e3ae7Eb49a33D6f3386Ec2b9D9, 0x2e5598608A4436dBb9c34CE6862B5AF882F49a6B, "polygon")
+      BeefyTestConfig(0x4C98CB046c3eb7e3ae7Eb49a33D6f3386Ec2b9D9, 0x2e5598608A4436dBb9c34CE6862B5AF882F49a6B, "polygon", 43513290)
     );
 
     // Ethereum - stEth-ETH vault
-    testConfigs.push(BeefyTestConfig(0xa7739fd3d12ac7F16D8329AF3Ee407e19De10D8D, address(0), "mainnet"));
+    testConfigs.push(BeefyTestConfig(0xa7739fd3d12ac7F16D8329AF3Ee407e19De10D8D, address(0), "mainnet", 17941201));
   }
 
   function getTestConfig(uint256 i) public view returns (bytes memory) {
-    return abi.encode(testConfigs[i].beefyVault, testConfigs[i].beefyBooster, testConfigs[i].network);
+    return abi.encode(testConfigs[i].beefyVault, testConfigs[i].beefyBooster, testConfigs[i].network, testConfigs[i].blockNumber);
   }
 
   function getTestConfigLength() public view returns (uint256) {
