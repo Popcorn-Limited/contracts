@@ -17,8 +17,7 @@ contract DotDotAdapterTest is AbstractAdapterTest {
         IDotDotStaking(0x8189F0afdBf8fE6a9e13c69bA35528ac6abeB1af);
 
     function setUp() public {
-        uint256 forkId = vm.createSelectFork(vm.rpcUrl("binance"));
-        vm.selectFork(forkId);
+        vm.createSelectFork(vm.rpcUrl("binance"), 23959360);
 
         testConfigStorage = ITestConfigStorage(
             address(new DotDotTestConfigStorage())
