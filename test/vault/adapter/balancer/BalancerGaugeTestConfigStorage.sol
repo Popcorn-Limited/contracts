@@ -14,7 +14,7 @@ contract BalancerGaugeTestConfigStorage is ITestConfigStorage {
 
   constructor() {
     // Mainnet - USDC-DAI-USDT Gauge
-    testConfigs.push(BalancerGaugeTestConfig(0x5612876e6F6cA370d93873FE28c874e89E741fB9));
+    testConfigs.push(BalancerGaugeTestConfig(0x79eF6103A513951a3b25743DB509E267685726B7));
   }
 
   function getTestConfig(uint256 i) public view returns (bytes memory) {
