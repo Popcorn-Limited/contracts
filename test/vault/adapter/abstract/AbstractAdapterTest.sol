@@ -16,7 +16,7 @@ import {MockStrategy} from "../../../utils/mocks/MockStrategy.sol";
 import {Math} from "openzeppelin-contracts/utils/math/Math.sol";
 import {Clones} from "openzeppelin-contracts/proxy/Clones.sol";
 
-contract AbstractAdapterTest is PropertyTest {
+abstract contract AbstractAdapterTest is PropertyTest {
     using Math for uint256;
 
     ITestConfigStorage testConfigStorage;
