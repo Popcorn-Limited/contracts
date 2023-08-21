@@ -57,11 +57,25 @@ contract AcrossAdapter is BaseAdapter {
                              ACCOUNTING LOGIC
      //////////////////////////////////////////////////////////////*/
 
-    function _totalAssets() internal view override returns (uint256) {
+    /**
+     * @notice Returns the total amount of underlying assets.
+     * @dev This function must be overriden. If the farm requires the usage of lpToken than this function must convert lpToken balance into underlying balance
+     */
+    function _totalUnderlying() internal view override returns (uint256) {
         uint256 totalLpBalance = IAcceleratingDistributor(acrossDistributor)
         .getUserStake(address (lpToken), address(this))
         .cumulativeBalance;
         return (totalLpBalance * _exchangeRateCurrent()) / 1e18;
+    }
+
+    /**
+     * @notice Returns the total amount of lpToken
+     * @dev This function is optional. Some farms might require the user to deposit lpTokens directly into the farm
+     */
+    function _totalLP() internal view override returns (uint256) {
+        return IAcceleratingDistributor(acrossDistributor)
+        .getUserStake(address (lpToken), address(this))
+        .cumulativeBalance;
     }
 
     function _exchangeRateCurrent() internal view returns (uint256) {
@@ -142,9 +156,21 @@ contract AcrossAdapter is BaseAdapter {
     //////////////////////////////////////////////////////////////*/
 
     function _deposit(uint256 amount) internal override {
-        underlying.safeTransferFrom(msg.sender, address(this), amount);
+        if (useLpToken) {
+            lpToken.safeTransferFrom(msg.sender, address(this), amount);
+            _depositLP(amount);
+        } else {
+            underlying.safeTransferFrom(msg.sender, address(this), amount);
+            _depositUnderlying(amount);
+        }
+    }
+
+    /**
+     * @notice Deposits underlying asset and converts it if necessary into an lpToken before depositing
+     * @dev This function must be overriden. Some farms require the user to into an lpToken before depositing others might use the underlying directly
+     **/
+    function _depositUnderlying(uint256 amount) internal override {
         IAcrossHop(acrossHop).addLiquidity(address(underlying), amount);
-        _depositLP(amount);
     }
 
     /**
@@ -161,8 +187,13 @@ contract AcrossAdapter is BaseAdapter {
     //////////////////////////////////////////////////////////////*/
 
     function _withdraw(uint256 amount, address receiver) internal override {
-        _withdrawLP(amount);
-        underlying.safeTransfer(receiver, amount);
+        if (useLpToken) {
+            if (!paused()) _withdrawLP(amount);
+            lpToken.safeTransfer(receiver, amount);
+        } else {
+            if (!paused()) _withdrawUnderlying(amount);
+            underlying.safeTransfer(receiver, amount);
+        }
     }
 
     /**
