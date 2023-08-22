@@ -26,11 +26,13 @@ contract AlpacaLendV1Adapter is BaseAdapter {
     uint256 public pid;
 
     error InvalidAsset();
+    error LpTokenNotSupported();
 
     function __AlpacaLendV2Adapter_init(
         AdapterConfig memory _adapterConfig,
         ProtocolConfig memory _protocolConfig
     ) internal onlyInitializing {
+        if(_adapterConfig.useLpToken) revert LpTokenNotSupported();
         __BaseAdapter_init(_adapterConfig);
 
         uint256 _pid = abi.decode(_protocolConfig.protocolInitData, (uint256));
@@ -44,7 +46,6 @@ contract AlpacaLendV1Adapter is BaseAdapter {
 
         pid = _pid;
         _adapterConfig.underlying.approve(address(alpacaManager), type(uint256).max);
-        _adapterConfig.lpToken.approve(address(alpacaManager), type(uint256).max);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -56,11 +57,9 @@ contract AlpacaLendV1Adapter is BaseAdapter {
      * @dev This function must be overridden. If the farm requires the usage of lpToken than this function must convert lpToken balance into underlying balance
      */
     function _totalUnderlying() internal view override returns (uint256) {
-        uint256 assets = ibToken.convertToAssets(
+        return ibToken.convertToAssets(
             ibToken.balanceOf(address(this))
         );
-
-        return assets;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -94,7 +93,6 @@ contract AlpacaLendV1Adapter is BaseAdapter {
      * @dev This function must be overriden. Some farms require the user to into an lpToken before depositing others might use the underlying directly
      **/
     function _withdrawUnderlying(uint256 amount) internal override {
-        uint256 alpacaShares = ibToken.convertToShares(amount);
-        alpacaManager.withdraw(address(ibToken), alpacaShares);
+        alpacaManager.withdraw(address(ibToken), ibToken.convertToShares(amount));
     }
 }

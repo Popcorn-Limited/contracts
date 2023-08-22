@@ -7,6 +7,7 @@ import {IAlpacaLendV1Vault} from "./IAlpacaLendV1.sol";
 import {BaseAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../../../base/BaseAdapter.sol";
 import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
+import {IPermissionRegistry} from "../../../../../interfaces/vault/IPermissionRegistry.sol";
 
 contract AlpacaLendV1Adapter is BaseAdapter {
     using SafeERC20 for IERC20;
@@ -17,18 +18,19 @@ contract AlpacaLendV1Adapter is BaseAdapter {
 
     error NotEndorsed();
     error InvalidAsset();
+    error LpTokenNotSupported();
 
     function __AlpacaLendV1Adapter_init(
         AdapterConfig memory _adapterConfig,
         ProtocolConfig memory _protocolConfig
     ) internal onlyInitializing {
+        if(_adapterConfig.useLpToken) revert LpTokenNotSupported();
         __BaseAdapter_init(_adapterConfig);
 
         address _vault = abi.decode(_protocolConfig.protocolInitData, (address));
 
-        //TODO: uncomment when across PR is merged
-//        if (!IPermissionRegistry(registry).endorsed(_vault))
-//            revert NotEndorsed();
+        if (!IPermissionRegistry(_protocolConfig.registry).endorsed(_vault))
+            revert NotEndorsed();
 
         alpacaVault = IAlpacaLendV1Vault(_vault);
 
@@ -81,8 +83,7 @@ contract AlpacaLendV1Adapter is BaseAdapter {
      * @dev This function must be overriden. Some farms require the user to into an lpToken before depositing others might use the underlying directly
      **/
     function _withdrawUnderlying(uint256 amount) internal override {
-        uint256 alpacaShares = convertToUnderlyingShares(0, amount);
-        alpacaVault.withdraw(alpacaShares);
+        alpacaVault.withdraw(convertToUnderlyingShares(0, amount));
     }
 
     /// @notice The amount of alapacaV1 shares to withdraw given an mount of adapter shares
