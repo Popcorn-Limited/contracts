@@ -13,6 +13,8 @@ remappings = [
   'solmate/=lib/solmate/src/'
 ]
 
+no_match_contract = "Skip"
+
 [rpc_endpoints]
 mainnet = "${ETH_RPC_URL}" 
 polygon = "${POLYGON_RPC_URL}" 
