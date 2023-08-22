@@ -25,6 +25,7 @@ contract ConvexAdapter is BaseAdapter {
         AdapterConfig memory _adapterConfig,
         ProtocolConfig memory _protocolConfig
     ) internal onlyInitializing {
+        if(!_adapterConfig.useLpToken) revert LpTokenNotSupported();
         __BaseAdapter_init(_adapterConfig);
 
         uint256 _pid = abi.decode(_protocolConfig.protocolInitData, (uint256));
