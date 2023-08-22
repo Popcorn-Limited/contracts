@@ -33,9 +33,9 @@ contract ConvexAdapter is BaseAdapter {
         (address _asset, , , address _convexRewards, , ) = convexBooster.poolInfo(_pid);
         convexRewards = IConvexRewards(_convexRewards);
 
-        if (_asset != address(underlying)) revert AssetMismatch();
+        if (_asset != address(lpToken)) revert AssetMismatch();
 
-        _adapterConfig.underlying.approve(convexBooster, type(uint256).max);
+        _adapterConfig.lpToken.approve(convexBooster, type(uint256).max);
         pid = _pid;
     }
 
@@ -44,36 +44,31 @@ contract ConvexAdapter is BaseAdapter {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Returns the total amount of underlying assets.
-     * @dev This function must be overriden. If the farm requires the usage of lpToken than this function must convert lpToken balance into underlying balance
+     * @notice Returns the total amount of lptoken assets.
+     * @dev This function must be overriden. If the farm requires the usage of lpToken than this function must convert
+     * lpToken balance into lpToken balance
      */
-    function _totalUnderlying() internal view override returns (uint256) {
+    function _totalLP() internal view override returns (uint256) {
         return convexRewards.balanceOf(address(this));
     }
 
-    /**
-     * @notice Returns the total amount of lpToken
-     * @dev This function is optional. Some farms might require the user to deposit lpTokens directly into the farm
-     */
-    function _totalLP() internal view override returns (uint256) {
-        (uint256 stake, ) = stargateStaking.userInfo(stakingPid, address(this));
-        return stake;
-    }
+
 
     /*//////////////////////////////////////////////////////////////
                             DEPOSIT LOGIC
     //////////////////////////////////////////////////////////////*/
 
     function _deposit(uint256 amount) internal override {
-        underlying.safeTransferFrom(msg.sender, address(this), amount);
-        _depositUnderlying(amount);
+        lpToken.safeTransferFrom(msg.sender, address(this), amount);
+        _depositLP(amount);
     }
 
     /**
-     * @notice Deposits underlying asset and converts it if necessary into an lpToken before depositing
-     * @dev This function must be overriden. Some farms require the user to into an lpToken before depositing others might use the underlying directly
+     * @notice Deposits lpToken asset and converts it if necessary into an lpToken before depositing
+     * @dev This function must be overridden. Some farms require the user to into an lpToken before
+     * depositing others might use the lpToken directly
      **/
-    function _depositUnderlying(uint256 amount) internal override {
+    function _depositLP(uint256 amount) internal override {
         convexBooster.deposit(pid, amount, true);
     }
 
@@ -82,15 +77,16 @@ contract ConvexAdapter is BaseAdapter {
                             WITHDRAWAL LOGIC
     //////////////////////////////////////////////////////////////*/
     function _withdraw(uint256 amount, address receiver) internal override {
-        _withdrawUnderlying(amount);
+        _withdrawLP(amount);
         underlying.safeTransfer(receiver, amount);
     }
 
     /**
-     * @notice Withdraws underlying asset. If necessary it converts the lpToken into underlying before withdrawing
-     * @dev This function must be overriden. Some farms require the user to into an lpToken before depositing others might use the underlying directly
+     * @notice Withdraws lpToken asset. If necessary it converts the lpToken into underlying before withdrawing
+     * @dev This function must be overridden. Some farms require the user to into an lpToken before depositing others
+     * might use the underlying directly
      **/
-    function _withdrawUnderlying(uint256 amount) internal override {
+    function _withdrawLP(uint256 amount) internal override {
         convexRewards.withdrawAndUnwrap(amount, false);
     }
 
