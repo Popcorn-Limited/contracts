@@ -62,9 +62,7 @@ contract AcrossAdapter is BaseAdapter {
      * @dev This function must be overriden. If the farm requires the usage of lpToken than this function must convert lpToken balance into underlying balance
      */
     function _totalUnderlying() internal view override returns (uint256) {
-        uint256 totalLpBalance = IAcceleratingDistributor(acrossDistributor)
-        .getUserStake(address (lpToken), address(this))
-        .cumulativeBalance;
+        uint256 totalLpBalance = _totalLP();
         return (totalLpBalance * _exchangeRateCurrent()) / 1e18;
     }
 
@@ -171,6 +169,7 @@ contract AcrossAdapter is BaseAdapter {
      **/
     function _depositUnderlying(uint256 amount) internal override {
         IAcrossHop(acrossHop).addLiquidity(address(underlying), amount);
+        _depositLP(lpToken.balanceOf(address(this)));
     }
 
     /**
@@ -178,8 +177,7 @@ contract AcrossAdapter is BaseAdapter {
      * @dev This function must be overriden. Some farms require the user to into an lpToken before depositing others might use the underlying directly
      **/
     function _depositLP(uint256 amount) internal override {
-        uint256 balance = lpToken.balanceOf(address(this));
-        IAcceleratingDistributor(acrossDistributor).stake(address(lpToken), balance);
+        IAcceleratingDistributor(acrossDistributor).stake(address(lpToken), amount);
     }
 
     /*//////////////////////////////////////////////////////////////
