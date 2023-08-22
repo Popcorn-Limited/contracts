@@ -31,13 +31,12 @@ contract BeefyAdapterTest is AbstractAdapterTest {
   }
 
   function _setUpTest(bytes memory testConfig) internal {
-    (address _beefyVault, address _beefyBooster, string memory _network) = abi.decode(
+    (address _beefyVault, address _beefyBooster, string memory _network, uint blockNumber) = abi.decode(
       testConfig,
-      (address, address, string)
+      (address, address, string, uint)
     );
 
-    uint256 forkId = vm.createSelectFork(vm.rpcUrl(_network));
-    vm.selectFork(forkId);
+    vm.createSelectFork(vm.rpcUrl(_network), blockNumber);
 
     beefyVault = IBeefyVault(_beefyVault);
     beefyBooster = IBeefyBooster(_beefyBooster);
@@ -377,8 +376,7 @@ contract BeefyAdapterTest is AbstractAdapterTest {
 
     vm.warp(block.timestamp + 10 days);
 
-    vm.prank(bob);
-    adapter.withdraw(1, bob, bob);
+    adapter.harvest();
 
     address[] memory rewardTokens = IWithRewards(address(adapter)).rewardTokens();
     assertEq(rewardTokens[0], beefyBooster.rewardToken());

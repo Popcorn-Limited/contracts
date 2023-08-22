@@ -16,7 +16,7 @@ import {MockStrategy} from "../../../utils/mocks/MockStrategy.sol";
 import {Math} from "openzeppelin-contracts/utils/math/Math.sol";
 import {Clones} from "openzeppelin-contracts/proxy/Clones.sol";
 
-contract AbstractAdapterTest is PropertyTest {
+abstract contract AbstractAdapterTest is PropertyTest {
     using Math for uint256;
 
     ITestConfigStorage testConfigStorage;
@@ -526,7 +526,7 @@ contract AbstractAdapterTest is PropertyTest {
         // Deposit and mint dont revert
         vm.startPrank(bob);
         adapter.deposit(defaultAmount, bob);
-        adapter.mint(defaultAmount * 1e9, bob);
+        adapter.mint(defaultAmount, bob);
     }
 
     function testFail__unpause_nonOwner() public virtual {

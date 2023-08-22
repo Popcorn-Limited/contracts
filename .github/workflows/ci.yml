@@ -1,0 +1,14 @@
+name: CI
+run-name: Build and test
+on: pull_request
+
+jobs:
+  full:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up foundry
+        uses: foundry-rs/foundry-toolchain@v1
+      - uses: actions/checkout@v3
+      - run: forge install
+      - run: forge build
+      - run: forge test

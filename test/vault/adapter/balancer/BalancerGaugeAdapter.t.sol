@@ -15,12 +15,13 @@ contract BalancerGaugeAdapterTest is AbstractAdapterTest {
 
   address lp_token;
   address registry = 0x239e55F427D44C3cc793f49bFB507ebe76638a2b; // Minter
-  IGauge gague;
+  IGauge gauge;
   uint256 compoundDefaultAmount = 1e18;
 
   function setUp() public {
     uint256 forkId = vm.createSelectFork(vm.rpcUrl("mainnet"));
     vm.selectFork(forkId);
+    vm.rollFork(17940670);
 
     testConfigStorage = ITestConfigStorage(address(new BalancerGaugeTestConfigStorage()));
 
@@ -34,14 +35,14 @@ contract BalancerGaugeAdapterTest is AbstractAdapterTest {
   function _setUpTest(bytes memory testConfig) internal {
     (address _balancerGauge) = abi.decode(testConfig, (address));
 
-    gague = IGauge(_balancerGauge);
-    lp_token = gague.lp_token();
+    gauge = IGauge(_balancerGauge);
+    lp_token = gauge.lp_token();
 
-    (bool isKilled) = gague.is_killed();
+    (bool isKilled) = gauge.is_killed();
     assertEq(isKilled, false, "InvalidGauge");
 
     setUpBaseTest(IERC20(lp_token), address(new BalancerGaugeAdapter()), registry, 10, "vcB-", true);
-    vm.label(address(asset), "USDC-DAI-USDT");
+    vm.label(address(asset), "rETH-WETH Pool LP Token");
     vm.label(address(_balancerGauge), "_balancerGauge");
     vm.label(address(this), "test");
 
@@ -101,7 +102,7 @@ function test__initialization() public override {
   }
 
   function verify_adapterInit() public override {
-    assertEq(adapter.asset(), gague.lp_token(), "asset");
+    assertEq(adapter.asset(), gauge.lp_token(), "asset");
     assertEq(
       IERC20Metadata(address(adapter)).name(),
       string.concat("VaultCraft Balancer ", IERC20Metadata(address(asset)).name(), " Adapter"),
@@ -113,7 +114,7 @@ function test__initialization() public override {
       "symbol"
     );
 
-    assertEq(asset.allowance(address(adapter), address(gague)), type(uint256).max, "allowance");
+    assertEq(asset.allowance(address(adapter), address(gauge)), type(uint256).max, "allowance");
 
     // Test Beefy Config Boundaries
     createAdapter();
@@ -177,10 +178,9 @@ function test__initialization() public override {
     vm.prank(bob);
     adapter.deposit(1000e18, bob);
 
-    vm.warp(block.timestamp + 10 days);
+    vm.warp(block.timestamp + 30 days);
 
-    vm.prank(bob);
-    adapter.withdraw(1, bob, bob);
+    adapter.harvest();
 
     address[] memory rewardTokens = IWithRewards(address(adapter)).rewardTokens();
     assertEq(rewardTokens[0], IMinter(registry).getBalancerToken());

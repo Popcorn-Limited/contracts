@@ -17,8 +17,7 @@ contract MasterChefV2AdapterTest is AbstractAdapterTest {
   uint256 pid;
 
   function setUp() public {
-    uint256 forkId = vm.createSelectFork(vm.rpcUrl("mainnet"));
-    vm.selectFork(forkId);
+    vm.createSelectFork(vm.rpcUrl("mainnet"), 16941311);
 
     testConfigStorage = ITestConfigStorage(address(new MasterChefV2TestConfigStorage()));
 
@@ -111,8 +110,7 @@ contract MasterChefV2AdapterTest is AbstractAdapterTest {
     vm.roll(block.number + 3000);
     vm.warp(block.timestamp + 200);
 
-    vm.prank(bob);
-    adapter.withdraw(1, bob, bob);
+    adapter.harvest();
 
     address[] memory rewardTokens = IWithRewards(address(adapter)).rewardTokens();
     assertEq(rewardTokens[0], rewardsToken);
