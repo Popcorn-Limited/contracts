@@ -2,43 +2,47 @@
 // Docgen-SOLC: 0.8.15
 
 pragma solidity ^0.8.15;
-import {IConvexBooster, IConvexRewards, IRewards} from "./IConvex.sol";
+import "./IGmdVault.sol";
 import {BaseAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../../base/BaseAdapter.sol";
+import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
 
-contract ConvexAdapter is BaseAdapter {
+contract GmdAdapter is BaseAdapter {
+    using Math for uint256;
     using SafeERC20 for IERC20;
 
-    /// @notice The poolId inside Convex booster for relevant Curve lpToken.
-    uint256 public pid;
+    uint256 public poolId;
+    IGmdVault public gmdVault;
+    IERC20 public receiptToken;
 
-    /// @notice The booster address for Convex
-    IConvexBooster public convexBooster;
-
-    /// @notice The Convex convexRewards.
-    IConvexRewards public convexRewards;
-
-    error AssetMismatch();
     error LpTokenSupported();
+    error InvalidPool(uint poolId);
+    error InsufficientSharesReceived();
+    error AssetMismatch(uint poolId, address asset, address lpToken);
 
-    function __ConvexAdapter_init(
+    function __GmdAdapter_init(
         AdapterConfig memory _adapterConfig,
         ProtocolConfig memory _protocolConfig
     ) internal onlyInitializing {
         if(!_adapterConfig.useLpToken) revert LpTokenSupported();
         __BaseAdapter_init(_adapterConfig);
 
-        uint256 _pid = abi.decode(_protocolConfig.protocolInitData, (uint256));
-        convexBooster = IConvexBooster(_protocolConfig.registry);
+        gmdVault = IGmdVault(_protocolConfig.registry);
+        poolId = abi.decode(_protocolConfig.protocolInitData, (uint256));
 
-        (address _asset, , , address _convexRewards, , ) = convexBooster.poolInfo(_pid);
-        convexRewards = IConvexRewards(_convexRewards);
+        IGmdVault.PoolInfo memory poolInfo = gmdVault.poolInfo(poolId);
+        receiptToken = IERC20(poolInfo.GDlptoken);
 
-        if (_asset != address(lpToken)) revert AssetMismatch();
+        if (
+            !poolInfo.stakable ||
+            !poolInfo.rewardStart ||
+            !poolInfo.withdrawable
+        ) revert InvalidPool(poolId);
+        if(address (lpToken) != poolInfo.lpToken)
+            revert AssetMismatch(poolId, address (lpToken), poolInfo.lpToken);
 
-        _adapterConfig.lpToken.approve(address (convexBooster), type(uint256).max);
-        pid = _pid;
+        _adapterConfig.lpToken.approve(address(gmdVault), type(uint256).max);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -51,7 +55,14 @@ contract ConvexAdapter is BaseAdapter {
      * lpToken balance into lpToken balance
      */
     function _totalLP() internal view override returns (uint256) {
-        return convexRewards.balanceOf(address(this));
+        IGmdVault.PoolInfo memory poolInfo = gmdVault.poolInfo(poolId);
+        uint256 gmdLpTokenBalance = IERC20(poolInfo.GDlptoken).balanceOf(address(this));
+        uint256 asset = gmdLpTokenBalance.mulDiv(
+            poolInfo.totalStaked,
+            IERC20(poolInfo.GDlptoken).totalSupply(),
+            Math.Rounding.Down
+        );
+        return asset.mulDiv(1e6, 1e18, Math.Rounding.Down);
     }
 
 
@@ -71,7 +82,12 @@ contract ConvexAdapter is BaseAdapter {
      * depositing others might use the lpToken directly
      **/
     function _depositLP(uint256 amount) internal override {
-        convexBooster.deposit(pid, amount, true);
+        IERC20 receiptToken_ = receiptToken;
+        uint256 initialReceiptTokenBalance = receiptToken_.balanceOf(address(this));
+
+        gmdVault.enter(amount, poolId);
+        uint256 sharesReceived = receiptToken_.balanceOf(address(this)) - initialReceiptTokenBalance;
+        if(sharesReceived <= 0) revert InsufficientSharesReceived();
     }
 
 
@@ -89,18 +105,21 @@ contract ConvexAdapter is BaseAdapter {
      * might use the underlying directly
      **/
     function _withdrawLP(uint256 amount) internal override {
-        convexRewards.withdrawAndUnwrap(amount, false);
+        gmdVault.leave(convertToUnderlyingShares(amount), poolId);
     }
 
-
-    /*//////////////////////////////////////////////////////////////
-                            CLAIM LOGIC
-    //////////////////////////////////////////////////////////////*/
-
-    /**
-     * @notice Claims rewards
-     */
-    function _claim() internal override {
-        try convexRewards.getReward(address(this), true) {} catch {}
+    function convertToUnderlyingShares(
+        uint256 shares
+    ) public view returns (uint256) {
+        IGmdVault.PoolInfo memory poolInfo = gmdVault.poolInfo(poolId);
+        uint256 supply = _totalLP();
+        return
+            supply == 0
+                ? shares
+                : shares.mulDiv(
+                IERC20(poolInfo.GDlptoken).balanceOf(address(this)),
+                supply,
+                Math.Rounding.Up
+            );
     }
 }
