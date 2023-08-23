@@ -10,7 +10,6 @@ import {BaseAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../../base/Bas
 import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
-
 contract AcrossAdapter is BaseAdapter {
     using Math for uint256;
     using SafeERC20 for IERC20;
@@ -20,7 +19,6 @@ contract AcrossAdapter is BaseAdapter {
 
     /// @notice The Across token distributor contract
     address public acrossDistributor;
-
 
     error Disabled();
     error NotEndorsed(address _acrossHop);
@@ -38,8 +36,11 @@ contract AcrossAdapter is BaseAdapter {
 
         if (!IPermissionRegistry(_protocolConfig.registry).endorsed(_acrossHop))
             revert NotEndorsed(_acrossHop);
-        if (!IPermissionRegistry(_protocolConfig.registry).endorsed(_acrossDistributor))
-            revert NotEndorsed(_acrossDistributor);
+        if (
+            !IPermissionRegistry(_protocolConfig.registry).endorsed(
+                _acrossDistributor
+            )
+        ) revert NotEndorsed(_acrossDistributor);
 
         if (!IAcrossHop(_acrossHop).pooledTokens(address(underlying)).isEnabled)
             revert Disabled();
@@ -47,10 +48,18 @@ contract AcrossAdapter is BaseAdapter {
         acrossHop = _acrossHop;
         acrossDistributor = _acrossDistributor;
 
-        lpToken = IERC20(IAcrossHop(acrossHop).pooledTokens(address(underlying)).lpToken);
+        lpToken = IERC20(
+            IAcrossHop(acrossHop).pooledTokens(address(underlying)).lpToken
+        );
 
-        _adapterConfig.underlying.approve(address(_acrossHop), type(uint256).max);
-        _adapterConfig.lpToken.approve(address(_acrossDistributor), type(uint256).max);
+        _adapterConfig.underlying.approve(
+            address(_acrossHop),
+            type(uint256).max
+        );
+        _adapterConfig.lpToken.approve(
+            address(_acrossDistributor),
+            type(uint256).max
+        );
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -62,8 +71,7 @@ contract AcrossAdapter is BaseAdapter {
      * @dev This function must be overriden. If the farm requires the usage of lpToken than this function must convert lpToken balance into underlying balance
      */
     function _totalUnderlying() internal view override returns (uint256) {
-        uint256 totalLpBalance = _totalLP();
-        return (totalLpBalance * _exchangeRateCurrent()) / 1e18;
+        return (_totalLP() * _exchangeRateCurrent()) / 1e18;
     }
 
     /**
@@ -71,13 +79,15 @@ contract AcrossAdapter is BaseAdapter {
      * @dev This function is optional. Some farms might require the user to deposit lpTokens directly into the farm
      */
     function _totalLP() internal view override returns (uint256) {
-        return IAcceleratingDistributor(acrossDistributor)
-        .getUserStake(address (lpToken), address(this))
-        .cumulativeBalance;
+        return
+            IAcceleratingDistributor(acrossDistributor)
+                .getUserStake(address(lpToken), address(this))
+                .cumulativeBalance;
     }
 
     function _exchangeRateCurrent() internal view returns (uint256) {
-        IAcrossHop.PooledToken memory pooledToken = IAcrossHop(acrossHop).pooledTokens(address(underlying));
+        IAcrossHop.PooledToken memory pooledToken = IAcrossHop(acrossHop)
+            .pooledTokens(address(underlying));
         uint256 lpTokenTotalSupply = IERC20(pooledToken.lpToken).totalSupply();
         if (lpTokenTotalSupply == 0) return 1e18; // initial rate is 1:1 between LP tokens and collateral.
 
@@ -98,8 +108,8 @@ contract AcrossAdapter is BaseAdapter {
         // active request.
         uint256 balance = IERC20(underlying).balanceOf(acrossHop);
         uint256 balanceSansBond = address(underlying) ==
-        address(IAcrossHop(acrossHop).bondToken()) &&
-        _activeRequest()
+            address(IAcrossHop(acrossHop).bondToken()) &&
+            _activeRequest()
             ? balance - IAcrossHop(acrossHop).bondAmount()
             : balance;
         if (balanceSansBond > pooledToken.liquidReserves) {
@@ -119,16 +129,16 @@ contract AcrossAdapter is BaseAdapter {
         // and opposite size. LiquidReserves + utilizedReserves will always be larger than undistributedLpFees so this
         // int will always be positive so there is no risk in underflow in type casting in the return line.
         int256 numerator = int256(pooledToken.liquidReserves) +
-        pooledToken.utilizedReserves -
-        int256(pooledToken.undistributedLpFees);
+            pooledToken.utilizedReserves -
+            int256(pooledToken.undistributedLpFees);
         return (uint256(numerator) * 1e18) / lpTokenTotalSupply;
     }
 
     function _activeRequest() internal view returns (bool) {
         return
-        IAcrossHop(acrossHop)
-        .rootBundleProposal()
-        .unclaimedPoolRebalanceLeafCount != 0;
+            IAcrossHop(acrossHop)
+                .rootBundleProposal()
+                .unclaimedPoolRebalanceLeafCount != 0;
     }
 
     // Calculate the unallocated accumulatedFees from the last time the contract was called.
@@ -139,9 +149,9 @@ contract AcrossAdapter is BaseAdapter {
         // accumulatedFees := min(undistributedLpFees * lpFeeRatePerSecond * timeFromLastInteraction, undistributedLpFees)
         // The min acts to pay out all fees in the case the equation returns more than the remaining fees.
         uint256 timeFromLastInteraction = IAcrossHop(acrossHop)
-        .getCurrentTime() - lastLpFeeUpdate;
+            .getCurrentTime() - lastLpFeeUpdate;
         uint256 maxUndistributedLpFees = (undistributedLpFees *
-        IAcrossHop(acrossHop).lpFeeRatePerSecond() *
+            IAcrossHop(acrossHop).lpFeeRatePerSecond() *
             timeFromLastInteraction) / (1e18);
         return
             maxUndistributedLpFees < undistributedLpFees
@@ -177,7 +187,10 @@ contract AcrossAdapter is BaseAdapter {
      * @dev This function must be overriden. Some farms require the user to into an lpToken before depositing others might use the underlying directly
      **/
     function _depositLP(uint256 amount) internal override {
-        IAcceleratingDistributor(acrossDistributor).stake(address(lpToken), amount);
+        IAcceleratingDistributor(acrossDistributor).stake(
+            address(lpToken),
+            amount
+        );
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -199,10 +212,22 @@ contract AcrossAdapter is BaseAdapter {
      * @dev This function must be overridden. Some farms require the user to into an lpToken before depositing
      *      others might use the underlying directly
      **/
-    function _withdrawLP(uint256 amount) internal override {
+    function _withdrawUnderlying(uint256 amount) internal override {
         uint256 _lpShare = convertToUnderlyingShares(0, amount);
-        IAcceleratingDistributor(acrossDistributor).unstake(address(lpToken), _lpShare);
-        IAcrossHop(acrossHop).removeLiquidity(address(underlying), _lpShare, false);
+
+        _withdrawLP(_lpShare);
+        IAcrossHop(acrossHop).removeLiquidity(
+            address(underlying),
+            _lpShare,
+            false
+        );
+    }
+
+    function _withdrawLP(uint256 amount) internal override {
+        IAcceleratingDistributor(acrossDistributor).unstake(
+            address(lpToken),
+            amount
+        );
     }
 
     /// @notice The amount of beefy shares to withdraw given an amount of adapter shares
@@ -210,15 +235,11 @@ contract AcrossAdapter is BaseAdapter {
         uint256,
         uint256 shares
     ) public view returns (uint256) {
-        uint256 totalLpBalance = IAcceleratingDistributor(acrossDistributor)
-            .getUserStake(address(lpToken), address(this))
-            .cumulativeBalance;
-
         uint256 supply = _totalAssets();
         return
             supply == 0
                 ? shares
-                : shares.mulDiv(totalLpBalance, supply, Math.Rounding.Up);
+                : shares.mulDiv(_totalLP(), supply, Math.Rounding.Up);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -229,7 +250,10 @@ contract AcrossAdapter is BaseAdapter {
      * @notice Claims rewards
      */
     function _claim() internal override {
-        try IAcceleratingDistributor(acrossDistributor).withdrawReward(address(lpToken)) {
-        } catch {}
+        try
+            IAcceleratingDistributor(acrossDistributor).withdrawReward(
+                address(lpToken)
+            )
+        {} catch {}
     }
 }
