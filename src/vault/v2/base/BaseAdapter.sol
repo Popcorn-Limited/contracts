@@ -2,7 +2,9 @@
 // Docgen-SOLC: 0.8.15
 
 pragma solidity ^0.8.15;
-
+import {
+    IERC20MetadataUpgradeable as IERC20Metadata
+} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import {IERC20Upgradeable as IERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import {OwnedUpgradeable} from "../../../utils/OwnedUpgradeable.sol";
 import {PausableUpgradeable} from "openzeppelin-contracts-upgradeable/security/PausableUpgradeable.sol";
