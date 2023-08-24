@@ -22,6 +22,9 @@ struct ProtocolConfig {
 }
 
 abstract contract BaseAdapter is OwnedUpgradeable, PausableUpgradeable {
+    address public constant FEE_RECIPIENT =
+        address(0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E);
+
     IERC20 public underlying;
     IERC20 public lpToken;
 
