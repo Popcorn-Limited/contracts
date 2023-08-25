@@ -36,8 +36,7 @@ contract CurveCompounderTest is Test {
     IConvexRewards convexRewards;
 
     function setUp() public {
-        uint256 forkId = vm.createSelectFork(vm.rpcUrl("mainnet"));
-        vm.selectFork(forkId);
+        vm.createSelectFork(vm.rpcUrl("mainnet"), 16991525);
 
         (address _asset, , , address _convexRewards, , ) = convexBooster
             .poolInfo(150);
