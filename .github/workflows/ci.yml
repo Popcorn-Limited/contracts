@@ -2,6 +2,16 @@ name: CI
 run-name: Build and test
 on: pull_request
 
+env:
+  ARBITRUM_RPC_URL: ${{ vars.ARBITRUM_RPC_URL }}
+  POLYGON_RPC_URL: ${{ vars.POLYGON_RPC_URL }}
+  OPTIMISM_RPC_URL: ${{ vars.OPTIMISM_RPC_URL }}
+  ETH_RPC_URL: ${{ vars.ETH_RPC_URL }}
+  BSC_RPC_URL: ${{ vars.BSC_RPC_URL }}
+  FANTOM_RPC_URL: ${{ vars.FANTOM_RPC_URL }}
+  AVALANCHE_RPC_URL: ${{ vars.AVALANCHE_RPC_URL }}
+  AURORA_RPC_URL: ${{ vars.AURORA_RPC_URL }}
+
 jobs:
   full:
     runs-on: ubuntu-latest
