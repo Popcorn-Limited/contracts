@@ -19,9 +19,4 @@ contract Tester is Test {
         uint256 forkId = vm.createSelectFork(vm.rpcUrl("aurora"));
         vm.selectFork(forkId);
     }
-
-    function test_stuff() public {
-        emit log_address(auroraStNear.wNear());
-        emit log_uint(auroraStNear.stNearPrice());
-    }
 }
