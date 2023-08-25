@@ -16,8 +16,7 @@ contract ConvexAdapterTest is AbstractAdapterTest {
   uint256 pid;
 
   function setUp() public {
-    uint256 forkId = vm.createSelectFork(vm.rpcUrl("mainnet"));
-    vm.selectFork(forkId);
+    vm.createSelectFork(vm.rpcUrl("mainnet"), 16991525);
 
     testConfigStorage = ITestConfigStorage(address(new ConvexTestConfigStorage()));
 
@@ -110,8 +109,7 @@ contract ConvexAdapterTest is AbstractAdapterTest {
 
     vm.warp(block.timestamp + 30 days);
 
-    vm.prank(bob);
-    adapter.withdraw(1, bob, bob);
+    adapter.harvest();
 
     address[] memory rewardTokens = IWithRewards(address(adapter)).rewardTokens();
     assertEq(rewardTokens[0], 0xD533a949740bb3306d119CC777fa900bA034cd52); // CRV
