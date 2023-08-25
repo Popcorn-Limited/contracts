@@ -2,13 +2,12 @@
 // Docgen-SOLC: 0.8.15
 
 pragma solidity ^0.8.15;
-import {
-    IERC20MetadataUpgradeable as IERC20Metadata
-} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
-import {IERC20Upgradeable as IERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+import {IBaseHelper} from "./interfaces/IBaseHelper.sol";
 import {OwnedUpgradeable} from "../../../utils/OwnedUpgradeable.sol";
 import {PausableUpgradeable} from "openzeppelin-contracts-upgradeable/security/PausableUpgradeable.sol";
-import {IBaseHelper} from "./interfaces/IBaseHelper.sol";
+import {IERC20Upgradeable as IERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+import {IERC4626Upgradeable as IERC4626} from "openzeppelin-contracts-upgradeable/interfaces/IERC4626Upgradeable.sol";
+
 
 struct AdapterConfig {
     IERC20 underlying;
