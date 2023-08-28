@@ -98,10 +98,25 @@ contract VelodromeAdapter is BaseAdapter {
      * @notice Claims rewards
      */
     function claim() public returns (bool success) {
-        //TODO: remove this depending on solidly review
-        address[] memory _rewardTokens = new address[](3);
-        try gauge.getReward(address(this), _rewardTokens) {
+        try gauge.getReward(address(this), _getRewardTokens()) {
             success = true;
         } catch {}
+    }
+
+    /**
+    * @notice Gets all the reward tokens for a protocol
+     * @dev This function converts all reward token types from IERC20[] to address[]
+     **/
+    function _getRewardTokens() internal virtual view returns(address[] memory) {
+        uint256 len = rewardTokens.length;
+        address[] memory _rewardTokens = new address[](len);
+        for(uint256 i = 0; i < len ;) {
+            _rewardTokens[i] = address(rewardTokens[i]);
+            unchecked {
+                i++;
+            }
+        }
+
+        return _rewardTokens;
     }
 }
