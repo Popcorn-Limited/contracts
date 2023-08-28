@@ -21,7 +21,7 @@ contract VelodromeAdapter is BaseAdapter {
     error LpTokenSupported();
     error NotEndorsed(address gauge);
 
-    function __ConvexAdapter_init(
+    function __VelodromeAdapter_init(
         AdapterConfig memory _adapterConfig,
         ProtocolConfig memory _protocolConfig
     ) internal onlyInitializing {
