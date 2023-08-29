@@ -64,6 +64,7 @@ contract MasterChefV2Adapter is BaseAdapter {
     //////////////////////////////////////////////////////////////*/
 
     function _deposit(uint256 amount) internal override {
+        lpToken.safeTransferFrom(msg.sender, address(this), amount);
         _depositLP(amount);
     }
 
