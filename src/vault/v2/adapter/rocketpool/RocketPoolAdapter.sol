@@ -114,17 +114,16 @@ contract RocketPoolAdapter is BaseAdapter {
         ) {
             rocketTokenRETH.burn(rETHShares);
             wETH.deposit{value: amount}();
-            return;
+        } else {
+            //if there isn't enough ETH in the rocket pool, we swap rETH directly for WETH
+            UniswapV3Utils.swap(
+                uniRouter,
+                address(rocketTokenRETH),
+                address(underlying),
+                uniSwapFee,
+                rETHShares
+            );
         }
-
-        //if there isn't enough ETH in the rocket pool, we swap rETH directly for WETH
-        UniswapV3Utils.swap(
-            uniRouter,
-            address(rocketTokenRETH),
-            address(underlying),
-            uniSwapFee,
-            rETHShares
-        );
     }
 
     function convertToUnderlyingShares(
