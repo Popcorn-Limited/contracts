@@ -16,8 +16,8 @@ contract RocketPoolAdapter is BaseAdapter {
     address public uniRouter;
     uint24 public uniSwapFee;
 
-    IWETH public wETH;
-    RocketStorageInterface public rocketStorage;
+    IWETH public wETH; //0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2
+    RocketStorageInterface public rocketStorage; //0x1d8f8f00cfa6758d7bE78336684788Fb0ee0Fa46
     RocketTokenRETHInterface public rocketTokenRETH;
     RocketDepositPoolInterface public rocketDepositPool;
 
