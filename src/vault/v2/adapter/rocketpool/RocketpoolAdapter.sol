@@ -2,14 +2,14 @@
 // Docgen-SOLC: 0.8.15
 
 pragma solidity ^0.8.15;
-import "./IRocketPool.sol";
+import "./IRocketpool.sol";
 import {UniswapV3Utils, IUniV3Pool} from "../../../../utils/UniswapV3Utils.sol";
 import {BaseAdapter, IERC20 as ERC20, AdapterConfig, ProtocolConfig} from "../../base/BaseAdapter.sol";
 import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
 
-contract RocketPoolAdapter is BaseAdapter {
+contract RocketpoolAdapter is BaseAdapter {
     using SafeERC20 for ERC20;
     using Math for uint256;
 
@@ -26,7 +26,7 @@ contract RocketPoolAdapter is BaseAdapter {
     error LpTokenNotSupported();
     error InsufficientSharesReceived();
 
-    function __RocketPoolAdapter_init(
+    function __RocketpoolAdapter_init(
         AdapterConfig memory _adapterConfig,
         ProtocolConfig memory _protocolConfig
     ) internal onlyInitializing {
@@ -41,7 +41,10 @@ contract RocketPoolAdapter is BaseAdapter {
         ) = abi.decode(
             _protocolConfig.protocolInitData, (address, address, address , uint24 )
         );
+
         wETH = IWETH(_wETH);
+        uniRouter = _uniRouter;
+        uniSwapFee = _uniSwapFee;
         rocketStorage = RocketStorageInterface(_rocketStorageAddress);
 
         address rocketDepositPoolAddress = rocketStorage.getAddress(
@@ -52,8 +55,8 @@ contract RocketPoolAdapter is BaseAdapter {
         );
 
         if(
-            address(rocketDepositPoolAddress) == address(0) ||
-            address(rocketTokenRETHAddress) == address(0)
+            rocketDepositPoolAddress == address(0) ||
+            rocketTokenRETHAddress == address(0)
         ) revert InvalidAddress();
 
         rocketDepositPool = RocketDepositPoolInterface(rocketDepositPoolAddress);

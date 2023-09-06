@@ -2,6 +2,10 @@
 // Docgen-SOLC: 0.8.15
 
 pragma solidity ^0.8.15;
+import {
+    AdapterConfig,
+    ProtocolConfig
+} from "../BaseAdapter.sol";
 
 interface IBaseAdapter {
     function deposit(uint256 amount) external;
@@ -21,4 +25,9 @@ interface IBaseAdapter {
     function maxDeposit() external view virtual returns (uint256);
 
     function maxWithdraw() external view virtual returns (uint256);
+
+    function initialize(
+        AdapterConfig memory _adapterConfig,
+        ProtocolConfig memory _protocolConfig
+    ) external;
 }
