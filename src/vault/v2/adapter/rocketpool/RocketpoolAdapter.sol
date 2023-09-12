@@ -94,7 +94,7 @@ contract RocketpoolAdapter is BaseAdapter {
      **/
     function _depositUnderlying(uint256 amount) internal override {
         wETH.withdraw(amount);
-        rocketDepositPool.deposit{value: amount}();
+        rocketDepositPool.deposit{value: amount}(); //TODO: how do I know that it's open for deposit
     }
 
     /*//////////////////////////////////////////////////////////////

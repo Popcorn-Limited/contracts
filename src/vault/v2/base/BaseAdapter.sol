@@ -187,7 +187,8 @@ abstract contract BaseAdapter is OwnedUpgradeable, PausableUpgradeable {
 
     /// @notice Unpause Deposits and deposit all funds into the underlying protocol. Caller must be owner.
     function unpause() external onlyOwner {
-        _deposit(totalAssets());
+        //_deposit(totalAssets());
+        _depositUnderlying(totalAssets()); //this returns the balance of the adapter back to the protocol
         _unpause();
     }
 }
