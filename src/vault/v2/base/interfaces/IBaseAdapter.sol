@@ -8,7 +8,16 @@ import {
 } from "../BaseAdapter.sol";
 
 interface IBaseAdapter {
+
+    function pause() external;
+
+    function unpause() external;
+
+    function addVault(address vault) external;
+
     function deposit(uint256 amount) external;
+
+    function isVault(address vault) external view returns (bool);
 
     function withdraw(uint256 amount, address receiver) external;
 

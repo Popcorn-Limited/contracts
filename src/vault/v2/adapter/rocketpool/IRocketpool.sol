@@ -93,3 +93,7 @@ interface ICurveMetapool {
         uint256 min_dy
     ) external returns (uint256);
 }
+
+interface RocketDepositSettingsInterface {
+    function getMinimumDeposit() external view returns (uint256);
+}
