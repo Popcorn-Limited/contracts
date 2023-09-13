@@ -44,6 +44,10 @@ contract RocketpoolDepositorTest is BaseAdapterTest {
     _setUpTest(testConfigStorage.getTestConfig(0));
   }
 
+  function overrideSetup(bytes memory testConfig) public override {
+    _setUpTest(testConfig);
+  }
+
   function _setUpTest(bytes memory testConfig) internal {
     (
       address _rocketStorageAddress,

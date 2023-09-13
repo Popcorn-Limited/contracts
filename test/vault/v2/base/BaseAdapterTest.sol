@@ -133,16 +133,6 @@ abstract contract BaseAdapterTest is PropertyTest {
     //////////////////////////////////////////////////////////////*/
 
     /*
-    * @dev This function clones a new adapter and set it to `adapter` storage variable
-    */
-    function createAdapter() public virtual {
-        //Todo: might need to rename this to createStrategy() or cloneStrategy() or createStrategyClone();
-        //Todo: might need to add a storage variable here to store the strategy**
-        adapter = IVault(Clones.clone(implementation)); //IBaseAdapter(Clones.clone(implementation));
-        vm.label(address(adapter), "adapter");
-    }
-
-    /*
      * @dev This function checks that the invariants in the adapter initialization function are checked:
      *      Some of the invariants that could be checked:
      *      - check that all errors in the adapter init function revert.
@@ -155,7 +145,6 @@ abstract contract BaseAdapterTest is PropertyTest {
     * @dev This function tests the creation verification and initialization of an adapter
     */
     function test__initialization() public virtual {
-        createAdapter();
         verify_adapterInit();
     }
 
@@ -282,11 +271,7 @@ abstract contract BaseAdapterTest is PropertyTest {
             uint256 amount = bound(uint256(fuzzAmount), minFuzz, maxAssets);
 
             _mintAssetAndApproveForAdapter(amount, bob);
-            emit log("PING");
-
             prop_deposit(bob, bob, amount, testId);
-            emit log("PING1");
-
             increasePricePerShare(raise);
 
             _mintAssetAndApproveForAdapter(amount, bob);
@@ -539,7 +524,7 @@ abstract contract BaseAdapterTest is PropertyTest {
         adapter.deposit(defaultAmount, bob);
 
         uint256 oldTotalAssets = adapter.totalAssets();
-        //adapter.setPerformanceFee(performanceFee);
+        adapter.setPerformanceFee(performanceFee);
         increasePricePerShare(raise);
 
         uint256 gain = ((adapter.convertToAssets(1e18) -
@@ -552,7 +537,7 @@ abstract contract BaseAdapterTest is PropertyTest {
 
         emit Harvested();
 
-        //adapter.harvest();
+        adapter.harvest();
 
         // Multiply with the decimal offset
         assertApproxEqAbs(
@@ -570,19 +555,19 @@ abstract contract BaseAdapterTest is PropertyTest {
     }
 
     function test__disable_auto_harvest() public virtual {
-//        adapter.toggleAutoHarvest();
+        adapter.toggleAutoHarvest();
 
-//        assertFalse(adapter.autoHarvest());
-//
-//        uint lastHarvest = adapter.lastHarvest();
-//
-//        vm.warp(block.timestamp + 12);
-//
-//        _mintAssetAndApproveForAdapter(defaultAmount, bob);
-//        vm.prank(bob);
-//        adapter.deposit(defaultAmount, bob);
-//
-//        assertEq(lastHarvest, adapter.lastHarvest(), "should not auto harvest");
+        assertFalse(adapter.autoHarvest());
+
+        uint lastHarvest = adapter.lastHarvest();
+
+        vm.warp(block.timestamp + 12);
+
+        _mintAssetAndApproveForAdapter(defaultAmount, bob);
+        vm.prank(bob);
+        adapter.deposit(defaultAmount, bob);
+
+        assertEq(lastHarvest, adapter.lastHarvest(), "should not auto harvest");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -592,21 +577,21 @@ abstract contract BaseAdapterTest is PropertyTest {
     event HarvestCooldownChanged(uint256 oldCooldown, uint256 newCooldown);
 
     function test__setHarvestCooldown() public virtual {
-//        vm.expectEmit(false, false, false, true, address(adapter));
-//        emit HarvestCooldownChanged(0, 1 hours);
-//        adapter.setHarvestCooldown(1 hours);
-//
-//        assertEq(adapter.harvestCooldown(), 1 hours);
+        vm.expectEmit(false, false, false, true, address(adapter));
+        emit HarvestCooldownChanged(0, 1 hours);
+        adapter.setHarvestCooldown(1 hours);
+
+        assertEq(adapter.harvestCooldown(), 1 hours);
     }
 
-//    function testFail__setHarvestCooldown_nonOwner() public virtual {
-//        vm.prank(alice);
-//        adapter.setHarvestCooldown(1 hours);
-//    }
+    function testFail__setHarvestCooldown_nonOwner() public virtual {
+        vm.prank(alice);
+        adapter.setHarvestCooldown(1 hours);
+    }
 
-//    function testFail__setHarvestCooldown_invalid_fee() public virtual {
-//        adapter.setHarvestCooldown(2 days);
-//    }
+    function testFail__setHarvestCooldown_invalid_fee() public virtual {
+        adapter.setHarvestCooldown(2 days);
+    }
 
     /*//////////////////////////////////////////////////////////////
                             MANAGEMENT FEE
@@ -615,21 +600,21 @@ abstract contract BaseAdapterTest is PropertyTest {
     event PerformanceFeeChanged(uint256 oldFee, uint256 newFee);
 
     function test__setPerformanceFee() public virtual {
-//        vm.expectEmit(false, false, false, true, address(adapter));
-//        emit PerformanceFeeChanged(0, 1e16);
-//        adapter.setPerformanceFee(1e16);
-//
-//        assertEq(adapter.performanceFee(), 1e16);
+        vm.expectEmit(false, false, false, true, address(adapter));
+        emit PerformanceFeeChanged(0, 1e16);
+        adapter.setPerformanceFee(1e16);
+
+        assertEq(adapter.performanceFee(), 1e16);
     }
 
-//    function testFail__setPerformanceFee_nonOwner() public virtual {
-//        vm.prank(alice);
-//        adapter.setPerformanceFee(1e16);
-//    }
-//
-//    function testFail__setPerformanceFee_invalid_fee() public virtual {
-//        adapter.setPerformanceFee(3e17);
-//    }
+    function testFail__setPerformanceFee_nonOwner() public virtual {
+        vm.prank(alice);
+        adapter.setPerformanceFee(1e16);
+    }
+
+    function testFail__setPerformanceFee_invalid_fee() public virtual {
+        adapter.setPerformanceFee(3e17);
+    }
 
     /*//////////////////////////////////////////////////////////////
                               CLAIM
@@ -643,32 +628,32 @@ abstract contract BaseAdapterTest is PropertyTest {
     //////////////////////////////////////////////////////////////*/
 
     function test__permit() public {
-//        uint256 privateKey = 0xBEEF;
-//        address owner = vm.addr(privateKey);
-//
-//        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
-//            privateKey,
-//            keccak256(
-//                abi.encodePacked(
-//                    "\x19\x01",
-//                    adapter.DOMAIN_SEPARATOR(),
-//                    keccak256(
-//                        abi.encode(
-//                            PERMIT_TYPEHASH,
-//                            owner,
-//                            address(0xCAFE),
-//                            1e18,
-//                            0,
-//                            block.timestamp
-//                        )
-//                    )
-//                )
-//            )
-//        );
-//
-//        adapter.permit(owner, address(0xCAFE), 1e18, block.timestamp, v, r, s);
-//
-//        assertEq(adapter.allowance(owner, address(0xCAFE)), 1e18, "allowance");
-//        assertEq(adapter.nonces(owner), 1, "nonce");
+        uint256 privateKey = 0xBEEF;
+        address owner = vm.addr(privateKey);
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            privateKey,
+            keccak256(
+                abi.encodePacked(
+                    "\x19\x01",
+                    adapter.DOMAIN_SEPARATOR(),
+                    keccak256(
+                        abi.encode(
+                            PERMIT_TYPEHASH,
+                            owner,
+                            address(0xCAFE),
+                            1e18,
+                            0,
+                            block.timestamp
+                        )
+                    )
+                )
+            )
+        );
+
+        adapter.permit(owner, address(0xCAFE), 1e18, block.timestamp, v, r, s);
+
+        assertEq(adapter.allowance(owner, address(0xCAFE)), 1e18, "allowance");
+        assertEq(adapter.nonces(owner), 1, "nonce");
     }
 }
