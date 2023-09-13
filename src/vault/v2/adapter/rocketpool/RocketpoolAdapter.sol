@@ -16,7 +16,7 @@ contract RocketpoolAdapter is BaseAdapter {
     address public uniRouter;
     uint24 public uniSwapFee;
 
-    IWETH public wETH; //0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2
+    IWETH public WETH; //0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2
     RocketStorageInterface public rocketStorage; //0x1d8f8f00cfa6758d7bE78336684788Fb0ee0Fa46
     RocketTokenRETHInterface public rocketTokenRETH;
     RocketDepositPoolInterface public rocketDepositPool;
@@ -42,7 +42,7 @@ contract RocketpoolAdapter is BaseAdapter {
             _protocolConfig.protocolInitData, (address, address, address , uint24 )
         );
 
-        wETH = IWETH(_wETH);
+        WETH = IWETH(_wETH);
         uniRouter = _uniRouter;
         uniSwapFee = _uniSwapFee;
         rocketStorage = RocketStorageInterface(_rocketStorageAddress);
@@ -93,8 +93,8 @@ contract RocketpoolAdapter is BaseAdapter {
      *      others might use the underlying directly
      **/
     function _depositUnderlying(uint256 amount) internal override {
-        wETH.withdraw(amount);
-        rocketDepositPool.deposit{value: amount}(); //TODO: how do I know that it's open for deposit
+        WETH.withdraw(amount);
+        rocketDepositPool.deposit{value: amount}();
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -116,7 +116,7 @@ contract RocketpoolAdapter is BaseAdapter {
             > rocketTokenRETH.getEthValue(rETHShares)
         ) {
             rocketTokenRETH.burn(rETHShares);
-            wETH.deposit{value: amount}();
+            WETH.deposit{value: amount}();
         } else {
             //if there isn't enough ETH in the rocket pool, we swap rETH directly for WETH
             UniswapV3Utils.swap(
