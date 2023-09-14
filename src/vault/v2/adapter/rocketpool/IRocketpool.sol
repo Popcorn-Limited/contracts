@@ -95,5 +95,6 @@ interface ICurveMetapool {
 }
 
 interface RocketDepositSettingsInterface {
+    function getDepositFee() external view returns (uint256);
     function getMinimumDeposit() external view returns (uint256);
 }

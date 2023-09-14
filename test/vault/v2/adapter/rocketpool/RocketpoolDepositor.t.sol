@@ -21,7 +21,6 @@ import {
 import { RocketpoolDepositor } from "../../../../../src/vault/v2/strategies/rocketpool/RocketpoolDepositor.sol";
 import { RocketpoolTestConfigStorage, RocketPoolTestConfig } from "./RocketpoolTestConfigStorage.sol";
 import {
-  Math,
   IERC20,
   IBaseAdapter,
   AdapterConfig,
@@ -30,13 +29,20 @@ import {
   ITestConfigStorage
 } from "../../base/BaseAdapterTest.sol";
 import { IPermissionRegistry, Permission } from "../../../../../src/interfaces/vault/IPermissionRegistry.sol";
+import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
 
 contract RocketpoolDepositorTest is BaseAdapterTest {
   using Math for uint256;
+  IERC20 public constant WETH =
+      IERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
+  RocketStorageInterface public constant rocketStorage =
+      RocketStorageInterface(0x1d8f8f00cfa6758d7bE78336684788Fb0ee0Fa46);
 
   IBaseAdapter public strategy;
   IPermissionRegistry public permissionRegistry;
   RocketTokenRETHInterface public rocketTokenRETH;
+  RocketDepositSettingsInterface public rocketDepositSettings;
+
 
   function setUp() public {
     testConfigStorage = ITestConfigStorage(address(new RocketpoolTestConfigStorage()));
@@ -50,20 +56,17 @@ contract RocketpoolDepositorTest is BaseAdapterTest {
 
   function _setUpTest(bytes memory testConfig) internal {
     (
-      address _rocketStorageAddress,
-      address _wETH,
       address _uniRouter,
       uint24 _uniSwapFee,
       string memory _network
     ) = abi.decode(
-      testConfig, (address, address, address , uint24, string)
+      testConfig, (address , uint24, string)
     );
-
     uint256 forkId = vm.createSelectFork(vm.rpcUrl(_network), 18104376);
     vm.selectFork(forkId);
 
     AdapterConfig memory adapterConfig = AdapterConfig({
-      underlying: IERC20(_wETH),
+      underlying: WETH,
       lpToken: IERC20(address(0)),
       useLpToken: false,
       rewardTokens: rewardTokens,
@@ -73,8 +76,6 @@ contract RocketpoolDepositorTest is BaseAdapterTest {
     ProtocolConfig memory protocolConfig = ProtocolConfig({
       registry: address (0),
       protocolInitData: abi.encode(
-        _rocketStorageAddress,
-        _wETH,
         _uniRouter,
         _uniSwapFee
       )
@@ -82,7 +83,6 @@ contract RocketpoolDepositorTest is BaseAdapterTest {
 
     testConfigStorage = ITestConfigStorage(address(new RocketpoolTestConfigStorage()));
 
-    RocketStorageInterface rocketStorage = RocketStorageInterface(_rocketStorageAddress);
     address rocketDepositPoolAddress = rocketStorage.getAddress(
       keccak256(abi.encodePacked("contract.address", "rocketDepositPool"))
     );
@@ -91,7 +91,7 @@ contract RocketpoolDepositorTest is BaseAdapterTest {
     address rocketDepositSettingsAddress = rocketStorage.getAddress(
       keccak256(abi.encodePacked("contract.address", "rocketDAOProtocolSettingsDeposit"))
     );
-    RocketDepositSettingsInterface rocketDepositSettings = RocketDepositSettingsInterface(
+    rocketDepositSettings = RocketDepositSettingsInterface(
       rocketDepositSettingsAddress
     );
 
@@ -101,7 +101,7 @@ contract RocketpoolDepositorTest is BaseAdapterTest {
     rocketTokenRETH = RocketTokenRETHInterface(rocketTokenRETHAddress);
 
     BaseVaultConfig memory baseVaultConfig = BaseVaultConfig({
-      asset_: IERC20(_wETH),
+      asset_: WETH,
       fees: VaultFees({
         deposit: 0,
         withdrawal: 0,
@@ -122,7 +122,7 @@ contract RocketpoolDepositorTest is BaseAdapterTest {
     minFuzz = rocketDepositSettings.getMinimumDeposit() * 10;
 
     setUpBaseTest(
-      IERC20(_wETH),
+      WETH,
       address(new SingleStrategyVault()),
       address(permissionRegistry),
       10,
@@ -157,17 +157,15 @@ contract RocketpoolDepositorTest is BaseAdapterTest {
   function verify_adapterInit() public override {
     testConfigStorage = ITestConfigStorage(address(new RocketpoolTestConfigStorage()));
     (
-      address _rocketStorageAddress,
-      address _wETH,
       address _uniRouter,
       uint24 _uniSwapFee,
       string memory _network
     ) = abi.decode(
-      testConfigStorage.getTestConfig(0), (address, address, address , uint24, string)
+      testConfigStorage.getTestConfig(0), (address , uint24, string)
     );
 
     BaseVaultConfig memory baseVaultConfig = BaseVaultConfig({
-      asset_: IERC20(_wETH),
+      asset_: WETH,
       fees: VaultFees({
         deposit: 0,
         withdrawal: 0,
@@ -182,7 +180,7 @@ contract RocketpoolDepositorTest is BaseAdapterTest {
     });
 
     AdapterConfig memory adapterConfig = AdapterConfig({
-      underlying: IERC20(_wETH),
+      underlying: WETH,
       lpToken: IERC20(address(0)),
       useLpToken: false,
       rewardTokens: rewardTokens,
@@ -192,8 +190,6 @@ contract RocketpoolDepositorTest is BaseAdapterTest {
     ProtocolConfig memory protocolConfig = ProtocolConfig({
       registry: address (0),
       protocolInitData: abi.encode(
-        _rocketStorageAddress,
-        _wETH,
         _uniRouter,
         _uniSwapFee
       )
@@ -201,9 +197,6 @@ contract RocketpoolDepositorTest is BaseAdapterTest {
 
     address depositor = Clones.clone(address(new RocketpoolDepositor()));
     IBaseAdapter _strategy = IBaseAdapter(depositor);
-
-    RocketStorageInterface rocketStorage = RocketStorageInterface(_rocketStorageAddress);
-
 
     adapterConfig.useLpToken = true;
     vm.expectRevert(abi.encodeWithSelector(RocketpoolAdapter.LpTokenNotSupported.selector));
@@ -264,14 +257,16 @@ contract RocketpoolDepositorTest is BaseAdapterTest {
     IBaseAdapter(adapter.strategy()).pause();
     IBaseAdapter(adapter.strategy()).unpause();
 
+    uint256 depositFee = oldTotalAssets.mulDiv(rocketDepositSettings.getDepositFee(), 1 ether, Math.Rounding.Up);
+
     // We simply deposit back into the external protocol
     // TotalSupply and Assets dont change
-//    assertApproxEqAbs(
-//      oldTotalAssets,
-//      adapter.totalAssets(),
-//      _delta_,
-//      "totalAssets"
-//    );
+    assertApproxEqAbs(
+      oldTotalAssets,
+      adapter.totalAssets(),
+      depositFee,
+      "totalAssets"
+    );
     assertApproxEqAbs(
       oldTotalSupply,
       adapter.totalSupply(),
@@ -284,7 +279,7 @@ contract RocketpoolDepositorTest is BaseAdapterTest {
       _delta_,
       "asset balance"
     );
-    //assertApproxEqAbs(iouBalance(), oldIouBalance, _delta_, "iou balance");
+    assertApproxEqAbs(iouBalance(), oldIouBalance, depositFee, "iou balance");
 
     // Deposit and mint dont revert
     vm.startPrank(bob);

@@ -2,7 +2,6 @@
 // Docgen-SOLC: 0.8.15
 
 pragma solidity ^0.8.15;
-
 import {IERC20MetadataUpgradeable as IERC20Metadata} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import {IBaseHelper} from "./interfaces/IBaseHelper.sol";
 import {OwnedUpgradeable} from "../../../utils/OwnedUpgradeable.sol";
@@ -187,7 +186,6 @@ abstract contract BaseAdapter is OwnedUpgradeable, PausableUpgradeable {
 
     /// @notice Unpause Deposits and deposit all funds into the underlying protocol. Caller must be owner.
     function unpause() external onlyOwner {
-        //_deposit(totalAssets());
         _depositUnderlying(totalAssets()); //this returns the balance of the adapter back to the protocol
         _unpause();
     }
