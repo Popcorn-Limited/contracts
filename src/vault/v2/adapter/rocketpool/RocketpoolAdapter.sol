@@ -8,7 +8,6 @@ import {BaseAdapter, IERC20 as ERC20, AdapterConfig, ProtocolConfig} from "../..
 import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
-
 contract RocketpoolAdapter is BaseAdapter {
     using SafeERC20 for ERC20;
     using Math for uint256;
@@ -16,8 +15,15 @@ contract RocketpoolAdapter is BaseAdapter {
     address public uniRouter;
     uint24 public uniSwapFee;
 
-    IWETH public WETH; //0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2
-    RocketStorageInterface public rocketStorage; //0x1d8f8f00cfa6758d7bE78336684788Fb0ee0Fa46
+    bytes32 public constant rocketDepositPoolKey =
+        keccak256(abi.encodePacked("contract.address", "rocketDepositPool"));
+    bytes32 public constant rocketTokenRETHKey =
+        keccak256(abi.encodePacked("contract.address", "rocketTokenRETH"));
+
+    IWETH public constant WETH =
+        IWETH(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
+    RocketStorageInterface public constant rocketStorage =
+        RocketStorageInterface(0x1d8f8f00cfa6758d7bE78336684788Fb0ee0Fa46);
     RocketTokenRETHInterface public rocketTokenRETH;
     RocketDepositPoolInterface public rocketDepositPool;
 
@@ -34,24 +40,20 @@ contract RocketpoolAdapter is BaseAdapter {
         __BaseAdapter_init(_adapterConfig);
 
         (
-            address _rocketStorageAddress,
-            address _wETH,
             address _uniRouter,
             uint24 _uniSwapFee
         ) = abi.decode(
-            _protocolConfig.protocolInitData, (address, address, address , uint24 )
+            _protocolConfig.protocolInitData, (address , uint24 )
         );
 
-        WETH = IWETH(_wETH);
         uniRouter = _uniRouter;
         uniSwapFee = _uniSwapFee;
-        rocketStorage = RocketStorageInterface(_rocketStorageAddress);
 
         address rocketDepositPoolAddress = rocketStorage.getAddress(
-            keccak256(abi.encodePacked("contract.address", "rocketDepositPool"))
+            rocketDepositPoolKey
         );
         address rocketTokenRETHAddress = rocketStorage.getAddress(
-            keccak256(abi.encodePacked("contract.address", "rocketTokenRETH"))
+            rocketTokenRETHKey
         );
 
         if(
