@@ -145,12 +145,10 @@ contract RocketpoolAdapter is BaseAdapter {
                             HELPERS
     //////////////////////////////////////////////////////////////*/
     function _getDepositPool() internal view returns(RocketDepositPoolInterface) {
-        address rocketDepositPoolAddress = rocketStorage.getAddress(rocketDepositPoolKey);
-        return RocketDepositPoolInterface(rocketDepositPoolAddress);
+        return RocketDepositPoolInterface(rocketStorage.getAddress(rocketDepositPoolKey));
     }
 
     function _getRocketToken() internal view returns(RocketTokenRETHInterface) {
-        address rocketTokenRETHAddress = rocketStorage.getAddress(rocketTokenRETHKey);
-        return RocketTokenRETHInterface(rocketTokenRETHAddress);
+        return RocketTokenRETHInterface(rocketStorage.getAddress(rocketTokenRETHKey));
     }
 }
