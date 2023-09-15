@@ -24,8 +24,6 @@ contract RocketpoolAdapter is BaseAdapter {
         IWETH(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
     RocketStorageInterface public constant rocketStorage =
         RocketStorageInterface(0x1d8f8f00cfa6758d7bE78336684788Fb0ee0Fa46);
-    RocketTokenRETHInterface public rocketTokenRETH;
-    RocketDepositPoolInterface public rocketDepositPool;
 
     error NoSharesBurned();
     error InvalidAddress();
@@ -49,21 +47,15 @@ contract RocketpoolAdapter is BaseAdapter {
         uniRouter = _uniRouter;
         uniSwapFee = _uniSwapFee;
 
-        address rocketDepositPoolAddress = rocketStorage.getAddress(
-            rocketDepositPoolKey
-        );
-        address rocketTokenRETHAddress = rocketStorage.getAddress(
-            rocketTokenRETHKey
-        );
+        address rocketDepositPoolAddress = rocketStorage.getAddress(rocketDepositPoolKey);
+        address rocketTokenRETHAddress = rocketStorage.getAddress(rocketTokenRETHKey);
 
         if(
             rocketDepositPoolAddress == address(0) ||
             rocketTokenRETHAddress == address(0)
         ) revert InvalidAddress();
 
-        rocketDepositPool = RocketDepositPoolInterface(rocketDepositPoolAddress);
-        rocketTokenRETH = RocketTokenRETHInterface(rocketTokenRETHAddress);
-
+        RocketTokenRETHInterface rocketTokenRETH = RocketTokenRETHInterface(rocketTokenRETHAddress);
         rocketTokenRETH.approve(rocketTokenRETHAddress, type(uint256).max);
         rocketTokenRETH.approve(uniRouter, type(uint256).max);
     }
@@ -77,6 +69,7 @@ contract RocketpoolAdapter is BaseAdapter {
      * @dev This function must be overriden. If the farm requires the usage of lpToken than this function must convert lpToken balance into underlying balance
      */
     function _totalUnderlying() internal view override returns (uint256) {
+        RocketTokenRETHInterface rocketTokenRETH = _getRocketToken();
         return rocketTokenRETH.getEthValue(rocketTokenRETH.balanceOf(address (this)));
     }
 
@@ -96,7 +89,7 @@ contract RocketpoolAdapter is BaseAdapter {
      **/
     function _depositUnderlying(uint256 amount) internal override {
         WETH.withdraw(amount);
-        rocketDepositPool.deposit{value: amount}();
+        _getDepositPool().deposit{value: amount}();
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -114,6 +107,7 @@ contract RocketpoolAdapter is BaseAdapter {
      **/
     function _withdrawUnderlying(uint256 amount) internal override {
         uint256 rETHShares = convertToUnderlyingShares(amount);
+        RocketTokenRETHInterface rocketTokenRETH = _getRocketToken();
         if(rocketTokenRETH.getTotalCollateral()
             > rocketTokenRETH.getEthValue(rETHShares)
         ) {
@@ -139,11 +133,24 @@ contract RocketpoolAdapter is BaseAdapter {
             supply == 0
                 ? shares
                 : shares.mulDiv(
-                rocketTokenRETH.balanceOf(address(this)),
+                _getRocketToken().balanceOf(address(this)),
                 supply,
                 Math.Rounding.Up
             );
     }
 
     receive() external payable {}
+
+    /*//////////////////////////////////////////////////////////////
+                            HELPERS
+    //////////////////////////////////////////////////////////////*/
+    function _getDepositPool() internal view returns(RocketDepositPoolInterface) {
+        address rocketDepositPoolAddress = rocketStorage.getAddress(rocketDepositPoolKey);
+        return RocketDepositPoolInterface(rocketDepositPoolAddress);
+    }
+
+    function _getRocketToken() internal view returns(RocketTokenRETHInterface) {
+        address rocketTokenRETHAddress = rocketStorage.getAddress(rocketTokenRETHKey);
+        return RocketTokenRETHInterface(rocketTokenRETHAddress);
+    }
 }
