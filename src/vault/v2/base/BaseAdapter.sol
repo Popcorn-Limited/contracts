@@ -6,22 +6,8 @@ import {IERC20MetadataUpgradeable as IERC20Metadata} from "openzeppelin-contract
 import {IBaseHelper} from "./interfaces/IBaseHelper.sol";
 import {OwnedUpgradeable} from "../../../utils/OwnedUpgradeable.sol";
 import {PausableUpgradeable} from "openzeppelin-contracts-upgradeable/security/PausableUpgradeable.sol";
-import {IERC20Upgradeable as IERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import {IERC4626Upgradeable as IERC4626} from "openzeppelin-contracts-upgradeable/interfaces/IERC4626Upgradeable.sol";
-
-
-struct AdapterConfig {
-    IERC20 underlying;
-    IERC20 lpToken;
-    bool useLpToken;
-    IERC20[] rewardTokens;
-    address owner;
-}
-
-struct ProtocolConfig {
-    address registry;
-    bytes protocolInitData;
-}
+import {AdapterConfig, IERC20} from "./interfaces/IBaseAdapter.sol";
 
 abstract contract BaseAdapter is OwnedUpgradeable, PausableUpgradeable {
     address public constant FEE_RECIPIENT =
@@ -123,7 +109,10 @@ abstract contract BaseAdapter is OwnedUpgradeable, PausableUpgradeable {
      * @dev Uses either `_withdrawUnderlying` or `_withdrawLP`
      * @dev Only callable by the vault
      **/
-    function withdraw(uint256 amount, address receiver) external virtual onlyVault {
+    function withdraw(
+        uint256 amount,
+        address receiver
+    ) external virtual onlyVault {
         _withdraw(amount, receiver);
     }
 
@@ -162,6 +151,7 @@ abstract contract BaseAdapter is OwnedUpgradeable, PausableUpgradeable {
     }
 
     /// @dev This function needs to be called by a trusted contract on initialization of a new vault that wants to use this strategy
+    // TODO -- allow owner to remove vaults ?
     function addVault(address _vault) external onlyOwner {
         isVault[_vault] = true;
     }
@@ -186,7 +176,7 @@ abstract contract BaseAdapter is OwnedUpgradeable, PausableUpgradeable {
 
     /// @notice Unpause Deposits and deposit all funds into the underlying protocol. Caller must be owner.
     function unpause() external onlyOwner {
-        _depositUnderlying(totalAssets()); //this returns the balance of the adapter back to the protocol
+        _deposit(totalAssets()); //this returns the balance of the adapter back to the protocol
         _unpause();
     }
 }
