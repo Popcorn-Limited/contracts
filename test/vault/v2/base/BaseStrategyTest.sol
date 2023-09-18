@@ -27,6 +27,8 @@ abstract contract BaseAdapterTest is Test {
     address public owner;
 
     function _setUpBaseTest(uint256 i) internal virtual {
+        TestConfig memory testConfig_ = testConfigStorage.testConfigs(i);
+
         uint256 forkId = testConfig_.blockNumber > 0
             ? vm.createSelectFork(vm.rpcUrl(testConfig_.network), testConfig_.blockNumber)
             : vm.createSelectFork(vm.rpcUrl(testConfig_.network));
@@ -46,7 +48,7 @@ abstract contract BaseAdapterTest is Test {
         owner = _owner;
         vm.label(owner, "owner");
 
-        strategy = _setUpStrategy(testConfig_, owner);
+        strategy = _setUpStrategy(i, owner);
 
         vm.prank(owner);
         strategy.addVault(bob);
@@ -60,7 +62,7 @@ abstract contract BaseAdapterTest is Test {
     //////////////////////////////////////////////////////////////*/
 
     /// @dev -- This MUST be overriden to setup a strategy
-    function _setUpStrategy(uint256 i, address owner_) internal virtual {}
+    function _setUpStrategy(uint256 i_, address owner_) internal virtual {}
 
     function _mintAsset(uint256 amount, address receiver) internal virtual {
         deal(address(asset), receiver, amount);

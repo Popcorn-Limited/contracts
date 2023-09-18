@@ -31,78 +31,28 @@ contract RocketpoolDepositorTest is BaseAdapterTest {
             address(new RocketpoolTestConfigStorage())
         );
 
-        _setUpBaseTest(testConfigStorage.getTestConfig(0));
+        _setUpBaseTest(testConfigStorage.testConfigs(0));
     }
 
-    function _setUpStrategy(
-        TestConfig memory testConfig_,
-        address owner_
-    ) internal override {
-        (address _uniRouter, uint24 _uniSwapFee, string memory _network) = abi
-            .decode(testConfig, (address, uint24, string));
-
-        AdapterConfig memory adapterConfig = AdapterConfig({
-            underlying: WETH,
-            lpToken: IERC20(address(0)),
-            useLpToken: false,
-            rewardTokens: rewardTokens,
-            owner: address(this)
-        });
-
-        ProtocolConfig memory protocolConfig = ProtocolConfig({
-            registry: address(0),
-            protocolInitData: abi.encode(_uniRouter, _uniSwapFee)
-        });
-
-        testConfigStorage = ITestConfigStorage(
-            address(new RocketpoolTestConfigStorage())
+    function _setUpStrategy(uint256 i_, address owner_) internal override {
+        address implementation = Clones.clone(
+            address(new RocketpoolDepositor())
         );
 
-        address rocketDepositPoolAddress = rocketStorage.getAddress(
-            keccak256(abi.encodePacked("contract.address", "rocketDepositPool"))
+        vm.prank(owner_);
+        IBaseAdapter(implementation).initialize(
+            RocketpoolTestConfigStorage(address(testConfigStorage))
+                .adapterConfigs(i_),
+            RocketpoolTestConfigStorage(address(testConfigStorage))
+                .protocolConfigs(i_)
         );
-        RocketDepositPoolInterface rocketDepositPool = RocketDepositPoolInterface(
-                rocketDepositPoolAddress
-            );
-
-        address rocketDepositSettingsAddress = rocketStorage.getAddress(
-            keccak256(
-                abi.encodePacked(
-                    "contract.address",
-                    "rocketDAOProtocolSettingsDeposit"
-                )
-            )
-        );
-        rocketDepositSettings = RocketDepositSettingsInterface(
-            rocketDepositSettingsAddress
-        );
-
-        address rocketTokenRETHAddress = rocketStorage.getAddress(
-            keccak256(abi.encodePacked("contract.address", "rocketTokenRETH"))
-        );
-        rocketTokenRETH = RocketTokenRETHInterface(rocketTokenRETHAddress);
-
-        address depositor = Clones.clone(address(new RocketpoolDepositor()));
-        IBaseAdapter(depositor).initialize(adapterConfig, protocolConfig);
-
-        minFuzz = rocketDepositSettings.getMinimumDeposit() * 10;
-
-        defaultAmount = 1e17;
-        maxAssets = rocketDepositPool.getMaximumDepositAmount() / 100;
-        maxShares = maxAssets / 2;
-
-        vm.label(address(asset), "asset");
-        vm.label(address(this), "test");
-        strategy.addVault(address(vault));
-
-        vault.initialize(baseVaultConfig, address(strategy));
     }
 
     /*//////////////////////////////////////////////////////////////
-                          INITIALIZATIONadapter
+                          INITIALIZATION
     //////////////////////////////////////////////////////////////*/
 
-    function verify_adapterInit() public override {
+    function test__initialization() public override {
         testConfigStorage = ITestConfigStorage(
             address(new RocketpoolTestConfigStorage())
         );
@@ -208,8 +158,16 @@ contract RocketpoolDepositorTest is BaseAdapterTest {
     }
 
     /*//////////////////////////////////////////////////////////////
+                          TOTAL ASSETS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev - This MUST be overriden to test that totalAssets adds up the the expected values
+    function test__totalAssets() public virtual {}
+
+    /*//////////////////////////////////////////////////////////////
                               PAUSE
     //////////////////////////////////////////////////////////////*/
+
     function test__unpause() public override {
         _mintAssetAndApproveForAdapter(defaultAmount * 3, bob);
 
