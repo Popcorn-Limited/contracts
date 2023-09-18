@@ -5,7 +5,7 @@ pragma solidity ^0.8.15;
 
 struct TestConfig {
     address asset;
-    uint256 delta;
+    uint256 delta; // TODO -- should we add deposit / withdraw delta?
     string testId;
     string network;
     uint256 blockNumber;
