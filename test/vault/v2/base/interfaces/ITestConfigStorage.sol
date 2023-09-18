@@ -7,7 +7,8 @@ import {IERC20Upgradeable as IERC20} from "openzeppelin-contracts-upgradeable/to
 
 struct TestConfig {
     IERC20 asset;
-    uint256 delta; // TODO -- should we add deposit / withdraw delta?
+    uint256 depositDelta; // TODO -- should we add deposit / withdraw delta?
+    uint256 withdrawDelta; // TODO -- should we add deposit / withdraw delta?
     string testId;
     string network;
     uint256 blockNumber;

@@ -116,21 +116,21 @@ abstract contract BaseAdapterTest is Test {
         assertApproxEqAbs(
             newCallerAsset,
             oldCallerAsset - assets,
-            testConfig.delta,
+            testConfig.depositDelta,
             string.concat("balance", testPreFix)
         ); // NOTE: this may fail if the caller is a contract in which the asset is stored
         if (oldAllowance != type(uint256).max)
             assertApproxEqAbs(
                 newAllowance,
                 oldAllowance - assets,
-                testConfig.delta,
+                testConfig.depositDelta,
                 string.concat("allowance", testPreFix)
             );
 
         assertApproxEqAbs(
             newTotalAssets,
             oldTotalAssets + assets,
-            testConfig.delta,
+            testConfig.depositDelta,
             string.concat("totalAssets", testPreFix)
         );
     }
@@ -153,13 +153,13 @@ abstract contract BaseAdapterTest is Test {
         assertApproxEqAbs(
             newReceiverAsset,
             oldReceiverAsset + assets,
-            testConfig.delta,
+            testConfig.withdrawDelta,
             string.concat("balance", testPreFix)
         ); // NOTE: this may fail if the receiver is a contract in which the asset is stored
         assertApproxEqAbs(
             newTotalAssets,
             oldTotalAssets - assets,
-            testConfig.delta,
+            testConfig.withdrawDelta,
             string.concat("totalAssets", testPreFix)
         );
     }
@@ -378,13 +378,13 @@ abstract contract BaseAdapterTest is Test {
         assertApproxEqAbs(
             oldTotalAssets,
             strategy.totalAssets(),
-            testConfig.delta,
+            testConfig.withdrawDelta,
             "totalAssets"
         );
         assertApproxEqAbs(
             testConfig.asset.balanceOf(address(strategy)),
             oldTotalAssets,
-            testConfig.delta,
+            testConfig.withdrawDelta,
             "asset balance"
         );
     }
@@ -408,18 +408,22 @@ abstract contract BaseAdapterTest is Test {
         vm.prank(owner);
         strategy.unpause();
 
+        uint256 delta = testConfig.withdrawDelta > testConfig.depositDelta
+            ? testConfig.withdrawDelta
+            : testConfig.depositDelta;
+
         // We simply deposit back into the external protocol
         // TotalAssets shouldnt change significantly besides some slippage or rounding errors
         assertApproxEqAbs(
             oldTotalAssets,
             strategy.totalAssets(),
-            testConfig.delta,
+            delta,
             "totalAssets"
         );
         assertApproxEqAbs(
             testConfig.asset.balanceOf(address(strategy)),
             0,
-            testConfig.delta,
+            delta,
             "asset balance"
         );
     }

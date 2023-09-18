@@ -21,7 +21,8 @@ contract RocketpoolTestConfigStorage is ITestConfigStorage {
         testConfigs.push(
             TestConfig({
                 asset: WETH,
-                delta: 10,
+                depositDelta: 10,
+                withdrawDelta: 34,
                 testId: "RocketPool WETH",
                 network: "mainnet",
                 blockNumber: 18104376,
@@ -44,8 +45,9 @@ contract RocketpoolTestConfigStorage is ITestConfigStorage {
         );
         protocolConfigs.push(
             ProtocolConfig({
-                registry: address(0),
+                registry: 0x1d8f8f00cfa6758d7bE78336684788Fb0ee0Fa46, // rocketPoolStorage
                 protocolInitData: abi.encode(
+                    address(WETH),
                     0xE592427A0AEce92De3Edee1F18E0157C05861564, // UniRouter
                     24 // UniSwapFee
                 )
