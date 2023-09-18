@@ -20,10 +20,8 @@ contract RocketpoolAdapter is BaseAdapter {
     bytes32 public constant rocketTokenRETHKey =
         keccak256(abi.encodePacked("contract.address", "rocketTokenRETH"));
 
-    IWETH public constant WETH =
-        IWETH(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
-    RocketStorageInterface public constant rocketStorage =
-        RocketStorageInterface(0x1d8f8f00cfa6758d7bE78336684788Fb0ee0Fa46);
+    IWETH public WETH;
+    RocketStorageInterface public rocketStorage;
 
     error NoSharesBurned();
     error InvalidAddress();
@@ -37,25 +35,31 @@ contract RocketpoolAdapter is BaseAdapter {
         if (_adapterConfig.useLpToken) revert LpTokenNotSupported();
         __BaseAdapter_init(_adapterConfig);
 
-        (
-            address _uniRouter,
-            uint24 _uniSwapFee
-        ) = abi.decode(
-            _protocolConfig.protocolInitData, (address , uint24 )
-        );
-
+        rocketStorage = RocketStorageInterface(_protocolConfig.registry); // TODO what are the security assumptions here? Where does this data come from?
+        (address _weth, address _uniRouter, uint24 _uniSwapFee) = abi.decode(
+            _protocolConfig.protocolInitData,
+            (address, address, uint24)
+        ); // TODO what are the security assumptions here? Where does this data come from?
+        WETH = _weth;
         uniRouter = _uniRouter;
         uniSwapFee = _uniSwapFee;
 
-        address rocketDepositPoolAddress = rocketStorage.getAddress(rocketDepositPoolKey);
-        address rocketTokenRETHAddress = rocketStorage.getAddress(rocketTokenRETHKey);
+        address rocketDepositPoolAddress = rocketStorage.getAddress(
+            rocketDepositPoolKey
+        );
+        address rocketTokenRETHAddress = rocketStorage.getAddress(
+            rocketTokenRETHKey
+        );
 
-        if(
+        if (
             rocketDepositPoolAddress == address(0) ||
             rocketTokenRETHAddress == address(0)
         ) revert InvalidAddress();
 
-        RocketTokenRETHInterface rocketTokenRETH = RocketTokenRETHInterface(rocketTokenRETHAddress);
+        RocketTokenRETHInterface rocketTokenRETH = RocketTokenRETHInterface(
+            rocketTokenRETHAddress
+        );
+
         rocketTokenRETH.approve(rocketTokenRETHAddress, type(uint256).max);
         rocketTokenRETH.approve(uniRouter, type(uint256).max);
     }
@@ -70,7 +74,10 @@ contract RocketpoolAdapter is BaseAdapter {
      */
     function _totalUnderlying() internal view override returns (uint256) {
         RocketTokenRETHInterface rocketTokenRETH = _getRocketToken();
-        return rocketTokenRETH.getEthValue(rocketTokenRETH.balanceOf(address (this)));
+        return
+            rocketTokenRETH.getEthValue(
+                rocketTokenRETH.balanceOf(address(this))
+            );
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -108,8 +115,9 @@ contract RocketpoolAdapter is BaseAdapter {
     function _withdrawUnderlying(uint256 amount) internal override {
         uint256 rETHShares = convertToUnderlyingShares(amount);
         RocketTokenRETHInterface rocketTokenRETH = _getRocketToken();
-        if(rocketTokenRETH.getTotalCollateral()
-            > rocketTokenRETH.getEthValue(rETHShares)
+        if (
+            rocketTokenRETH.getTotalCollateral() >
+            rocketTokenRETH.getEthValue(rETHShares)
         ) {
             rocketTokenRETH.burn(rETHShares);
             WETH.deposit{value: amount}();
@@ -133,10 +141,10 @@ contract RocketpoolAdapter is BaseAdapter {
             supply == 0
                 ? shares
                 : shares.mulDiv(
-                _getRocketToken().balanceOf(address(this)),
-                supply,
-                Math.Rounding.Up
-            );
+                    _getRocketToken().balanceOf(address(this)),
+                    supply,
+                    Math.Rounding.Up
+                );
     }
 
     receive() external payable {}
@@ -144,11 +152,25 @@ contract RocketpoolAdapter is BaseAdapter {
     /*//////////////////////////////////////////////////////////////
                             HELPERS
     //////////////////////////////////////////////////////////////*/
-    function _getDepositPool() internal view returns(RocketDepositPoolInterface) {
-        return RocketDepositPoolInterface(rocketStorage.getAddress(rocketDepositPoolKey));
+    function _getDepositPool()
+        internal
+        view
+        returns (RocketDepositPoolInterface)
+    {
+        return
+            RocketDepositPoolInterface(
+                rocketStorage.getAddress(rocketDepositPoolKey)
+            );
     }
 
-    function _getRocketToken() internal view returns(RocketTokenRETHInterface) {
-        return RocketTokenRETHInterface(rocketStorage.getAddress(rocketTokenRETHKey));
+    function _getRocketToken()
+        internal
+        view
+        returns (RocketTokenRETHInterface)
+    {
+        return
+            RocketTokenRETHInterface(
+                rocketStorage.getAddress(rocketTokenRETHKey)
+            );
     }
 }
