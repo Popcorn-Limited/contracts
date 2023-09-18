@@ -39,7 +39,10 @@ contract AaveV3Adapter is BaseAdapter {
         lendingPool = ILendingPool(aToken.POOL());
         aaveIncentives = IAaveIncentives(aToken.getIncentivesController());
 
-        _adapterConfig.underlying.approve(address(lendingPool), type(uint256).max);
+        _adapterConfig.underlying.approve(
+            address(lendingPool),
+            type(uint256).max
+        );
     }
 
     /*//////////////////////////////////////////////////////////////

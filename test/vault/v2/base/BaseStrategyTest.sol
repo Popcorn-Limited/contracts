@@ -4,6 +4,8 @@
 pragma solidity ^0.8.15;
 
 import {Test} from "forge-std/Test.sol";
+import {VmSafe} from "forge-std/Vm.sol";
+
 import {Clones} from "openzeppelin-contracts/proxy/Clones.sol";
 import {Math} from "openzeppelin-contracts/utils/math/Math.sol";
 import "../../../../src/vault/v2/vaults/SingleStrategyVault.sol";
@@ -30,25 +32,28 @@ abstract contract BaseAdapterTest is Test {
         TestConfig memory testConfig_ = testConfigStorage.testConfigs(i);
 
         uint256 forkId = testConfig_.blockNumber > 0
-            ? vm.createSelectFork(vm.rpcUrl(testConfig_.network), testConfig_.blockNumber)
+            ? vm.createSelectFork(
+                vm.rpcUrl(testConfig_.network),
+                testConfig_.blockNumber
+            )
             : vm.createSelectFork(vm.rpcUrl(testConfig_.network));
         vm.selectFork(forkId);
 
         testConfig = testConfig_;
 
-        (address _bob, , , ) = vm.createWallet("bob");
-        bob = _bob;
+        VmSafe.Wallet memory _bob = vm.createWallet("bob");
+        bob = _bob.addr;
         vm.label(bob, "bob");
 
-        (address _alice, , , ) = vm.createWallet("alice");
-        alice = _alice;
+        VmSafe.Wallet memory _alice = vm.createWallet("alice");
+        alice = _alice.addr;
         vm.label(alice, "alice");
 
-        (address _owner, , , ) = vm.createWallet("owner");
-        owner = _owner;
+        VmSafe.Wallet memory _owner = vm.createWallet("owner");
+        owner = _owner.addr;
         vm.label(owner, "owner");
 
-        strategy = _setUpStrategy(i, owner);
+        strategy = IBaseAdapter(_setUpStrategy(i, owner));
 
         vm.prank(owner);
         strategy.addVault(bob);
@@ -62,10 +67,13 @@ abstract contract BaseAdapterTest is Test {
     //////////////////////////////////////////////////////////////*/
 
     /// @dev -- This MUST be overriden to setup a strategy
-    function _setUpStrategy(uint256 i_, address owner_) internal virtual {}
+    function _setUpStrategy(
+        uint256 i_,
+        address owner_
+    ) internal virtual returns (address) {}
 
     function _mintAsset(uint256 amount, address receiver) internal virtual {
-        deal(address(asset), receiver, amount);
+        deal(address(testConfig.asset), receiver, amount);
     }
 
     function _mintAssetAndApproveForStrategy(
@@ -74,7 +82,7 @@ abstract contract BaseAdapterTest is Test {
     ) internal {
         _mintAsset(amount, receiver);
         vm.prank(receiver);
-        asset.approve(address(vault), amount);
+        testConfig.asset.approve(address(strategy), amount);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -182,27 +190,30 @@ abstract contract BaseAdapterTest is Test {
 
     /// NOTE: These Are just prop tests currently. Override tests here if the adapter has unique max-functions which override AdapterBase.sol
     function test__maxDeposit() public virtual {
-        assertEq(strategy.maxDeposit(bob), type(uint256).max);
+        assertEq(strategy.maxDeposit(), type(uint256).max);
 
         vm.prank(owner);
         strategy.pause();
 
-        assertEq(strategy.maxDeposit(bob), 0);
+        assertEq(strategy.maxDeposit(), 0);
     }
 
     /// NOTE: These Are just prop tests currently. Override tests here if the adapter has unique max-functions which override AdapterBase.sol
     function test__maxWithdraw() public virtual {
-        assertEq(strategy.maxWithdraw(bob), 0);
+        assertEq(strategy.maxWithdraw(), 0);
 
-        _mintAssetAndApproveForStrategy(defaultAmount, address(this));
+        _mintAssetAndApproveForStrategy(
+            testConfig.defaultAmount,
+            address(this)
+        );
 
-        strategy.deposit(defaultAmount);
-        assertEq(strategy.maxWithdraw(bob), defaultAmount);
+        strategy.deposit(testConfig.defaultAmount);
+        assertEq(strategy.maxWithdraw(), testConfig.defaultAmount);
 
         vm.prank(owner);
         strategy.pause();
 
-        assertEq(strategy.maxWithdraw(bob), defaultAmount);
+        assertEq(strategy.maxWithdraw(), testConfig.defaultAmount);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -341,7 +352,7 @@ abstract contract BaseAdapterTest is Test {
     }
 
     function testFail__setRewardsToken_nonOwner() public virtual {
-        IERC20[] newRewardTokens = new IERC20[](2);
+        IERC20[] memory newRewardTokens = new IERC20[](2);
 
         vm.prank(alice);
         strategy.setRewardsToken(newRewardTokens);
@@ -352,10 +363,10 @@ abstract contract BaseAdapterTest is Test {
     //////////////////////////////////////////////////////////////*/
 
     function test__pause() public virtual {
-        _mintAssetAndApproveForStrategy(defaultAmount, bob);
+        _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
 
         vm.prank(bob);
-        strategy.deposit(defaultAmount);
+        strategy.deposit(testConfig.defaultAmount);
 
         uint256 oldTotalAssets = strategy.totalAssets();
 
@@ -371,12 +382,11 @@ abstract contract BaseAdapterTest is Test {
             "totalAssets"
         );
         assertApproxEqAbs(
-            asset.balanceOf(address(strategy)),
+            testConfig.asset.balanceOf(address(strategy)),
             oldTotalAssets,
             testConfig.delta,
             "asset balance"
         );
-        assertApproxEqAbs(iouBalance(), 0, testConfig.delta, "iou balance");
     }
 
     function testFail__pause_nonOwner() public virtual {
@@ -385,13 +395,12 @@ abstract contract BaseAdapterTest is Test {
     }
 
     function test__unpause() public virtual {
-        _mintAssetAndApproveForStrategy(defaultAmount * 3, bob);
+        _mintAssetAndApproveForStrategy(testConfig.defaultAmount * 3, bob);
 
         vm.prank(bob);
-        strategy.deposit(defaultAmount * 3);
+        strategy.deposit(testConfig.defaultAmount * 3);
 
         uint256 oldTotalAssets = strategy.totalAssets();
-        uint256 oldIouBalance = iouBalance();
 
         vm.prank(owner);
         strategy.pause();
@@ -408,16 +417,10 @@ abstract contract BaseAdapterTest is Test {
             "totalAssets"
         );
         assertApproxEqAbs(
-            asset.balanceOf(address(strategy)),
+            testConfig.asset.balanceOf(address(strategy)),
             0,
             testConfig.delta,
             "asset balance"
-        );
-        assertApproxEqAbs(
-            iouBalance(),
-            oldIouBalance,
-            testConfig.delta,
-            "iou balance"
         );
     }
 

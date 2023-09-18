@@ -3,8 +3,10 @@
 
 pragma solidity ^0.8.15;
 
+import {IERC20Upgradeable as IERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+
 struct TestConfig {
-    address asset;
+    IERC20 asset;
     uint256 delta; // TODO -- should we add deposit / withdraw delta?
     string testId;
     string network;
@@ -18,7 +20,7 @@ struct TestConfig {
 }
 
 interface ITestConfigStorage {
-    function testConfigs(uint256 i) external view returns (TestConfig memory);
+    function getTestConfig(uint256 i) external view returns (TestConfig memory);
 
     function getTestConfigLength() external view returns (uint256);
 }
