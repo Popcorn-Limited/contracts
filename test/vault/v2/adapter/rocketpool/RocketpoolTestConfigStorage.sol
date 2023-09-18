@@ -12,7 +12,7 @@ struct RocketPoolTestConfig {
 }
 
 contract RocketpoolTestConfigStorage is ITestConfigStorage {
-  RocketPoolTestConfig[] internal testConfigs;
+  TestConfig[] public testConfigs;
 
   constructor() {
     testConfigs.push(
@@ -21,14 +21,6 @@ contract RocketpoolTestConfigStorage is ITestConfigStorage {
         500,
         "mainnet"
       )
-    );
-  }
-
-  function getTestConfig(uint256 i) public view returns (bytes memory) {
-    return abi.encode(
-      testConfigs[i].uniRouter,
-      testConfigs[i].uniSwapFee,
-      testConfigs[i].network
     );
   }
 

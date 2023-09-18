@@ -2,10 +2,21 @@
 // Docgen-SOLC: 0.8.15
 
 pragma solidity ^0.8.15;
-import {
-    AdapterConfig,
-    ProtocolConfig
-} from "../BaseAdapter.sol";
+
+import {IERC20Upgradeable as IERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+
+struct AdapterConfig {
+    IERC20 underlying;
+    IERC20 lpToken;
+    bool useLpToken;
+    IERC20[] rewardTokens;
+    address owner;
+}
+
+struct ProtocolConfig {
+    address registry;
+    bytes protocolInitData;
+}
 
 interface IBaseAdapter {
 
