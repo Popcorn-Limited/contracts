@@ -8,7 +8,6 @@ import {BaseAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../../../base/
 import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
-
 contract IdleSeniorAdapter is BaseAdapter {
     using Math for uint256;
     using SafeERC20 for IERC20;
@@ -24,7 +23,7 @@ contract IdleSeniorAdapter is BaseAdapter {
         AdapterConfig memory _adapterConfig,
         ProtocolConfig memory _protocolConfig
     ) internal onlyInitializing {
-        if(_adapterConfig.useLpToken) revert LpTokenNotSupported();
+        if (_adapterConfig.useLpToken) revert LpTokenNotSupported();
         __BaseAdapter_init(_adapterConfig);
 
         IRegistry _registry = IRegistry(_protocolConfig.registry);
@@ -32,7 +31,8 @@ contract IdleSeniorAdapter is BaseAdapter {
 
         if (!_registry.isValidCdo(_cdo)) revert NotValidCDO(_cdo);
         if (IIdleCDO(_cdo).paused()) revert PausedCDO(_cdo);
-        if (IIdleCDO(_cdo).token() != address (underlying)) revert NotValidAsset(address (underlying));
+        if (IIdleCDO(_cdo).token() != address(underlying))
+            revert NotValidAsset(address(underlying));
 
         cdo = IIdleCDO(_cdo);
 
@@ -49,17 +49,17 @@ contract IdleSeniorAdapter is BaseAdapter {
      */
     function _totalUnderlying() internal view override returns (uint256) {
         address tranche = cdo.AATranche();
-        return (
-            IERC20(tranche).balanceOf(address(this)) * cdo.tranchePrice(tranche)
-        ) / cdo.ONE_TRANCHE_TOKEN();
+        return
+            (IERC20(tranche).balanceOf(address(this)) *
+                cdo.tranchePrice(tranche)) / cdo.ONE_TRANCHE_TOKEN();
     }
 
     /*//////////////////////////////////////////////////////////////
                             DEPOSIT LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function _deposit(uint256 amount) internal override {
-        underlying.safeTransferFrom(msg.sender, address(this), amount);
+    function _deposit(uint256 amount, address caller) internal override {
+        underlying.safeTransferFrom(caller, address(this), amount);
         _depositUnderlying(amount);
     }
 
@@ -76,7 +76,7 @@ contract IdleSeniorAdapter is BaseAdapter {
     //////////////////////////////////////////////////////////////*/
 
     function _withdraw(uint256 amount, address receiver) internal override {
-        _withdrawUnderlying(amount);
+        if (!paused()) _withdrawUnderlying(amount);
         underlying.safeTransfer(receiver, amount);
     }
 
@@ -99,5 +99,4 @@ contract IdleSeniorAdapter is BaseAdapter {
                 ? shares
                 : shares.mulDiv(balance, supply, Math.Rounding.Up);
     }
-
 }

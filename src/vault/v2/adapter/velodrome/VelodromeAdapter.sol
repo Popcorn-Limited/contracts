@@ -12,7 +12,6 @@ contract VelodromeAdapter is BaseAdapter {
     using Math for uint256;
     using SafeERC20 for IERC20;
 
-
     //// @notice The Velodrome contract
     IGauge public gauge;
 
@@ -25,17 +24,20 @@ contract VelodromeAdapter is BaseAdapter {
         AdapterConfig memory _adapterConfig,
         ProtocolConfig memory _protocolConfig
     ) internal onlyInitializing {
-        if(!_adapterConfig.useLpToken) revert LpTokenSupported();
+        if (!_adapterConfig.useLpToken) revert LpTokenSupported();
         __BaseAdapter_init(_adapterConfig);
 
-        address _gauge = abi.decode(_protocolConfig.protocolInitData, (address));
+        address _gauge = abi.decode(
+            _protocolConfig.protocolInitData,
+            (address)
+        );
         if (!IPermissionRegistry(_protocolConfig.registry).endorsed(_gauge))
             revert NotEndorsed(_gauge);
 
         gauge = IGauge(_gauge);
-        if (gauge.stake() != address (lpToken)) revert InvalidAsset();
+        if (gauge.stake() != address(lpToken)) revert InvalidAsset();
 
-        _adapterConfig.lpToken.approve(address (_gauge), type(uint256).max);
+        _adapterConfig.lpToken.approve(address(_gauge), type(uint256).max);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -51,14 +53,12 @@ contract VelodromeAdapter is BaseAdapter {
         return gauge.balanceOf(address(this));
     }
 
-
-
     /*//////////////////////////////////////////////////////////////
                             DEPOSIT LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function _deposit(uint256 amount) internal override {
-        lpToken.safeTransferFrom(msg.sender, address(this), amount);
+    function _deposit(uint256 amount, address caller) internal override {
+        lpToken.safeTransferFrom(caller, address(this), amount);
         _depositLP(amount);
     }
 
@@ -71,12 +71,11 @@ contract VelodromeAdapter is BaseAdapter {
         gauge.deposit(amount, 0);
     }
 
-
     /*//////////////////////////////////////////////////////////////
                             WITHDRAWAL LOGIC
     //////////////////////////////////////////////////////////////*/
     function _withdraw(uint256 amount, address receiver) internal override {
-        _withdrawLP(amount);
+        if (!paused()) _withdrawLP(amount);
         underlying.safeTransfer(receiver, amount);
     }
 
@@ -88,7 +87,6 @@ contract VelodromeAdapter is BaseAdapter {
     function _withdrawLP(uint256 amount) internal override {
         gauge.withdraw(amount);
     }
-
 
     /*//////////////////////////////////////////////////////////////
                             CLAIM LOGIC
@@ -104,13 +102,18 @@ contract VelodromeAdapter is BaseAdapter {
     }
 
     /**
-    * @notice Gets all the reward tokens for a protocol
+     * @notice Gets all the reward tokens for a protocol
      * @dev This function converts all reward token types from IERC20[] to address[]
      **/
-    function _getRewardTokens() internal virtual view returns(address[] memory) {
+    function _getRewardTokens()
+        internal
+        view
+        virtual
+        returns (address[] memory)
+    {
         uint256 len = rewardTokens.length;
         address[] memory _rewardTokens = new address[](len);
-        for(uint256 i = 0; i < len ;) {
+        for (uint256 i = 0; i < len; ) {
             _rewardTokens[i] = address(rewardTokens[i]);
             unchecked {
                 i++;

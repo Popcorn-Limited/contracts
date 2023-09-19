@@ -39,7 +39,7 @@ contract MasterChefV2Adapter is BaseAdapter {
         masterChef = IMasterChefV2(_protocolConfig.registry);
         address _lpToken = masterChef.lpToken(_pid);
 
-        if (_lpToken != address (lpToken)) revert InvalidAsset();
+        if (_lpToken != address(lpToken)) revert InvalidAsset();
         _adapterConfig.lpToken.approve(address(masterChef), type(uint256).max);
     }
 
@@ -63,8 +63,8 @@ contract MasterChefV2Adapter is BaseAdapter {
                             DEPOSIT LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function _deposit(uint256 amount) internal override {
-        lpToken.safeTransferFrom(msg.sender, address(this), amount);
+    function _deposit(uint256 amount, address caller) internal override {
+        lpToken.safeTransferFrom(caller, address(this), amount);
         _depositLP(amount);
     }
 
@@ -81,7 +81,7 @@ contract MasterChefV2Adapter is BaseAdapter {
     //////////////////////////////////////////////////////////////*/
 
     function _withdraw(uint256 amount, address receiver) internal override {
-        _withdrawLP(amount);
+        if (!paused()) _withdrawLP(amount);
         lpToken.safeTransfer(receiver, amount);
     }
 

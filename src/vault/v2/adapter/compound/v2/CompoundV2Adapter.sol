@@ -39,11 +39,14 @@ contract CompoundV2Adapter is BaseAdapter {
         comptroller = IComptroller(_comptroller);
 
         if (
-            keccak256(abi.encode(cToken.symbol())) != 
+            keccak256(abi.encode(cToken.symbol())) !=
             keccak256(abi.encode("cETH"))
         ) {
             if (cToken.underlying() != address(_adapterConfig.underlying))
-                revert DifferentAssets(cToken.underlying(), address(_adapterConfig.underlying));
+                revert DifferentAssets(
+                    cToken.underlying(),
+                    address(_adapterConfig.underlying)
+                );
         }
 
         (bool isListed, , ) = comptroller.markets(address(cToken));
@@ -68,8 +71,8 @@ contract CompoundV2Adapter is BaseAdapter {
                             DEPOSIT LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function _deposit(uint256 amount) internal override {
-        underlying.safeTransferFrom(msg.sender, address(this), amount);
+    function _deposit(uint256 amount, address caller) internal override {
+        underlying.safeTransferFrom(caller, address(this), amount);
         _depositUnderlying(amount);
     }
 
@@ -86,7 +89,7 @@ contract CompoundV2Adapter is BaseAdapter {
     //////////////////////////////////////////////////////////////*/
 
     function _withdraw(uint256 amount, address receiver) internal override {
-        _withdrawUnderlying(amount);
+        if (!paused()) _withdrawUnderlying(amount);
         underlying.safeTransfer(receiver, amount);
     }
 

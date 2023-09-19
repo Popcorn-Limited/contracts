@@ -6,7 +6,6 @@ import {IConvexBooster, IConvexRewards, IRewards} from "./IConvex.sol";
 import {BaseAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../../base/BaseAdapter.sol";
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
-
 contract ConvexAdapter is BaseAdapter {
     using SafeERC20 for IERC20;
 
@@ -26,18 +25,22 @@ contract ConvexAdapter is BaseAdapter {
         AdapterConfig memory _adapterConfig,
         ProtocolConfig memory _protocolConfig
     ) internal onlyInitializing {
-        if(!_adapterConfig.useLpToken) revert LpTokenSupported();
+        if (!_adapterConfig.useLpToken) revert LpTokenSupported();
         __BaseAdapter_init(_adapterConfig);
 
         uint256 _pid = abi.decode(_protocolConfig.protocolInitData, (uint256));
         convexBooster = IConvexBooster(_protocolConfig.registry);
 
-        (address _asset, , , address _convexRewards, , ) = convexBooster.poolInfo(_pid);
+        (address _asset, , , address _convexRewards, , ) = convexBooster
+            .poolInfo(_pid);
         convexRewards = IConvexRewards(_convexRewards);
 
         if (_asset != address(lpToken)) revert AssetMismatch();
 
-        _adapterConfig.lpToken.approve(address (convexBooster), type(uint256).max);
+        _adapterConfig.lpToken.approve(
+            address(convexBooster),
+            type(uint256).max
+        );
         pid = _pid;
     }
 
@@ -54,14 +57,12 @@ contract ConvexAdapter is BaseAdapter {
         return convexRewards.balanceOf(address(this));
     }
 
-
-
     /*//////////////////////////////////////////////////////////////
                             DEPOSIT LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function _deposit(uint256 amount) internal override {
-        lpToken.safeTransferFrom(msg.sender, address(this), amount);
+    function _deposit(uint256 amount, address caller) internal override {
+        lpToken.safeTransferFrom(caller, address(this), amount);
         _depositLP(amount);
     }
 
@@ -74,12 +75,11 @@ contract ConvexAdapter is BaseAdapter {
         convexBooster.deposit(pid, amount, true);
     }
 
-
     /*//////////////////////////////////////////////////////////////
                             WITHDRAWAL LOGIC
     //////////////////////////////////////////////////////////////*/
     function _withdraw(uint256 amount, address receiver) internal override {
-        _withdrawLP(amount);
+        if (!paused()) _withdrawLP(amount);
         underlying.safeTransfer(receiver, amount);
     }
 
@@ -91,7 +91,6 @@ contract ConvexAdapter is BaseAdapter {
     function _withdrawLP(uint256 amount) internal override {
         convexRewards.withdrawAndUnwrap(amount, false);
     }
-
 
     /*//////////////////////////////////////////////////////////////
                             CLAIM LOGIC

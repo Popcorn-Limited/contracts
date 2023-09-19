@@ -24,10 +24,13 @@ contract AlpacaLendV1Adapter is BaseAdapter {
         AdapterConfig memory _adapterConfig,
         ProtocolConfig memory _protocolConfig
     ) internal onlyInitializing {
-        if(_adapterConfig.useLpToken) revert LpTokenNotSupported();
+        if (_adapterConfig.useLpToken) revert LpTokenNotSupported();
         __BaseAdapter_init(_adapterConfig);
 
-        address _vault = abi.decode(_protocolConfig.protocolInitData, (address));
+        address _vault = abi.decode(
+            _protocolConfig.protocolInitData,
+            (address)
+        );
 
         if (!IPermissionRegistry(_protocolConfig.registry).endorsed(_vault))
             revert NotEndorsed();
@@ -36,7 +39,10 @@ contract AlpacaLendV1Adapter is BaseAdapter {
 
         if (alpacaVault.token() != address(underlying)) revert InvalidAsset();
 
-        _adapterConfig.underlying.approve(address(alpacaVault), type(uint256).max);
+        _adapterConfig.underlying.approve(
+            address(alpacaVault),
+            type(uint256).max
+        );
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -48,16 +54,17 @@ contract AlpacaLendV1Adapter is BaseAdapter {
      * @dev This function must be overridden. If the farm requires the usage of lpToken than this function must convert lpToken balance into underlying balance
      */
     function _totalUnderlying() internal view override returns (uint256) {
-        return (alpacaVault.balanceOf(address(this)) * alpacaVault.totalToken())
-                / alpacaVault.totalSupply();
+        return
+            (alpacaVault.balanceOf(address(this)) * alpacaVault.totalToken()) /
+            alpacaVault.totalSupply();
     }
 
     /*//////////////////////////////////////////////////////////////
                             DEPOSIT LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function _deposit(uint256 amount) internal override {
-        underlying.safeTransferFrom(msg.sender, address(this), amount);
+    function _deposit(uint256 amount, address caller) internal override {
+        underlying.safeTransferFrom(caller, address(this), amount);
         _depositUnderlying(amount);
     }
 
@@ -74,7 +81,7 @@ contract AlpacaLendV1Adapter is BaseAdapter {
     //////////////////////////////////////////////////////////////*/
 
     function _withdraw(uint256 amount, address receiver) internal override {
-        _withdrawUnderlying(amount);
+        if (!paused()) _withdrawUnderlying(amount);
         underlying.safeTransfer(receiver, amount);
     }
 
@@ -91,10 +98,11 @@ contract AlpacaLendV1Adapter is BaseAdapter {
         uint256,
         uint256 shares
     ) public view returns (uint256) {
-        return shares.mulDiv(
-            alpacaVault.totalSupply(),
-            alpacaVault.totalToken(),
-            Math.Rounding.Up
-        );
+        return
+            shares.mulDiv(
+                alpacaVault.totalSupply(),
+                alpacaVault.totalToken(),
+                Math.Rounding.Up
+            );
     }
 }

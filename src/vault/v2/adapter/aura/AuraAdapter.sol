@@ -51,8 +51,8 @@ contract AuraAdapter is BaseAdapter {
                             DEPOSIT LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function _deposit(uint256 amount) internal override {
-        lpToken.safeTransferFrom(msg.sender, address(this), amount);
+    function _deposit(uint256 amount, address caller) internal override {
+        lpToken.safeTransferFrom(caller, address(this), amount);
         _depositLP(amount);
     }
 
@@ -69,7 +69,7 @@ contract AuraAdapter is BaseAdapter {
     //////////////////////////////////////////////////////////////*/
 
     function _withdraw(uint256 amount, address receiver) internal override {
-        _withdrawLP(amount);
+        if (!paused()) _withdrawLP(amount);
         lpToken.safeTransfer(receiver, amount);
     }
 

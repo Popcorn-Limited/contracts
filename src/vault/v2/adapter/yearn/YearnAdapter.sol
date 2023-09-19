@@ -30,7 +30,9 @@ contract YearnAdapter is BaseAdapter {
 
         maxLoss = abi.decode(_protocolConfig.protocolInitData, (uint256));
         yVault = VaultAPI(
-            IYearnRegistry(_protocolConfig.registry).latestVault(address (underlying))
+            IYearnRegistry(_protocolConfig.registry).latestVault(
+                address(underlying)
+            )
         );
 
         if (maxLoss > 10_000) revert MaxLossTooHigh();
@@ -54,18 +56,17 @@ contract YearnAdapter is BaseAdapter {
         if (yVault.totalSupply() == 0) return yShares;
 
         return
-        yShares.mulDiv(
-            _freeFunds(),
-            yVault.totalSupply(),
-            Math.Rounding.Down
-        );
+            yShares.mulDiv(
+                _freeFunds(),
+                yVault.totalSupply(),
+                Math.Rounding.Down
+            );
     }
 
     /// @notice The amount of assets that are free to be withdrawn from the yVault after locked profts.
     function _freeFunds() internal view returns (uint256) {
         return _yTotalAssets() - _calculateLockedProfit();
     }
-
 
     /**
      * @notice Returns the total quantity of all assets under control of this Vault,
@@ -78,25 +79,24 @@ contract YearnAdapter is BaseAdapter {
     /// @notice Calculates how much profit is locked and cant be withdrawn.
     function _calculateLockedProfit() internal view returns (uint256) {
         uint256 lockedFundsRatio = (block.timestamp - yVault.lastReport()) *
-        yVault.lockedProfitDegradation();
+            yVault.lockedProfitDegradation();
 
         if (lockedFundsRatio < DEGRADATION_COEFFICIENT) {
             uint256 lockedProfit = yVault.lockedProfit();
             return
-            lockedProfit -
-            ((lockedFundsRatio * lockedProfit) / DEGRADATION_COEFFICIENT);
+                lockedProfit -
+                ((lockedFundsRatio * lockedProfit) / DEGRADATION_COEFFICIENT);
         } else {
             return 0;
         }
     }
 
-
     /*//////////////////////////////////////////////////////////////
                             DEPOSIT LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function _deposit(uint256 amount) internal override {
-        underlying.safeTransferFrom(msg.sender, address(this), amount);
+    function _deposit(uint256 amount, address caller) internal override {
+        underlying.safeTransferFrom(caller, address(this), amount);
         _depositUnderlying(amount);
     }
 
@@ -113,7 +113,7 @@ contract YearnAdapter is BaseAdapter {
     //////////////////////////////////////////////////////////////*/
 
     function _withdraw(uint256 amount, address receiver) internal override {
-        _withdrawUnderlying(amount);
+        if (!paused()) _withdrawUnderlying(amount);
         underlying.safeTransfer(receiver, amount);
     }
 
@@ -138,9 +138,9 @@ contract YearnAdapter is BaseAdapter {
             supply == 0
                 ? shares
                 : shares.mulDiv(
-                yVault.balanceOf(address(this)),
-                supply,
-                Math.Rounding.Up
-            );
+                    yVault.balanceOf(address(this)),
+                    supply,
+                    Math.Rounding.Up
+                );
     }
 }

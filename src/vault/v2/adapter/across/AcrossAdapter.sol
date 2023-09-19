@@ -163,12 +163,12 @@ contract AcrossAdapter is BaseAdapter {
                             DEPOSIT LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function _deposit(uint256 amount) internal override {
+    function _deposit(uint256 amount, address caller) internal override {
         if (useLpToken) {
-            lpToken.safeTransferFrom(msg.sender, address(this), amount);
+            lpToken.safeTransferFrom(caller, address(this), amount);
             _depositLP(amount);
         } else {
-            underlying.safeTransferFrom(msg.sender, address(this), amount);
+            underlying.safeTransferFrom(caller, address(this), amount);
             _depositUnderlying(amount);
         }
     }

@@ -43,7 +43,7 @@ interface IBaseAdapter {
 
     function isVault(address vault) external view returns (bool);
 
-    function rewardTokens() external view returns (IERC20[] memory);
+    function getRewardTokens() external view returns (IERC20[] memory);
 
     function setRewardsToken(IERC20[] memory rewardTokens) external;
 
