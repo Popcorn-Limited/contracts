@@ -4,17 +4,10 @@ pragma solidity ^0.8.15;
 
 import { IERC4626Upgradeable as IERC4626, IERC20Upgradeable as IERC20 } from "openzeppelin-contracts-upgradeable/interfaces/IERC4626Upgradeable.sol";
 import {IBaseAdapter} from "./IBaseAdapter.sol";
-import {BaseVaultConfig} from "../BaseVault.sol";
+import {BaseVaultConfig, VaultFees} from "../BaseVault.sol";
 
 
-//// Fees are set in 1e18 for 100% (1 BPS = 1e14)
-struct VaultFees {
-  uint64 deposit;
-  uint64 withdrawal;
-  uint64 management;
-  uint64 performance;
-}
-//
+
 ///// @notice Init data for a Vault
 //struct VaultInitParams {
 //  /// @Notice Address of the deposit asset
@@ -32,6 +25,9 @@ struct VaultFees {
 //}
 
 interface IVault is IERC4626 {
+
+  function owner() external view returns (address);
+
   // FEE VIEWS
 
   function accruedManagementFee() external view returns (uint256);
