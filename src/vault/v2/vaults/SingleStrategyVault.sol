@@ -22,6 +22,7 @@ contract SingleStrategyVault is BaseVault {
         address strategyAsset = useLpToken
             ? IBaseAdapter(_strategy).lpToken()
             : IBaseAdapter(_strategy).underlying();
+        console.log("strategy: ", strategyAsset, address(_vaultConfig.asset_));
         if (address(_vaultConfig.asset_) != strategyAsset)
             revert InvalidStrategy(_strategy);
 
