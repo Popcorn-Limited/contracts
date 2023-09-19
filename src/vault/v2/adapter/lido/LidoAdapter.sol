@@ -9,8 +9,6 @@ import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradea
 
 import {ILido, VaultAPI, ICurveMetapool, IWETH} from "./ILido.sol";
 
-
-
 contract LidoAdapter is BaseAdapter {
     using SafeERC20 for IERC20;
     using Math for uint256;
@@ -56,7 +54,10 @@ contract LidoAdapter is BaseAdapter {
             type(uint256).max
         );
 
-        _adapterConfig.underlying.approve(address(StableSwapSTETH), type(uint256).max);
+        _adapterConfig.underlying.approve(
+            address(StableSwapSTETH),
+            type(uint256).max
+        );
         _adapterConfig.underlying.approve(address(lido), type(uint256).max);
     }
 
@@ -77,8 +78,8 @@ contract LidoAdapter is BaseAdapter {
                             DEPOSIT LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function _deposit(uint256 amount) internal override {
-        underlying.safeTransferFrom(msg.sender, address(this), amount);
+    function _deposit(uint256 amount, address caller) internal override {
+        underlying.safeTransferFrom(caller, address(this), amount);
         _depositUnderlying(amount);
     }
 
@@ -96,7 +97,7 @@ contract LidoAdapter is BaseAdapter {
     //////////////////////////////////////////////////////////////*/
 
     function _withdraw(uint256 amount, address receiver) internal override {
-        _withdrawUnderlying(amount);
+        if (!paused()) _withdrawUnderlying(amount);
         underlying.safeTransfer(receiver, amount);
     }
 
@@ -122,10 +123,10 @@ contract LidoAdapter is BaseAdapter {
             supply == 0
                 ? shares
                 : shares.mulDiv(
-                lido.balanceOf(address(this)),
-                supply,
-                Math.Rounding.Up
-            );
+                    lido.balanceOf(address(this)),
+                    supply,
+                    Math.Rounding.Up
+                );
     }
 
     receive() external payable {}

@@ -7,7 +7,6 @@ import {BaseAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../../base/Bas
 import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
-
 contract GmdAdapter is BaseAdapter {
     using Math for uint256;
     using SafeERC20 for IERC20;
@@ -25,7 +24,7 @@ contract GmdAdapter is BaseAdapter {
         AdapterConfig memory _adapterConfig,
         ProtocolConfig memory _protocolConfig
     ) internal onlyInitializing {
-        if(!_adapterConfig.useLpToken) revert LpTokenSupported();
+        if (!_adapterConfig.useLpToken) revert LpTokenSupported();
         __BaseAdapter_init(_adapterConfig);
 
         gmdVault = IGmdVault(_protocolConfig.registry);
@@ -39,8 +38,8 @@ contract GmdAdapter is BaseAdapter {
             !poolInfo.rewardStart ||
             !poolInfo.withdrawable
         ) revert InvalidPool(poolId);
-        if(address (lpToken) != poolInfo.lpToken)
-            revert AssetMismatch(poolId, address (lpToken), poolInfo.lpToken);
+        if (address(lpToken) != poolInfo.lpToken)
+            revert AssetMismatch(poolId, address(lpToken), poolInfo.lpToken);
 
         _adapterConfig.lpToken.approve(address(gmdVault), type(uint256).max);
     }
@@ -56,7 +55,9 @@ contract GmdAdapter is BaseAdapter {
      */
     function _totalLP() internal view override returns (uint256) {
         IGmdVault.PoolInfo memory poolInfo = gmdVault.poolInfo(poolId);
-        uint256 gmdLpTokenBalance = IERC20(poolInfo.GDlptoken).balanceOf(address(this));
+        uint256 gmdLpTokenBalance = IERC20(poolInfo.GDlptoken).balanceOf(
+            address(this)
+        );
         uint256 asset = gmdLpTokenBalance.mulDiv(
             poolInfo.totalStaked,
             IERC20(poolInfo.GDlptoken).totalSupply(),
@@ -65,14 +66,12 @@ contract GmdAdapter is BaseAdapter {
         return asset.mulDiv(1e6, 1e18, Math.Rounding.Down);
     }
 
-
-
     /*//////////////////////////////////////////////////////////////
                             DEPOSIT LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function _deposit(uint256 amount) internal override {
-        lpToken.safeTransferFrom(msg.sender, address(this), amount);
+    function _deposit(uint256 amount, address caller) internal override {
+        lpToken.safeTransferFrom(caller, address(this), amount);
         _depositLP(amount);
     }
 
@@ -83,19 +82,21 @@ contract GmdAdapter is BaseAdapter {
      **/
     function _depositLP(uint256 amount) internal override {
         IERC20 receiptToken_ = receiptToken;
-        uint256 initialReceiptTokenBalance = receiptToken_.balanceOf(address(this));
+        uint256 initialReceiptTokenBalance = receiptToken_.balanceOf(
+            address(this)
+        );
 
         gmdVault.enter(amount, poolId);
-        uint256 sharesReceived = receiptToken_.balanceOf(address(this)) - initialReceiptTokenBalance;
-        if(sharesReceived <= 0) revert InsufficientSharesReceived();
+        uint256 sharesReceived = receiptToken_.balanceOf(address(this)) -
+            initialReceiptTokenBalance;
+        if (sharesReceived <= 0) revert InsufficientSharesReceived();
     }
-
 
     /*//////////////////////////////////////////////////////////////
                             WITHDRAWAL LOGIC
     //////////////////////////////////////////////////////////////*/
     function _withdraw(uint256 amount, address receiver) internal override {
-        _withdrawLP(amount);
+        if (!paused()) _withdrawLP(amount);
         underlying.safeTransfer(receiver, amount);
     }
 
@@ -117,9 +118,9 @@ contract GmdAdapter is BaseAdapter {
             supply == 0
                 ? shares
                 : shares.mulDiv(
-                IERC20(poolInfo.GDlptoken).balanceOf(address(this)),
-                supply,
-                Math.Rounding.Up
-            );
+                    IERC20(poolInfo.GDlptoken).balanceOf(address(this)),
+                    supply,
+                    Math.Rounding.Up
+                );
     }
 }

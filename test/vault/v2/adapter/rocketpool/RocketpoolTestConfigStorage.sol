@@ -21,8 +21,8 @@ contract RocketpoolTestConfigStorage is ITestConfigStorage {
         testConfigs.push(
             TestConfig({
                 asset: WETH,
-                depositDelta: 10,
-                withdrawDelta: 34,
+                depositDelta: 500000000000010, // DepositFee + 10
+                withdrawDelta: 500000000000010, // Slippage + 10
                 testId: "RocketPool WETH",
                 network: "mainnet",
                 blockNumber: 18104376,
@@ -40,7 +40,7 @@ contract RocketpoolTestConfigStorage is ITestConfigStorage {
                 lpToken: IERC20(address(0)),
                 useLpToken: false,
                 rewardTokens: rewardTokens,
-                owner: address(this)
+                owner: address(0x7777)
             })
         );
         protocolConfigs.push(
@@ -61,7 +61,7 @@ contract RocketpoolTestConfigStorage is ITestConfigStorage {
 
     function getTestConfig(
         uint256 i
-    ) public view returns (AdapterConfig memory) {
+    ) public view returns (TestConfig memory) {
         return testConfigs[i];
     }
 

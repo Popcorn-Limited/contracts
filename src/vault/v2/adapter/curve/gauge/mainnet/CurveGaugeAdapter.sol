@@ -8,7 +8,6 @@ import {BaseAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../../../../ba
 import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
-
 contract CurveGaugeAdapter is BaseAdapter {
     using SafeERC20 for IERC20;
 
@@ -30,12 +29,15 @@ contract CurveGaugeAdapter is BaseAdapter {
         if (!_adapterConfig.useLpToken) revert LpTokenSupported();
         __BaseAdapter_init(_adapterConfig);
 
-        uint256 _gaugeId = abi.decode(_protocolConfig.protocolInitData, (uint256));
+        uint256 _gaugeId = abi.decode(
+            _protocolConfig.protocolInitData,
+            (uint256)
+        );
         minter = IMinter(_protocolConfig.registry);
         gauge = IGauge(IGaugeController(minter.controller()).gauges(_gaugeId));
 
         crv = minter.token();
-        if (gauge.lp_token() != address (lpToken)) revert InvalidToken();
+        if (gauge.lp_token() != address(lpToken)) revert InvalidToken();
 
         _adapterConfig.lpToken.approve(address(gauge), type(uint256).max);
     }
@@ -56,7 +58,7 @@ contract CurveGaugeAdapter is BaseAdapter {
                             DEPOSIT LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function _deposit(uint256 amount) internal override {
+    function _deposit(uint256 amount, address caller) internal override {
         _depositLP(amount);
     }
 
@@ -73,7 +75,7 @@ contract CurveGaugeAdapter is BaseAdapter {
     //////////////////////////////////////////////////////////////*/
 
     function _withdraw(uint256 amount, address receiver) internal override {
-        _withdrawLP(amount);
+        if (!paused()) _withdrawLP(amount);
         lpToken.safeTransfer(receiver, amount);
     }
 

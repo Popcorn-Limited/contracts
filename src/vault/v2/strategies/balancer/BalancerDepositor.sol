@@ -16,7 +16,7 @@ contract BalanceDepositor is BalancerGaugeAdapter {
     }
 
     function deposit(uint256 amount) external override onlyVault whenNotPaused {
-        _deposit(amount);
+        _deposit(amount, msg.sender);
     }
 
     function withdraw(uint256 amount, address receiver) external override onlyVault {

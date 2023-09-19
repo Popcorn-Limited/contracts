@@ -11,16 +11,14 @@ import {RocketpoolDepositor} from "../../../../../src/vault/v2/strategies/rocket
 import {IOwned} from "../../../../../src/vault/v2/base/interfaces/IOwned.sol";
 
 import {RocketpoolTestConfigStorage, ITestConfigStorage, AdapterConfig, ProtocolConfig} from "./RocketpoolTestConfigStorage.sol";
-import {IERC20, IBaseAdapter, BaseAdapterTest} from "../../base/BaseStrategyTest.sol";
+import {IERC20, IBaseAdapter, BaseStrategyTest} from "../../base/BaseStrategyTest.sol";
 
-contract RocketpoolDepositorTest is BaseAdapterTest {
+contract RocketpoolDepositorTest is BaseStrategyTest {
     using Math for uint256;
 
-    function setUp() public {
-        testConfigStorage = ITestConfigStorage(
-            address(new RocketpoolTestConfigStorage())
-        );
+    IERC20 rETH = IERC20(0xae78736Cd615f374D3085123A210448E74Fc6393);
 
+    function setUp() public {
         _setUpBaseTest(0);
     }
 
@@ -43,6 +41,10 @@ contract RocketpoolDepositorTest is BaseAdapterTest {
         return strategy;
     }
 
+    function _setUpTestStorage() internal override returns (address) {
+        return address(new RocketpoolTestConfigStorage());
+    }
+
     /*//////////////////////////////////////////////////////////////
                           INITIALIZATION
     //////////////////////////////////////////////////////////////*/
@@ -50,29 +52,32 @@ contract RocketpoolDepositorTest is BaseAdapterTest {
     function test__initialization() public override {
         AdapterConfig memory adapterConfig = RocketpoolTestConfigStorage(
             address(testConfigStorage)
-        ).getAdapterConfig(i_);
+        ).getAdapterConfig(0);
         ProtocolConfig memory protocolConfig = RocketpoolTestConfigStorage(
             address(testConfigStorage)
-        ).getProtocolConfig(i_);
+        ).getProtocolConfig(0);
 
-        address strategy = Clones.clone(address(new RocketpoolDepositor()));
+        address rocketStorage = protocolConfig.registry;
+
+        IBaseAdapter _strategy = IBaseAdapter(
+            Clones.clone(address(new RocketpoolDepositor()))
+        );
 
         // --- TEST SUCCESSFUL INIT ---
         vm.prank(owner);
-        IBaseAdapter(strategy).initialize(adapterConfig, protocolConfig);
+        _strategy.initialize(adapterConfig, protocolConfig);
 
         // Verify Generic Config
-        IERC20 memory _rewardTokens = strategy.rewardTokens();
+        IERC20[] memory _rewardTokens = _strategy.getRewardTokens();
 
-        assertEq(IOwned(address(strategy)).owner(), owner);
-        assertEq(strategy.underlying(), adapterConfig.underlying);
-        assertEq(strategy.lpToken(), address(adapterConfig.lpToken));
-        assertEq(strategy.useLpToken(), address(adapterConfig.useLpToken));
-        assertEq(_rewardTokens.length, adapterConfig.rewardTokens.length);
+        assertEq(IOwned(address(_strategy)).owner(), owner);
         assertEq(
-            address(_rewardTokens[0]),
-            address(adapterConfig.rewardTokens[0])
+            address(_strategy.underlying()),
+            address(adapterConfig.underlying)
         );
+        assertEq(_strategy.lpToken(), address(adapterConfig.lpToken));
+        assertEq(_strategy.useLpToken(), adapterConfig.useLpToken);
+        assertEq(_rewardTokens.length, adapterConfig.rewardTokens.length);
 
         // Verify Protocol Specific Config
 
@@ -81,30 +86,31 @@ contract RocketpoolDepositorTest is BaseAdapterTest {
             (address, address, uint24)
         );
         assertEq(
-            address(RocketpoolDepositor(address(strategy)).rocketStorage()),
+            address(
+                RocketpoolDepositor(payable(address(_strategy))).rocketStorage()
+            ),
             protocolConfig.registry
         );
-        assertEq(address(RocketpoolDepositor(address(strategy)).WETH()), _weth);
         assertEq(
-            address(RocketpoolDepositor(address(strategy)).uniSwapFee()),
+            address(RocketpoolDepositor(payable(address(_strategy))).WETH()),
+            _weth
+        );
+        assertEq(
+            address(
+                RocketpoolDepositor(payable(address(_strategy))).uniRouter()
+            ),
             _uniRouter
         );
         assertEq(
-            uint24(RocketpoolDepositor(address(strategy)).uniSwapFee()),
+            uint24(
+                RocketpoolDepositor(payable(address(_strategy))).uniSwapFee()
+            ),
             _uniSwapFee
         );
 
         // Verify Allowances
         assertEq(
-            rocketTokenRETH.allowance(address(strategy), address(_uniRouter)),
-            type(uint256).max,
-            "allowance"
-        );
-        assertEq(
-            rocketTokenRETH.allowance(
-                address(_strategy),
-                rocketTokenRETHAddress
-            ),
+            rETH.allowance(address(_strategy), address(_uniRouter)),
             type(uint256).max,
             "allowance"
         );
@@ -112,6 +118,10 @@ contract RocketpoolDepositorTest is BaseAdapterTest {
         // ------------------------
         // ------------------------
         // --- TEST FAILED INIT ---
+
+        _strategy = IBaseAdapter(
+            Clones.clone(address(new RocketpoolDepositor()))
+        );
 
         vm.startPrank(owner);
 
@@ -126,7 +136,7 @@ contract RocketpoolDepositorTest is BaseAdapterTest {
                 RocketpoolAdapter.LpTokenNotSupported.selector
             )
         );
-        IBaseAdapter(strategy).initialize(adapterConfig, protocolConfig);
+        _strategy.initialize(adapterConfig, protocolConfig);
 
         // Reset faulty Config
         adapterConfig.useLpToken = false;
@@ -138,7 +148,7 @@ contract RocketpoolDepositorTest is BaseAdapterTest {
         vm.mockCall(
             address(rocketStorage),
             abi.encodeWithSelector(
-                rocketStorage.getAddress.selector,
+                RocketStorageInterface.getAddress.selector,
                 keccak256(
                     abi.encodePacked("contract.address", "rocketDepositPool")
                 )
@@ -148,10 +158,10 @@ contract RocketpoolDepositorTest is BaseAdapterTest {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                RocketpoolAdapter.LpTokenNotSupported.selector
+                RocketpoolAdapter.InvalidAddress.selector
             )
         );
-        IBaseAdapter(strategy).initialize(adapterConfig, protocolConfig);
+        _strategy.initialize(adapterConfig, protocolConfig);
 
         // Reset faulty Config
         vm.clearMockedCalls();
@@ -163,7 +173,7 @@ contract RocketpoolDepositorTest is BaseAdapterTest {
         vm.mockCall(
             address(rocketStorage),
             abi.encodeWithSelector(
-                rocketStorage.getAddress.selector,
+                RocketStorageInterface.getAddress.selector,
                 keccak256(
                     abi.encodePacked("contract.address", "rocketTokenRETH")
                 )
@@ -173,10 +183,10 @@ contract RocketpoolDepositorTest is BaseAdapterTest {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                RocketpoolAdapter.LpTokenNotSupported.selector
+                RocketpoolAdapter.InvalidAddress.selector
             )
         );
-        IBaseAdapter(strategy).initialize(adapterConfig, protocolConfig);
+        _strategy.initialize(adapterConfig, protocolConfig);
 
         // Reset faulty Config
         vm.clearMockedCalls();
@@ -190,17 +200,22 @@ contract RocketpoolDepositorTest is BaseAdapterTest {
 
     /// @dev - This MUST be overriden to test that totalAssets adds up the the expected values
     function test__totalAssets() public override {
-        // TODO test totalAssets after deposit and than after increase in underlying balance
+        _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
+
+        vm.prank(bob);
+        strategy.deposit(testConfig.defaultAmount);
+
+        uint256 oldAssets = strategy.totalAssets();
+
+        assertApproxEqAbs(
+            oldAssets,
+            testConfig.defaultAmount,
+            testConfig.depositDelta
+        );
+
+        // Increase TotalAssets
+        // TODO -- increase the getEthValue()
+
+        assertGt(strategy.totalAssets(), oldAssets);
     }
-
-    /*//////////////////////////////////////////////////////////////
-                              HARVEST
-    //////////////////////////////////////////////////////////////*/
-    function test__harvest() public override {}
-
-    function test__disable_auto_harvest() public override {}
-
-    function test__setHarvestCooldown() public override {}
-
-    function test__setPerformanceFee() public override {}
 }

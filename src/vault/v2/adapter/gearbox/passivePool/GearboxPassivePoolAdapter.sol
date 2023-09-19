@@ -3,12 +3,9 @@
 
 pragma solidity ^0.8.15;
 
-import {
-    SafeERC20Upgradeable as SafeERC20
-} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
-import { IPoolService, IContractRegistry, IAddressProvider } from "../IGearbox.sol";
+import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
+import {IPoolService, IContractRegistry, IAddressProvider} from "../IGearbox.sol";
 import {BaseAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../../../base/BaseAdapter.sol";
-
 
 contract BeefyAdapter is BaseAdapter {
     using SafeERC20 for IERC20;
@@ -29,15 +26,24 @@ contract BeefyAdapter is BaseAdapter {
         if (_adapterConfig.useLpToken) revert LpTokenNotSupported();
 
         __BaseAdapter_init(_adapterConfig);
-        (uint256 _pid, address addressProvider)= abi.decode(_protocolConfig.protocolInitData, (uint256, address));
+        (uint256 _pid, address addressProvider) = abi.decode(
+            _protocolConfig.protocolInitData,
+            (uint256, address)
+        );
 
-        poolService = IPoolService(IContractRegistry(IAddressProvider(addressProvider)
-            .getContractsRegister())
-            .pools(_pid));
+        poolService = IPoolService(
+            IContractRegistry(
+                IAddressProvider(addressProvider).getContractsRegister()
+            ).pools(_pid)
+        );
         dieselToken = IERC20(poolService.dieselToken());
 
-        if (address (underlying) != poolService.underlyingToken()) revert WrongPool();
-        _adapterConfig.underlying.approve(address (poolService), type(uint256).max);
+        if (address(underlying) != poolService.underlyingToken())
+            revert WrongPool();
+        _adapterConfig.underlying.approve(
+            address(poolService),
+            type(uint256).max
+        );
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -52,15 +58,18 @@ contract BeefyAdapter is BaseAdapter {
         uint256 _totalDieselTokens = dieselToken.balanceOf(address(this));
 
         // roundUp to account for fromDiesel() ReoundDown
-        return _totalDieselTokens == 0 ? 0 : poolService.fromDiesel(_totalDieselTokens);
+        return
+            _totalDieselTokens == 0
+                ? 0
+                : poolService.fromDiesel(_totalDieselTokens);
     }
 
     /*//////////////////////////////////////////////////////////////
                             DEPOSIT LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function _deposit(uint256 amount) internal override {
-        underlying.safeTransferFrom(msg.sender, address(this), amount);
+    function _deposit(uint256 amount, address caller) internal override {
+        underlying.safeTransferFrom(caller, address(this), amount);
         _depositUnderlying(amount);
     }
 
@@ -77,7 +86,7 @@ contract BeefyAdapter is BaseAdapter {
     //////////////////////////////////////////////////////////////*/
 
     function _withdraw(uint256 amount, address receiver) internal override {
-        _withdrawUnderlying(amount);
+        if (!paused()) _withdrawUnderlying(amount);
         underlying.safeTransfer(receiver, amount);
     }
 
@@ -86,6 +95,9 @@ contract BeefyAdapter is BaseAdapter {
      * @dev This function must be overriden. Some farms require the user to into an lpToken before depositing others might use the underlying directly
      **/
     function _withdrawUnderlying(uint256 amount) internal override {
-        poolService.removeLiquidity(poolService.toDiesel(amount) + 1 + 1, address(this));
+        poolService.removeLiquidity(
+            poolService.toDiesel(amount) + 1 + 1,
+            address(this)
+        );
     }
 }

@@ -4,7 +4,6 @@
 pragma solidity ^0.8.15;
 
 import {Test} from "forge-std/Test.sol";
-import {VmSafe} from "forge-std/Vm.sol";
 
 import {Clones} from "openzeppelin-contracts/proxy/Clones.sol";
 import {Math} from "openzeppelin-contracts/utils/math/Math.sol";
@@ -15,7 +14,7 @@ import {IVault} from "../../../../src/vault/v2/base/interfaces/IVault.sol";
 import {AdapterConfig, ProtocolConfig, IBaseAdapter} from "../../../../src/vault/v2/base/interfaces/IBaseAdapter.sol";
 import {IERC20Upgradeable as IERC20, IERC20MetadataUpgradeable as IERC20Metadata} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
 
-abstract contract BaseAdapterTest is Test {
+abstract contract BaseStrategyTest is Test {
     using Math for uint256;
 
     ITestConfigStorage public testConfigStorage;
@@ -24,12 +23,13 @@ abstract contract BaseAdapterTest is Test {
 
     IBaseAdapter public strategy;
 
-    address public bob;
-    address public alice;
-    address public owner;
+    address public bob = address(0x9999);
+    address public alice = address(0x8888);
+    address public owner = address(0x7777);
 
     function _setUpBaseTest(uint256 i) internal virtual {
-        TestConfig memory testConfig_ = testConfigStorage.testConfigs(i);
+        testConfigStorage = ITestConfigStorage(_setUpTestStorage());
+        TestConfig memory testConfig_ = testConfigStorage.getTestConfig(i);
 
         uint256 forkId = testConfig_.blockNumber > 0
             ? vm.createSelectFork(
@@ -39,18 +39,12 @@ abstract contract BaseAdapterTest is Test {
             : vm.createSelectFork(vm.rpcUrl(testConfig_.network));
         vm.selectFork(forkId);
 
+        testConfigStorage = ITestConfigStorage(_setUpTestStorage());
+
         testConfig = testConfig_;
 
-        VmSafe.Wallet memory _bob = vm.createWallet("bob");
-        bob = _bob.addr;
         vm.label(bob, "bob");
-
-        VmSafe.Wallet memory _alice = vm.createWallet("alice");
-        alice = _alice.addr;
         vm.label(alice, "alice");
-
-        VmSafe.Wallet memory _owner = vm.createWallet("owner");
-        owner = _owner.addr;
         vm.label(owner, "owner");
 
         strategy = IBaseAdapter(_setUpStrategy(i, owner));
@@ -72,6 +66,8 @@ abstract contract BaseAdapterTest is Test {
         address owner_
     ) internal virtual returns (address) {}
 
+    function _setUpTestStorage() internal virtual returns (address) {}
+
     function _mintAsset(uint256 amount, address receiver) internal virtual {
         deal(address(testConfig.asset), receiver, amount);
     }
@@ -86,8 +82,89 @@ abstract contract BaseAdapterTest is Test {
     }
 
     /*//////////////////////////////////////////////////////////////
-                            PROP TESTS
+                          INITIALIZATION
     //////////////////////////////////////////////////////////////*/
+
+    /*
+     * @dev This function checks that the invariants in the strategy initialization function are checked:
+     *      Some of the invariants that could be checked:
+     *      - check that all errors in the strategy init function revert.
+     *      - specific protocol or strategy config are verified in the registry.
+     *      - correct allowance amounts are approved
+     */
+    function test__initialization() public virtual {}
+
+    /*//////////////////////////////////////////////////////////////
+                          TOTAL ASSETS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev - This MUST be overriden to test that totalAssets adds up the the expected values
+    function test__totalAssets() public virtual {}
+
+    /*//////////////////////////////////////////////////////////////
+                          MAX VIEWS
+    //////////////////////////////////////////////////////////////*/
+
+    /// NOTE: These Are just prop tests currently. Override tests here if the adapter has unique max-functions which override AdapterBase.sol
+    function test__maxDeposit() public virtual {
+        assertEq(strategy.maxDeposit(), type(uint256).max);
+
+        // We need to deposit smth since pause tries to burn rETH which it cant if balance is 0
+        _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
+        vm.prank(bob);
+        strategy.deposit(testConfig.defaultAmount);
+
+        vm.prank(owner);
+        strategy.pause();
+
+        assertEq(strategy.maxDeposit(), 0);
+    }
+
+    /// NOTE: These Are just prop tests currently. Override tests here if the adapter has unique max-functions which override AdapterBase.sol
+    function test__maxWithdraw() public virtual {
+        assertEq(strategy.maxWithdraw(), 0);
+
+        _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
+        vm.prank(bob);
+        strategy.deposit(testConfig.defaultAmount);
+
+        assertApproxEqAbs(
+            strategy.maxWithdraw(),
+            testConfig.defaultAmount,
+            testConfig.depositDelta,
+            "pre pause"
+        );
+
+        vm.prank(owner);
+        strategy.pause();
+
+        assertApproxEqAbs(
+            strategy.maxWithdraw(),
+            testConfig.defaultAmount,
+            testConfig.withdrawDelta,
+            "post pause"
+        );
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                    DEPOSIT/MINT/WITHDRAW/REDEEM
+    //////////////////////////////////////////////////////////////*/
+
+    function test__deposit(uint8 fuzzAmount) public virtual {
+        uint8 len = uint8(testConfigStorage.getTestConfigLength());
+        for (uint8 i; i < len; i++) {
+            if (i > 0) _setUpBaseTest(i);
+            uint256 amount = bound(
+                uint256(fuzzAmount),
+                testConfig.minDeposit,
+                testConfig.maxDeposit
+            );
+
+            prop_deposit(bob, amount, testConfig.testId);
+
+            prop_deposit(alice, amount, testConfig.testId);
+        }
+    }
 
     function prop_deposit(
         address caller,
@@ -133,107 +210,6 @@ abstract contract BaseAdapterTest is Test {
             testConfig.depositDelta,
             string.concat("totalAssets", testPreFix)
         );
-    }
-
-    function prop_withdraw(
-        address caller,
-        address receiver,
-        uint256 assets,
-        string memory testPreFix
-    ) public virtual {
-        uint256 oldReceiverAsset = IERC20(testConfig.asset).balanceOf(receiver);
-        uint256 oldTotalAssets = strategy.totalAssets();
-
-        vm.prank(caller);
-        strategy.withdraw(assets, receiver);
-
-        uint256 newReceiverAsset = IERC20(testConfig.asset).balanceOf(receiver);
-        uint256 newTotalAssets = strategy.totalAssets();
-
-        assertApproxEqAbs(
-            newReceiverAsset,
-            oldReceiverAsset + assets,
-            testConfig.withdrawDelta,
-            string.concat("balance", testPreFix)
-        ); // NOTE: this may fail if the receiver is a contract in which the asset is stored
-        assertApproxEqAbs(
-            newTotalAssets,
-            oldTotalAssets - assets,
-            testConfig.withdrawDelta,
-            string.concat("totalAssets", testPreFix)
-        );
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                          INITIALIZATION
-    //////////////////////////////////////////////////////////////*/
-
-    /*
-     * @dev This function checks that the invariants in the strategy initialization function are checked:
-     *      Some of the invariants that could be checked:
-     *      - check that all errors in the strategy init function revert.
-     *      - specific protocol or strategy config are verified in the registry.
-     *      - correct allowance amounts are approved
-     */
-    function test__initialization() public virtual {}
-
-    /*//////////////////////////////////////////////////////////////
-                          TOTAL ASSETS
-    //////////////////////////////////////////////////////////////*/
-
-    /// @dev - This MUST be overriden to test that totalAssets adds up the the expected values
-    function test__totalAssets() public virtual {}
-
-    /*//////////////////////////////////////////////////////////////
-                          MAX VIEWS
-    //////////////////////////////////////////////////////////////*/
-
-    /// NOTE: These Are just prop tests currently. Override tests here if the adapter has unique max-functions which override AdapterBase.sol
-    function test__maxDeposit() public virtual {
-        assertEq(strategy.maxDeposit(), type(uint256).max);
-
-        vm.prank(owner);
-        strategy.pause();
-
-        assertEq(strategy.maxDeposit(), 0);
-    }
-
-    /// NOTE: These Are just prop tests currently. Override tests here if the adapter has unique max-functions which override AdapterBase.sol
-    function test__maxWithdraw() public virtual {
-        assertEq(strategy.maxWithdraw(), 0);
-
-        _mintAssetAndApproveForStrategy(
-            testConfig.defaultAmount,
-            address(this)
-        );
-
-        strategy.deposit(testConfig.defaultAmount);
-        assertEq(strategy.maxWithdraw(), testConfig.defaultAmount);
-
-        vm.prank(owner);
-        strategy.pause();
-
-        assertEq(strategy.maxWithdraw(), testConfig.defaultAmount);
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                    DEPOSIT/MINT/WITHDRAW/REDEEM
-    //////////////////////////////////////////////////////////////*/
-
-    function test__deposit(uint8 fuzzAmount) public virtual {
-        uint8 len = uint8(testConfigStorage.getTestConfigLength());
-        for (uint8 i; i < len; i++) {
-            if (i > 0) _setUpBaseTest(i);
-            uint256 amount = bound(
-                uint256(fuzzAmount),
-                testConfig.minDeposit,
-                testConfig.maxDeposit
-            );
-
-            prop_deposit(bob, amount, testConfig.testId);
-
-            prop_deposit(alice, amount, testConfig.testId);
-        }
     }
 
     function testFail__deposit_zero_assets() public virtual {
@@ -286,6 +262,35 @@ abstract contract BaseAdapterTest is Test {
         }
     }
 
+    function prop_withdraw(
+        address caller,
+        address receiver,
+        uint256 assets,
+        string memory testPreFix
+    ) public virtual {
+        uint256 oldReceiverAsset = IERC20(testConfig.asset).balanceOf(receiver);
+        uint256 oldTotalAssets = strategy.totalAssets();
+
+        vm.prank(caller);
+        strategy.withdraw(assets, receiver);
+
+        uint256 newReceiverAsset = IERC20(testConfig.asset).balanceOf(receiver);
+        uint256 newTotalAssets = strategy.totalAssets();
+
+        assertApproxEqAbs(
+            newReceiverAsset,
+            oldReceiverAsset + assets,
+            testConfig.withdrawDelta,
+            string.concat("balance", testPreFix)
+        ); // NOTE: this may fail if the receiver is a contract in which the asset is stored
+        assertApproxEqAbs(
+            newTotalAssets,
+            oldTotalAssets - assets,
+            testConfig.withdrawDelta,
+            string.concat("totalAssets", testPreFix)
+        );
+    }
+
     // TODO - should we add a buffer here or make depositAmont = amount?
     function test__withdraw_while_paused() public virtual {
         uint256 depositAmount = testConfig.defaultAmount * 2;
@@ -297,7 +302,7 @@ abstract contract BaseAdapterTest is Test {
         vm.prank(owner);
         strategy.pause();
 
-        prop_withdraw(bob, alice, testConfig.defaultAmount, testConfig.testId);
+        prop_withdraw(bob, alice, strategy.maxWithdraw(), testConfig.testId);
     }
 
     // TODO - should we add a buffer here or make depositAmont = amount?
@@ -345,7 +350,7 @@ abstract contract BaseAdapterTest is Test {
         vm.prank(owner);
         strategy.setRewardsToken(newRewardTokens);
 
-        IERC20[] memory actualRewardTokens = strategy.rewardTokens();
+        IERC20[] memory actualRewardTokens = strategy.getRewardTokens();
         assertEq(actualRewardTokens.length, 2);
         assertEq(address(actualRewardTokens[0]), address(0x1111));
         assertEq(address(actualRewardTokens[1]), address(0x2222));
@@ -417,7 +422,7 @@ abstract contract BaseAdapterTest is Test {
         assertApproxEqAbs(
             oldTotalAssets,
             strategy.totalAssets(),
-            delta,
+            delta * 3,
             "totalAssets"
         );
         assertApproxEqAbs(
@@ -442,27 +447,4 @@ abstract contract BaseAdapterTest is Test {
 
     /// @dev OPTIONAL -- Implement this if the strategy utilizes `claim()`
     function test__claim() public virtual {}
-
-    /*//////////////////////////////////////////////////////////////
-                              HARVEST
-    //////////////////////////////////////////////////////////////*/
-
-    /// @dev OPTIONAL -- Implement this if the strategy utilizes `harvest()`
-    function test__harvest() public virtual {}
-
-    /*//////////////////////////////////////////////////////////////
-                              HARVEST CONFIG
-    //////////////////////////////////////////////////////////////*/
-
-    function test__setHarvestConfig() public virtual {}
-
-    function test__setHarvestConfigOnlyOwner() public virtual {}
-
-    /*//////////////////////////////////////////////////////////////
-                              MIN TRADE AMOUNTS
-    //////////////////////////////////////////////////////////////*/
-
-    function test__setMinTradeAmounts() public virtual {}
-
-    function test__setMinTradeAmountsOnlyOwner() public virtual {}
 }

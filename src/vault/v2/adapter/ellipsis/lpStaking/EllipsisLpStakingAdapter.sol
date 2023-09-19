@@ -7,7 +7,6 @@ import {IEllipsis, ILpStaking, IAddressProvider} from "../IEllipsis.sol";
 import {BaseAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../../../base/BaseAdapter.sol";
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
-
 contract EllipsisLpStakingAdapter is BaseAdapter {
     using SafeERC20 for IERC20;
 
@@ -28,7 +27,8 @@ contract EllipsisLpStakingAdapter is BaseAdapter {
         uint256 pId = abi.decode(_protocolConfig.protocolInitData, (uint256));
         lpStaking = ILpStaking(_protocolConfig.registry);
 
-        if (lpStaking.registeredTokens(pId) != address(lpToken)) revert InvalidToken();
+        if (lpStaking.registeredTokens(pId) != address(lpToken))
+            revert InvalidToken();
 
         _adapterConfig.lpToken.approve(address(lpStaking), type(uint256).max);
     }
@@ -42,14 +42,15 @@ contract EllipsisLpStakingAdapter is BaseAdapter {
      * @dev This function must be overriden. If the farm requires the usage of lpToken than this function must convert lpToken balance into underlying balance
      */
     function _totalLP() internal view override returns (uint256) {
-        return lpStaking.userInfo(address(lpToken), address(this)).depositAmount;
+        return
+            lpStaking.userInfo(address(lpToken), address(this)).depositAmount;
     }
 
     /*//////////////////////////////////////////////////////////////
                             DEPOSIT LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function _deposit(uint256 amount) internal override {
+    function _deposit(uint256 amount, address caller) internal override {
         _depositLP(amount);
     }
 
@@ -58,7 +59,7 @@ contract EllipsisLpStakingAdapter is BaseAdapter {
      * @dev This function must be overriden. Some farms require the user to into an lpToken before depositing others might use the underlying directly
      **/
     function _depositLP(uint256 amount) internal override {
-        lpStaking.deposit(address (lpToken), amount, false);
+        lpStaking.deposit(address(lpToken), amount, false);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -66,7 +67,7 @@ contract EllipsisLpStakingAdapter is BaseAdapter {
     //////////////////////////////////////////////////////////////*/
 
     function _withdraw(uint256 amount, address receiver) internal override {
-        _withdrawLP(amount);
+        if (!paused()) _withdrawLP(amount);
         lpToken.safeTransfer(receiver, amount);
     }
 
@@ -75,7 +76,7 @@ contract EllipsisLpStakingAdapter is BaseAdapter {
      * @dev This function must be overriden. Some farms require the user to into an lpToken before depositing others might use the underlying directly
      **/
     function _withdrawLP(uint256 amount) internal override {
-        lpStaking.withdraw(address (lpToken), amount, false);
+        lpStaking.withdraw(address(lpToken), amount, false);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -86,7 +87,6 @@ contract EllipsisLpStakingAdapter is BaseAdapter {
      * @notice Claims rewards
      */
     function _claim() internal override {
-        try lpStaking.claim(address(this), _rewardToken) {
-        } catch {}
+        try lpStaking.claim(address(this), _rewardToken) {} catch {}
     }
 }

@@ -62,8 +62,8 @@ contract CompoundV3Adapter is BaseAdapter {
     //////////////////////////////////////////////////////////////*/
     error SupplyPaused();
 
-    function _deposit(uint256 amount) internal override {
-        underlying.safeTransferFrom(msg.sender, address(this), amount);
+    function _deposit(uint256 amount, address caller) internal override {
+        underlying.safeTransferFrom(caller, address(this), amount);
         _depositUnderlying(amount);
     }
 
@@ -82,7 +82,7 @@ contract CompoundV3Adapter is BaseAdapter {
     error WithdrawPaused();
 
     function _withdraw(uint256 amount, address receiver) internal override {
-        _withdrawUnderlying(amount);
+        if (!paused()) _withdrawUnderlying(amount);
         underlying.safeTransfer(receiver, amount);
     }
 
