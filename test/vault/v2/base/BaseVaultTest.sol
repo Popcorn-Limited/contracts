@@ -70,7 +70,7 @@ abstract contract BaseVaultTest is Test {
             address(adapter)
         );
 
-        assertEq(newVault.name(), "VaultCraft SingleStrategyVault");
+        assertEq(newVault.name(), _getVaultConfig().name);
         assertEq(newVault.symbol(), "vc-TKN");
         assertEq(newVault.decimals(), 27);
 
@@ -91,5 +91,16 @@ abstract contract BaseVaultTest is Test {
         assertEq(newVault.quitPeriod(), 3 days);
         assertEq(asset.allowance(address(newVault), address(adapter)), type(uint256).max);
     }
+
+    function testFail__initialize_strategy_is_addressZero() public {
+        IVault vault = _createVault();
+        vm.label(address(vault), "vault");
+
+        vault.initialize(
+            _getVaultConfig(),
+            address(0)
+        );
+    }
+
 
 }

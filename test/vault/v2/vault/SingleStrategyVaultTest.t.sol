@@ -17,8 +17,6 @@ import {
     SafeERC20Upgradeable as SafeERC20
 } from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "../../../../src/vault/v2/vaults/SingleStrategyVault.sol";
-//import {BaseVault, IERC20, BaseVaultConfig, VaultFees} from "../base/BaseVault.sol";
-//import {IBaseAdapter} from "../base/interfaces/IBaseAdapter.sol";
 
 contract SingleStrategyVaultTest is BaseVaultTest {
     IERC20[] public rewardTokens;
