@@ -157,9 +157,7 @@ contract RocketpoolDepositorTest is BaseStrategyTest {
         );
 
         vm.expectRevert(
-            abi.encodeWithSelector(
-                RocketpoolAdapter.InvalidAddress.selector
-            )
+            abi.encodeWithSelector(RocketpoolAdapter.InvalidAddress.selector)
         );
         _strategy.initialize(adapterConfig, protocolConfig);
 
@@ -182,9 +180,7 @@ contract RocketpoolDepositorTest is BaseStrategyTest {
         );
 
         vm.expectRevert(
-            abi.encodeWithSelector(
-                RocketpoolAdapter.InvalidAddress.selector
-            )
+            abi.encodeWithSelector(RocketpoolAdapter.InvalidAddress.selector)
         );
         _strategy.initialize(adapterConfig, protocolConfig);
 
@@ -211,6 +207,11 @@ contract RocketpoolDepositorTest is BaseStrategyTest {
             oldAssets,
             testConfig.defaultAmount,
             testConfig.depositDelta
+        );
+
+        assertEq(
+            oldAssets,
+            rETH.getEthValue(rETH.balanceOf(address(strategy)))
         );
 
         // Increase TotalAssets
