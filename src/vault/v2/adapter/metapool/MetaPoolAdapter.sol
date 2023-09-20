@@ -8,7 +8,6 @@ import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/
 import {BaseAdapter, IERC20, AdapterConfig, ProtocolConfig, IERC20Metadata} from "../../base/BaseAdapter.sol";
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
-
 contract MetaPoolAdapter is BaseAdapter {
     using Math for uint256;
     using SafeERC20 for IERC20;
@@ -31,19 +30,21 @@ contract MetaPoolAdapter is BaseAdapter {
         AdapterConfig memory _adapterConfig,
         ProtocolConfig memory _protocolConfig
     ) internal onlyInitializing {
-        if(!_adapterConfig.useLpToken) revert LpTokenSupported();
+        if (!_adapterConfig.useLpToken) revert LpTokenSupported();
         __BaseAdapter_init(_adapterConfig);
 
         iPool = IMetaPool(_protocolConfig.registry);
-        if (address(iPool.wNear()) != address (lpToken))
-            revert NotValidAsset(address (lpToken));
+        if (address(iPool.wNear()) != address(lpToken))
+            revert NotValidAsset(address(lpToken));
 
         stNear = iPool.stNear();
         wNear = iPool.wNear();
 
-
         IERC20(stNear).safeApprove(_protocolConfig.registry, type(uint256).max);
-        _adapterConfig.lpToken.approve(address (_protocolConfig.registry), type(uint256).max);
+        _adapterConfig.lpToken.approve(
+            address(_protocolConfig.registry),
+            type(uint256).max
+        );
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -56,21 +57,20 @@ contract MetaPoolAdapter is BaseAdapter {
      * lpToken balance into lpToken balance
      */
     function _totalLP() internal view override returns (uint256) {
-        return (
-            stNear.balanceOf(address(this)) *
-            (BPS_DENOMINATOR - iPool.wNearSwapFee()) *
-            iPool.stNearPrice()
-        ) / BPS_DENOMINATOR / (10 ** stNearDecimals);
+        return
+            (stNear.balanceOf(address(this)) *
+                (BPS_DENOMINATOR - iPool.wNearSwapFee()) *
+                iPool.stNearPrice()) /
+            BPS_DENOMINATOR /
+            (10 ** stNearDecimals);
     }
-
-
 
     /*//////////////////////////////////////////////////////////////
                             DEPOSIT LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function _deposit(uint256 amount) internal override {
-        lpToken.safeTransferFrom(msg.sender, address(this), amount);
+    function _deposit(uint256 amount, address caller) internal override {
+        lpToken.safeTransferFrom(caller, address(this), amount);
         _depositLP(amount);
     }
 
@@ -83,12 +83,11 @@ contract MetaPoolAdapter is BaseAdapter {
         iPool.swapwNEARForstNEAR(amount);
     }
 
-
     /*//////////////////////////////////////////////////////////////
                             WITHDRAWAL LOGIC
     //////////////////////////////////////////////////////////////*/
     function _withdraw(uint256 amount, address receiver) internal override {
-        _withdrawLP(amount);
+        if (!paused()) _withdrawLP(amount);
         underlying.safeTransfer(receiver, amount);
     }
 
@@ -104,15 +103,15 @@ contract MetaPoolAdapter is BaseAdapter {
     /// @notice The amount of ellipsis shares to withdraw given an amount of adapter shares
     function convertToUnderlyingShares(
         uint256 shares
-    ) public view  returns (uint256) {
+    ) public view returns (uint256) {
         uint256 supply = _totalLP();
         return
             supply == 0
                 ? shares
                 : shares.mulDiv(
-                stNear.balanceOf(address(this)),
-                supply,
-                Math.Rounding.Up
-            );
+                    stNear.balanceOf(address(this)),
+                    supply,
+                    Math.Rounding.Up
+                );
     }
 }

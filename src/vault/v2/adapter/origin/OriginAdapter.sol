@@ -26,11 +26,15 @@ contract OriginAdapter is BaseAdapter {
         if (_adapterConfig.useLpToken) revert LpTokenNotSupported();
         __BaseAdapter_init(_adapterConfig);
 
-        address _wAsset = abi.decode(_protocolConfig.protocolInitData, (address));
+        address _wAsset = abi.decode(
+            _protocolConfig.protocolInitData,
+            (address)
+        );
 
         if (!IPermissionRegistry(_protocolConfig.registry).endorsed(_wAsset))
             revert NotEndorsed();
-        if (IERC4626(_wAsset).asset() != address (underlying)) revert InvalidAsset();
+        if (IERC4626(_wAsset).asset() != address(underlying))
+            revert InvalidAsset();
 
         _adapterConfig.underlying.approve(_wAsset, type(uint256).max);
     }
@@ -51,8 +55,8 @@ contract OriginAdapter is BaseAdapter {
                             DEPOSIT LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function _deposit(uint256 amount) internal override {
-        underlying.safeTransferFrom(msg.sender, address(this), amount);
+    function _deposit(uint256 amount, address caller) internal override {
+        underlying.safeTransferFrom(caller, address(this), amount);
         _depositUnderlying(amount);
     }
 
@@ -69,7 +73,7 @@ contract OriginAdapter is BaseAdapter {
     //////////////////////////////////////////////////////////////*/
 
     function _withdraw(uint256 amount, address receiver) internal override {
-        _withdrawUnderlying(amount);
+        if (!paused()) _withdrawUnderlying(amount);
         underlying.safeTransfer(receiver, amount);
     }
 

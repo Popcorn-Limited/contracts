@@ -2,11 +2,20 @@
 // Docgen-SOLC: 0.8.15
 
 pragma solidity ^0.8.15;
-import "./IRocketpool.sol";
+
 import {UniswapV3Utils, IUniV3Pool} from "../../../../utils/UniswapV3Utils.sol";
 import {BaseAdapter, IERC20 as ERC20, AdapterConfig, ProtocolConfig} from "../../base/BaseAdapter.sol";
 import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
+import {
+    IWETH,
+    ICurveMetapool,
+    RocketStorageInterface,
+    RocketTokenRETHInterface,
+    RocketDepositPoolInterface,
+    RocketDepositSettingsInterface,
+    RocketNetworkBalancesInterface
+} from "./IRocketpool.sol";
 
 contract RocketpoolAdapter is BaseAdapter {
     using SafeERC20 for ERC20;
@@ -17,13 +26,11 @@ contract RocketpoolAdapter is BaseAdapter {
 
     bytes32 public constant rocketDepositPoolKey =
         keccak256(abi.encodePacked("contract.address", "rocketDepositPool"));
-    bytes32 public constant rocketTokenRETHKey =
+    bytes32 public constant rETHKey =
         keccak256(abi.encodePacked("contract.address", "rocketTokenRETH"));
 
-    IWETH public constant WETH =
-        IWETH(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
-    RocketStorageInterface public constant rocketStorage =
-        RocketStorageInterface(0x1d8f8f00cfa6758d7bE78336684788Fb0ee0Fa46);
+    IWETH public WETH;
+    RocketStorageInterface public rocketStorage;
 
     error NoSharesBurned();
     error InvalidAddress();
@@ -37,27 +44,26 @@ contract RocketpoolAdapter is BaseAdapter {
         if (_adapterConfig.useLpToken) revert LpTokenNotSupported();
         __BaseAdapter_init(_adapterConfig);
 
-        (
-            address _uniRouter,
-            uint24 _uniSwapFee
-        ) = abi.decode(
-            _protocolConfig.protocolInitData, (address , uint24 )
-        );
-
+        rocketStorage = RocketStorageInterface(_protocolConfig.registry); // TODO what are the security assumptions here? Where does this data come from?
+        (address _weth, address _uniRouter, uint24 _uniSwapFee) = abi.decode(
+            _protocolConfig.protocolInitData,
+            (address, address, uint24)
+        ); // TODO what are the security assumptions here? Where does this data come from?
+        WETH = IWETH(_weth);
         uniRouter = _uniRouter;
         uniSwapFee = _uniSwapFee;
 
-        address rocketDepositPoolAddress = rocketStorage.getAddress(rocketDepositPoolKey);
-        address rocketTokenRETHAddress = rocketStorage.getAddress(rocketTokenRETHKey);
+        address rocketDepositPoolAddress = rocketStorage.getAddress(
+            rocketDepositPoolKey
+        );
+        address rETHAddress = rocketStorage.getAddress(rETHKey);
 
-        if(
-            rocketDepositPoolAddress == address(0) ||
-            rocketTokenRETHAddress == address(0)
-        ) revert InvalidAddress();
+        if (rocketDepositPoolAddress == address(0) || rETHAddress == address(0))
+            revert InvalidAddress();
 
-        RocketTokenRETHInterface rocketTokenRETH = RocketTokenRETHInterface(rocketTokenRETHAddress);
-        rocketTokenRETH.approve(rocketTokenRETHAddress, type(uint256).max);
-        rocketTokenRETH.approve(uniRouter, type(uint256).max);
+        RocketTokenRETHInterface rETH = RocketTokenRETHInterface(rETHAddress);
+
+        rETH.approve(uniRouter, type(uint256).max);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -66,19 +72,20 @@ contract RocketpoolAdapter is BaseAdapter {
 
     /**
      * @notice Returns the total amount of underlying assets.
-     * @dev This function must be overriden. If the farm requires the usage of lpToken than this function must convert lpToken balance into underlying balance
+     * @dev This function must be overridden. If the farm requires the usage of lpToken than this function
+     * must convert lpToken balance into underlying balance
      */
     function _totalUnderlying() internal view override returns (uint256) {
-        RocketTokenRETHInterface rocketTokenRETH = _getRocketToken();
-        return rocketTokenRETH.getEthValue(rocketTokenRETH.balanceOf(address (this)));
+        RocketTokenRETHInterface rETH = _getRocketToken();
+        return rETH.getEthValue(rETH.balanceOf(address(this)));
     }
 
     /*//////////////////////////////////////////////////////////////
                             DEPOSIT LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function _deposit(uint256 amount) internal override {
-        underlying.safeTransferFrom(msg.sender, address(this), amount);
+    function _deposit(uint256 amount, address caller) internal override {
+        underlying.safeTransferFrom(caller, address(this), amount); // TODO -- if caller is address(this) (from unpause) we shouldnt call this
         _depositUnderlying(amount);
     }
 
@@ -97,27 +104,27 @@ contract RocketpoolAdapter is BaseAdapter {
     //////////////////////////////////////////////////////////////*/
 
     function _withdraw(uint256 amount, address receiver) internal override {
-        _withdrawUnderlying(amount);
+        if (!paused()) _withdrawUnderlying(amount);
         underlying.safeTransfer(receiver, amount);
     }
 
     /**
      * @notice Withdraws underlying asset. If necessary it converts the lpToken into underlying before withdrawing
-     * @dev This function must be overridden. Some farms require the user to into an lpToken before depositing others might use the underlying directly
+     * @dev This function must be overridden. Some farms require the user to into an lpToken before depositing
+     * others might use the underlying directly
      **/
     function _withdrawUnderlying(uint256 amount) internal override {
-        uint256 rETHShares = convertToUnderlyingShares(amount);
-        RocketTokenRETHInterface rocketTokenRETH = _getRocketToken();
-        if(rocketTokenRETH.getTotalCollateral()
-            > rocketTokenRETH.getEthValue(rETHShares)
-        ) {
-            rocketTokenRETH.burn(rETHShares);
+        RocketTokenRETHInterface rETH = _getRocketToken();
+        uint256 rETHShares = rETH.getRethValue(amount) + 1;
+
+        if (rETH.getTotalCollateral() > amount) {
+            rETH.burn(rETHShares);
             WETH.deposit{value: amount}();
         } else {
             //if there isn't enough ETH in the rocket pool, we swap rETH directly for WETH
             UniswapV3Utils.swap(
                 uniRouter,
-                address(rocketTokenRETH),
+                address(rETH),
                 address(underlying),
                 uniSwapFee,
                 rETHShares
@@ -133,10 +140,10 @@ contract RocketpoolAdapter is BaseAdapter {
             supply == 0
                 ? shares
                 : shares.mulDiv(
-                _getRocketToken().balanceOf(address(this)),
-                supply,
-                Math.Rounding.Up
-            );
+                    _getRocketToken().balanceOf(address(this)),
+                    supply,
+                    Math.Rounding.Up
+                );
     }
 
     receive() external payable {}
@@ -144,11 +151,22 @@ contract RocketpoolAdapter is BaseAdapter {
     /*//////////////////////////////////////////////////////////////
                             HELPERS
     //////////////////////////////////////////////////////////////*/
-    function _getDepositPool() internal view returns(RocketDepositPoolInterface) {
-        return RocketDepositPoolInterface(rocketStorage.getAddress(rocketDepositPoolKey));
+    function _getDepositPool()
+        internal
+        view
+        returns (RocketDepositPoolInterface)
+    {
+        return
+            RocketDepositPoolInterface(
+                rocketStorage.getAddress(rocketDepositPoolKey)
+            );
     }
 
-    function _getRocketToken() internal view returns(RocketTokenRETHInterface) {
-        return RocketTokenRETHInterface(rocketStorage.getAddress(rocketTokenRETHKey));
+    function _getRocketToken()
+        internal
+        view
+        returns (RocketTokenRETHInterface)
+    {
+        return RocketTokenRETHInterface(rocketStorage.getAddress(rETHKey));
     }
 }

@@ -39,7 +39,10 @@ contract AaveV3Adapter is BaseAdapter {
         lendingPool = ILendingPool(aToken.POOL());
         aaveIncentives = IAaveIncentives(aToken.getIncentivesController());
 
-        _adapterConfig.underlying.approve(address(lendingPool), type(uint256).max);
+        _adapterConfig.underlying.approve(
+            address(lendingPool),
+            type(uint256).max
+        );
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -58,8 +61,8 @@ contract AaveV3Adapter is BaseAdapter {
                             DEPOSIT LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function _deposit(uint256 amount) internal override {
-        underlying.safeTransferFrom(msg.sender, address(this), amount);
+    function _deposit(uint256 amount, address caller) internal override {
+        underlying.safeTransferFrom(caller, address(this), amount);
         _depositUnderlying(amount);
     }
 
@@ -76,7 +79,7 @@ contract AaveV3Adapter is BaseAdapter {
     //////////////////////////////////////////////////////////////*/
 
     function _withdraw(uint256 amount, address receiver) internal override {
-        _withdrawUnderlying(amount);
+        if (!paused()) _withdrawUnderlying(amount);
         underlying.safeTransfer(receiver, amount);
     }
 

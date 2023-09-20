@@ -2,28 +2,10 @@
 // Docgen-SOLC: 0.8.15
 
 pragma solidity ^0.8.15;
-import {
-    IRToken,
-    ILendingPool,
-    IRewardMinter,
-    IRadiantMining,
-    IProtocolDataProvider,
-    IIncentivesController,
-    IMiddleFeeDistributor
-} from "./IRadiant.sol";
-import {
-    IERC20,
-    BaseAdapter,
-    AdapterConfig,
-    ProtocolConfig
-} from "../../base/BaseAdapter.sol";
-import {
-    MathUpgradeable as Math
-} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
-import {
-    SafeERC20Upgradeable as SafeERC20
-} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
-
+import {IRToken, ILendingPool, IRewardMinter, IRadiantMining, IProtocolDataProvider, IIncentivesController, IMiddleFeeDistributor} from "./IRadiant.sol";
+import {IERC20, BaseAdapter, AdapterConfig, ProtocolConfig} from "../../base/BaseAdapter.sol";
+import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
+import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
 contract RadiantAdapter is BaseAdapter {
     using SafeERC20 for IERC20;
@@ -50,7 +32,6 @@ contract RadiantAdapter is BaseAdapter {
     error LpTokenNotSupported();
     error DifferentAssets(address asset, address underlying);
 
-
     function __RadiantAdapter_init(
         AdapterConfig memory _adapterConfig,
         ProtocolConfig memory _protocolConfig
@@ -58,23 +39,29 @@ contract RadiantAdapter is BaseAdapter {
         if (_adapterConfig.useLpToken) revert LpTokenNotSupported();
         __BaseAdapter_init(_adapterConfig);
 
-        (address radiantDataProvider) = abi.decode(
+        address radiantDataProvider = abi.decode(
             _protocolConfig.protocolInitData,
             (address)
         );
 
         (address _rToken, , ) = IProtocolDataProvider(radiantDataProvider)
-            .getReserveTokensAddresses(address (underlying));
+            .getReserveTokensAddresses(address(underlying));
 
         rToken = IRToken(_rToken);
-        if (rToken.UNDERLYING_ASSET_ADDRESS() != address (underlying))
-            revert DifferentAssets(rToken.UNDERLYING_ASSET_ADDRESS(), address (underlying));
+        if (rToken.UNDERLYING_ASSET_ADDRESS() != address(underlying))
+            revert DifferentAssets(
+                rToken.UNDERLYING_ASSET_ADDRESS(),
+                address(underlying)
+            );
 
         lendingPool = ILendingPool(rToken.POOL());
         controller = IIncentivesController(rToken.getIncentivesController());
         IRewardMinter minter = IRewardMinter(controller.rewardMinter());
 
-        _adapterConfig.underlying.approve(address (lendingPool), type(uint256).max);
+        _adapterConfig.underlying.approve(
+            address(lendingPool),
+            type(uint256).max
+        );
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -93,8 +80,8 @@ contract RadiantAdapter is BaseAdapter {
                             DEPOSIT LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function _deposit(uint256 amount) internal override {
-        underlying.safeTransferFrom(msg.sender, address(this), amount);
+    function _deposit(uint256 amount, address caller) internal override {
+        underlying.safeTransferFrom(caller, address(this), amount);
         _depositUnderlying(amount);
     }
 
@@ -103,7 +90,7 @@ contract RadiantAdapter is BaseAdapter {
      * @dev This function must be overriden. Some farms require the user to into an lpToken before depositing others might use the underlying directly
      **/
     function _depositUnderlying(uint256 amount) internal override {
-        lendingPool.deposit(address (underlying), amount, address(this), 0);
+        lendingPool.deposit(address(underlying), amount, address(this), 0);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -111,7 +98,7 @@ contract RadiantAdapter is BaseAdapter {
     //////////////////////////////////////////////////////////////*/
 
     function _withdraw(uint256 amount, address receiver) internal override {
-        _withdrawUnderlying(amount);
+        if (!paused()) _withdrawUnderlying(amount);
         underlying.safeTransfer(receiver, amount);
     }
 
@@ -120,7 +107,7 @@ contract RadiantAdapter is BaseAdapter {
      * @dev This function must be overriden. Some farms require the user to into an lpToken before depositing others might use the underlying directly
      **/
     function _withdrawUnderlying(uint256 amount) internal override {
-        lendingPool.withdraw(address (underlying), amount, address(this));
+        lendingPool.withdraw(address(underlying), amount, address(this));
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -133,7 +120,6 @@ contract RadiantAdapter is BaseAdapter {
     function _claim() internal override {
         if (address(controller) == address(0)) return;
 
-        try controller.claimAll(address(this)) {
-        } catch {}
+        try controller.claimAll(address(this)) {} catch {}
     }
 }

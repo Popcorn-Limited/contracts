@@ -9,7 +9,6 @@ import {BaseAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../../../base/
 import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
-
 contract EllipsisPoolAdapter is BaseAdapter {
     using Math for uint256;
     using SafeERC20 for IERC20;
@@ -30,25 +29,46 @@ contract EllipsisPoolAdapter is BaseAdapter {
 
         __BaseAdapter_init(_adapterConfig);
 
-        (   address _ellipsisPool,
+        (
+            address _ellipsisPool,
             address _addressProvider,
             address _ellipsisLPStaking
-        ) = abi.decode(_protocolConfig.protocolInitData, (address,address,address));
+        ) = abi.decode(
+                _protocolConfig.protocolInitData,
+                (address, address, address)
+            );
 
-        if (!IPermissionRegistry(_protocolConfig.registry).endorsed(_ellipsisPool))
-            revert NotEndorsed(_ellipsisPool);
-        if (!IPermissionRegistry(_protocolConfig.registry).endorsed(_addressProvider))
-            revert NotEndorsed(_addressProvider);
-        if (!IPermissionRegistry(_protocolConfig.registry).endorsed(_ellipsisLPStaking))
-            revert NotEndorsed(_ellipsisLPStaking);
+        if (
+            !IPermissionRegistry(_protocolConfig.registry).endorsed(
+                _ellipsisPool
+            )
+        ) revert NotEndorsed(_ellipsisPool);
+        if (
+            !IPermissionRegistry(_protocolConfig.registry).endorsed(
+                _addressProvider
+            )
+        ) revert NotEndorsed(_addressProvider);
+        if (
+            !IPermissionRegistry(_protocolConfig.registry).endorsed(
+                _ellipsisLPStaking
+            )
+        ) revert NotEndorsed(_ellipsisLPStaking);
 
         ellipsisPool = _ellipsisPool;
         addressProvider = _addressProvider;
         ellipsisLPStaking = _ellipsisLPStaking;
-        lpToken = IERC20( IAddressProvider(_addressProvider).get_lp_token(_ellipsisPool) );
+        lpToken = IERC20(
+            IAddressProvider(_addressProvider).get_lp_token(_ellipsisPool)
+        );
 
-        _adapterConfig.lpToken.approve(address(_ellipsisLPStaking), type(uint256).max);
-        _adapterConfig.underlying.approve(address(_ellipsisPool), type(uint256).max);
+        _adapterConfig.lpToken.approve(
+            address(_ellipsisLPStaking),
+            type(uint256).max
+        );
+        _adapterConfig.underlying.approve(
+            address(_ellipsisPool),
+            type(uint256).max
+        );
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -60,15 +80,24 @@ contract EllipsisPoolAdapter is BaseAdapter {
      * @dev This function must be overriden. If the farm requires the usage of lpToken than this function must convert lpToken balance into underlying balance
      */
     function _totalUnderlying() internal view override returns (uint256) {
-        uint256 lpBalance = ILpStaking(ellipsisLPStaking).userInfo(address (lpToken), address(this)).depositAmount;
+        uint256 lpBalance = ILpStaking(ellipsisLPStaking)
+            .userInfo(address(lpToken), address(this))
+            .depositAmount;
 
         if (lpBalance > 0) {
-            uint256 n_coins = IAddressProvider(addressProvider).get_n_coins(ellipsisPool);
+            uint256 n_coins = IAddressProvider(addressProvider).get_n_coins(
+                ellipsisPool
+            );
 
-            address[4] memory coins = IAddressProvider(addressProvider).get_coins(ellipsisPool);
+            address[4] memory coins = IAddressProvider(addressProvider)
+                .get_coins(ellipsisPool);
             for (uint256 i = 0; i < n_coins; i++) {
-                if (coins[i] == address (underlying)) {
-                    return IEllipsis(ellipsisPool).calc_withdraw_one_coin(lpBalance, int128(uint128(i)));
+                if (coins[i] == address(underlying)) {
+                    return
+                        IEllipsis(ellipsisPool).calc_withdraw_one_coin(
+                            lpBalance,
+                            int128(uint128(i))
+                        );
                 }
             }
         }
@@ -79,8 +108,8 @@ contract EllipsisPoolAdapter is BaseAdapter {
                             DEPOSIT LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function _deposit(uint256 amount) internal override {
-        underlying.safeTransferFrom(msg.sender, address(this), amount);
+    function _deposit(uint256 amount, address caller) internal override {
+        underlying.safeTransferFrom(caller, address(this), amount);
         _depositUnderlying(amount);
     }
 
@@ -90,12 +119,15 @@ contract EllipsisPoolAdapter is BaseAdapter {
      **/
     function _depositUnderlying(uint256 amount) internal override {
         if (address(ellipsisLPStaking) != address(0)) {
-            uint256 n_coins = IAddressProvider(addressProvider).get_n_coins(ellipsisPool);
-            address[4] memory coins = IAddressProvider(addressProvider).get_coins(ellipsisPool);
+            uint256 n_coins = IAddressProvider(addressProvider).get_n_coins(
+                ellipsisPool
+            );
+            address[4] memory coins = IAddressProvider(addressProvider)
+                .get_coins(ellipsisPool);
             if (n_coins == 2) {
                 uint256[2] memory amounts;
                 for (uint i = 0; i < n_coins; i++) {
-                    if (coins[i] == address (underlying)) {
+                    if (coins[i] == address(underlying)) {
                         amounts[i] = amount;
                     }
                 }
@@ -103,7 +135,7 @@ contract EllipsisPoolAdapter is BaseAdapter {
             } else if (n_coins == 3) {
                 uint256[3] memory amounts;
                 for (uint i = 0; i < n_coins; i++) {
-                    if (coins[i] == address (underlying)) {
+                    if (coins[i] == address(underlying)) {
                         amounts[i] = amount;
                     } else {
                         amounts[i] = 0;
@@ -113,14 +145,18 @@ contract EllipsisPoolAdapter is BaseAdapter {
             } else {
                 uint256[4] memory amounts;
                 for (uint i = 0; i < n_coins; i++) {
-                    if (coins[i] == address (underlying)) {
+                    if (coins[i] == address(underlying)) {
                         amounts[i] = amount;
                     }
                 }
                 IEllipsis(ellipsisPool).add_liquidity(amounts, 0);
             }
 
-            ILpStaking(ellipsisLPStaking).deposit(address(lpToken), IERC20(lpToken).balanceOf(address(this)), false);
+            ILpStaking(ellipsisLPStaking).deposit(
+                address(lpToken),
+                IERC20(lpToken).balanceOf(address(this)),
+                false
+            );
         }
     }
 
@@ -129,7 +165,7 @@ contract EllipsisPoolAdapter is BaseAdapter {
     //////////////////////////////////////////////////////////////*/
 
     function _withdraw(uint256 amount, address receiver) internal override {
-        _withdrawUnderlying(amount);
+        if (!paused()) _withdrawUnderlying(amount);
         underlying.safeTransfer(receiver, amount);
     }
 
@@ -139,26 +175,45 @@ contract EllipsisPoolAdapter is BaseAdapter {
      **/
     function _withdrawUnderlying(uint256 amount) internal override {
         uint256 _lpShare = convertToUnderlyingShares(0, amount);
-        ILpStaking(ellipsisLPStaking).withdraw(address (lpToken), _lpShare, false);
-        uint256 n_coins = IAddressProvider(addressProvider).get_n_coins(ellipsisPool);
+        ILpStaking(ellipsisLPStaking).withdraw(
+            address(lpToken),
+            _lpShare,
+            false
+        );
+        uint256 n_coins = IAddressProvider(addressProvider).get_n_coins(
+            ellipsisPool
+        );
 
         uint256 lpTokenBalance = IERC20(lpToken).balanceOf(address(this));
 
-        address[4] memory coins = IAddressProvider(addressProvider).get_coins(ellipsisPool);
+        address[4] memory coins = IAddressProvider(addressProvider).get_coins(
+            ellipsisPool
+        );
         for (uint256 i = 0; i < n_coins; i++) {
-            if (coins[i] == address (underlying)) {
-                IEllipsis(ellipsisPool).remove_liquidity_one_coin(lpTokenBalance, int128(uint128(i)), 0);
+            if (coins[i] == address(underlying)) {
+                IEllipsis(ellipsisPool).remove_liquidity_one_coin(
+                    lpTokenBalance,
+                    int128(uint128(i)),
+                    0
+                );
                 break;
             }
         }
     }
 
-    function convertToUnderlyingShares(uint256, uint256 shares) public view returns (uint256) {
-        uint256 lpBalance = ILpStaking(ellipsisLPStaking).userInfo(address (lpToken), address(this)).depositAmount;
+    function convertToUnderlyingShares(
+        uint256,
+        uint256 shares
+    ) public view returns (uint256) {
+        uint256 lpBalance = ILpStaking(ellipsisLPStaking)
+            .userInfo(address(lpToken), address(this))
+            .depositAmount;
 
         uint256 supply = _totalUnderlying();
-        return supply == 0 ? shares : shares.mulDiv(lpBalance, supply, Math.Rounding.Up);
-
+        return
+            supply == 0
+                ? shares
+                : shares.mulDiv(lpBalance, supply, Math.Rounding.Up);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -172,7 +227,7 @@ contract EllipsisPoolAdapter is BaseAdapter {
         address[] memory _rewardTokens = new address[](1);
         _rewardTokens[0] = ILpStaking(ellipsisLPStaking).rewardToken();
         try
-        ILpStaking(ellipsisLPStaking).claim(address(this), _rewardTokens) {
-        } catch {}
+            ILpStaking(ellipsisLPStaking).claim(address(this), _rewardTokens)
+        {} catch {}
     }
 }

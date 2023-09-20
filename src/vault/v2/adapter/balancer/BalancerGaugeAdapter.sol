@@ -22,7 +22,10 @@ contract BalancerGaugeAdapter is BaseAdapter {
     ) internal onlyInitializing {
         __BaseAdapter_init(_adapterConfig);
 
-        address _gauge = abi.decode(_protocolConfig.protocolInitData, (address));
+        address _gauge = abi.decode(
+            _protocolConfig.protocolInitData,
+            (address)
+        );
         balMinter = IMinter(_protocolConfig.registry);
         gauge = IGauge(_gauge);
 
@@ -45,8 +48,8 @@ contract BalancerGaugeAdapter is BaseAdapter {
                             DEPOSIT LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function _deposit(uint256 amount) internal override {
-        underlying.safeTransferFrom(msg.sender, address(this), amount);
+    function _deposit(uint256 amount, address caller) internal override {
+        underlying.safeTransferFrom(caller, address(this), amount);
         _depositUnderlying(amount);
     }
 
@@ -63,7 +66,7 @@ contract BalancerGaugeAdapter is BaseAdapter {
     //////////////////////////////////////////////////////////////*/
 
     function _withdraw(uint256 amount, address receiver) internal override {
-        _withdrawUnderlying(amount);
+        if (!paused()) _withdrawUnderlying(amount);
         underlying.safeTransfer(receiver, amount);
     }
 
