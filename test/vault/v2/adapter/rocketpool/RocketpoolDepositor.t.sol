@@ -2,11 +2,16 @@
 // Docgen-SOLC: 0.8.15
 
 pragma solidity ^0.8.15;
-
 import {Clones} from "openzeppelin-contracts/proxy/Clones.sol";
 import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
-
-import {RocketpoolAdapter, RocketStorageInterface, RocketTokenRETHInterface, RocketDepositPoolInterface, RocketDepositSettingsInterface} from "../../../../../src/vault/v2/adapter/rocketpool/RocketpoolAdapter.sol";
+import {
+    RocketpoolAdapter,
+    RocketStorageInterface,
+    RocketTokenRETHInterface,
+    RocketDepositPoolInterface,
+    RocketDepositSettingsInterface,
+    RocketNetworkBalancesInterface
+} from "../../../../../src/vault/v2/adapter/rocketpool/RocketpoolAdapter.sol";
 import {RocketpoolDepositor} from "../../../../../src/vault/v2/strategies/rocketpool/RocketpoolDepositor.sol";
 import {IOwned} from "../../../../../src/vault/v2/base/interfaces/IOwned.sol";
 
@@ -16,7 +21,7 @@ import {IERC20, IBaseAdapter, BaseStrategyTest} from "../../base/BaseStrategyTes
 contract RocketpoolDepositorTest is BaseStrategyTest {
     using Math for uint256;
 
-    IERC20 rETH = IERC20(0xae78736Cd615f374D3085123A210448E74Fc6393);
+    RocketTokenRETHInterface public rETH = RocketTokenRETHInterface(0xae78736Cd615f374D3085123A210448E74Fc6393);
 
     function setUp() public {
         _setUpBaseTest(0);
@@ -214,9 +219,22 @@ contract RocketpoolDepositorTest is BaseStrategyTest {
             rETH.getEthValue(rETH.balanceOf(address(strategy)))
         );
 
+        address rocketNetworkBalances = RocketStorageInterface(0x1d8f8f00cfa6758d7bE78336684788Fb0ee0Fa46)
+            .getAddress(keccak256(abi.encodePacked("contract.address", "rocketNetworkBalances"))
+        );
+
+        uint256 initialTotalEthBalance = RocketNetworkBalancesInterface(rocketNetworkBalances).getTotalETHBalance();
+
         // Increase TotalAssets
-        // TODO -- increase the getEthValue()
+        vm.mockCall(
+            rocketNetworkBalances,
+            abi.encodeWithSelector(
+                RocketNetworkBalancesInterface.getTotalETHBalance.selector
+            ),
+            abi.encode(initialTotalEthBalance * 100)
+        );
 
         assertGt(strategy.totalAssets(), oldAssets);
+        vm.clearMockedCalls();
     }
 }

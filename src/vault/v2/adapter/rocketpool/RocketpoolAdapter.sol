@@ -7,7 +7,15 @@ import {UniswapV3Utils, IUniV3Pool} from "../../../../utils/UniswapV3Utils.sol";
 import {BaseAdapter, IERC20 as ERC20, AdapterConfig, ProtocolConfig} from "../../base/BaseAdapter.sol";
 import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
-import {RocketStorageInterface, RocketTokenRETHInterface, RocketDepositPoolInterface, IWETH, ICurveMetapool, RocketDepositSettingsInterface} from "./IRocketpool.sol";
+import {
+    IWETH,
+    ICurveMetapool,
+    RocketStorageInterface,
+    RocketTokenRETHInterface,
+    RocketDepositPoolInterface,
+    RocketDepositSettingsInterface,
+    RocketNetworkBalancesInterface
+} from "./IRocketpool.sol";
 
 contract RocketpoolAdapter is BaseAdapter {
     using SafeERC20 for ERC20;
@@ -64,7 +72,8 @@ contract RocketpoolAdapter is BaseAdapter {
 
     /**
      * @notice Returns the total amount of underlying assets.
-     * @dev This function must be overriden. If the farm requires the usage of lpToken than this function must convert lpToken balance into underlying balance
+     * @dev This function must be overridden. If the farm requires the usage of lpToken than this function
+     * must convert lpToken balance into underlying balance
      */
     function _totalUnderlying() internal view override returns (uint256) {
         RocketTokenRETHInterface rETH = _getRocketToken();
@@ -101,7 +110,8 @@ contract RocketpoolAdapter is BaseAdapter {
 
     /**
      * @notice Withdraws underlying asset. If necessary it converts the lpToken into underlying before withdrawing
-     * @dev This function must be overridden. Some farms require the user to into an lpToken before depositing others might use the underlying directly
+     * @dev This function must be overridden. Some farms require the user to into an lpToken before depositing
+     * others might use the underlying directly
      **/
     function _withdrawUnderlying(uint256 amount) internal override {
         RocketTokenRETHInterface rETH = _getRocketToken();
