@@ -387,4 +387,206 @@ abstract contract BaseVaultTest is Test {
         uint256 actualAssets = vault.redeem(shares, bob, bob);
     }
 
+    /*//////////////////////////////////////////////////////////////
+                     FEE LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    /*//////////////////////////////////////////////////////////////
+                          CHANGE FEES
+    //////////////////////////////////////////////////////////////*/
+    function testFail__proposeFees_nonOwner() public {
+        VaultFees memory newVaultFees = VaultFees({ deposit: 1, withdrawal: 1, management: 1, performance: 1 });
+        vm.prank(alice);
+        vault.proposeFees(newVaultFees);
+    }
+
+    function testFail__proposeFees_fees_too_high() public {
+        VaultFees memory newVaultFees = VaultFees({ deposit: 1e18, withdrawal: 1, management: 1, performance: 1 });
+        vault.proposeFees(newVaultFees);
+    }
+    function testFail__changeFees_NonOwner() public {
+        vm.prank(alice);
+        vault.changeFees();
+    }
+
+    function testFail__changeFees_respect_rageQuit() public {
+        VaultFees memory newVaultFees = VaultFees({ deposit: 1, withdrawal: 1, management: 1, performance: 1 });
+        vault.proposeFees(newVaultFees);
+
+        // Didnt respect 3 days before propsal and change
+        vault.changeFees();
+    }
+
+    function testFail__changeFees_after_init() public {
+        vault.changeFees();
+    }
+
+    event NewFeesProposed(VaultFees newFees, uint256 timestamp);
+    function test__proposeFees() public {
+        VaultFees memory newVaultFees = VaultFees({ deposit: 1, withdrawal: 1, management: 1, performance: 1 });
+
+        uint256 callTime = block.timestamp;
+        vm.expectEmit(false, false, false, true, address(vault));
+        emit NewFeesProposed(newVaultFees, callTime);
+
+        vm.prank(bob);
+        vault.proposeFees(newVaultFees);
+
+        assertEq(vault.proposedFeeTime(), callTime);
+        VaultFees memory vaultFees = vault.proposedFees();
+        assertEq(vaultFees.deposit, 1);
+        assertEq(vaultFees.withdrawal, 1);
+        assertEq(vaultFees.management, 1);
+        assertEq(vaultFees.performance, 1);
+    }
+
+    event ChangedFees(VaultFees oldFees, VaultFees newFees);
+    function test__changeFees() public {
+        VaultFees memory newVaultFees = VaultFees({ deposit: 1, withdrawal: 1, management: 1, performance: 1 });
+
+        vm.prank(bob);
+        vault.proposeFees(newVaultFees);
+
+        vm.warp(block.timestamp + 3 days);
+
+        vm.expectEmit(false, false, false, true, address(vault));
+        emit ChangedFees(VaultFees({ deposit: 100, withdrawal: 0, management: 100, performance: 100 }), newVaultFees);
+
+        vm.prank(bob);
+        vault.changeFees();
+
+        VaultFees memory vaultFees = vault.fees();
+        assertEq(vaultFees.deposit, 1);
+        assertEq(vaultFees.withdrawal, 1);
+        assertEq(vaultFees.management, 1);
+        assertEq(vaultFees.performance, 1);
+
+        VaultFees memory proposedVaultFees = vault.proposedFees();
+
+        assertEq(proposedVaultFees.deposit, 0);
+        assertEq(proposedVaultFees.withdrawal, 0);
+        assertEq(proposedVaultFees.management, 0);
+        assertEq(proposedVaultFees.performance, 0);
+        assertEq(vault.proposedFeeTime(), 0);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                          SET FEE_RECIPIENT
+    //////////////////////////////////////////////////////////////*/
+    event FeeRecipientUpdated(address oldFeeRecipient, address newFeeRecipient);
+    function test__setFeeRecipient() public {
+        vm.expectEmit(false, false, false, true, address(vault));
+        emit FeeRecipientUpdated(feeRecipient, alice);
+
+        vm.prank(bob);
+        vault.setFeeRecipient(alice);
+
+        assertEq(vault.feeRecipient(), alice);
+    }
+
+    function testFail__setFeeRecipient_NonOwner() public {
+        vm.prank(alice);
+        vault.setFeeRecipient(alice);
+    }
+
+    function testFail__setFeeRecipient_addressZero() public {
+        vault.setFeeRecipient(address(0));
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                          SET RAGE QUIT
+    //////////////////////////////////////////////////////////////*/
+    function testFail__setQuitPeriod_NonOwner() public {
+        vm.prank(alice);
+        vault.setQuitPeriod(1 days);
+    }
+
+    function testFail__setQuitPeriod_too_low() public {
+        vault.setQuitPeriod(23 hours);
+    }
+
+    function testFail__setQuitPeriod_too_high() public {
+        vault.setQuitPeriod(8 days);
+    }
+
+    function testFail__setQuitPeriod_during_initial_quitPeriod() public {
+        vault.setQuitPeriod(1 days);
+    }
+
+    function testFail__setQuitPeriod_during_fee_quitPeriod() public {
+        // Pass the inital quit period
+        vm.warp(block.timestamp + 3 days);
+        vault.proposeFees(VaultFees({ deposit: 1, withdrawal: 1, management: 1, performance: 1 }));
+        vault.setQuitPeriod(1 days);
+    }
+
+    event QuitPeriodSet(uint256 quitPeriod);
+    function test__setQuitPeriod() public {
+        // Pass the inital quit period
+        vm.warp(block.timestamp + 3 days);
+
+        uint256 newQuitPeriod = 1 days;
+        vm.expectEmit(false, false, false, true, address(vault));
+        emit QuitPeriodSet(newQuitPeriod);
+
+        vm.prank(bob);
+        vault.setQuitPeriod(newQuitPeriod);
+
+        assertEq(vault.quitPeriod(), newQuitPeriod);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                         SET DEPOSIT LIMIT
+    //////////////////////////////////////////////////////////////*/
+    function testFail__setDepositLimit_NonOwner() public {
+        vm.prank(alice);
+        vault.setDepositLimit(uint256(100));
+    }
+
+    event DepositLimitSet(uint256 depositLimit);
+    function test__setDepositLimit() public {
+        uint256 newDepositLimit = 100;
+        vm.expectEmit(false, false, false, true, address(vault));
+        emit DepositLimitSet(newDepositLimit);
+
+        vm.prank(bob);
+        vault.setDepositLimit(newDepositLimit);
+
+        assertEq(vault.depositLimit(), newDepositLimit);
+
+        asset.mint(address(this), 101);
+        asset.approve(address(vault), 101);
+
+        vm.expectRevert(abi.encodeWithSelector(IVault.MaxError.selector, 101));
+        vault.deposit(101, address(this));
+
+        vm.expectRevert(abi.encodeWithSelector(IVault.MaxError.selector, 101 * 1e9));
+        vault.mint(101 * 1e9, address(this));
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                              PERMIT
+    //////////////////////////////////////////////////////////////*/
+    bytes32 constant PERMIT_TYPEHASH =
+        keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
+    function test_permit() public {
+        uint256 privateKey = 0xBEEF;
+        address owner = vm.addr(privateKey);
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            privateKey,
+            keccak256(
+                abi.encodePacked(
+                    "\x19\x01",
+                    vault.DOMAIN_SEPARATOR(),
+                    keccak256(abi.encode(PERMIT_TYPEHASH, owner, address(0xCAFE), 1e18, 0, block.timestamp))
+                )
+            )
+        );
+
+        vault.permit(owner, address(0xCAFE), 1e18, block.timestamp, v, r, s);
+
+        assertEq(vault.allowance(owner, address(0xCAFE)), 1e18);
+        assertEq(vault.nonces(owner), 1);
+    }
 }
