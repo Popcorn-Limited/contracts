@@ -56,12 +56,12 @@ contract SingleStrategyVaultTest is BaseVaultTest {
             asset_: IERC20(address(asset)),
             fees: VaultFees({
                 deposit: 100,
-                withdrawal: 100,
+                withdrawal: 0,
                 management: 100,
                 performance: 100
             }),
             feeRecipient: feeRecipient,
-            depositLimit: 0,
+            depositLimit: 1000,
             owner: bob,
             protocolOwner: bob,
             name: "VaultCraft SingleStrategyVault"

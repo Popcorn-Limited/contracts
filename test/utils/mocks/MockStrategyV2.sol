@@ -1,12 +1,16 @@
 pragma solidity ^0.8.15;
 import {
-  IERC20,
   BaseAdapter,
   AdapterConfig,
-  ProtocolConfig
+  ProtocolConfig,
+  IERC20Metadata
 } from "../../../src/vault/v2/base/BaseAdapter.sol";
+import {
+  ERC4626Upgradeable
+} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
+import { ERC20Upgradeable } from "openzeppelin-contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 
-contract MockStrategyV2 is BaseAdapter {
+contract MockStrategyV2 is BaseAdapter, ERC20Upgradeable {
 
   function __MockAdapter_init(
     AdapterConfig memory _adapterConfig,
@@ -15,17 +19,17 @@ contract MockStrategyV2 is BaseAdapter {
     __BaseAdapter_init(_adapterConfig);
   }
 
-  function _totalLP() internal view override returns (uint256) {
-    return 0;
+  function _totalUnderlying() internal view override returns (uint256) {
+    return totalSupply();
   }
 
-  function _deposit(uint256 amount) internal override {}
+  function _deposit(uint256 amount) internal override {
+    underlying.transferFrom(msg.sender, address(this), amount);
+    _mint(msg.sender, amount);
+  }
 
-  function _depositLP(uint256 amount) internal override {}
-
-  function _withdraw(uint256 amount, address receiver) internal override {}
-
-  function _withdrawLP(uint256 amount) internal override {}
-
-  function _claim() internal override {}
+  function _withdraw(uint256 amount, address receiver) internal override {
+    _burn(msg.sender, amount);
+    underlying.transfer(receiver, amount);
+  }
 }

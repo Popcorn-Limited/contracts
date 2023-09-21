@@ -46,6 +46,7 @@ abstract contract BaseVaultTest is Test {
             _getVaultConfig(),
             address(adapter)
         );
+        adapter.addVault(address(vault));
     }
 
 
@@ -92,7 +93,7 @@ abstract contract BaseVaultTest is Test {
         assertEq(asset.allowance(address(newVault), address(adapter)), type(uint256).max);
     }
 
-    function testFail__initialize_strategy_is_addressZero() public {
+    function testFail__initialize_strategy_addressZero() public {
         IVault vault = _createVault();
         vm.label(address(vault), "vault");
 
@@ -102,5 +103,202 @@ abstract contract BaseVaultTest is Test {
         );
     }
 
+    function testFail__initialize_asset_is_zero() public {
+        BaseVaultConfig memory vaultConfig = _getVaultConfig();
+        vaultConfig.asset_ = IERC20(address(0));
+
+        IVault vault = _createVault();
+        vm.label(address(vault), "vault");
+
+        vault.initialize(
+            vaultConfig,
+            address(adapter)
+        );
+    }
+
+    function testFail__initialize_invalid_vault_fees() public {
+        BaseVaultConfig memory vaultConfig = _getVaultConfig();
+        vaultConfig.fees.deposit = 1e19;
+        vaultConfig.fees.management = 1e19;
+        vaultConfig.fees.withdrawal = 1e19;
+        vaultConfig.fees.performance = 1e19;
+
+        IVault vault = _createVault();
+        vm.label(address(vault), "vault");
+
+        vault.initialize(
+            vaultConfig,
+            address(adapter)
+        );
+    }
+
+    function testFail__initialize_invalid_fee_recipient() public {
+        BaseVaultConfig memory vaultConfig = _getVaultConfig();
+        vaultConfig.feeRecipient = address(0);
+
+        IVault vault = _createVault();
+        vm.label(address(vault), "vault");
+
+        vault.initialize(
+            vaultConfig,
+            address(adapter)
+        );
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                       DEPOSIT LOGIC
+    //////////////////////////////////////////////////////////////*/
+    function testFail__deposit_zero() public {
+        vault.deposit(0, address(this));
+    }
+
+    function testFail__deposit_with_no_approval() public {
+        vault.deposit(1e18, address(this));
+    }
+
+    function testFail__deposit_with_not_enough_approval() public {
+        asset.mint(address(this), 1e18);
+        asset.approve(address(vault), 0.5e18);
+        assertEq(asset.allowance(address(this), address(vault)), 0.5e18);
+
+        vault.deposit(1e18, address(this));
+    }
+
+    function test__deposit(uint128 fuzzAmount) public {
+        uint256 aliceAssetAmount = bound(uint256(fuzzAmount), 1, _getVaultConfig().depositLimit);
+
+        asset.mint(alice, aliceAssetAmount);
+
+        vm.prank(alice);
+        asset.approve(address(vault), aliceAssetAmount);
+        assertEq(asset.allowance(alice, address(vault)), aliceAssetAmount);
+
+        uint256 alicePreDepositBal = asset.balanceOf(alice);
+
+        vm.prank(alice);
+        uint256 aliceShareAmount = vault.deposit(aliceAssetAmount, alice);
+
+        assertEq(aliceAssetAmount, aliceShareAmount);
+        assertEq(vault.previewDeposit(aliceAssetAmount), aliceShareAmount);
+        assertEq(vault.totalSupply(), aliceShareAmount);
+        assertEq(vault.totalAssets(), aliceAssetAmount);
+        assertEq(vault.balanceOf(alice), aliceShareAmount);
+        assertEq(vault.convertToAssets(vault.balanceOf(alice)), aliceAssetAmount);
+        assertEq(asset.balanceOf(alice), alicePreDepositBal - aliceAssetAmount);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                       WITHDRAW LOGIC
+    //////////////////////////////////////////////////////////////*/
+    function testFail__withdraw_with_no_assets() public {
+        vault.withdraw(1e18, address(this), address(this));
+    }
+
+    function testFail__withdraw_with_not_enough_assets() public {
+        vault.withdraw(1e18, address(this), address(this));
+    }
+
+    function test__withdraw(uint128 fuzzAmount) public {
+        uint256 aliceAssetAmount = bound(uint256(fuzzAmount), 1, _getVaultConfig().depositLimit);
+
+        asset.mint(alice, aliceAssetAmount);
+        uint256 alicePreDepositBal = asset.balanceOf(alice);
+
+        vm.prank(alice);
+        asset.approve(address(vault), aliceAssetAmount);
+
+        vm.prank(alice);
+        uint256 aliceShareAmount = vault.deposit(aliceAssetAmount, alice);
+
+        assertEq(vault.previewWithdraw(aliceAssetAmount), aliceShareAmount);
+
+        vm.prank(alice);
+        vault.withdraw(aliceAssetAmount, alice, alice);
+
+        assertEq(vault.totalAssets(), 0);
+        assertEq(vault.balanceOf(alice), 0);
+        assertEq(vault.convertToAssets(vault.balanceOf(alice)), 0);
+        assertEq(asset.balanceOf(alice), alicePreDepositBal);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                       MINT LOGIC
+    //////////////////////////////////////////////////////////////*/
+    function testFail__mint_zero() public {
+        vault.mint(0, address(this));
+    }
+
+    function testFail__mint_with_no_approval() public {
+        vault.mint(1e18, address(this));
+    }
+
+    function testFail__mint_with_not_enough_approval() public {
+        asset.mint(address(this), 1e18);
+        asset.approve(address(vault), 1e6);
+        assertEq(asset.allowance(address(this), address(vault)), 1e6);
+
+        vault.mint(1e18, address(this));
+    }
+
+    function test__mint(uint256 fuzzAmount) public {
+        uint256 aliceShareAmount = bound(uint256(fuzzAmount), 1, _getVaultConfig().depositLimit);
+        asset.mint(alice, aliceShareAmount);
+        uint256 alicePreDepositBal = asset.balanceOf(alice);
+
+        vm.prank(alice);
+        asset.approve(address(vault), aliceShareAmount);
+        assertEq(asset.allowance(alice, address(vault)), aliceShareAmount);
+
+
+        vm.prank(alice);
+        uint256 aliceAssetAmount = vault.mint(aliceShareAmount, alice);
+        assertEq(aliceShareAmount, aliceAssetAmount);
+        assertEq(vault.previewWithdraw(aliceAssetAmount), aliceShareAmount);
+        assertEq(vault.previewDeposit(aliceAssetAmount), aliceShareAmount);
+        assertEq(vault.totalSupply(), aliceShareAmount);
+        assertEq(vault.totalAssets(), aliceAssetAmount);
+        assertEq(vault.balanceOf(alice), aliceShareAmount);
+        assertEq(asset.balanceOf(alice), alicePreDepositBal - aliceAssetAmount);
+        assertEq(vault.convertToAssets(vault.balanceOf(alice)), aliceAssetAmount);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                     REDEEM LOGIC
+    //////////////////////////////////////////////////////////////*/
+    function testFail__redeem_zero() public {
+        vault.redeem(0, address(this), address(this));
+    }
+
+    function testFail__redeem_with_no_shares() public {
+        vault.redeem(1e18, address(this), address(this));
+    }
+
+    function testFail__redeem_with_not_enough_shares() public {
+        asset.mint(address(this), 0.5e18);
+        asset.approve(address(vault), 0.5e18);
+
+        vault.deposit(0.5e18, address(this));
+
+        vault.redeem(1e27, address(this), address(this));
+    }
+
+    function test__redeem(uint256 fuzzAmount) public {
+        uint256 aliceShareAmount = bound(uint256(fuzzAmount), 1, _getVaultConfig().depositLimit);
+        asset.mint(alice, aliceShareAmount);
+        uint256 alicePreDepositBal = asset.balanceOf(alice);
+
+        vm.prank(alice);
+        asset.approve(address(vault), aliceShareAmount);
+
+        vm.prank(alice);
+        uint256 aliceAssetAmount = vault.mint(aliceShareAmount, alice);
+
+        vm.prank(alice);
+        vault.redeem(aliceShareAmount, alice, alice);
+        assertEq(vault.totalAssets(), 0);
+        assertEq(vault.balanceOf(alice), 0);
+        assertEq(vault.convertToAssets(vault.balanceOf(alice)), 0);
+        assertEq(asset.balanceOf(alice), alicePreDepositBal);
+    }
 
 }
