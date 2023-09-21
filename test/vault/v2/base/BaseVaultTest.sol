@@ -15,7 +15,7 @@ import {
 import {
     AdapterConfig, ProtocolConfig
 } from "../../../../src/vault/v2/base/BaseAdapter.sol";
-
+import "forge-std/Console.sol";
 
 abstract contract BaseVaultTest is Test {
 
@@ -58,6 +58,25 @@ abstract contract BaseVaultTest is Test {
     function _createVault() internal virtual returns (IVault);
 
     function _getVaultConfig() internal virtual returns(BaseVaultConfig memory);
+
+    function _setFees(
+        uint64 depositFee,
+        uint64 withdrawalFee,
+        uint64 managementFee,
+        uint64 performanceFee
+    ) internal {
+        vault.proposeFees(
+            VaultFees({
+                deposit: depositFee,
+                withdrawal: withdrawalFee,
+                management: managementFee,
+                performance: performanceFee
+            })
+        );
+
+        vm.warp(block.timestamp + 3 days);
+        vault.changeFees();
+    }
 
     /*//////////////////////////////////////////////////////////////
                           INITIALIZATION
@@ -299,6 +318,73 @@ abstract contract BaseVaultTest is Test {
         assertEq(vault.balanceOf(alice), 0);
         assertEq(vault.convertToAssets(vault.balanceOf(alice)), 0);
         assertEq(asset.balanceOf(alice), alicePreDepositBal);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                     PREVIEW LOGIC WITH FEES
+    //////////////////////////////////////////////////////////////*/
+    function test__preview_deposit_with_deposit_fee(uint8 fuzzAmount) public {
+        uint256 amount = bound(uint256(fuzzAmount), 1, _getVaultConfig().depositLimit);
+        uint64 depositFee = uint64(_getVaultConfig().depositLimit / 10);
+        vm.prank(bob);
+        _setFees(depositFee, 0, 0, 0);
+
+        asset.mint(alice, amount);
+
+        vm.prank(alice);
+        asset.approve(address(vault), amount);
+
+        // Test PreviewDeposit and Deposit
+        uint256 expectedShares = vault.previewDeposit(amount);
+
+        vm.prank(alice);
+        uint256 actualShares = vault.deposit(amount, alice);
+        assertApproxEqAbs(expectedShares, actualShares, 2);
+    }
+
+    function test__preview_withdraw_with_withdrawal_fee(uint8 fuzzAmount) public {
+        uint256 amount = bound(uint256(fuzzAmount), 100, _getVaultConfig().depositLimit);
+
+        uint64 withdrawalFee = uint64(_getVaultConfig().depositLimit / 10);
+        vm.prank(bob);
+        _setFees(0, withdrawalFee, 0, 0);
+
+        asset.mint(alice, amount);
+
+        vm.startPrank(alice);
+        asset.approve(address(vault), amount);
+        uint256 shares = vault.deposit(amount, alice);
+        vm.stopPrank();
+
+        // Test PreviewWithdraw and Withdraw
+        // NOTE: Reduce the amount of assets to withdraw to take withdrawalFee into account (otherwise we would withdraw more than we deposited)
+        uint256 withdrawAmount = (amount / 10) * 9;
+        uint256 expectedShares = vault.previewWithdraw(withdrawAmount);
+
+        vm.prank(alice);
+        uint256 actualShares = vault.withdraw(withdrawAmount, alice, alice);
+        assertApproxEqAbs(expectedShares, actualShares, 1);
+    }
+
+    function test__preview_redeem_with_withdrawal_fee(uint8 fuzzAmount) public {
+        uint256 amount = bound(uint256(fuzzAmount), 100, _getVaultConfig().depositLimit);
+
+        uint64 withdrawalFee = uint64(_getVaultConfig().depositLimit / 10);
+        vm.prank(bob);
+        _setFees(0, withdrawalFee, 0, 0);
+
+        asset.mint(bob, amount);
+
+        vm.startPrank(bob);
+        asset.approve(address(vault), amount);
+        uint256 shares = vault.deposit(amount, bob);
+        vm.stopPrank();
+
+        // Test PreviewRedeem and Redeem
+        uint256 expectedAssets = vault.previewRedeem(shares);
+
+        vm.prank(bob);
+        uint256 actualAssets = vault.redeem(shares, bob, bob);
     }
 
 }
