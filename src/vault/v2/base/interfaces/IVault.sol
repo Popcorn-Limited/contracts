@@ -24,7 +24,9 @@ import {BaseVaultConfig, VaultFees} from "../BaseVault.sol";
 //  address owner;
 //}
 
+
 interface IVault is IERC4626 {
+  error MaxError(uint256 amount);
 
   function owner() external view returns (address);
 
