@@ -28,13 +28,16 @@ import {BaseVaultConfig, VaultFees} from "../BaseVault.sol";
 interface IVault is IERC4626 {
   error MaxError(uint256 amount);
 
+  //  CONVERT SHARES & ASSETS
+  function convertToAssets(uint256 shares) external view returns (uint256 assets);
+
   function owner() external view returns (address);
 
   // FEE VIEWS
 
   function accruedManagementFee() external view returns (uint256);
 
-  function accruedPerformanceFee() external view returns (uint256);
+  function accruedPerformanceFee(uint256 performanceFee) external view returns (uint256);
 
   function highWaterMark() external view returns (uint256);
 

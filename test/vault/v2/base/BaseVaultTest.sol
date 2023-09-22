@@ -10,14 +10,18 @@ import { MockStrategyV2 } from "../../../utils/mocks/MockStrategyV2.sol";
 import { IVault } from "../../../../src/vault/v2/base/interfaces/IVault.sol";
 import { BaseVaultConfig, BaseVault, VaultFees } from "../../../../src/vault/v2/base/BaseVault.sol";
 import {
-    IERC4626Upgradeable as IERC4626, IERC20Upgradeable as IERC20
+    IERC20Upgradeable as IERC20,
+    IERC4626Upgradeable as IERC4626
 } from "openzeppelin-contracts-upgradeable/interfaces/IERC4626Upgradeable.sol";
 import {
     AdapterConfig, ProtocolConfig
 } from "../../../../src/vault/v2/base/BaseAdapter.sol";
+import { FixedPointMathLib } from "solmate/utils/FixedPointMathLib.sol";
+
 import "forge-std/Console.sol";
 
 abstract contract BaseVaultTest is Test {
+    using FixedPointMathLib for uint256;
 
     IVault public vault;
     MockERC20 public asset;
@@ -81,37 +85,6 @@ abstract contract BaseVaultTest is Test {
     /*//////////////////////////////////////////////////////////////
                           INITIALIZATION
     //////////////////////////////////////////////////////////////*/
-    function test__metadata() public {
-        IVault newVault = _createVault();
-
-        uint256 callTime = block.timestamp;
-        newVault.initialize(
-            _getVaultConfig(),
-            address(adapter)
-        );
-
-        assertEq(newVault.name(), _getVaultConfig().name);
-        assertEq(newVault.symbol(), "vc-TKN");
-        assertEq(newVault.decimals(), 27);
-
-        assertEq(address(newVault.asset()), address(asset));
-        assertEq(address(newVault.strategy()), address(adapter));
-        assertEq(newVault.owner(), bob);
-
-        VaultFees memory vaultFees = newVault.fees();
-        VaultFees memory expectedVaultFees = _getVaultConfig().fees;
-
-        assertEq(vaultFees.deposit, expectedVaultFees.deposit);
-        assertEq(vaultFees.withdrawal, expectedVaultFees.withdrawal);
-        assertEq(vaultFees.management, expectedVaultFees.management);
-        assertEq(vaultFees.performance, expectedVaultFees.performance);
-        assertEq(newVault.feeRecipient(), feeRecipient);
-        assertEq(newVault.highWaterMark(), 1e9);
-
-        assertEq(newVault.quitPeriod(), 3 days);
-        assertEq(asset.allowance(address(newVault), address(adapter)), type(uint256).max);
-    }
-
     function testFail__initialize_strategy_addressZero() public {
         IVault vault = _createVault();
         vm.label(address(vault), "vault");
@@ -163,6 +136,38 @@ abstract contract BaseVaultTest is Test {
             address(adapter)
         );
     }
+
+    function test__metadata() public {
+        IVault newVault = _createVault();
+
+        uint256 callTime = block.timestamp;
+        newVault.initialize(
+            _getVaultConfig(),
+            address(adapter)
+        );
+
+        assertEq(newVault.name(), _getVaultConfig().name);
+        assertEq(newVault.symbol(), "vc-TKN");
+        assertEq(newVault.decimals(), 27);
+
+        assertEq(address(newVault.asset()), address(asset));
+        assertEq(address(newVault.strategy()), address(adapter));
+        assertEq(newVault.owner(), bob);
+
+        VaultFees memory vaultFees = newVault.fees();
+        VaultFees memory expectedVaultFees = _getVaultConfig().fees;
+
+        assertEq(vaultFees.deposit, expectedVaultFees.deposit);
+        assertEq(vaultFees.withdrawal, expectedVaultFees.withdrawal);
+        assertEq(vaultFees.management, expectedVaultFees.management);
+        assertEq(vaultFees.performance, expectedVaultFees.performance);
+        assertEq(newVault.feeRecipient(), feeRecipient);
+        assertEq(newVault.highWaterMark(), 1e9);
+
+        assertEq(newVault.quitPeriod(), 3 days);
+        assertEq(asset.allowance(address(newVault), address(adapter)), type(uint256).max);
+    }
+
 
     /*//////////////////////////////////////////////////////////////
                        DEPOSIT LOGIC
@@ -388,8 +393,95 @@ abstract contract BaseVaultTest is Test {
     }
 
     /*//////////////////////////////////////////////////////////////
-                     FEE LOGIC
+                     FEE COLLECTION LOGIC
     //////////////////////////////////////////////////////////////*/
+    function test__managementFee(uint128 timeframe) public {
+        // Test Timeframe less than 10 years
+        timeframe = uint128(bound(timeframe, 1, 315576000));
+        uint256 depositAmount = _getVaultConfig().depositLimit;
+
+        vm.prank(bob);
+        _setFees(0, 0, 1e17, 0);
+
+        asset.mint(alice, depositAmount);
+        vm.startPrank(alice);
+        asset.approve(address(vault), depositAmount);
+        vault.deposit(depositAmount, alice);
+        vm.stopPrank();
+
+        // Increase Block Time to trigger managementFee
+        vm.warp(block.timestamp + timeframe);
+
+        uint256 expectedFeeInAsset = vault.accruedManagementFee();
+
+        uint256 supply = vault.totalSupply();
+        uint256 expectedFeeInShares = supply == 0
+            ? expectedFeeInAsset
+            : expectedFeeInAsset.mulDivDown(supply, depositAmount- expectedFeeInAsset);
+
+        vault.takeManagementAndPerformanceFees();
+        assertEq(vault.totalSupply(), depositAmount + expectedFeeInShares);
+        assertEq(vault.balanceOf(feeRecipient), expectedFeeInShares, "fee bal");
+
+        assertApproxEqAbs(vault.convertToAssets(expectedFeeInShares), expectedFeeInAsset, 10, "convert back");
+
+        // High Water Mark should remain unchanged
+        assertEq(vault.highWaterMark(), 1e18, "hwm");
+    }
+
+    uint256 constant public SECONDS_PER_YEAR = 365.25 days;
+    function test__managementFee_change_fees_later() public {
+        uint256 depositAmount = _getVaultConfig().depositLimit;
+
+        asset.mint(alice, depositAmount);
+        vm.startPrank(alice);
+        asset.approve(address(vault), depositAmount);
+        vault.deposit(depositAmount, alice);
+        vm.stopPrank();
+
+        // Set it to half the time without any fees
+        vm.warp(block.timestamp + (SECONDS_PER_YEAR / 2));
+        assertEq(vault.accruedManagementFee(), 0);
+
+        vm.prank(bob);
+        _setFees(0, 0, 1e17, 0);
+
+        vm.warp(block.timestamp + (SECONDS_PER_YEAR / 2));
+        assertEq(vault.accruedManagementFee(), ((depositAmount * 1e17) / 1e18) / 2);
+    }
+
+    function test__performanceFee(uint128 amount) public {
+        vm.assume(amount >= 1e18);
+        uint256 depositAmount = _getVaultConfig().depositLimit;
+
+        vm.prank(bob);
+        _setFees(0, 0, 0, 1e17);
+
+        asset.mint(alice, depositAmount);
+        vm.startPrank(alice);
+        asset.approve(address(vault), depositAmount);
+        vault.deposit(depositAmount, alice);
+        vm.stopPrank();
+
+        // Increase asset assets to trigger performanceFee
+        asset.mint(address(adapter), amount);
+
+        uint256 expectedFeeInAsset = vault.accruedPerformanceFee(_getVaultConfig().fees.performance);
+
+        uint256 supply = vault.totalSupply();
+        uint256 totalAssets = vault.totalAssets();
+
+        uint256 expectedFeeInShares = supply == 0
+            ? expectedFeeInAsset
+            : expectedFeeInAsset.mulDivDown(supply, totalAssets - expectedFeeInAsset);
+
+        vault.takeManagementAndPerformanceFees();
+        assertEq(vault.totalSupply(), depositAmount + expectedFeeInShares);
+        assertEq(vault.balanceOf(feeRecipient), expectedFeeInShares);
+
+        // There should be a new High Water Mark
+        assertApproxEqRel(vault.highWaterMark(), 1e18, 30, "hwm");
+    }
 
     /*//////////////////////////////////////////////////////////////
                           CHANGE FEES
@@ -473,6 +565,15 @@ abstract contract BaseVaultTest is Test {
     /*//////////////////////////////////////////////////////////////
                           SET FEE_RECIPIENT
     //////////////////////////////////////////////////////////////*/
+    function testFail__setFeeRecipient_NonOwner() public {
+        vm.prank(alice);
+        vault.setFeeRecipient(alice);
+    }
+
+    function testFail__setFeeRecipient_addressZero() public {
+        vault.setFeeRecipient(address(0));
+    }
+
     event FeeRecipientUpdated(address oldFeeRecipient, address newFeeRecipient);
     function test__setFeeRecipient() public {
         vm.expectEmit(false, false, false, true, address(vault));
@@ -482,15 +583,6 @@ abstract contract BaseVaultTest is Test {
         vault.setFeeRecipient(alice);
 
         assertEq(vault.feeRecipient(), alice);
-    }
-
-    function testFail__setFeeRecipient_NonOwner() public {
-        vm.prank(alice);
-        vault.setFeeRecipient(alice);
-    }
-
-    function testFail__setFeeRecipient_addressZero() public {
-        vault.setFeeRecipient(address(0));
     }
 
     /*//////////////////////////////////////////////////////////////
