@@ -450,10 +450,9 @@ abstract contract BaseVault is
      *  the average of their current value and the value at the previous fee harvest checkpoint. This method is similar to
      *  calculating a definite integral using the trapezoid rule.
      */
-    function accruedManagementFee() internal view returns (uint256) {
+    function accruedManagementFee() public view returns (uint256) {
         uint256 managementFee = fees.management;
-        return
-            managementFee > 0
+            return managementFee > 0
                 ? managementFee.mulDiv(
                     totalAssets() * (block.timestamp - feesUpdatedAt),
                     SECONDS_PER_YEAR,
@@ -470,7 +469,7 @@ abstract contract BaseVault is
      */
     function accruedPerformanceFee(
         uint256 performanceFee
-    ) internal view returns (uint256) {
+    ) public view returns (uint256) {
         uint256 highWaterMark_ = highWaterMark;
         uint256 shareValue = convertToAssets(1e18);
 
