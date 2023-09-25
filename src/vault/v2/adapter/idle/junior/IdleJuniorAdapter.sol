@@ -48,9 +48,13 @@ contract IdleJuniorAdapter is BaseAdapter {
      * @dev This function must be overridden. If the farm requires the usage of lpToken than this function must convert lpToken balance into underlying balance
      */
     function _totalUnderlying() internal view override returns (uint256) {
+        address tranche = cdo.BBTranche();
         return
-            (IERC20(cdo.BBTranche()).balanceOf(address(this)) *
-                cdo.tranchePrice(cdo.BBTranche())) / cdo.ONE_TRANCHE_TOKEN();
+            IERC20(tranche).balanceOf(address(this)).mulDiv(
+                cdo.tranchePrice(tranche),
+                cdo.ONE_TRANCHE_TOKEN(),
+                Math.Rounding.Down
+            );
     }
 
     /*//////////////////////////////////////////////////////////////
