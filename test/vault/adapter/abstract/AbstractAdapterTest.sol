@@ -70,7 +70,7 @@ abstract contract AbstractAdapterTest is PropertyTest {
         _asset_ = address(asset_);
         _delta_ = delta_;
 
-        vm.label(bob,"bob");
+        vm.label(bob, "bob");
         vm.label(alice, "alice");
 
         defaultAmount = 10 ** IERC20Metadata(address(asset_)).decimals() * 1e9;
@@ -292,16 +292,18 @@ abstract contract AbstractAdapterTest is PropertyTest {
             uint256 amount = bound(uint256(fuzzAmount), minFuzz, maxAssets);
 
             _mintAssetAndApproveForAdapter(amount, bob);
-            emit log("PING");
 
             prop_deposit(bob, bob, amount, testId);
-            emit log("PING1");
 
             increasePricePerShare(raise);
 
             _mintAssetAndApproveForAdapter(amount, bob);
             prop_deposit(bob, alice, amount, testId);
         }
+    }
+
+    function testFail__deposit_zero() public {
+        adapter.deposit(0, address(this));
     }
 
     function test__mint(uint8 fuzzAmount) public virtual {
@@ -320,6 +322,10 @@ abstract contract AbstractAdapterTest is PropertyTest {
 
             prop_mint(bob, alice, amount, testId);
         }
+    }
+
+    function testFail__mint_zero() public {
+        adapter.mint(0, address(this));
     }
 
     function test__withdraw(uint8 fuzzAmount) public virtual {
@@ -350,6 +356,10 @@ abstract contract AbstractAdapterTest is PropertyTest {
         }
     }
 
+    function testFail__withdraw_zero() public {
+        adapter.withdraw(0, address(this), address(this));
+    }
+
     function test__redeem(uint8 fuzzAmount) public virtual {
         uint8 len = uint8(testConfigStorage.getTestConfigLength());
         for (uint8 i; i < len; i++) {
@@ -373,6 +383,10 @@ abstract contract AbstractAdapterTest is PropertyTest {
             adapter.approve(alice, type(uint256).max);
             prop_redeem(alice, bob, amount, testId);
         }
+    }
+
+    function testFail__redeem_zero() public {
+        adapter.redeem(0, address(this), address(this));
     }
 
     /*//////////////////////////////////////////////////////////////

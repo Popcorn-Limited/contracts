@@ -253,7 +253,6 @@ contract PropertyTest is EnhancedTest {
         uint256 oldAllowance = IERC20(_vault_).allowance(owner, caller);
 
         vm.prank(caller);
-        emit log("DING");
         uint256 shares = IERC4626(_vault_).withdraw(assets, caller, owner);
 
         uint256 newReceiverAsset = IERC20(_asset_).balanceOf(caller);
