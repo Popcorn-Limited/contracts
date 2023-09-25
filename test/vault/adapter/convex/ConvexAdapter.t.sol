@@ -94,37 +94,25 @@ contract ConvexAdapterTest is AbstractAdapterTest {
 
     // OPTIONAL
     function test__rewardsTokens() public override {
-        // Test Gear+ETH pool (id=136) as it contains additional rewards
-        (address _asset, , , address _convexRewards, , ) = convexBooster
-            .poolInfo(136);
-        convexRewards = IConvexRewards(_convexRewards);
-
-        setUpBaseTest(
-            IERC20(_asset),
-            address(new ConvexAdapter()),
-            address(convexBooster),
-            10,
-            "Convex",
-            true
-        );
-
-        vm.label(address(convexBooster), "convexBooster");
-        vm.label(address(convexRewards), "convexRewards");
-        vm.label(address(asset), "asset");
-        vm.label(address(this), "test");
-
-        adapter.initialize(
-            abi.encode(asset, address(this), strategy, 0, sigs, ""),
-            externalRegistry,
-            abi.encode(136)
-        );
+        address CRV = 0xD533a949740bb3306d119CC777fa900bA034cd52;
+        address CVX = 0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B;
+        address GEAR = 0xBa3335588D9403515223F109EdC4eB7269a9Ab5D;
 
         address[] memory rewardTokens = IWithRewards(address(adapter))
             .rewardTokens();
-        address CRV = 0xD533a949740bb3306d119CC777fa900bA034cd52;
-        address CVX = 0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B;
+
         assertEq(rewardTokens[0], CRV, "CRV");
         assertEq(rewardTokens[1], CVX, "CVX");
+        assertEq(rewardTokens.length, 2, "length");
+
+        overrideSetup(testConfigStorage.getTestConfig(1));
+
+        rewardTokens = IWithRewards(address(adapter)).rewardTokens();
+
+        assertEq(rewardTokens[0], CRV, "CRV");
+        assertEq(rewardTokens[1], CVX, "CVX");
+        assertEq(rewardTokens[2], GEAR, "GEAR");
+        assertEq(rewardTokens.length, 3, "length");
     }
 
     /*//////////////////////////////////////////////////////////////
