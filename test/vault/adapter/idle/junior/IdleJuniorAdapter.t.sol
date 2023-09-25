@@ -9,6 +9,7 @@ import {IdleJuniorAdapter, SafeERC20, IERC20, IERC20Metadata, IStrategy, ERC20, 
 import {AbstractAdapterTest, ITestConfigStorage, IAdapter, Math} from "../../abstract/AbstractAdapterTest.sol";
 import {IdleTestConfigStorage, IdleTestConfig} from "../IdleTestConfigStorage.sol";
 import {MockStrategyClaimer} from "../../../../utils/mocks/MockStrategyClaimer.sol";
+import {IVaultController} from "../../../../../src/interfaces/vault/IVaultController.sol";
 
 contract IdleJuniorAdapterTest is AbstractAdapterTest {
     using Math for uint256;
@@ -169,6 +170,31 @@ contract IdleJuniorAdapterTest is AbstractAdapterTest {
         emit log_named_uint("newAttackerdai", newAttackerdai);
 
         logValues(daiIdleJuniorAdapter, tranche, dai, "latest-");
+
+        // Unfreeze the remaining assets
+        address owner = 0x22f5413C075Ccd56D575A54763831C4c27A37Bdb;
+        IVaultController vaultController = IVaultController(
+            0x7D51BABA56C2CA79e15eEc9ECc4E92d9c0a7dbeb
+        );
+        address vault = 0x6cE9c05E159F8C4910490D8e8F7a63e95E6CEcAF;
+        address[] memory vaults = new address[](1);
+        vaults[0] = vault;
+
+        // We would need to get atleast 1 tranche share and send it to the adapter (If we dont do this pausing will fail since the tranche doesnt allow us to withdraw 0)
+        deal(address(tranche), address(daiIdleJuniorAdapter), 1);
+
+        // Pause the adapter so `totalAssets` reads the asset balance instead of the tranche balance
+        vm.prank(owner);
+        vaultController.pauseAdapters(vaults);
+
+        logValues(daiIdleJuniorAdapter, tranche, dai, "paused-");
+
+        // Unpause the adapter to move all funds back into the strategy and resume business as usual
+        vm.prank(owner);
+        vaultController.unpauseAdapters(vaults);
+
+        logValues(daiIdleJuniorAdapter, tranche, dai, "unpaused-");
+        assertGt(daiIdleJuniorAdapter.totalAssets(), 0);
     }
 
     /*//////////////////////////////////////////////////////////////

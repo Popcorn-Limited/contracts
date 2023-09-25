@@ -111,9 +111,7 @@ abstract contract AdapterBase is
         address receiver,
         uint256 assets,
         uint256 shares
-    ) internal virtual override nonReentrant {
-        if (shares == 0 || assets == 0) revert ZeroAmount();
-        
+    ) internal virtual override nonReentrant {        
         IERC20(asset()).safeTransferFrom(caller, address(this), assets);
 
         _protocolDeposit(assets, shares);
@@ -135,8 +133,6 @@ abstract contract AdapterBase is
         uint256 assets,
         uint256 shares
     ) internal virtual override {
-        if (shares == 0 || assets == 0) revert ZeroAmount();
-
         if (caller != owner) {
             _spendAllowance(owner, caller, shares);
         }

@@ -302,10 +302,6 @@ abstract contract AbstractAdapterTest is PropertyTest {
         }
     }
 
-    function testFail__deposit_zero() public {
-        adapter.deposit(0, address(this));
-    }
-
     function test__mint(uint8 fuzzAmount) public virtual {
         uint8 len = uint8(testConfigStorage.getTestConfigLength());
         for (uint8 i; i < len; i++) {
@@ -322,10 +318,6 @@ abstract contract AbstractAdapterTest is PropertyTest {
 
             prop_mint(bob, alice, amount, testId);
         }
-    }
-
-    function testFail__mint_zero() public {
-        adapter.mint(0, address(this));
     }
 
     function test__withdraw(uint8 fuzzAmount) public virtual {
@@ -356,10 +348,6 @@ abstract contract AbstractAdapterTest is PropertyTest {
         }
     }
 
-    function testFail__withdraw_zero() public {
-        adapter.withdraw(0, address(this), address(this));
-    }
-
     function test__redeem(uint8 fuzzAmount) public virtual {
         uint8 len = uint8(testConfigStorage.getTestConfigLength());
         for (uint8 i; i < len; i++) {
@@ -383,10 +371,6 @@ abstract contract AbstractAdapterTest is PropertyTest {
             adapter.approve(alice, type(uint256).max);
             prop_redeem(alice, bob, amount, testId);
         }
-    }
-
-    function testFail__redeem_zero() public {
-        adapter.redeem(0, address(this), address(this));
     }
 
     /*//////////////////////////////////////////////////////////////
