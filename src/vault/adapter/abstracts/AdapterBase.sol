@@ -112,6 +112,8 @@ abstract contract AdapterBase is
         uint256 assets,
         uint256 shares
     ) internal virtual override nonReentrant {
+        if (shares == 0 || assets == 0) revert ZeroAmount();
+        
         IERC20(asset()).safeTransferFrom(caller, address(this), assets);
 
         _protocolDeposit(assets, shares);
@@ -126,10 +128,6 @@ abstract contract AdapterBase is
      * @notice Withdraws `assets` from the underlying protocol and burns vault shares from `owner`.
      * @dev Executes harvest if `harvestCooldown` is passed since last invocation.
      */
-
-    error Test(uint256 x, uint256 y);
-    error Ping(uint256 x);
-
     function _withdraw(
         address caller,
         address receiver,
@@ -137,28 +135,19 @@ abstract contract AdapterBase is
         uint256 assets,
         uint256 shares
     ) internal virtual override {
+        if (shares == 0 || assets == 0) revert ZeroAmount();
+
         if (caller != owner) {
             _spendAllowance(owner, caller, shares);
         }
-
-        // revert Test(assets, shares);
 
         if (!paused()) {
             _protocolWithdraw(assets, shares);
         }
 
-        // revert Ping(shares);
-
         _burn(owner, shares);
 
-        // revert Ping(IERC20(asset()).balanceOf(address(this)));
-        // revert Test(assets, IERC20(asset()).balanceOf(address(this)));
-
-        //// This works for RT_deposit_withdraw & RT_deposit_redeem
         IERC20(asset()).safeTransfer(receiver, assets);
-
-        //// This works for RT_mint_withdraw & RT_mint_redeem
-        // IERC20(asset()).safeTransfer(receiver, assets - 1450);
 
         if (autoHarvest) harvest();
 

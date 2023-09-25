@@ -85,8 +85,12 @@ contract IdleJuniorAdapter is AdapterBase {
 
     function _totalAssets() internal view override returns (uint256) {
         address tranche = cdo.BBTranche();
-        uint256 balance = IERC20(tranche).balanceOf(address(this));
-        return (balance * cdo.tranchePrice(tranche)) / cdo.ONE_TRANCHE_TOKEN();
+        return
+            IERC20(tranche).balanceOf(address(this)).mulDiv(
+                cdo.tranchePrice(tranche),
+                cdo.ONE_TRANCHE_TOKEN(),
+                Math.Rounding.Down
+            );
     }
 
     /// @notice The amount of ellipsis shares to withdraw given an amount of adapter shares

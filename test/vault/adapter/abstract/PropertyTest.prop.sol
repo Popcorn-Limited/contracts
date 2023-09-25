@@ -253,7 +253,6 @@ contract PropertyTest is EnhancedTest {
         uint256 oldAllowance = IERC20(_vault_).allowance(owner, caller);
 
         vm.prank(caller);
-        emit log("DING");
         uint256 shares = IERC4626(_vault_).withdraw(assets, caller, owner);
 
         uint256 newReceiverAsset = IERC20(_asset_).balanceOf(caller);
@@ -272,6 +271,7 @@ contract PropertyTest is EnhancedTest {
             _delta_,
             string.concat("asset", testPreFix)
         ); // NOTE: this may fail if the receiver is a contract in which the asset is stored
+        
         if (caller != owner && oldAllowance != type(uint256).max)
             assertApproxEqAbs(
                 newAllowance,
