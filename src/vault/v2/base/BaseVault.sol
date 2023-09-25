@@ -58,7 +58,6 @@ abstract contract BaseVault is
         _disableInitializers();
     }
 
-
     function __BaseVault__init(
         BaseVaultConfig memory vaultConfig
     ) internal onlyInitializing {
@@ -69,7 +68,9 @@ abstract contract BaseVault is
 
         if (address(vaultConfig.asset_) == address(0)) revert InvalidAsset();
 
-        _decimals = IERC20Metadata(address(vaultConfig.asset_)).decimals() + decimalOffset; // Asset decimals + decimal offset to combat inflation attacks
+        _decimals =
+            IERC20Metadata(address(vaultConfig.asset_)).decimals() +
+            decimalOffset; // Asset decimals + decimal offset to combat inflation attacks
 
         INITIAL_CHAIN_ID = block.chainid;
         INITIAL_DOMAIN_SEPARATOR = computeDomainSeparator();
@@ -82,7 +83,8 @@ abstract contract BaseVault is
         ) revert InvalidVaultFees();
         fees = vaultConfig.fees;
 
-        if (vaultConfig.feeRecipient == address(0)) revert InvalidFeeRecipient();
+        if (vaultConfig.feeRecipient == address(0))
+            revert InvalidFeeRecipient();
         feeRecipient = vaultConfig.feeRecipient;
 
         contractName = keccak256(
@@ -160,7 +162,7 @@ abstract contract BaseVault is
         );
 
         shares = _convertToShares(assets, Math.Rounding.Down) - feeShares;
-        if (shares == 0) revert ZeroAmount();
+        if (shares == 0 || assets == 0) revert ZeroAmount();
 
         if (feeShares > 0) _mint(feeRecipient, feeShares);
 
@@ -188,7 +190,6 @@ abstract contract BaseVault is
         address receiver
     ) public override nonReentrant returns (uint256 assets) {
         if (receiver == address(0)) revert InvalidReceiver();
-        if (shares == 0) revert ZeroAmount();
 
         // Inititalize account for managementFee on first deposit
         if (totalSupply() == 0) feesUpdatedAt = block.timestamp;
@@ -202,6 +203,7 @@ abstract contract BaseVault is
         );
 
         assets = _convertToAssets(shares + feeShares, Math.Rounding.Up);
+        if (shares == 0 || assets == 0) revert ZeroAmount();
 
         if (assets > maxMint(receiver)) revert MaxError(assets);
 
@@ -241,7 +243,7 @@ abstract contract BaseVault is
         if (assets > maxWithdraw(owner)) revert MaxError(assets);
 
         shares = _convertToShares(assets, Math.Rounding.Up);
-        if (shares == 0) revert ZeroAmount();
+        if (shares == 0 || assets == 0) revert ZeroAmount();
 
         uint256 withdrawalFee = uint256(fees.withdrawal);
 
@@ -282,7 +284,6 @@ abstract contract BaseVault is
         address owner
     ) public override nonReentrant returns (uint256 assets) {
         if (receiver == address(0)) revert InvalidReceiver();
-        if (shares == 0) revert ZeroAmount();
         if (shares > maxRedeem(owner)) revert MaxError(shares);
 
         if (msg.sender != owner)
@@ -295,6 +296,7 @@ abstract contract BaseVault is
         );
 
         assets = _convertToAssets(shares - feeShares, Math.Rounding.Up);
+        if (shares == 0 || assets == 0) revert ZeroAmount();
 
         _burn(owner, shares);
 
@@ -452,7 +454,8 @@ abstract contract BaseVault is
      */
     function accruedManagementFee() public view returns (uint256) {
         uint256 managementFee = fees.management;
-            return managementFee > 0
+        return
+            managementFee > 0
                 ? managementFee.mulDiv(
                     totalAssets() * (block.timestamp - feesUpdatedAt),
                     SECONDS_PER_YEAR,

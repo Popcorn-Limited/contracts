@@ -50,8 +50,11 @@ contract IdleSeniorAdapter is BaseAdapter {
     function _totalUnderlying() internal view override returns (uint256) {
         address tranche = cdo.AATranche();
         return
-            (IERC20(tranche).balanceOf(address(this)) *
-                cdo.tranchePrice(tranche)) / cdo.ONE_TRANCHE_TOKEN();
+            IERC20(tranche).balanceOf(address(this)).mulDiv(
+                cdo.tranchePrice(tranche),
+                cdo.ONE_TRANCHE_TOKEN(),
+                Math.Rounding.Down
+            );
     }
 
     /*//////////////////////////////////////////////////////////////
