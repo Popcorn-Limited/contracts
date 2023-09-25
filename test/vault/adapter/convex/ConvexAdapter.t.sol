@@ -94,6 +94,31 @@ contract ConvexAdapterTest is AbstractAdapterTest {
 
     // OPTIONAL
     function test__rewardsTokens() public override {
+        // Test Gear+ETH pool (id=136) as it contains additional rewards
+        (address _asset, , , address _convexRewards, , ) = convexBooster
+            .poolInfo(136);
+        convexRewards = IConvexRewards(_convexRewards);
+
+        setUpBaseTest(
+            IERC20(_asset),
+            address(new ConvexAdapter()),
+            address(convexBooster),
+            10,
+            "Convex",
+            true
+        );
+
+        vm.label(address(convexBooster), "convexBooster");
+        vm.label(address(convexRewards), "convexRewards");
+        vm.label(address(asset), "asset");
+        vm.label(address(this), "test");
+
+        adapter.initialize(
+            abi.encode(asset, address(this), strategy, 0, sigs, ""),
+            externalRegistry,
+            abi.encode(136)
+        );
+
         address[] memory rewardTokens = IWithRewards(address(adapter))
             .rewardTokens();
         address CRV = 0xD533a949740bb3306d119CC777fa900bA034cd52;
