@@ -6,8 +6,13 @@ pragma solidity ^0.8.15;
 import {VaultInitParams, VaultFees, IERC4626, IERC20} from "./IVault.sol";
 import {VaultMetadata} from "./IVaultRegistry.sol";
 import {IDeploymentController} from "./IDeploymentController.sol";
+import {IPermissionRegistry, Permission} from "./IPermissionRegistry.sol";
+import { IVaultRegistry } from "./IVaultRegistry.sol";
+import { IAdminProxy } from "./IAdminProxy.sol";
+import { ITemplateRegistry } from "./ITemplateRegistry.sol";
+import {IMultiRewardEscrow} from "../IMultiRewardEscrow.sol";
 
-struct DeploymentArgs {
+    struct DeploymentArgs {
     /// @Notice templateId
     bytes32 id;
     /// @Notice encoded init params
@@ -114,6 +119,8 @@ interface IVaultController {
 
     function setPerformanceFee(uint256 newFee) external;
 
+    function setPermissions(address[] calldata targets, Permission[] calldata newPermissions) external;
+
     function setAdapterPerformanceFees(address[] calldata adapters) external;
 
     function performanceFee() external view returns (uint256);
@@ -138,4 +145,19 @@ interface IVaultController {
     ) external view returns (bytes32);
 
     function toggleAdapterAutoHarvest(address[] calldata adapters) external;
+
+    function deploymentController() external view returns(IDeploymentController);
+
+    function templateRegistry() external view returns(ITemplateRegistry);
+
+    function permissionRegistry() external view returns(IPermissionRegistry);
+
+    function vaultRegistry() external view returns(IVaultRegistry);
+
+    function adminProxy() external view returns(IAdminProxy);
+
+    function escrow() external view returns(IMultiRewardEscrow);
+
+    function owner() external view returns(address);
+
 }
