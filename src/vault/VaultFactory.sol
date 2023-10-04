@@ -33,6 +33,7 @@ contract VaultFactory is Owned {
     /*//////////////////////////////////////////////////////////////
                                IMMUTABLES
     //////////////////////////////////////////////////////////////*/
+    IVaultRegistry public vaultRegistry;
 
     bytes32 public immutable VAULT = "Vault";
     bytes32 public immutable ADAPTER = "Adapter";
@@ -72,6 +73,9 @@ contract VaultFactory is Owned {
     /*//////////////////////////////////////////////////////////////
                           VAULT DEPLOYMENT LOGIC
     //////////////////////////////////////////////////////////////*/
+    error InvalidConfig();
+    error VaultDeploymentFailed();
+    error NotAllowed(address subject);
 
     event VaultDeployed(
         address indexed vault,
@@ -79,8 +83,14 @@ contract VaultFactory is Owned {
         address indexed adapter
     );
 
-    error InvalidConfig();
-    error VaultDeploymentFailed();
+    modifier canCreate() {
+        if (
+            permissionRegistry.endorsed(address(1))
+                ? !permissionRegistry.endorsed(msg.sender)
+                : permissionRegistry.rejected(msg.sender)
+        ) revert NotAllowed(msg.sender);
+        _;
+    }
 
     /**
      * @notice Deploy a new Vault. Optionally with an Adapter and Staking. Caller must be owner.
@@ -137,8 +147,6 @@ contract VaultFactory is Owned {
                           REGISTER VAULT
     //////////////////////////////////////////////////////////////*/
 
-    IVaultRegistry public vaultRegistry;
-
     /// @notice Call the `VaultRegistry` to register a vault via `AdminProxy`
     function _registerVault(
         address vault,
@@ -151,84 +159,6 @@ contract VaultFactory is Owned {
                 metadata
             )
         );
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                       VERIFICATION LOGIC
-    //////////////////////////////////////////////////////////////*/
-
-    error NotSubmitterNorOwner(address caller);
-    error NotSubmitter(address caller);
-    error NotAllowed(address subject);
-    error ArrayLengthMismatch();
-
-    /// @notice Verify that the caller is the creator of the vault or owner of `VaultController` (admin rights).
-    function _verifyCreatorOrOwner(
-        address vault
-    ) internal returns (VaultMetadata memory metadata) {
-        metadata = vaultRegistry.getVault(vault);
-        if (msg.sender != metadata.creator && msg.sender != owner)
-            revert NotSubmitterNorOwner(msg.sender);
-    }
-
-    /// @notice Verify that the caller is the creator of the vault.
-    function _verifyCreator(
-        address vault
-    ) internal view returns (VaultMetadata memory metadata) {
-        metadata = vaultRegistry.getVault(vault);
-        if (msg.sender != metadata.creator) revert NotSubmitter(msg.sender);
-    }
-
-    /// @notice Verify that the token is not rejected nor a clone.
-    function _verifyToken(address token) internal view {
-        if (
-            (
-                permissionRegistry.endorsed(address(0))
-                    ? !permissionRegistry.endorsed(token)
-                    : permissionRegistry.rejected(token)
-            ) ||
-            cloneRegistry.cloneExists(token) ||
-            token == address(0)
-        ) revert NotAllowed(token);
-    }
-
-    /// @notice Verify that the array lengths are equal.
-    function _verifyEqualArrayLength(
-        uint256 length1,
-        uint256 length2
-    ) internal pure {
-        if (length1 != length2) revert ArrayLengthMismatch();
-    }
-
-    modifier canCreate() {
-        if (
-            permissionRegistry.endorsed(address(1))
-                ? !permissionRegistry.endorsed(msg.sender)
-                : permissionRegistry.rejected(msg.sender)
-        ) revert NotAllowed(msg.sender);
-        _;
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                          OWNERSHIP LOGIC
-    //////////////////////////////////////////////////////////////*/
-
-    IAdminProxy public adminProxy;
-
-    /**
-     * @notice Nominates a new owner of `AdminProxy`. Caller must be owner.
-     * @dev Must be called if the `VaultController` gets swapped out or upgraded
-     */
-    function nominateNewAdminProxyOwner(address newOwner) external onlyOwner {
-        adminProxy.nominateNewOwner(newOwner);
-    }
-
-    /**
-     * @notice Accepts ownership of `AdminProxy`. Caller must be nominated owner.
-     * @dev Must be called after construction
-     */
-    function acceptAdminProxyOwnership() external {
-        adminProxy.acceptOwnership();
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -333,74 +263,6 @@ contract VaultFactory is Owned {
                 abi.encodeWithSelector(IAdapter.toggleAutoHarvest.selector)
             );
         }
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                      DEPLOYMENT CONTROLLER LOGIC
-    //////////////////////////////////////////////////////////////*/
-
-    IDeploymentController public deploymentController;
-    ICloneRegistry public cloneRegistry;
-    ITemplateRegistry public templateRegistry;
-    IPermissionRegistry public permissionRegistry;
-
-    event DeploymentControllerChanged(
-        address oldController,
-        address newController
-    );
-
-    error InvalidDeploymentController(address deploymentController);
-
-    /**
-     * @notice Sets a new `DeploymentController` and saves its auxilary contracts. Caller must be owner.
-     * @param _deploymentController New DeploymentController.
-     */
-    function setDeploymentController(
-        IDeploymentController _deploymentController
-    ) external onlyOwner {
-        _setDeploymentController(_deploymentController);
-    }
-
-    function _setDeploymentController(
-        IDeploymentController _deploymentController
-    ) internal {
-        if (
-            address(_deploymentController) == address(0) ||
-            address(deploymentController) == address(_deploymentController)
-        ) revert InvalidDeploymentController(address(_deploymentController));
-
-        emit DeploymentControllerChanged(
-            address(deploymentController),
-            address(_deploymentController)
-        );
-
-        // Dont try to change ownership on construction
-        if (address(deploymentController) != address(0))
-            _transferDependencyOwnership(address(_deploymentController));
-
-        deploymentController = _deploymentController;
-        cloneRegistry = _deploymentController.cloneRegistry();
-        templateRegistry = _deploymentController.templateRegistry();
-    }
-
-    function _transferDependencyOwnership(
-        address _deploymentController
-    ) internal {
-        adminProxy.execute(
-            address(deploymentController),
-            abi.encodeWithSelector(
-                IDeploymentController.nominateNewDependencyOwner.selector,
-                _deploymentController
-            )
-        );
-
-        adminProxy.execute(
-            _deploymentController,
-            abi.encodeWithSelector(
-                IDeploymentController.acceptDependencyOwnership.selector,
-                ""
-            )
-        );
     }
 
     /*//////////////////////////////////////////////////////////////
