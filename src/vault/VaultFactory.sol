@@ -73,6 +73,9 @@ contract VaultFactory is Owned {
     /*//////////////////////////////////////////////////////////////
                           VAULT DEPLOYMENT LOGIC
     //////////////////////////////////////////////////////////////*/
+    error InvalidConfig();
+    error VaultDeploymentFailed();
+    error NotAllowed(address subject);
 
     event VaultDeployed(
         address indexed vault,
@@ -80,8 +83,14 @@ contract VaultFactory is Owned {
         address indexed adapter
     );
 
-    error InvalidConfig();
-    error VaultDeploymentFailed();
+    modifier canCreate() {
+        if (
+            permissionRegistry.endorsed(address(1))
+                ? !permissionRegistry.endorsed(msg.sender)
+                : permissionRegistry.rejected(msg.sender)
+        ) revert NotAllowed(msg.sender);
+        _;
+    }
 
     /**
      * @notice Deploy a new Vault. Optionally with an Adapter and Staking. Caller must be owner.
