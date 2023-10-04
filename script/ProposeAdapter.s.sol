@@ -3,14 +3,14 @@
 pragma solidity ^0.8.15;
 
 import {Script} from "forge-std/Script.sol";
-import {VaultController, IAdapter, VaultInitParams, VaultMetadata, IERC4626, IERC20, VaultFees} from "../src/vault/VaultController.sol";
+import {VaultFactory, IAdapter, VaultInitParams, VaultMetadata, IERC4626, IERC20, VaultFees} from "../src/vault/VaultFactory.sol";
 import {IVaultController, DeploymentArgs} from "../src/interfaces/vault/IVaultController.sol";
 
 contract ProposeAdapter is Script {
     address deployer;
 
-    VaultController controller =
-        VaultController(0xa199409F99bDBD998Ae1ef4FdaA58b356370837d);
+    VaultFactory controller =
+        VaultFactory(0xa199409F99bDBD998Ae1ef4FdaA58b356370837d);
 
     address[] vaults;
     IERC4626[] adapters;

@@ -8,7 +8,7 @@ import {CloneFactory} from "../src/vault/CloneFactory.sol";
 import {PermissionRegistry} from "../src/vault/PermissionRegistry.sol";
 import {TemplateRegistry, Template} from "../src/vault/TemplateRegistry.sol";
 import {DeploymentController} from "../src/vault/DeploymentController.sol";
-import {VaultController, IAdapter, VaultInitParams, VaultMetadata, IERC4626, IERC20, VaultFees} from "../src/vault/VaultController.sol";
+import {VaultFactory, IAdapter, VaultInitParams, VaultMetadata, IERC4626, IERC20, VaultFees} from "../src/vault/VaultFactory.sol";
 import {Vault} from "../src/vault/Vault.sol";
 import {AdminProxy} from "../src/vault/AdminProxy.sol";
 import {VaultRegistry} from "../src/vault/VaultRegistry.sol";
@@ -59,8 +59,8 @@ contract DeployVaultSystem is Script {
     IMultiRewardEscrow escrow =
         IMultiRewardEscrow(0x23DBbE898A8b69eA0681F8d8C74f4B17dAAe5FCd);
 
-    VaultController controller =
-        VaultController(0xa199409F99bDBD998Ae1ef4FdaA58b356370837d);
+    VaultFactory controller =
+        VaultFactory(0xa199409F99bDBD998Ae1ef4FdaA58b356370837d);
     VaultRouter router;
 
     IERC20 pop = IERC20(0x6F0fecBC276de8fC69257065fE47C5a03d986394);

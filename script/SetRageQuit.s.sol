@@ -3,7 +3,7 @@
 pragma solidity ^0.8.15;
 
 import {Script} from "forge-std/Script.sol";
-import {VaultController, IAdapter, VaultInitParams, VaultMetadata, IERC4626, IERC20, VaultFees} from "../src/vault/VaultController.sol";
+import {VaultFactory, IAdapter, VaultInitParams, VaultMetadata, IERC4626, IERC20, VaultFees} from "../src/vault/VaultFactory.sol";
 
 contract SetRageQuit is Script {
     address deployer;
@@ -23,7 +23,7 @@ contract SetRageQuit is Script {
         ];
         periods = [1 days, 1 days];
 
-        VaultController(0x9Ec0BEfBf3d8860B3e1715fb407b66186fe1E702)
+        VaultFactory(0x9Ec0BEfBf3d8860B3e1715fb407b66186fe1E702)
             .setVaultQuitPeriods(vaults, periods);
 
         vm.stopBroadcast();

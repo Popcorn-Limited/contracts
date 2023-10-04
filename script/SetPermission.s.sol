@@ -3,15 +3,15 @@
 pragma solidity ^0.8.15;
 
 import {Script} from "forge-std/Script.sol";
-import {VaultController, IAdapter, VaultInitParams, VaultMetadata, IERC4626, IERC20, VaultFees} from "../src/vault/VaultController.sol";
+import {VaultFactory, IAdapter, VaultInitParams, VaultMetadata, IERC4626, IERC20, VaultFees} from "../src/vault/VaultFactory.sol";
 import {IVaultController, DeploymentArgs} from "../src/interfaces/vault/IVaultController.sol";
 import {IPermissionRegistry, Permission} from "../src/interfaces/vault/IPermissionRegistry.sol";
 
 contract SetPermission is Script {
     address deployer;
 
-    VaultController controller =
-        VaultController(0x7D51BABA56C2CA79e15eEc9ECc4E92d9c0a7dbeb);
+    VaultFactory controller =
+        VaultFactory(0x7D51BABA56C2CA79e15eEc9ECc4E92d9c0a7dbeb);
 
     address[] targets;
     Permission[] permissions;
