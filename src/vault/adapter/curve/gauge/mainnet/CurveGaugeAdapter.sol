@@ -52,13 +52,13 @@ contract CurveGaugeAdapter is AdapterBase, WithRewards {
         address registry,
         bytes memory curveInitData
     ) external initializer {
-        __AdapterBase_init(adapterInitData);
-
         uint256 _gaugeId = abi.decode(curveInitData, (uint256));
 
         minter = IMinter(registry);
         gauge = IGauge(IGaugeController(minter.controller()).gauges(_gaugeId));
         crv = minter.token();
+
+        __AdapterBase_init(adapterInitData);
 
         if (gauge.lp_token() != asset()) revert InvalidAsset();
 

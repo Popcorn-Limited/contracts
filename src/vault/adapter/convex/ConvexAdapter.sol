@@ -117,7 +117,7 @@ contract ConvexAdapter is AdapterBase, WithRewards {
         tokens[1] = 0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B; // CVX
 
         for (uint256 i; i < len; i++) {
-            tokens[i + 1] = convexRewards.extraRewards(i).rewardToken();
+            tokens[i + 2] = convexRewards.extraRewards(i).rewardToken();
         }
     }
 

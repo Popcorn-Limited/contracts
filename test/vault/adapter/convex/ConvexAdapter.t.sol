@@ -17,7 +17,7 @@ contract ConvexAdapterTest is AbstractAdapterTest {
     uint256 pid;
 
     function setUp() public {
-        vm.createSelectFork(vm.rpcUrl("mainnet"), 16991525);
+        vm.createSelectFork(vm.rpcUrl("mainnet"), 18284775);
 
         testConfigStorage = ITestConfigStorage(
             address(new ConvexTestConfigStorage())
