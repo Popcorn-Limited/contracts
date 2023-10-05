@@ -2,76 +2,80 @@
 // Docgen-SOLC: 0.8.15
 
 pragma solidity ^0.8.15;
-import "forge-std/Console.sol";
 import {Test} from "forge-std/Test.sol";
 import {MockERC20} from "../utils/mocks/MockERC20.sol";
 import {IVaultController, DeploymentArgs} from "../../src/interfaces/vault/IVaultController.sol";
 import {VaultController, IAdapter, VaultInitParams, VaultMetadata} from "../../src/vault/VaultController.sol";
 import {VaultFees, IERC4626, IERC20} from "../../src/interfaces/vault/IVault.sol";
 
-
 contract DebugVaultControllerTest is Test {
-    IERC20 public asset = IERC20(address(0));
-    IERC4626 public adapter = IERC4626(0x4EC671E19730DD92Aa7cB3399970DBE988F88111);
+    IERC20 public asset = IERC20(0x1ee442b5326009Bb18F2F472d3e0061513d1A0fF);
+    // IERC4626 public adapter =
+    //     IERC4626(0x4EC671E19730DD92Aa7cB3399970DBE988F88111);
     address public feeRecipient = 0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E;
+
+    address caller = 0x22f5413C075Ccd56D575A54763831C4c27A37Bdb;
 
     MockERC20 rewardToken;
     string metadataCid = "cid";
     address[8] swapTokenAddresses;
-    bytes32 templateId = "MockAdapter";
+    bytes32 adapterId = "BalancerGaugeAdapter";
 
     IVaultController public controller;
 
     function setUp() public {
         vm.createSelectFork(vm.rpcUrl("mainnet"), 17542478);
-        controller = IVaultController(0x7D51BABA56C2CA79e15eEc9ECc4E92d9c0a7dbeb);
+        controller = IVaultController(
+            0x7D51BABA56C2CA79e15eEc9ECc4E92d9c0a7dbeb
+        );
 
         vm.label(address(controller), "vaultController");
         vm.label(address(controller.adminProxy()), "adminProxy");
         vm.label(address(controller.templateRegistry()), "templateRegistry");
-        vm.label(address(controller.deploymentController()), "deploymentController");
-        vm.label(address(controller.deploymentController().cloneFactory()), "cloneFactory");
+        vm.label(
+            address(controller.deploymentController()),
+            "deploymentController"
+        );
+        vm.label(
+            address(controller.deploymentController().cloneFactory()),
+            "cloneFactory"
+        );
     }
-
 
     /*//////////////////////////////////////////////////////////////
                         VAULT DEPLOYMENT
     //////////////////////////////////////////////////////////////*/
     function test__deployVault() public {
+        vm.prank(caller);
         address vaultClone = controller.deployVault(
             VaultInitParams({
                 asset: asset,
                 adapter: IERC4626(address(0)),
                 fees: VaultFees({
-                    deposit: 100,
-                    withdrawal: 200,
-                    management: 300,
-                    performance: 400
+                    deposit: 0,
+                    withdrawal: 0,
+                    management: 0,
+                    performance: 0
                 }),
                 feeRecipient: feeRecipient,
                 depositLimit: type(uint256).max,
-                owner: address(this)
+                owner: caller
             }),
-            DeploymentArgs({id: templateId, data: abi.encode(uint256(100))}),
-            DeploymentArgs({id: "MockStrategy", data: ""}),
-            true,
-            abi.encode(
-                address(rewardToken),
-                0.1 ether,
-                1 ether,
-                true,
-                10000000,
-                2 days,
-                1 days
-            ),
+            DeploymentArgs({id: adapterId, data: abi.encode(0x87012b0C3257423fD74a5986F81a0f1954C17a1d)}),
+            DeploymentArgs({
+                id: "BalancerLpCompounder",
+                data: "0x0000000000000000000000003472a5a71965499acd81997a54bba8d852c6e53d000000000000000000000000ba12222222228d8ba445958a75a0704d566bf2c800000000000000000000000000000000000000000000000000000000000000c0000000000000000000000000000000000000000000000000000000000000044000000000000000000000000000000000000000000000000000000000000006200000000000000000000000000000000000000000000000000000000000000660000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000024000000000000000000000000000000000000000000000000000000000000002c00000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000001009f1f16b025f703ee985b58ced48daf93dad2f7ef00020000000000000000001e00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000000b460daa847c45f1c4a41cb05bfb3b51c92e41b3600020000000000000000019400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003000000000000000000000000ba100000625a3754423978a60c9317c58a424e3d0000000000000000000000002260fac5e5542a773aa44fbcfedf7c193bc2c5990000000000000000000000003472a5a71965499acd81997a54bba8d852c6e53d00000000000000000000000000000000000000000000000000000000000000037fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000016000000000000000000000000000000000000000000000000000000000000001a000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0000000000000000000000000000000000000000000000000000000000000000"
+            }),
+            false,
+            "",
             VaultMetadata({
                 vault: address(0),
                 staking: address(0),
-                creator: address(this),
+                creator: caller,
                 metadataCID: metadataCid,
                 swapTokenAddresses: swapTokenAddresses,
-                swapAddress: address(0x5555),
-                exchange: uint256(1)
+                swapAddress: address(0),
+                exchange: uint256(0)
             }),
             0
         );
