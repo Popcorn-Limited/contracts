@@ -55,6 +55,11 @@ contract TemplateRegistry is Owned {
     emit TemplateAdded(version, category, template);
   }
 
+  function getTemplate(bytes32 version, bytes32 category) external view returns (address) {
+    return allTemplates[version][category][0];
+  }
+
+
   /**
   * @param version the template version
   * @param category of the new template, i.e. vault or strategy

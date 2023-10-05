@@ -23,15 +23,7 @@ struct Template {
 interface ITemplateRegistry is IOwned {
   function templates(bytes32 templateCategory, bytes32 templateId) external view returns (Template memory);
 
-  function templateCategoryExists(bytes32 templateCategory) external view returns (bool);
-
-  function templateExists(bytes32 templateId) external view returns (bool);
-
-  function getTemplateCategories() external view returns (bytes32[] memory);
-
-  function getTemplate(bytes32 templateCategory, bytes32 templateId) external view returns (Template memory);
-
-  function getTemplateIds(bytes32 templateCategory) external view returns (bytes32[] memory);
+  function getTemplate(bytes32 version, bytes32 category) external view returns (address);
 
   function addTemplate(
     bytes32 templateType,
@@ -40,6 +32,4 @@ interface ITemplateRegistry is IOwned {
   ) external;
 
   function addTemplateCategory(bytes32 templateCategory) external;
-
-  function toggleTemplateEndorsement(bytes32 templateCategory, bytes32 templateId) external;
 }

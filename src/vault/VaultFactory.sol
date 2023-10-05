@@ -2,7 +2,6 @@
 // Docgen-SOLC: 0.8.15
 pragma solidity ^0.8.15;
 
-import {Owned} from "../utils/Owned.sol";
 import {IVault} from "../interfaces/vault/IVault.sol";
 import {ITemplateRegistry} from "../interfaces/vault/ITemplateRegistry.sol";
 import {IVaultRegistry, VaultMetadata} from "../interfaces/vault/IVaultRegistry.sol";
@@ -17,7 +16,8 @@ import {BaseVaultConfig} from "./v2/base/BaseVault.sol";
  * Deploys Vaults, Adapter, Strategies and Staking contracts.
  * Calls admin functions on deployed contracts.
  */
-contract VaultFactory is Owned {
+contract VaultFactory {
+
     /*//////////////////////////////////////////////////////////////
                                IMMUTABLES
     //////////////////////////////////////////////////////////////*/
@@ -27,8 +27,25 @@ contract VaultFactory is Owned {
 
     bytes32 public constant VERSION = "v2.0.0";
 
-    bytes32 public immutable VAULT = "Vault";
-    bytes32 public immutable STRATEGY = "Strategy";
+    bytes32 public immutable REBALANCING_VAULT = "RebalancingVault";
+    bytes32 public immutable SINGLE_STRATEGY_VAULT = "SingleStrategyVault";
+
+    bytes32 public immutable LEVERAGE_STRATEGY = "LeverageStrategy";
+    bytes32 public immutable DEPOSITOR_STRATEGY = "DepositorStrategy";
+    bytes32 public immutable COMPOUNDER_STRATEGY = "CompounderStrategy";
+    bytes32 public immutable REWARD_CLAIMER_STRATEGY = "RewardClaimerStrategy";
+
+    /*//////////////////////////////////////////////////////////////
+                               ERRORS
+    //////////////////////////////////////////////////////////////*/
+    error ZeroAddress();
+    error VaultDeploymentFailed();
+
+    /*//////////////////////////////////////////////////////////////
+                               EVENTS
+    //////////////////////////////////////////////////////////////*/
+    event VaultDeployed(address indexed vault, bytes indexed vaultCategory);
+    event VaultRegistryUpdated(address indexed old, address indexed updated);
 
     /**
      * @notice Constructor of this contract.
@@ -38,36 +55,17 @@ contract VaultFactory is Owned {
      * @param implementation address of the vault's implementation contract.
      */
     constructor(
-        address _owner,
         IVaultRegistry _vaultRegistry,
-        ITemplateRegistry _templateRegistry,
-        address implementation
-    ) Owned(_owner) {
+        ITemplateRegistry _templateRegistry
+    ) {
         vaultRegistry = _vaultRegistry;
         templateRegistry = _templateRegistry;
-        vaultImplementation = implementation;
     }
 
-    event VaultImplementationUpdated(address old, address updated);
-
-    function setImplementation(address implementation) external onlyOwner {
-        emit VaultImplementationUpdated(vaultImplementation, implementation);
-        vaultImplementation = implementation;
-
-    }
 
     /*//////////////////////////////////////////////////////////////
                           VAULT DEPLOYMENT LOGIC
     //////////////////////////////////////////////////////////////*/
-    error InvalidConfig();
-    error VaultDeploymentFailed();
-    error NotAllowed(address subject);
-
-    event VaultDeployed(
-        address indexed vault,
-        address indexed strategy
-    );
-
     /**
      * @notice Deploy a new Vault.
      * @param vaultData Vault init params.
@@ -76,23 +74,35 @@ contract VaultFactory is Owned {
      */
     function deployVault(
         BaseVaultConfig memory vaultData,
-        address strategy,
-        VaultMetadata memory metadata
+        bytes32 vaultCategory,
+        bytes32 strategyCategory
     ) external returns (address vault) {
-        require(templateRegistry.templates(VERSION, strategy), "passed strategy is not valid");
+        address vaultImplementation = templateRegistry.getTemplate(VERSION, vaultCategory);
+        if (address(0) == vaultImplementation) revert ZeroAddress();
+
+        address strategyImplementation = templateRegistry.getTemplate(VERSION, strategyCategory);
+        if (address(0) == strategyImplementation) revert ZeroAddress();
 
         vault = Clones.clone(vaultImplementation);
-        (bool success, ) = IVault(vault).initialize(vaultData, strategy);
-        if(!success) revert VaultDeploymentFailed();
+        IVault(vault).initialize(vaultData, strategyImplementation);
 
-        address staking;
+        VaultMetadata memory metadata;
         metadata.vault = vault;
-        metadata.staking = staking;
+        metadata.vaultCategory = vaultCategory;
         metadata.creator = msg.sender;
 
         vaultRegistry.registerVault(metadata);
 
-        emit VaultDeployed(vault, strategy);
+        emit VaultDeployed(vault, vaultCategory);
     }
 
+    /*//////////////////////////////////////////////////////////////
+                          UPDATE VAULT FACTORY
+    //////////////////////////////////////////////////////////////*/
+    function setVaultRegistry(address newVaultRegistry) external onlyOwner {
+        if(address(0) == newVaultRegistry) revert ZeroAddress();
+
+        emit VaultRegistryUpdated(vaultRegistry, newVaultRegistry);
+        vaultRegistry = newVaultRegistry;
+    }
 }

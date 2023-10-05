@@ -17,7 +17,7 @@ contract VaultRegistry is Owned {
                             IMMUTABLES
     //////////////////////////////////////////////////////////////*/
 
-  /// @param _owner `AdminProxy`
+  /// @param _owner `VaultFactory`
   constructor(address _owner) Owned(_owner) {}
 
   /*//////////////////////////////////////////////////////////////
@@ -33,7 +33,11 @@ contract VaultRegistry is Owned {
   // addresses of all registered vaults
   address[] public allVaults;
 
-  event VaultAdded(address vaultAddress, string metadataCID);
+  event VaultAdded(
+    address indexed vaultAddress,
+    bytes indexed vaultCategory,
+    address indexed creator
+  );
 
   error VaultAlreadyRegistered();
 
@@ -49,7 +53,7 @@ contract VaultRegistry is Owned {
     allVaults.push(_metadata.vault);
     vaultsByAsset[IERC4626(_metadata.vault).asset()].push(_metadata.vault);
 
-    emit VaultAdded(_metadata.vault, _metadata.metadataCID);
+    emit VaultAdded(_metadata.vault, _metadata.vaultCategory, _metadata.creator);
   }
 
   /*//////////////////////////////////////////////////////////////

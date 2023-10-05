@@ -7,18 +7,10 @@ import { IOwned } from "../IOwned.sol";
 struct VaultMetadata {
   /// @notice Vault address
   address vault;
-  /// @notice Staking contract for the vault
-  address staking;
+  /// @notice Category of vault deployed e.g (SINGLE_STRATEGY VAULT or REBALANCING VAULT)
+  bytes32 vaultCategory;
   /// @notice Owner and Vault creator
   address creator;
-  /// @notice IPFS CID of vault metadata
-  string metadataCID;
-  /// @notice OPTIONAL - If the asset is an Lp Token these are its underlying assets
-  address[8] swapTokenAddresses;
-  /// @notice OPTIONAL - If the asset is an Lp Token its the pool address
-  address swapAddress;
-  /// @notice OPTIONAL - If the asset is an Lp Token this is the identifier of the exchange (1 = curve)
-  uint256 exchange;
 }
 
 interface IVaultRegistry is IOwned {
