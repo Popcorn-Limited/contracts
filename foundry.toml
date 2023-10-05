@@ -10,7 +10,8 @@ remappings = [
   'forge-std/=lib/forge-std/src/',
   'openzeppelin-contracts/=lib/openzeppelin-contracts/contracts/',
   'openzeppelin-contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts',
-  'solmate/=lib/solmate/src/'
+  'solmate/=lib/solmate/src/',
+  'create3-factory/=lib/create-factory/'
 ]
 
 no_match_contract = "Skip"
