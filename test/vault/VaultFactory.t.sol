@@ -16,7 +16,7 @@ import { IAdminProxy } from "../../src/interfaces/vault/IAdminProxy.sol";
 import { IVaultFactory } from "../../src/interfaces/vault/IVaultFactory.sol";
 import { IERC20, IVault } from "../../src/vault/v2/base/interfaces/IVault.sol";
 import { IVaultRegistry } from "../../src/interfaces/vault/IVaultRegistry.sol";
-import { TemplateRegistry, Template } from "../../src/vault/TemplateRegistry.sol";
+import { TemplateRegistry } from "../../src/vault/TemplateRegistry.sol";
 import { ITemplateRegistry } from "../../src/interfaces/vault/ITemplateRegistry.sol";
 import { SingleStrategyVault } from "../../src/vault/v2/vaults/SingleStrategyVault.sol";
 import { AdapterConfig, ProtocolConfig } from "../../src/vault/v2/base/interfaces/IBaseAdapter.sol";

@@ -90,5 +90,6 @@ contract VaultFactory is Owned {
 
         emit VaultRegistryUpdated(address(vaultRegistry), address(newVaultRegistry));
         vaultRegistry = IVaultRegistry(newVaultRegistry);
+        vaultRegistry.addFactory(address(this));
     }
 }

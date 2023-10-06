@@ -13,7 +13,7 @@ import { IERC4626Upgradeable as IERC4626 } from "openzeppelin-contracts-upgradea
  * @notice  Registers vaults with metadata for use by a frontend.
  */
 contract VaultRegistry is Owned {
-  mapping(address => bool) factories;
+  mapping(address => bool) public factories;
 
   /// @param _owner `VaultFactory`
   constructor(address _owner) Owned(_owner) {}

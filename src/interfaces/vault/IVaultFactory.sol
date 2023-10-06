@@ -5,7 +5,6 @@ pragma solidity ^0.8.15;
 
 import {VaultInitParams, VaultFees, IERC4626, IERC20} from "./IVault.sol";
 import {VaultMetadata} from "./IVaultRegistry.sol";
-import {IDeploymentController} from "./IDeploymentController.sol";
 
 struct DeploymentArgs {
     /// @Notice templateId
@@ -124,10 +123,6 @@ interface IVaultFactory {
     function setAdapterHarvestCooldowns(address[] calldata adapters) external;
 
     function harvestCooldown() external view returns (uint256);
-
-    function setDeploymentController(
-        IDeploymentController _deploymentController
-    ) external;
 
     function setActiveTemplateId(
         bytes32 templateCategory,

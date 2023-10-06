@@ -11,7 +11,7 @@ remappings = [
   'openzeppelin-contracts/=lib/openzeppelin-contracts/contracts/',
   'openzeppelin-contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts',
   'solmate/=lib/solmate/src/',
-  'create3-factory/=lib/create-factory/'
+  'create3-factory/=lib/create3-factory/'
 ]
 
 no_match_contract = "Skip"

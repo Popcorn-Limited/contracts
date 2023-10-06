@@ -14,6 +14,8 @@ struct VaultMetadata {
 }
 
 interface IVaultRegistry is IOwned {
+  function addFactory(address factory) external;
+
   function getVault(address vault) external view returns (VaultMetadata memory);
 
   function getSubmitter(address vault) external view returns (address);
