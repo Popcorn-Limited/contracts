@@ -2,7 +2,8 @@
 // Docgen-SOLC: 0.8.15
 pragma solidity ^0.8.15;
 
-import {IVault} from "../interfaces/vault/IVault.sol";
+import {Owned} from "../utils/Owned.sol";
+import {IVault} from "./v2/base/interfaces/IVault.sol";
 import {ITemplateRegistry} from "../interfaces/vault/ITemplateRegistry.sol";
 import {IVaultRegistry, VaultMetadata} from "../interfaces/vault/IVaultRegistry.sol";
 import {Clones} from "openzeppelin-contracts/proxy/Clones.sol";
@@ -16,7 +17,7 @@ import {BaseVaultConfig} from "./v2/base/BaseVault.sol";
  * Deploys Vaults, Adapter, Strategies and Staking contracts.
  * Calls admin functions on deployed contracts.
  */
-contract VaultFactory {
+contract VaultFactory is Owned {
 
     /*//////////////////////////////////////////////////////////////
                                IMMUTABLES
@@ -44,7 +45,7 @@ contract VaultFactory {
     /*//////////////////////////////////////////////////////////////
                                EVENTS
     //////////////////////////////////////////////////////////////*/
-    event VaultDeployed(address indexed vault, bytes indexed vaultCategory);
+    event VaultDeployed(address indexed vault, bytes32 indexed vaultCategory);
     event VaultRegistryUpdated(address indexed old, address indexed updated);
 
     /**
@@ -52,12 +53,12 @@ contract VaultFactory {
      * @param _owner Owner of the contract. Controls management functions.
      * @param _vaultRegistry `VaultRegistry` to safe vault metadata.
      * @param _templateRegistry registry for strategies that a vault can use.
-     * @param implementation address of the vault's implementation contract.
      */
     constructor(
+        address _owner,
         IVaultRegistry _vaultRegistry,
         ITemplateRegistry _templateRegistry
-    ) {
+    ) Owned(_owner) {
         vaultRegistry = _vaultRegistry;
         templateRegistry = _templateRegistry;
     }
@@ -69,8 +70,8 @@ contract VaultFactory {
     /**
      * @notice Deploy a new Vault.
      * @param vaultData Vault init params.
-     * @param strategy the strategy address.
-     * @param metadata Vault metadata for the `VaultRegistry` (Will be used by the frontend for additional informations)
+     * @param vaultCategory category of vault to deploy
+     * @param strategyCategory category of strategy to deploy
      */
     function deployVault(
         BaseVaultConfig memory vaultData,
@@ -102,7 +103,7 @@ contract VaultFactory {
     function setVaultRegistry(address newVaultRegistry) external onlyOwner {
         if(address(0) == newVaultRegistry) revert ZeroAddress();
 
-        emit VaultRegistryUpdated(vaultRegistry, newVaultRegistry);
-        vaultRegistry = newVaultRegistry;
+        emit VaultRegistryUpdated(address(vaultRegistry), address(newVaultRegistry));
+        vaultRegistry = IVaultRegistry(newVaultRegistry);
     }
 }

@@ -14,7 +14,8 @@ struct DeploymentArgs {
     bytes data;
 }
 
-interface IVaultController {
+interface IVaultFactory {
+
     function deployVault(
         VaultInitParams memory vaultData,
         DeploymentArgs memory adapterData,
@@ -138,4 +139,6 @@ interface IVaultController {
     ) external view returns (bytes32);
 
     function toggleAdapterAutoHarvest(address[] calldata adapters) external;
+
+    //function VERSION() external view returns(bytes32);
 }

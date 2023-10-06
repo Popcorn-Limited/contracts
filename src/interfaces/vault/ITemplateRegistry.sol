@@ -21,15 +21,13 @@ struct Template {
 }
 
 interface ITemplateRegistry is IOwned {
+
+
   function templates(bytes32 templateCategory, bytes32 templateId) external view returns (Template memory);
 
   function getTemplate(bytes32 version, bytes32 category) external view returns (address);
 
-  function addTemplate(
-    bytes32 templateType,
-    bytes32 templateId,
-    Template memory template
-  ) external;
+  function addTemplate(bytes32 version, bytes32 category, address template) external;
 
   function addTemplateCategory(bytes32 templateCategory) external;
 }

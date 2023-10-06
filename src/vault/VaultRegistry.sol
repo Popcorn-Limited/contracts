@@ -35,7 +35,7 @@ contract VaultRegistry is Owned {
 
   event VaultAdded(
     address indexed vaultAddress,
-    bytes indexed vaultCategory,
+    bytes32 indexed vaultCategory,
     address indexed creator
   );
 
