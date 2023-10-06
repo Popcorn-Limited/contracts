@@ -13,16 +13,29 @@ import { IERC4626Upgradeable as IERC4626 } from "openzeppelin-contracts-upgradea
  * @notice  Registers vaults with metadata for use by a frontend.
  */
 contract VaultRegistry is Owned {
-  /*//////////////////////////////////////////////////////////////
-                            IMMUTABLES
-    //////////////////////////////////////////////////////////////*/
+  mapping(address => bool) factories;
 
   /// @param _owner `VaultFactory`
   constructor(address _owner) Owned(_owner) {}
 
+  function addFactory(address factory) external onlyOwner {
+    factories[factory] = true;
+  }
+
+  function removeFactory(address factory) external onlyOwner {
+    factories[factory] = false;
+  }
+
   /*//////////////////////////////////////////////////////////////
                             REGISTRATION LOGIC
-    //////////////////////////////////////////////////////////////*/
+  //////////////////////////////////////////////////////////////*/
+
+  error NotFactory();
+
+  modifier onlyFactory() {
+    if (!factories[msg.sender]) revert NotFactory();
+    _;
+  }
 
   // vault to metadata
   mapping(address => VaultMetadata) public metadata;
@@ -45,7 +58,7 @@ contract VaultRegistry is Owned {
    * @notice Registers a new vault with Metadata which can be used by a frontend. Caller must be owner. (`VaultController`)
    * @param _metadata VaultMetadata (See IVaultRegistry for more details)
    */
-  function registerVault(VaultMetadata calldata _metadata) external onlyOwner {
+  function registerVault(VaultMetadata calldata _metadata) external onlyFactory {
     if (metadata[_metadata.vault].vault != address(0)) revert VaultAlreadyRegistered();
 
     metadata[_metadata.vault] = _metadata;
