@@ -33,11 +33,12 @@ contract DeployInfra is CREATE3Script {
                 getCreate3ContractSalt("VaultRegistry"),
                 bytes.concat(
                     type(VaultRegistry).creationCode,
-                    // VaultRegistry is owned by factory
-                    abi.encode(getCreate3Contract("VaultFactory"))
+                    // VaultRegistry is owned by admin proxy
+                    abi.encode(address(adminProxy))
                 )
             )
         );
+        adminProxy.execute(target, abi.encodeWithSelector(VaultRegistry.addFactory.selector, getCreate3Contract("VaultFactory")));
 
         templateRegistry = TemplateRegistry(
             create3.deploy(
@@ -59,13 +60,7 @@ contract DeployInfra is CREATE3Script {
                 )
             )
         );
+
+        vm.stopBroadcast();
     }
-
-    // deploy vault factory
-
-    // deploy vault registry
-
-    // deploy template registry
-
-    // deploy admin proxy
 }
