@@ -28,26 +28,6 @@ contract VaultFactory is Owned {
 
     bytes32 public constant VERSION = "v2.0.0";
 
-    bytes32 public immutable REBALANCING_VAULT = "RebalancingVault";
-    bytes32 public immutable SINGLE_STRATEGY_VAULT = "SingleStrategyVault";
-
-    bytes32 public immutable LEVERAGE_STRATEGY = "LeverageStrategy";
-    bytes32 public immutable DEPOSITOR_STRATEGY = "DepositorStrategy";
-    bytes32 public immutable COMPOUNDER_STRATEGY = "CompounderStrategy";
-    bytes32 public immutable REWARD_CLAIMER_STRATEGY = "RewardClaimerStrategy";
-
-    /*//////////////////////////////////////////////////////////////
-                               ERRORS
-    //////////////////////////////////////////////////////////////*/
-    error ZeroAddress();
-    error VaultDeploymentFailed();
-
-    /*//////////////////////////////////////////////////////////////
-                               EVENTS
-    //////////////////////////////////////////////////////////////*/
-    event VaultDeployed(address indexed vault, bytes32 indexed vaultCategory);
-    event VaultRegistryUpdated(address indexed old, address indexed updated);
-
     /**
      * @notice Constructor of this contract.
      * @param _owner Owner of the contract. Controls management functions.
@@ -67,6 +47,15 @@ contract VaultFactory is Owned {
     /*//////////////////////////////////////////////////////////////
                           VAULT DEPLOYMENT LOGIC
     //////////////////////////////////////////////////////////////*/
+    error VaultDeploymentFailed();
+
+    event VaultDeployed(
+        address indexed vault,
+        address indexed strategy
+    );
+
+    error InvalidStrategy();
+
     /**
      * @notice Deploy a new Vault.
      * @param vaultData Vault init params.
@@ -78,11 +67,7 @@ contract VaultFactory is Owned {
         bytes32 vaultCategory,
         bytes32 strategyCategory
     ) external returns (address vault) {
-        address vaultImplementation = templateRegistry.getTemplate(VERSION, vaultCategory);
-        if (address(0) == vaultImplementation) revert ZeroAddress();
-
-        address strategyImplementation = templateRegistry.getTemplate(VERSION, strategyCategory);
-        if (address(0) == strategyImplementation) revert ZeroAddress();
+        if (!templateRegistry.templates(VERSION, strategy)) revert InvalidStrategy();
 
         vault = Clones.clone(vaultImplementation);
         IVault(vault).initialize(vaultData, strategyImplementation);

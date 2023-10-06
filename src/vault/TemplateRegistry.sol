@@ -4,7 +4,6 @@
 pragma solidity ^0.8.15;
 
 import { Owned } from "../utils/Owned.sol";
-import { Template } from "../interfaces/vault/ITemplateRegistry.sol";
 
 /**
  * @title   TemplateRegistry
