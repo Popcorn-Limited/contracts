@@ -5,7 +5,7 @@ pragma solidity ^0.8.15;
 import {Owned} from "../utils/Owned.sol";
 import {IVault} from "./v2/base/interfaces/IVault.sol";
 import {ITemplateRegistry} from "../interfaces/vault/ITemplateRegistry.sol";
-import {IVaultRegistry, VaultMetadata} from "../interfaces/vault/IVaultRegistry.sol";
+import {IVaultRegistry} from "../interfaces/vault/IVaultRegistry.sol";
 import {Clones} from "openzeppelin-contracts/proxy/Clones.sol";
 import {BaseVaultConfig} from "./v2/base/BaseVault.sol";
 
@@ -28,6 +28,19 @@ contract VaultFactory is Owned {
 
     bytes32 public constant VERSION = "v2.0.0";
 
+    /*//////////////////////////////////////////////////////////////
+                               ERRORS
+    //////////////////////////////////////////////////////////////*/
+    error ZeroAddress();
+    error VaultDeploymentFailed();
+    error InvalidStrategy();
+
+    /*//////////////////////////////////////////////////////////////
+                               EVENTS
+    //////////////////////////////////////////////////////////////*/
+    event VaultDeployed(address indexed vault);
+    event VaultImplementationUpdated(address indexed oldVault, address indexed newVault);
+
     /**
      * @notice Constructor of this contract.
      * @param _owner Owner of the contract. Controls management functions.
@@ -37,10 +50,19 @@ contract VaultFactory is Owned {
     constructor(
         address _owner,
         IVaultRegistry _vaultRegistry,
-        ITemplateRegistry _templateRegistry
+        ITemplateRegistry _templateRegistry,
+        address vault
     ) Owned(_owner) {
         vaultRegistry = _vaultRegistry;
         templateRegistry = _templateRegistry;
+        vaultImplementation = vault;
+    }
+
+    function updateVaultImplementation(address newVault) external onlyOwner {
+        address oldVault = vaultImplementation;
+        vaultImplementation = newVault;
+
+        emit VaultImplementationUpdated(oldVault, newVault);
     }
 
 
@@ -59,37 +81,19 @@ contract VaultFactory is Owned {
     /**
      * @notice Deploy a new Vault.
      * @param vaultData Vault init params.
-     * @param vaultCategory category of vault to deploy
-     * @param strategyCategory category of strategy to deploy
+     * @param strategy the strategy contract
      */
     function deployVault(
         BaseVaultConfig memory vaultData,
-        bytes32 vaultCategory,
-        bytes32 strategyCategory
+        address strategy
     ) external returns (address vault) {
         if (!templateRegistry.templates(VERSION, strategy)) revert InvalidStrategy();
 
         vault = Clones.clone(vaultImplementation);
-        IVault(vault).initialize(vaultData, strategyImplementation);
+        IVault(vault).initialize(vaultData, strategy);
 
-        VaultMetadata memory metadata;
-        metadata.vault = vault;
-        metadata.vaultCategory = vaultCategory;
-        metadata.creator = msg.sender;
+        vaultRegistry.registerVault(vault, msg.sender);
 
-        vaultRegistry.registerVault(metadata);
-
-        emit VaultDeployed(vault, vaultCategory);
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                          UPDATE VAULT FACTORY
-    //////////////////////////////////////////////////////////////*/
-    function setVaultRegistry(address newVaultRegistry) external onlyOwner {
-        if(address(0) == newVaultRegistry) revert ZeroAddress();
-
-        emit VaultRegistryUpdated(address(vaultRegistry), address(newVaultRegistry));
-        vaultRegistry = IVaultRegistry(newVaultRegistry);
-        vaultRegistry.addFactory(address(this));
+        emit VaultDeployed(vault);
     }
 }
