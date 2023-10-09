@@ -8,11 +8,8 @@ import { Owned } from "../utils/Owned.sol";
 /**
  * @title   TemplateRegistry
  * @author  RedVeil
- * @notice  Adds Templates to be used for creating new clones.
+ * @notice  Adds templates for new vaults.
  *
- * Templates are used by the `CloneFactory` to create new clones.
- * Templates can be added permissionlessly via `DeploymentController`.
- * Templates can be endorsed by the DAO via `VaultController`.
  */
 contract TemplateRegistry is Owned {
   /*//////////////////////////////////////////////////////////////
@@ -53,11 +50,6 @@ contract TemplateRegistry is Owned {
 
     emit TemplateAdded(version, category, template);
   }
-
-  function getTemplate(bytes32 version, bytes32 category) external view returns (address) {
-    return allTemplates[version][category][0];
-  }
-
 
   /**
   * @param version the template version
