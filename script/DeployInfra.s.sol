@@ -1,7 +1,7 @@
 import {CREATE3Script} from "./base/CREATE3Script.sol";
 
 import {AdminProxy} from "../src/vault/AdminProxy.sol";
-import {VaultFactory} from "../src/vault/VaultFactory.sol";
+import {SingleStrategyVaultFactory} from "../src/vault/SingleStrategyVaultFactory.sol";
 import {VaultRegistry} from "../src/vault/VaultRegistry.sol";
 import {TemplateRegistry} from "../src/vault/TemplateRegistry.sol";
 
@@ -10,7 +10,7 @@ contract DeployInfra is CREATE3Script {
 
    function run() public returns (
        AdminProxy adminProxy,
-       VaultFactory vaultFactory,
+       SingleStrategyVaultFactory vaultFactory,
        VaultRegistry vaultRegistry,
        TemplateRegistry templateRegistry
    ) {
@@ -38,7 +38,7 @@ contract DeployInfra is CREATE3Script {
                )
            )
        );
-       adminProxy.execute(address(vaultRegistry), abi.encodeWithSelector(VaultRegistry.addFactory.selector, getCreate3Contract("VaultFactory")));
+       adminProxy.execute(address(vaultRegistry), abi.encodeWithSelector(VaultRegistry.addFactory.selector, getCreate3Contract("SingleStrategyVaultFactory")));
 
        templateRegistry = TemplateRegistry(
            create3.deploy(
@@ -51,11 +51,11 @@ contract DeployInfra is CREATE3Script {
            )
        );
 
-       vaultFactory = VaultFactory(
+       vaultFactory = SingleStrategyVaultFactory(
            create3.deploy(
-               getCreate3ContractSalt("VaultFactory"),
+               getCreate3ContractSalt("SingleStrategyVaultFactory"),
                bytes.concat(
-                   type(VaultFactory).creationCode,
+                   type(SingleStrategyVaultFactory).creationCode,
                    abi.encode(address(adminProxy), address(vaultRegistry), address(templateRegistry))
                )
            )

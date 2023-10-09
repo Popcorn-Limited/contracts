@@ -13,6 +13,7 @@ import { Owned } from "../utils/Owned.sol";
 contract VaultRegistry is Owned {
   mapping(address => bool) public factories;
 
+  /// @param _owner `VaultFactory`
   constructor(address _owner) Owned(_owner) {}
 
   function addFactory(address factory) external onlyOwner {

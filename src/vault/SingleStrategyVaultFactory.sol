@@ -17,7 +17,7 @@ import {BaseVaultConfig} from "./v2/base/BaseVault.sol";
  * Deploys Vaults, Adapter, Strategies and Staking contracts.
  * Calls admin functions on deployed contracts.
  */
-contract VaultFactory is Owned {
+contract SingleStrategyVaultFactory is Owned {
 
     /*//////////////////////////////////////////////////////////////
                                IMMUTABLES
