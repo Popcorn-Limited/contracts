@@ -24,6 +24,7 @@ contract SingleStrategyVaultFactoryTest is Test {
     IERC20[] public rewardTokens;
     SingleStrategyVaultFactory public vaultFactory;
     IVaultRegistry public vaultRegistry;
+    IVaultRegistry public customStrategyVaultRegistry;
     ITemplateRegistry public templateRegistry;
 
     address strategy;
@@ -49,13 +50,18 @@ contract SingleStrategyVaultFactoryTest is Test {
         vaultRegistry = IVaultRegistry(address(
             new VaultRegistry(address(this))
         ));
+        customStrategyVaultRegistry = IVaultRegistry(address(
+            new VaultRegistry(address(this))
+        ));
         vaultFactory = new SingleStrategyVaultFactory(
             address(this),
             vaultRegistry,
+            customStrategyVaultRegistry,
             templateRegistry,
             vaultImpl
         );
         vaultRegistry.addFactory(address(vaultFactory));
+        customStrategyVaultRegistry.addFactory(address(vaultFactory));
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -87,6 +93,8 @@ contract SingleStrategyVaultFactoryTest is Test {
         assertEq(vault.fees().management, vaultConfig.fees.management);
         assertEq(vault.fees().withdrawal, vaultConfig.fees.withdrawal);
         assertEq(vault.fees().performance, vaultConfig.fees.performance);
+
+        assertTrue(vaultRegistry.vaults(vaultAddress));
     }
 
     function test__cannotDeployVaultWithUnknownStrategy() public {
@@ -96,6 +104,60 @@ contract SingleStrategyVaultFactoryTest is Test {
             vaultConfig,
             vm.addr(3) 
         );
+    }
+
+    function test__deployCustomStrategyVault() public {
+        BaseVaultConfig memory vaultConfig = _getVaultConfig();
+        address strat = _createStrategy();
+        address vaultAddress = vaultFactory.deployCustomStrategyVault(
+            vaultConfig,
+            strat
+        );
+
+        IVault vault = IVault(vaultAddress);
+        assertEq(vault.name(), vaultConfig.name);
+        assertEq(vault.asset(), address(asset));
+        assertEq(vault.feeRecipient(), feeRecipient);
+        assertEq(vault.fees().deposit, vaultConfig.fees.deposit);
+        assertEq(vault.fees().management, vaultConfig.fees.management);
+        assertEq(vault.fees().withdrawal, vaultConfig.fees.withdrawal);
+        assertEq(vault.fees().performance, vaultConfig.fees.performance);
+
+        assertTrue(customStrategyVaultRegistry.vaults(vaultAddress));
+    }
+
+    function test__canMigrateVaultToMainRegistry() public {
+        BaseVaultConfig memory vaultConfig = _getVaultConfig();
+        address strat = _createStrategy();
+        address vaultAddress = vaultFactory.deployCustomStrategyVault(
+            vaultConfig,
+            strat
+        );
+        assertTrue(customStrategyVaultRegistry.vaults(vaultAddress));
+    
+        templateRegistry.addTemplate(VERSION, "STRATEGY", strat);
+
+        vaultFactory.migrateVault(vaultAddress);
+
+        assertTrue(vaultRegistry.vaults(vaultAddress));
+    }
+
+    function test__cannotMigrateVaultWithUnknownStrategey() public {
+        BaseVaultConfig memory vaultConfig = _getVaultConfig();
+        address strat = _createStrategy();
+        address vaultAddress = vaultFactory.deployCustomStrategyVault(
+            vaultConfig,
+            strat
+        );
+        assertTrue(customStrategyVaultRegistry.vaults(vaultAddress));
+    
+        vm.expectRevert(SingleStrategyVaultFactory.InvalidStrategy.selector);
+        vaultFactory.migrateVault(vaultAddress);
+    }
+
+    function test__cannotMigrateUnknownVault() public {
+        vm.expectRevert(SingleStrategyVaultFactory.NotAVault.selector);
+        vaultFactory.migrateVault(address(2));
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -122,7 +184,7 @@ contract SingleStrategyVaultFactoryTest is Test {
         return adapterAddress;
     }
 
-    function _getVaultConfig() internal returns(BaseVaultConfig memory) {
+    function _getVaultConfig() internal view returns(BaseVaultConfig memory) {
         return BaseVaultConfig({
             asset_: IERC20(address(asset)),
             fees: VaultFees({

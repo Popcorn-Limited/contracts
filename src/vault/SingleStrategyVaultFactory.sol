@@ -8,6 +8,7 @@ import {ITemplateRegistry} from "../interfaces/vault/ITemplateRegistry.sol";
 import {IVaultRegistry} from "../interfaces/vault/IVaultRegistry.sol";
 import {Clones} from "openzeppelin-contracts/proxy/Clones.sol";
 import {BaseVaultConfig} from "./v2/base/BaseVault.sol";
+import {SingleStrategyVault} from "./v2/vaults/SingleStrategyVault.sol";
 
 /**
  * @title   VaultController
@@ -23,6 +24,7 @@ contract SingleStrategyVaultFactory is Owned {
                                IMMUTABLES
     //////////////////////////////////////////////////////////////*/
     IVaultRegistry public vaultRegistry;
+    IVaultRegistry public customStrategyVaultRegistry;
     ITemplateRegistry public templateRegistry;
     address public vaultImplementation;
 
@@ -34,12 +36,15 @@ contract SingleStrategyVaultFactory is Owned {
     error ZeroAddress();
     error VaultDeploymentFailed();
     error InvalidStrategy();
+    error NotAVault();
 
     /*//////////////////////////////////////////////////////////////
                                EVENTS
     //////////////////////////////////////////////////////////////*/
     event VaultDeployed(address indexed vault);
+    event CustomStrategyVaultDeployed(address indexed vault); 
     event VaultImplementationUpdated(address indexed oldVault, address indexed newVault);
+    event VaultMigrated(address indexed vault);
 
     /**
      * @notice Constructor of this contract.
@@ -50,10 +55,12 @@ contract SingleStrategyVaultFactory is Owned {
     constructor(
         address _owner,
         IVaultRegistry _vaultRegistry,
+        IVaultRegistry _customStrategyVaultRegistry,
         ITemplateRegistry _templateRegistry,
         address vault
     ) Owned(_owner) {
         vaultRegistry = _vaultRegistry;
+        customStrategyVaultRegistry = _customStrategyVaultRegistry;
         templateRegistry = _templateRegistry;
         vaultImplementation = vault;
     }
@@ -95,5 +102,28 @@ contract SingleStrategyVaultFactory is Owned {
         vaultRegistry.registerVault(vault, msg.sender);
 
         emit VaultDeployed(vault);
+    }
+
+    function deployCustomStrategyVault(
+        BaseVaultConfig memory vaultData,
+        address strategy
+    ) external returns (address vault) {
+        vault = Clones.clone(vaultImplementation);
+        IVault(vault).initialize(vaultData, strategy);
+
+        customStrategyVaultRegistry.registerVault(vault, msg.sender);
+
+        emit CustomStrategyVaultDeployed(vault);
+    }
+
+    function migrateVault(address vault) external {
+        // check whether the given address is a valid custom strategy vault
+        if (!customStrategyVaultRegistry.vaults(vault)) revert NotAVault();
+        // check whether the vault's strategy is registered in the TemplateRegistry
+        if (!templateRegistry.templates(VERSION, address(SingleStrategyVault(vault).strategy()))) revert InvalidStrategy();
+    
+        vaultRegistry.registerVault(vault, msg.sender);
+
+        emit VaultMigrated(vault);
     }
 }
