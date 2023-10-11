@@ -5,8 +5,14 @@ pragma solidity ^0.8.15;
 
 import {IGauge, IMinter, IGaugeController} from "../../ICurve.sol";
 import {BaseAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../../../../base/BaseAdapter.sol";
+import {Owned} from "../../../../../../utils/Owned.sol";
 import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
+import {Clones} from "openzeppelin-contracts/proxy/Clones.sol";
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
+
+struct CurveConfig {
+    address gauge;
+}
 
 contract CurveGaugeAdapter is BaseAdapter {
     using SafeERC20 for IERC20;
@@ -14,32 +20,19 @@ contract CurveGaugeAdapter is BaseAdapter {
     /// @notice The Curve Gauge contract
     IGauge public gauge;
 
-    /// @notice The Curve Gauge contract
-    IMinter public minter;
+    /// @notice The Curve Minter contract
+    IMinter constant public minter = IMinter(0xd061D61a4d941c39E5453435B6345Dc261C2fcE0);
 
-    address public crv;
-
-    error InvalidToken();
-    error LpTokenSupported();
 
     function __CurveGaugeAdapter_init(
         AdapterConfig memory _adapterConfig,
-        ProtocolConfig memory _protocolConfig
+        CurveConfig memory _protocolConfig
     ) internal onlyInitializing {
-        if (!_adapterConfig.useLpToken) revert LpTokenSupported();
         __BaseAdapter_init(_adapterConfig);
 
-        uint256 _gaugeId = abi.decode(
-            _protocolConfig.protocolInitData,
-            (uint256)
-        );
-        minter = IMinter(_protocolConfig.registry);
-        gauge = IGauge(IGaugeController(minter.controller()).gauges(_gaugeId));
+        gauge = IGauge(_protocolConfig.gauge);
 
-        crv = minter.token();
-        if (gauge.lp_token() != address(lpToken)) revert InvalidToken();
-
-        _adapterConfig.lpToken.approve(address(gauge), type(uint256).max);
+        _adapterConfig.lpToken.approve(_protocolConfig.gauge, type(uint256).max);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -96,5 +89,48 @@ contract CurveGaugeAdapter is BaseAdapter {
      */
     function _claim() internal override {
         try minter.mint(address(gauge)) {} catch {}
+    }
+}
+
+
+contract CurveGaugeAdapterFactory is Owned {
+    /// @dev likelihood of the GaugeController address changing is near zero.
+    IGaugeController constant controller = IGaugeController(0x2F50D538606Fa9EDD2B11E2446BEb18C9D5846bB);
+
+    // needs access to TemplateRegistry to register any new copy that's created
+
+    /// @dev the CurveGaugeAdapter contract's address
+    address implementation;
+
+    error InvalidToken();
+    error LpTokenSupported();
+
+    constructor(address _owner, address _implementation) Owned(_owner) {
+        implementation = _implementation;
+    }
+
+    function deploy(AdapterConfig calldata adapterConfig, uint gaugeId) external returns (address adapter) {
+        if (!adapterConfig.useLpToken) revert LpTokenSupported();
+
+        IGauge gauge = IGauge(controller.gauges(gaugeId));
+        if (gauge.lp_token() != address(adapterConfig.lpToken)) revert InvalidToken();
+        
+        // could add another check to verify that `adapterConfig.rewardTokens` contains CRV.
+
+        CurveConfig memory curveConfig = CurveConfig({
+            gauge: address(gauge)
+        });
+
+        adapter = Clones.clone(implementation);
+        // We'd use the top level strategy contract that exposes a initialize function.
+        // Not the case here
+        //
+        // CurveGaugeAdapter(adapter).initialize(adapterConfig, curveConfig);
+
+        // add to template registry
+    }
+
+    function updateImplementation(address newImplementation) external onlyOwner {
+        implementation = newImplementation;
     }
 }
