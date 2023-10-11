@@ -4,16 +4,12 @@
 pragma solidity ^0.8.15;
 
 import { Owned } from "../utils/Owned.sol";
-import { Template } from "../interfaces/vault/ITemplateRegistry.sol";
 
 /**
  * @title   TemplateRegistry
  * @author  RedVeil
- * @notice  Adds Templates to be used for creating new clones.
+ * @notice  Adds templates for new vaults.
  *
- * Templates are used by the `CloneFactory` to create new clones.
- * Templates can be added permissionlessly via `DeploymentController`.
- * Templates can be endorsed by the DAO via `VaultController`.
  */
 contract TemplateRegistry is Owned {
   /*//////////////////////////////////////////////////////////////
@@ -27,97 +23,51 @@ contract TemplateRegistry is Owned {
                           TEMPLATE LOGIC
     //////////////////////////////////////////////////////////////*/
 
-  // TemplateCategory => TemplateId => Template
-  mapping(bytes32 => mapping(bytes32 => Template)) public templates;
-  mapping(bytes32 => bytes32[]) public templateIds;
-  mapping(bytes32 => bool) public templateExists;
+  // keeps track of all the existing allTemplates given a version & category
+  /// @dev version => category => template
+  mapping(bytes32 => mapping(bytes32 => address[])) public allTemplates;
+  // allows to check whether a template is registered or not.
+  // version => template address => bool
+  mapping(bytes32 => mapping(address => bool)) public templates;
 
-  mapping(bytes32 => bool) public templateCategoryExists;
-  bytes32[] public templateCategories;
-
-  event TemplateCategoryAdded(bytes32 templateCategory);
-  event TemplateAdded(bytes32 templateCategory, bytes32 templateId, address implementation);
-  event TemplateUpdated(bytes32 templateCategory, bytes32 templateId);
-
-  error KeyNotFound(bytes32 templateCategory);
-  error TemplateExists(bytes32 templateId);
-  error TemplateCategoryExists(bytes32 templateCategory);
-
-  /**
-   * @notice Adds a new templateCategory to the registry. Caller must be owner. (`DeploymentController`)
-   * @param templateCategory A new category of templates.
-   * @dev The basic templateCategories will be added via `VaultController` they are ("Vault", "Adapter", "Strategy" and "Staking").
-   * @dev Allows for new categories to be added in the future.
-   */
-  function addTemplateCategory(bytes32 templateCategory) external onlyOwner {
-    if (templateCategoryExists[templateCategory]) revert TemplateCategoryExists(templateCategory);
-
-    templateCategoryExists[templateCategory] = true;
-    templateCategories.push(templateCategory);
-
-    emit TemplateCategoryAdded(templateCategory);
-  }
+  event TemplateAdded(bytes32 version, bytes32 category, address template);
+  error TemplateExists(bytes32 version, address template);
 
   /**
    * @notice Adds a new template to the registry.
-   * @param templateCategory TemplateCategory of the new template.
-   * @param templateId Unique TemplateId of the new template.
-   * @param template Contains the implementation address and necessary informations to clone the implementation.
+   * @param version the template version
+   * @param category of the new template, i.e. vault or strategy
+   * @param template the address of the deployed template contract
    */
-  function addTemplate(bytes32 templateCategory, bytes32 templateId, Template memory template) external onlyOwner {
-    if (!templateCategoryExists[templateCategory]) revert KeyNotFound(templateCategory);
-    if (templateExists[templateId]) revert TemplateExists(templateId);
+  function addTemplate(bytes32 version, bytes32 category, address template) external onlyOwner {
+    if (templates[version][template]) {
+      revert TemplateExists(version, template);
+    }
+    // we don't add any checks whether a template is already registered or not because this is only callable
+    // by an admin who should do the necessary checks off-chain.
+    allTemplates[version][category].push(template);
+    templates[version][template] = true;
 
-    template.endorsed = false;
-    templates[templateCategory][templateId] = template;
-
-    templateIds[templateCategory].push(templateId);
-    templateExists[templateId] = true;
-
-    emit TemplateAdded(templateCategory, templateId, template.implementation);
+    emit TemplateAdded(version, category, template);
   }
-
-  /*//////////////////////////////////////////////////////////////
-                          ENDORSEMENT LOGIC
-    //////////////////////////////////////////////////////////////*/
-
-  event TemplateEndorsementToggled(
-    bytes32 templateCategory,
-    bytes32 templateId,
-    bool oldEndorsement,
-    bool newEndorsement
-  );
 
   /**
-   * @notice Toggles the endorsement of a template. Caller must be owner. (`DeploymentController`)
-   * @param templateCategory TemplateCategory of the template to endorse.
-   * @param templateId TemplateId of the template to endorse.
-   * @dev A template must be endorsed before it can be used for clones.
-   * @dev Only the DAO can endorse templates via `VaultController`.
-   */
-  function toggleTemplateEndorsement(bytes32 templateCategory, bytes32 templateId) external onlyOwner {
-    if (!templateCategoryExists[templateCategory]) revert KeyNotFound(templateCategory);
-    if (!templateExists[templateId]) revert KeyNotFound(templateId);
+  * @param version the template version
+  * @param category of the new template, i.e. vault or strategy
+  * @param template the address of the deployed template contract
+  */
+  function removeTemplate(bytes32 version, bytes32 category, address template) external onlyOwner {
+    address[] memory templateList = allTemplates[version][category];
+    uint length = templateList.length;
+    for (uint i; i < length;) {
+      if (templateList[i] == template) {
+        allTemplates[version][category][i] = templateList[length - 1];
+        allTemplates[version][category].pop();
+        break;
+      }
+      unchecked {++i;}
+    }
 
-    bool oldEndorsement = templates[templateCategory][templateId].endorsed;
-    templates[templateCategory][templateId].endorsed = !oldEndorsement;
-
-    emit TemplateEndorsementToggled(templateCategory, templateId, oldEndorsement, !oldEndorsement);
-  }
-
-  /*//////////////////////////////////////////////////////////////
-                          TEMPLATE VIEW LOGIC
-    //////////////////////////////////////////////////////////////*/
-
-  function getTemplateCategories() external view returns (bytes32[] memory) {
-    return templateCategories;
-  }
-
-  function getTemplateIds(bytes32 templateCategory) external view returns (bytes32[] memory) {
-    return templateIds[templateCategory];
-  }
-
-  function getTemplate(bytes32 templateCategory, bytes32 templateId) external view returns (Template memory) {
-    return templates[templateCategory][templateId];
+    templates[version][template] = false;
   }
 }

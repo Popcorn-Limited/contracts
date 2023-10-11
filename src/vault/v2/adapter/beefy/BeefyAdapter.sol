@@ -7,7 +7,6 @@ import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import {BaseAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../../base/BaseAdapter.sol";
 import {IBeefyVault, IBeefyBooster, IBeefyBalanceCheck, IBeefyStrat} from "./IBeefy.sol";
-import {IPermissionRegistry} from "../../../../interfaces/vault/IPermissionRegistry.sol";
 
 contract BeefyAdapter is BaseAdapter {
     using SafeERC20 for IERC20;
@@ -37,15 +36,6 @@ contract BeefyAdapter is BaseAdapter {
             (address, address)
         );
 
-        if (
-            !IPermissionRegistry(_protocolConfig.registry).endorsed(_beefyVault)
-        ) revert NotEndorsed(_beefyVault);
-        if (
-            _beefyBooster != address(0) &&
-            !IPermissionRegistry(_protocolConfig.registry).endorsed(
-                _beefyBooster
-            )
-        ) revert NotEndorsed(_beefyBooster);
         if (
             IBeefyVault(_beefyVault).want() !=
             address(_adapterConfig.underlying)

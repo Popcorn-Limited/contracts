@@ -23,9 +23,9 @@ contract MockStrategyV2 is BaseAdapter, ERC20Upgradeable {
     return totalSupply();
   }
 
-  function _deposit(uint256 amount, address caller) internal override {
-    underlying.transferFrom(caller, address(this), amount);
-    _mint(caller, amount);
+  function _deposit(uint256 amount,  address caller) internal override {
+    underlying.transferFrom(msg.sender, address(this), amount);
+    _mint(msg.sender, amount);
   }
 
   function _withdraw(uint256 amount, address receiver) internal override {

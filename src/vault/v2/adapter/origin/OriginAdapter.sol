@@ -3,7 +3,6 @@
 
 pragma solidity ^0.8.15;
 
-import {IPermissionRegistry} from "../../../../interfaces/vault/IPermissionRegistry.sol";
 import {BaseAdapter, IERC20, AdapterConfig, ProtocolConfig, IERC4626} from "../../base/BaseAdapter.sol";
 import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
@@ -15,7 +14,6 @@ contract OriginAdapter is BaseAdapter {
     /// @notice The wrapped oToken contract.
     IERC4626 public wAsset;
 
-    error NotEndorsed();
     error InvalidAsset();
     error LpTokenNotSupported();
 
@@ -31,8 +29,6 @@ contract OriginAdapter is BaseAdapter {
             (address)
         );
 
-        if (!IPermissionRegistry(_protocolConfig.registry).endorsed(_wAsset))
-            revert NotEndorsed();
         if (IERC4626(_wAsset).asset() != address(underlying))
             revert InvalidAsset();
 

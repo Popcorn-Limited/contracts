@@ -4,8 +4,6 @@
 pragma solidity ^0.8.15;
 
 import { Owned } from "../utils/Owned.sol";
-import { VaultMetadata } from "../interfaces/vault/IVaultRegistry.sol";
-import { IERC4626Upgradeable as IERC4626 } from "openzeppelin-contracts-upgradeable/interfaces/IERC4626Upgradeable.sol";
 
 /**
  * @title   VaultRegistry
@@ -13,55 +11,54 @@ import { IERC4626Upgradeable as IERC4626 } from "openzeppelin-contracts-upgradea
  * @notice  Registers vaults with metadata for use by a frontend.
  */
 contract VaultRegistry is Owned {
-  /*//////////////////////////////////////////////////////////////
-                            IMMUTABLES
-    //////////////////////////////////////////////////////////////*/
+  mapping(address => bool) public factories;
 
-  /// @param _owner `AdminProxy`
   constructor(address _owner) Owned(_owner) {}
+
+  function addFactory(address factory) external onlyOwner {
+    factories[factory] = true;
+  }
+
+  function removeFactory(address factory) external onlyOwner {
+    factories[factory] = false;
+  }
 
   /*//////////////////////////////////////////////////////////////
                             REGISTRATION LOGIC
-    //////////////////////////////////////////////////////////////*/
+  //////////////////////////////////////////////////////////////*/
 
-  // vault to metadata
-  mapping(address => VaultMetadata) public metadata;
+  error NotFactory();
 
-  // asset to vault addresses
-  mapping(address => address[]) public vaultsByAsset;
+  modifier onlyFactory() {
+    if (!factories[msg.sender]) revert NotFactory();
+    _;
+  }
+
+  // easy way to check whether a given address is a vault
+  mapping(address => bool) public vaults;
 
   // addresses of all registered vaults
   address[] public allVaults;
 
-  event VaultAdded(address vaultAddress, string metadataCID);
+  event VaultAdded(
+    address indexed vault,
+    address indexed creator
+  );
 
   error VaultAlreadyRegistered();
 
   /**
    * @notice Registers a new vault with Metadata which can be used by a frontend. Caller must be owner. (`VaultController`)
-   * @param _metadata VaultMetadata (See IVaultRegistry for more details)
+   * @param vault the vault's address
+   * @param creator the vault's creator
    */
-  function registerVault(VaultMetadata calldata _metadata) external onlyOwner {
-    if (metadata[_metadata.vault].vault != address(0)) revert VaultAlreadyRegistered();
+  function registerVault(address vault, address creator) external onlyFactory {
+    if (vaults[vault]) revert VaultAlreadyRegistered();
 
-    metadata[_metadata.vault] = _metadata;
+    vaults[vault] = true;
+    allVaults.push(vault);
 
-    allVaults.push(_metadata.vault);
-    vaultsByAsset[IERC4626(_metadata.vault).asset()].push(_metadata.vault);
-
-    emit VaultAdded(_metadata.vault, _metadata.metadataCID);
-  }
-
-  /*//////////////////////////////////////////////////////////////
-                            VAULT VIEWING LOGIC
-    //////////////////////////////////////////////////////////////*/
-
-  function getVault(address vault) external view returns (VaultMetadata memory) {
-    return metadata[vault];
-  }
-
-  function getVaultsByAsset(address asset) external view returns (address[] memory) {
-    return vaultsByAsset[asset];
+    emit VaultAdded(vault, creator);
   }
 
   function getTotalVaults() external view returns (uint256) {
@@ -70,9 +67,5 @@ contract VaultRegistry is Owned {
 
   function getRegisteredAddresses() external view returns (address[] memory) {
     return allVaults;
-  }
-
-  function getSubmitter(address vault) external view returns (VaultMetadata memory) {
-    return metadata[vault];
   }
 }

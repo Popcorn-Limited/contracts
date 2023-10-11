@@ -5,7 +5,6 @@ pragma solidity ^0.8.15;
 
 import {AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20, Math, IStrategy, IAdapter} from "../abstracts/AdapterBase.sol";
 import {WithRewards, IWithRewards} from "../abstracts/WithRewards.sol";
-import {IPermissionRegistry} from "../../../interfaces/vault/IPermissionRegistry.sol";
 import {IAcrossHop, IAcceleratingDistributor} from "./IAcross.sol";
 
 contract AcrossAdapter is AdapterBase, WithRewards {
@@ -19,7 +18,6 @@ contract AcrossAdapter is AdapterBase, WithRewards {
     address public acrossDistributor;
     address public lpToken;
 
-    error NotEndorsed(address _acrossHop);
     error Disabled();
 
     /**
@@ -41,11 +39,6 @@ contract AcrossAdapter is AdapterBase, WithRewards {
             (address, address)
         );
         __AdapterBase_init(adapterInitData);
-
-        if (!IPermissionRegistry(registry).endorsed(_acrossHop))
-            revert NotEndorsed(_acrossHop);
-        if (!IPermissionRegistry(registry).endorsed(_acrossDistributor))
-            revert NotEndorsed(_acrossDistributor);
 
         _name = string.concat(
             "VaultCraft Across ",

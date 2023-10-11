@@ -6,7 +6,6 @@ pragma solidity ^0.8.15;
 import {AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20, Math, IStrategy, IAdapter} from "../../abstracts/AdapterBase.sol";
 import {WithRewards, IWithRewards} from "../../abstracts/WithRewards.sol";
 import {IAlpacaLendV1Vault} from "./IAlpacaLendV1.sol";
-import {IPermissionRegistry} from "../../../../interfaces/vault/IPermissionRegistry.sol";
 
 /**
  * @title   AlpacaV1 Adapter
@@ -30,7 +29,6 @@ contract AlpacaLendV1Adapter is AdapterBase {
                             INITIALIZATION
     //////////////////////////////////////////////////////////////*/
 
-    error NotEndorsed();
     error InvalidAsset();
 
     /**
@@ -50,9 +48,6 @@ contract AlpacaLendV1Adapter is AdapterBase {
         __AdapterBase_init(adapterInitData);
 
         address _vault = abi.decode(alpacaV1InitData, (address));
-
-        if (!IPermissionRegistry(registry).endorsed(_vault))
-            revert NotEndorsed();
 
         alpacaVault = IAlpacaLendV1Vault(_vault);
 
