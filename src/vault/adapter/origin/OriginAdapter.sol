@@ -4,7 +4,6 @@
 pragma solidity ^0.8.15;
 
 import {AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20, Math, IStrategy, IAdapter, IERC4626} from "../abstracts/AdapterBase.sol";
-import {IPermissionRegistry} from "../../../interfaces/vault/IPermissionRegistry.sol";
 
 /**
  * @title   Origin Adapter
@@ -28,7 +27,6 @@ contract OriginAdapter is AdapterBase {
                             INITIALIZATION
     //////////////////////////////////////////////////////////////*/
 
-    error NotEndorsed();
     error InvalidAsset();
 
     /**
@@ -45,8 +43,6 @@ contract OriginAdapter is AdapterBase {
         __AdapterBase_init(adapterInitData);
         address _wAsset = abi.decode(ousdInitData, (address));
 
-        if (!IPermissionRegistry(registry).endorsed(_wAsset))
-            revert NotEndorsed();
         if (IERC4626(_wAsset).asset() != asset()) revert InvalidAsset();
 
         wAsset = IERC4626(_wAsset);

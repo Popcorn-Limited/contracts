@@ -4,7 +4,6 @@
 pragma solidity ^0.8.15;
 
 import {IGauge, ILpToken} from "./ISolidly.sol";
-import {IPermissionRegistry} from "../../../../interfaces/vault/IPermissionRegistry.sol";
 import {BaseAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../../base/BaseAdapter.sol";
 import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
@@ -18,7 +17,6 @@ contract GmdAdapter is BaseAdapter {
 
     error InvalidAsset();
     error LpTokenSupported();
-    error NotEndorsed(address gauge);
 
     function __GmdAdapter_init(
         AdapterConfig memory _adapterConfig,
@@ -31,8 +29,6 @@ contract GmdAdapter is BaseAdapter {
             _protocolConfig.protocolInitData,
             (address)
         );
-        if (!IPermissionRegistry(_protocolConfig.registry).endorsed(_gauge))
-            revert NotEndorsed(_gauge);
 
         gauge = IGauge(_gauge);
         if (gauge.stake() != address(lpToken)) revert InvalidAsset();

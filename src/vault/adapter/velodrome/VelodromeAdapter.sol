@@ -6,7 +6,6 @@ pragma solidity ^0.8.15;
 import {AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20, Math, IStrategy, IAdapter} from "../abstracts/AdapterBase.sol";
 import {WithRewards, IWithRewards} from "../abstracts/WithRewards.sol";
 import {IGauge, ILpToken} from "./IVelodrome.sol";
-import {IPermissionRegistry} from "../../../interfaces/vault/IPermissionRegistry.sol";
 
 /**
  * @title   Velodrome Adapter
@@ -50,9 +49,6 @@ contract VelodromeAdapter is AdapterBase, WithRewards {
         __AdapterBase_init(adapterInitData);
 
         address _gauge = abi.decode(velodromeInitData, (address));
-
-        if (!IPermissionRegistry(registry).endorsed(_gauge))
-            revert NotEndorsed(_gauge);
 
         gauge = IGauge(_gauge);
 

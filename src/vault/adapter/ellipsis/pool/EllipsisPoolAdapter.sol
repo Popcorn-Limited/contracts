@@ -5,7 +5,6 @@ pragma solidity ^0.8.15;
 
 import { AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20, Math, IStrategy, IAdapter } from "../../abstracts/AdapterBase.sol";
 import { WithRewards, IWithRewards } from "../../abstracts/WithRewards.sol";
-import { IPermissionRegistry } from "../../../../interfaces/vault/IPermissionRegistry.sol";
 import { IEllipsis, ILpStaking, IAddressProvider } from "../IEllipsis.sol";
 
 contract EllipsisAdapter is AdapterBase, WithRewards {
@@ -20,7 +19,6 @@ contract EllipsisAdapter is AdapterBase, WithRewards {
     address public addressProvider;
     address public lpToken;
 
-    error NotEndorsed(address _ellipsisPool);
     error InvalidToken();
 
     /**
@@ -39,10 +37,6 @@ contract EllipsisAdapter is AdapterBase, WithRewards {
     ) external initializer {
         (address _ellipsisPool, address _addressProvider, address _ellipsisLPStaking) = abi.decode(ellipsisInitData, (address,address,address));
         __AdapterBase_init(adapterInitData);
-
-        if (!IPermissionRegistry(registry).endorsed(_ellipsisPool)) revert NotEndorsed(_ellipsisPool);
-        if (!IPermissionRegistry(registry).endorsed(_addressProvider)) revert NotEndorsed(_addressProvider);
-        if (!IPermissionRegistry(registry).endorsed(_ellipsisLPStaking)) revert NotEndorsed(_ellipsisLPStaking);
 
         _name = string.concat("VaultCraft Ellipsis", IERC20Metadata(asset()).name(), " Adapter");
         _symbol = string.concat("vcE-", IERC20Metadata(asset()).symbol());

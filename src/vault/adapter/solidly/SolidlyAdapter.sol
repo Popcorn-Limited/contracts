@@ -6,7 +6,6 @@ pragma solidity ^0.8.15;
 import {AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20, Math, IStrategy, IAdapter} from "../abstracts/AdapterBase.sol";
 import {WithRewards, IWithRewards} from "../abstracts/WithRewards.sol";
 import {IGauge, ILpToken} from "./ISolidly.sol";
-import {IPermissionRegistry} from "../../../interfaces/vault/IPermissionRegistry.sol";
 
 /**
  * @title   Solidly Adapter
@@ -30,8 +29,6 @@ contract SolidlyAdapter is AdapterBase, WithRewards {
     /*//////////////////////////////////////////////////////////////
                             INITIALIZATION
     //////////////////////////////////////////////////////////////*/
-
-    error NotEndorsed(address gauge);
     error InvalidAsset();
 
     /**
@@ -50,11 +47,6 @@ contract SolidlyAdapter is AdapterBase, WithRewards {
         __AdapterBase_init(adapterInitData);
 
         address _gauge = abi.decode(solidlyInitData, (address));
-
-        if (!IPermissionRegistry(registry).endorsed(_gauge))
-            revert NotEndorsed(_gauge);
-
-        gauge = IGauge(_gauge);
 
         if (gauge.stake() != asset()) revert InvalidAsset();
 

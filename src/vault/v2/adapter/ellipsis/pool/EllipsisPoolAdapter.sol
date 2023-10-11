@@ -4,7 +4,6 @@
 pragma solidity ^0.8.15;
 
 import {IEllipsis, ILpStaking, IAddressProvider} from "../IEllipsis.sol";
-import {IPermissionRegistry} from "../../../../../interfaces/vault/IPermissionRegistry.sol";
 import {BaseAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../../../base/BaseAdapter.sol";
 import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
@@ -19,7 +18,6 @@ contract EllipsisPoolAdapter is BaseAdapter {
     address public ellipsisLPStaking;
 
     error LpTokenNotSupported();
-    error NotEndorsed(address _ellipsisPool);
 
     function __EllipsisPoolAdapter_init(
         AdapterConfig memory _adapterConfig,
@@ -34,25 +32,9 @@ contract EllipsisPoolAdapter is BaseAdapter {
             address _addressProvider,
             address _ellipsisLPStaking
         ) = abi.decode(
-                _protocolConfig.protocolInitData,
-                (address, address, address)
-            );
-
-        if (
-            !IPermissionRegistry(_protocolConfig.registry).endorsed(
-                _ellipsisPool
-            )
-        ) revert NotEndorsed(_ellipsisPool);
-        if (
-            !IPermissionRegistry(_protocolConfig.registry).endorsed(
-                _addressProvider
-            )
-        ) revert NotEndorsed(_addressProvider);
-        if (
-            !IPermissionRegistry(_protocolConfig.registry).endorsed(
-                _ellipsisLPStaking
-            )
-        ) revert NotEndorsed(_ellipsisLPStaking);
+            _protocolConfig.protocolInitData,
+            (address, address, address)
+        );
 
         ellipsisPool = _ellipsisPool;
         addressProvider = _addressProvider;

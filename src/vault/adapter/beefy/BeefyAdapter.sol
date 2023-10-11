@@ -6,7 +6,6 @@ pragma solidity ^0.8.15;
 import {AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20, Math, IStrategy, IAdapter} from "../abstracts/AdapterBase.sol";
 import {WithRewards, IWithRewards} from "../abstracts/WithRewards.sol";
 import {IBeefyVault, IBeefyBooster, IBeefyBalanceCheck, IBeefyStrat} from "./IBeefy.sol";
-import {IPermissionRegistry} from "../../../interfaces/vault/IPermissionRegistry.sol";
 
 /**
  * @title   Beefy Adapter
@@ -54,12 +53,6 @@ contract BeefyAdapter is AdapterBase, WithRewards {
         );
         __AdapterBase_init(adapterInitData);
 
-        if (!IPermissionRegistry(registry).endorsed(_beefyVault))
-            revert NotEndorsed(_beefyVault);
-        if (
-            _beefyBooster != address(0) &&
-            !IPermissionRegistry(registry).endorsed(_beefyBooster)
-        ) revert NotEndorsed(_beefyBooster);
         if (IBeefyVault(_beefyVault).want() != asset())
             revert InvalidBeefyVault(_beefyVault);
         if (

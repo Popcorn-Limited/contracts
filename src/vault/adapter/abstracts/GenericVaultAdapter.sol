@@ -4,7 +4,6 @@
 pragma solidity ^0.8.15;
 
 import {AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20, Math, IStrategy, IAdapter, IERC4626} from "../abstracts/AdapterBase.sol";
-import {IPermissionRegistry} from "../../../interfaces/vault/IPermissionRegistry.sol";
 
 /**
  * @title   ERC4626 Vauöt Adapter
@@ -25,8 +24,6 @@ contract GenericVaultAdapter is AdapterBase {
     /*//////////////////////////////////////////////////////////////
                             INITIALIZATION
     //////////////////////////////////////////////////////////////*/
-
-    error NotEndorsed();
     error InvalidAsset();
 
     /**
@@ -44,8 +41,6 @@ contract GenericVaultAdapter is AdapterBase {
         
         address _vault = abi.decode(vaultInitData, (address));
 
-        if (!IPermissionRegistry(registry).endorsed(_vault))
-            revert NotEndorsed();
         if (IERC4626(_vault).asset() != asset()) revert InvalidAsset();
 
         vault = IERC4626(_vault);

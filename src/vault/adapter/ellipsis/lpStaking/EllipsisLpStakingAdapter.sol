@@ -5,7 +5,6 @@ pragma solidity ^0.8.15;
 
 import {AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20, Math, IStrategy, IAdapter} from "../../abstracts/AdapterBase.sol";
 import {WithRewards, IWithRewards} from "../../abstracts/WithRewards.sol";
-import {IPermissionRegistry} from "../../../../interfaces/vault/IPermissionRegistry.sol";
 import {IEllipsis, ILpStaking, IAddressProvider} from "../IEllipsis.sol";
 
 contract EllipsisLpStakingAdapter is AdapterBase, WithRewards {

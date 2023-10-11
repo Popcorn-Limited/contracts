@@ -7,7 +7,6 @@ import {IAlpacaLendV1Vault} from "./IAlpacaLendV1.sol";
 import {BaseAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../../../base/BaseAdapter.sol";
 import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
-import {IPermissionRegistry} from "../../../../../interfaces/vault/IPermissionRegistry.sol";
 
 contract AlpacaLendV1Adapter is BaseAdapter {
     using SafeERC20 for IERC20;
@@ -31,9 +30,6 @@ contract AlpacaLendV1Adapter is BaseAdapter {
             _protocolConfig.protocolInitData,
             (address)
         );
-
-        if (!IPermissionRegistry(_protocolConfig.registry).endorsed(_vault))
-            revert NotEndorsed();
 
         alpacaVault = IAlpacaLendV1Vault(_vault);
 
