@@ -18,8 +18,6 @@ import {
 } from "../../../../src/vault/v2/base/BaseAdapter.sol";
 import { FixedPointMathLib } from "solmate/utils/FixedPointMathLib.sol";
 
-import "forge-std/Console.sol";
-
 abstract contract BaseVaultTest is Test {
     using FixedPointMathLib for uint256;
 

@@ -9,7 +9,6 @@ import {Clones} from "openzeppelin-contracts/proxy/Clones.sol";
 import {Math} from "openzeppelin-contracts/utils/math/Math.sol";
 import "../../../../src/vault/v2/vaults/SingleStrategyVault.sol";
 import {ITestConfigStorage, TestConfig} from "./interfaces/ITestConfigStorage.sol";
-import {PropertyTest} from "../../adapter/abstract/PropertyTest.prop.sol";
 import {IVault} from "../../../../src/vault/v2/base/interfaces/IVault.sol";
 import {AdapterConfig, ProtocolConfig, IBaseAdapter} from "../../../../src/vault/v2/base/interfaces/IBaseAdapter.sol";
 import {IERC20Upgradeable as IERC20, IERC20MetadataUpgradeable as IERC20Metadata} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";

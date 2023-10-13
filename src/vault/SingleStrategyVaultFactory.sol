@@ -76,14 +76,10 @@ contract SingleStrategyVaultFactory is Owned {
     /*//////////////////////////////////////////////////////////////
                           VAULT DEPLOYMENT LOGIC
     //////////////////////////////////////////////////////////////*/
-    error VaultDeploymentFailed();
-
     event VaultDeployed(
         address indexed vault,
         address indexed strategy
     );
-
-    error InvalidStrategy();
 
     /**
      * @notice Deploy a new Vault.
