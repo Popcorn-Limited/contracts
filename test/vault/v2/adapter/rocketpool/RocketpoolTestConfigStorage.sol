@@ -7,7 +7,7 @@ import {ITestConfigStorage, TestConfig} from "../../base/interfaces/ITestConfigS
 import {IERC20, IBaseAdapter, AdapterConfig, ProtocolConfig} from "../../base/BaseStrategyTest.sol";
 
 contract RocketpoolTestConfigStorage is ITestConfigStorage {
-    TestConfig[] public testConfigs;
+    TestConfig[] public _testConfigs;
     AdapterConfig[] public adapterConfigs;
     ProtocolConfig[] public protocolConfigs;
 
@@ -18,7 +18,7 @@ contract RocketpoolTestConfigStorage is ITestConfigStorage {
 
     constructor() {
         // Config 0
-        testConfigs.push(
+        _testConfigs.push(
             TestConfig({
                 asset: WETH,
                 depositDelta: 500000000000010, // DepositFee + 10
@@ -56,24 +56,27 @@ contract RocketpoolTestConfigStorage is ITestConfigStorage {
     }
 
     function getTestConfigLength() public view returns (uint256) {
-        return testConfigs.length;
+        return _testConfigs.length;
     }
 
     function getTestConfig(
         uint256 i
     ) public view returns (TestConfig memory) {
-        return testConfigs[i];
+        if(i > _testConfigs.length) i = 0;
+        return _testConfigs[i];
     }
 
     function getAdapterConfig(
         uint256 i
     ) public view returns (AdapterConfig memory) {
+        if(i > adapterConfigs.length) i = 0;
         return adapterConfigs[i];
     }
 
     function getProtocolConfig(
         uint256 i
     ) public view returns (ProtocolConfig memory) {
+        if(i > protocolConfigs.length) i = 0;
         return protocolConfigs[i];
     }
 }
