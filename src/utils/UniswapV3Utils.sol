@@ -3,8 +3,14 @@
 pragma solidity ^0.8.0;
 
 import "./Path.sol";
-import {IUniswapRouterV3, ExactInputSingleParams, ExactInputParams, IUniQuoterV2, QuoteExactInputSingleParams} from "../interfaces/external/uni/v3/IUniswapRouterV3.sol";
-import {IUniV3Pool} from "../interfaces/external/uni/v3/IUniV3Pool.sol";
+import {
+    IUniswapRouterV3,
+    ExactInputSingleParams,
+    ExactInputParams,
+    IUniQuoterV2,
+    QuoteExactInputSingleParams
+} from "../base/interfaces/external/uni/v3/IUniswapRouterV3.sol";
+import {IUniV3Pool} from "../base/interfaces/external/uni/v3/IUniV3Pool.sol";
 
 library UniswapV3Utils {
     using Path for bytes;
