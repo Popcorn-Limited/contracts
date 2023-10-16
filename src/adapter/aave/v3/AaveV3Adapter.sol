@@ -14,13 +14,12 @@ contract AaveV3Adapter is BaseAdapter {
     IAToken public aToken;
 
     /// @notice The Aave liquidity mining contract
-    IAaveIncentives public aaveIncentives;
-
-    /// @notice Check to see if Aave liquidity mining is active
-    bool public isActiveIncentives;
+    IAaveIncentives public constant aaveIncentives = IAaveIncentives(0x8164Cc65827dcFe994AB23944CBC90e0aa80bFcb);
 
     /// @notice The Aave LendingPool contract
-    ILendingPool public lendingPool;
+    ILendingPool public constant lendingPool = ILendingPool(0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2);
+
+    IProtocolDataProvider public constant dataProvider = IProtocolDataProvider(0x7B4EB56E7CD4b454BA8ff71E4518426369a138a3);
 
     error LpTokenNotSupported();
 
@@ -32,12 +31,8 @@ contract AaveV3Adapter is BaseAdapter {
 
         __BaseAdapter_init(_adapterConfig);
 
-        (address _aToken, , ) = IProtocolDataProvider(_protocolConfig.registry)
-            .getReserveTokensAddresses(address(_adapterConfig.underlying));
+        (address _aToken, , ) = dataProvider.getReserveTokensAddresses(address(_adapterConfig.underlying));
         aToken = IAToken(_aToken);
-
-        lendingPool = ILendingPool(aToken.POOL());
-        aaveIncentives = IAaveIncentives(aToken.getIncentivesController());
 
         _adapterConfig.underlying.approve(
             address(lendingPool),
@@ -99,17 +94,16 @@ contract AaveV3Adapter is BaseAdapter {
      * @notice Claims rewards
      */
     function _claim() internal override {
-        if (address(aaveIncentives) == address(0)) return;
+        // see https://docs.aave.com/developers/whats-new/multiple-rewards-and-claim#multiple-rewards-and-claim
+        if (aaveIncentives.getRewardsByAsset(address(aToken)).length == 0) {
+            return;
+        }
 
         address[] memory _assets = new address[](1);
         _assets[0] = address(aToken);
 
         try
-            aaveIncentives.claimAllRewardsOnBehalf(
-                _assets,
-                address(this),
-                address(this)
-            )
+            aaveIncentives.claimAllRewardsToSelf(_assets) returns (address[] memory, uint[] memory)
         {} catch {}
     }
 }

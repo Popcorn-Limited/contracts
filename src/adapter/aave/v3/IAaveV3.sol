@@ -1,27 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.15;
 
-import { IERC20Upgradeable as IERC20 } from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
-import { DataTypes } from "./lib.sol";
-
-interface IScaledBalanceToken {
-  /**
-   * @dev Returns the scaled balance of the user. The scaled balance is the sum of all the
-   * updated stored balance divided by the reserve's liquidity index at the moment of the update
-   * @param user The user whose balance is calculated
-   * @return The scaled balance of the user
-   **/
-  function scaledBalanceOf(address user) external view returns (uint256);
-
-  /**
-   * @dev Returns the scaled total supply of the variable debt token. Represents sum(debt/index)
-   * @return The scaled total supply
-   **/
-  function scaledTotalSupply() external view returns (uint256);
-}
+import { IERC20 } from "openzeppelin-contracts/interfaces/IERC20.sol";
 
 // Aave aToken (wrapped underlying)
-interface IAToken is IERC20, IScaledBalanceToken {
+interface IAToken is IERC20 {
   /**
    * @dev Returns the address of the underlying asset of this aToken (E.g. WETH for aWETH)
    **/
@@ -43,17 +26,10 @@ interface IAaveIncentives {
   function getRewardsByAsset(address asset) external view returns (address[] memory);
 
   /**
-   * @dev Returns list of reward tokens for all markets.
-   **/
-  function getRewardsList() external view returns (address[] memory);
-
-  /**
    * @dev Claim all rewards for specified assets for user.
    **/
-  function claimAllRewardsOnBehalf(
-    address[] memory assets,
-    address user,
-    address to
+  function claimAllRewardsToSelf(
+    address[] memory assets
   ) external returns (address[] memory rewardsList, uint256[] memory claimedAmount);
 }
 
@@ -71,15 +47,6 @@ interface ILendingPool {
     uint256 amount,
     address to
   ) external returns (uint256);
-
-  /**
-   * @dev Returns the state and configuration of the reserve
-   * @param asset The address of the underlying asset of the reserve
-   * @return The state of the reserve
-   **/
-  function getReserveData(address asset) external view returns (DataTypes.ReserveData memory);
-
-  function getReserveNormalizedIncome(address asset) external view returns (uint256);
 }
 
 // Aave protocol data provider
