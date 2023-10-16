@@ -1,9 +1,9 @@
 import {CREATE3Script} from "./base/CREATE3Script.sol";
 
-import {AdminProxy} from "../src/vault/AdminProxy.sol";
-import {SingleStrategyVaultFactory} from "../src/vault/SingleStrategyVaultFactory.sol";
-import {VaultRegistry} from "../src/vault/VaultRegistry.sol";
-import {TemplateRegistry} from "../src/vault/TemplateRegistry.sol";
+import {AdminProxy} from "../src/AdminProxy.sol";
+import {SingleStrategyVaultFactory} from "../src/SingleStrategyVaultFactory.sol";
+import {VaultRegistry} from "../src/VaultRegistry.sol";
+import {TemplateRegistry} from "../src/TemplateRegistry.sol";
 
 contract DeployInfra is CREATE3Script {
     constructor() CREATE3Script(vm.envString("VERSION")) {}

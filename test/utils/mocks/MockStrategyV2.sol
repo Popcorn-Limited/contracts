@@ -4,7 +4,7 @@ import {
   AdapterConfig,
   ProtocolConfig,
   IERC20Metadata
-} from "../../../src/vault/v2/base/BaseAdapter.sol";
+} from "../../../src/base/BaseAdapter.sol";
 import {
   ERC4626Upgradeable
 } from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
