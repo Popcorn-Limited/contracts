@@ -18,7 +18,7 @@ abstract contract BaseStrategyRewardClaimer {
     // rewardToken -> rewardIndex
     mapping(IERC20 => uint256) public strategyRewardIndex;
     // vault => rewardToken -> rewardsIndex
-    mapping(address => mapping(IERC20 => uint256)) public vaultRewardIndex;
+    mapping (address => mapping(IERC20 => uint256)) public vaultRewardIndex;
     // vault => rewardToken -> accruedRewards
     mapping(address => mapping(IERC20 => uint256)) public accruedVaultRewards;
 

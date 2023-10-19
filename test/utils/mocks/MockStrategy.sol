@@ -10,7 +10,7 @@ import {
 } from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import { ERC20Upgradeable } from "openzeppelin-contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 
-contract MockStrategyV2 is BaseAdapter, ERC20Upgradeable {
+contract MockStrategy is BaseAdapter, ERC20Upgradeable {
 
   function __MockAdapter_init(
     AdapterConfig memory _adapterConfig,

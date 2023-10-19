@@ -2,12 +2,12 @@
 // Docgen-SOLC: 0.8.15
 
 pragma solidity ^0.8.15;
+import "forge-std/Console.sol";
 import {
     IERC20,
     Clones,
     IVault,
     VaultFees,
-    MockERC20,
     BaseVaultTest,
     MockStrategy,
     BaseVaultConfig,
@@ -16,14 +16,15 @@ import {
 import {
     SafeERC20Upgradeable as SafeERC20
 } from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
-import "../../src/vaults/SingleStrategyVault.sol";
+import {RewardClaimerVault} from "../../src/vaults/RewardClaimerVault.sol";
+import {MockRewardClaimerStrategy} from "../utils/mocks/MockRewardClaimerStrategy.sol";
 
-contract SingleStrategyVaultTest is BaseVaultTest {
+contract RewardClaimerVaultTest is BaseVaultTest {
     IERC20[] public rewardTokens;
 
     function _createAdapter() internal override returns (MockStrategy) {
         if(adapterImplementation == address(0)) {
-            adapterImplementation = address(new MockStrategy());
+            adapterImplementation = address(new MockRewardClaimerStrategy());
         }
 
         AdapterConfig memory adapterConfig = AdapterConfig({
@@ -40,13 +41,14 @@ contract SingleStrategyVaultTest is BaseVaultTest {
         });
 
         address adapterAddress = Clones.clone(adapterImplementation);
-        MockStrategy(adapterAddress).__MockAdapter_init(adapterConfig, protocolConfig);
-        return MockStrategy(adapterAddress);
+        MockRewardClaimerStrategy(adapterAddress)
+            .__MockRewardClaimerStrategy_init(adapterConfig, protocolConfig);
+        return MockRewardClaimerStrategy(adapterAddress);
     }
 
     function _createVault() internal override returns (IVault) {
         if(vaultImplementation == address(0)) {
-            vaultImplementation = address(new SingleStrategyVault());
+            vaultImplementation = address(new RewardClaimerVault());
         }
         return IVault(Clones.clone(vaultImplementation));
     }
@@ -67,4 +69,10 @@ contract SingleStrategyVaultTest is BaseVaultTest {
             name: "VaultCraft SingleStrategyVault"
         });
     }
+
+    //TODO: Add test cases for the following
+    //1. Add test cases for disturbing reward to MockStrategy
+    //2. Track deposits for users in vaults and for vaults in strategies
+    //3. Add test cases for vault to withdraw reward from strategy
+    //4. Add test cases for users to withdraw reward from vault
 }
