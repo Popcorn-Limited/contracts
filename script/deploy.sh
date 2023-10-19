@@ -3,7 +3,7 @@
 # Deploy Clone Implementations
 # source .env && forge create MultiRewardStaking --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY
 # source .env && forge create YearnAdapter --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY
-source .env && forge create YearnFactoryAdapter --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY
+source .env && forge create VaultRouter --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY
 # source .env && forge create BeefyAdapter --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY
 # source .env && forge create CompoundV2Adapter --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY
 # source .env && forge create OusdAdapter --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY
@@ -32,7 +32,7 @@ source .env && forge create YearnFactoryAdapter --rpc-url=$FORKING_RPC_URL --pri
 # source .env && cast send 0xcC09F5bd7582D02Bb31825d09589F4773B65eCc9 "execute(address, bytes)" 0x87eBAC6021F133E217FF6b8e374cae2C3456936E 0x79ba509700000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000000 --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY
 
 # Set up VaultController
-source .env && forge create VaultController --constructor-args 0x22f5413C075Ccd56D575A54763831C4c27A37Bdb 0x7Edd61A58B5920dF39208E9888D8be713f639A60 0x58A2704deA4168D307EFF593E897eC73C6670F6A 0x2246c4c469735bCE95C120939b0C078EC37A08D0 0x1F381429943AFBb6870b3b9B0aB4707a6BdC2356 0x0E9C19bF470ecd5f167c97bF5f2FcA433adD2066 --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY --verify --etherscan-api-key=$ETHERSCAN_API_KEY
+# source .env && forge create VaultController --constructor-args 0x22f5413C075Ccd56D575A54763831C4c27A37Bdb 0x7Edd61A58B5920dF39208E9888D8be713f639A60 0x58A2704deA4168D307EFF593E897eC73C6670F6A 0x2246c4c469735bCE95C120939b0C078EC37A08D0 0x1F381429943AFBb6870b3b9B0aB4707a6BdC2356 0x0E9C19bF470ecd5f167c97bF5f2FcA433adD2066 --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY --verify --etherscan-api-key=$ETHERSCAN_API_KEY
 # source .env && cast send 0xcC09F5bd7582D02Bb31825d09589F4773B65eCc9 "nominateNewOwner(address)" 0xF40749d72Ab5422CC5d735A373E66d67f7cA9393 --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY
 # source .env && cast send 0xF40749d72Ab5422CC5d735A373E66d67f7cA9393 "acceptAdminProxyOwnership()" --rpc-url=$FORKING_RPC_URL --private-key=$PRIVATE_KEY
 
