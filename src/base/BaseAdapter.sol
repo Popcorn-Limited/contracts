@@ -164,7 +164,7 @@ abstract contract BaseAdapter is OwnedUpgradeable, PausableUpgradeable {
         rewardTokens = _rewardTokens;
     }
 
-    function getRewardTokens() external view returns (IERC20[] memory) {
+    function getRewardTokens() public view virtual returns (IERC20[] memory) {
         return rewardTokens;
     }
 
