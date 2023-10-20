@@ -2,7 +2,6 @@
 // Docgen-SOLC: 0.8.15
 
 pragma solidity ^0.8.15;
-import "forge-std/Console.sol";
 import {
     IERC20,
     Clones,
