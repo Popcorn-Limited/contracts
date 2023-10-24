@@ -55,13 +55,20 @@ contract RewardClaimerVault is BaseVault, BaseVaultRewardClaimer {
     }
 
     /*//////////////////////////////////////////////////////////////
+                  REWARD CLAIMER LOGIC
+    //////////////////////////////////////////////////////////////*/
+    function getReward() external {
+        _withdrawAccruedUserReward();
+    }
+
+    /*//////////////////////////////////////////////////////////////
                       DEPOSIT / WITHDRAW LOGIC
     //////////////////////////////////////////////////////////////*/
     function deposit(
         uint assets,
         address receiver
     ) public override returns (uint shares) {
-        _accrueUser(receiver);
+        _accrueUserReward(receiver);
         return super.deposit(assets, receiver);
     }
 
@@ -69,7 +76,7 @@ contract RewardClaimerVault is BaseVault, BaseVaultRewardClaimer {
         uint shares,
         address receiver
     ) public override returns (uint assets) {
-        _accrueUser(msg.sender);
+        _accrueUserReward(msg.sender);
         return super.mint(shares, receiver);
     }
 
@@ -78,7 +85,7 @@ contract RewardClaimerVault is BaseVault, BaseVaultRewardClaimer {
         address receiver,
         address owner
     ) public override returns (uint256) {
-        _accrueUser(owner);
+        _accrueUserReward(owner);
         return super.withdraw(assets, receiver, owner);
     }
 
@@ -87,7 +94,7 @@ contract RewardClaimerVault is BaseVault, BaseVaultRewardClaimer {
         address receiver,
         address owner
     ) public override returns (uint256) {
-        _accrueUser(owner);
+        _accrueUserReward(owner);
         return super.redeem(shares, receiver, owner);
     }
 

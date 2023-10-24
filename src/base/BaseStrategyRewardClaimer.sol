@@ -30,7 +30,7 @@ abstract contract BaseStrategyRewardClaimer {
         //totalAssetDeposited is the total amount of lp tokens or whatever tokens deposited into the strategy
         //reward is shared to all deposits by dividing it by totalAssetDeposited
         //another assumption here is that the reward has been transferred into the strategy already.
-        uint totalAssetDeposited = __totalAssets();
+        uint totalAssetDeposited = _totalDeposits();
         uint256 rewardIndex;
 
         if (totalAssetDeposited != 0) {
@@ -44,6 +44,34 @@ abstract contract BaseStrategyRewardClaimer {
 
         strategyRewardIndex[rewardToken] += rewardIndex;
         rewardToken.safeTransferFrom(msg.sender, address(this), reward);
+    }
+
+    /**
+     * @notice Updates the reward index of a vault on deposit and withdrawal
+     */
+    function _accrueVaultReward(address vault) internal {
+        IERC20Upgradeable[] memory _tokens = _getRewardTokens();
+
+        for (uint i; i < _tokens.length; i++) {
+            IERC20 _rewardToken = IERC20(address(_tokens[i]));
+            uint256 rewardIndexDelta = strategyRewardIndex[_rewardToken] -
+                                vaultRewardIndex[vault][_rewardToken];
+
+            if (rewardIndexDelta == 0) continue;
+
+            uint256 rewardEarned = _balanceOf(vault).mulDiv(
+                rewardIndexDelta,
+                uint256(10 ** _decimals()),
+                Math.Rounding.Down
+            );
+
+            accruedVaultRewards[vault][_rewardToken] += rewardEarned;
+            vaultRewardIndex[vault][_rewardToken] = strategyRewardIndex[_rewardToken];
+
+//            unchecked {
+//                ++i;
+//            }
+        }
     }
 
     function _withdrawAccruedReward() internal {
@@ -65,43 +93,11 @@ abstract contract BaseStrategyRewardClaimer {
         }
     }
 
-    /**
-     * @notice Updates the reward index of a vault on deposit and withdrawal
-     */
-    function _accrueVaultReward(address vault) internal {
-        IERC20Upgradeable[] memory _tokens = _getRewardTokens();
+    function _decimals() internal virtual view returns(uint256);
 
-        for (uint i; i < _tokens.length; ) {
-            IERC20 _rewardToken = IERC20(address(_tokens[i]));
-            uint256 rewardIndexDelta = strategyRewardIndex[_rewardToken] -
-                                vaultRewardIndex[vault][_rewardToken];
-            if (rewardIndexDelta == 0) continue;
+    function _totalDeposits() internal virtual view returns(uint256);
 
-            uint256 rewardEarned = _balanceOf(vault).mulDiv(
-                rewardIndexDelta,
-                uint256(10 ** _decimals()),
-                Math.Rounding.Down
-            );
+    function _balanceOf(address vault) internal virtual view returns(uint256);
 
-            accruedVaultRewards[vault][_rewardToken] += rewardEarned;
-            vaultRewardIndex[vault][_rewardToken] = strategyRewardIndex[_rewardToken];
-
-            unchecked {
-                ++i;
-            }
-        }
-    }
     function _getRewardTokens() public view virtual returns (IERC20Upgradeable[] memory);
-
-    function _balanceOf(address vault) internal view returns(uint256) {
-        return 5e18;
-    }
-
-    function _decimals() internal view returns(uint256) {
-        return 18;
-    }
-
-    function __totalAssets() internal view returns(uint256) {
-        return 1e18;
-    }
 }

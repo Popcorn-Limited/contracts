@@ -8,7 +8,6 @@ import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol"
 import {IERC20Upgradeable} from "openzeppelin-contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 
 
-
 /// @notice The whole reward and accrual logic is heavily based on the Fei Protocol's Flywheel contracts.
 /// https://github.com/fei-protocol/flywheel-v2/blob/main/src/rewards/FlywheelStaticRewards.sol
 /// https://github.com/fei-protocol/flywheel-v2/blob/main/src/FlywheelCore.sol
@@ -32,7 +31,7 @@ abstract contract BaseVaultRewardClaimer {
     // user => rewardToken -> accruedRewards
     mapping(address => mapping(IERC20 => uint256)) public accruedRewards;
 
-    function accrueRewards(IERC20 rewardToken, uint accrued) public {
+    function accrueVaultRewards(IERC20 rewardToken, uint accrued) public {
         // we allow anybody to call this. To prevent someone from accruing rewards that are never
         // sent to the contract, we always transfer them ourselves. Primarily it will be called by a
         // strategy contract reporting its harvest.
@@ -57,12 +56,12 @@ abstract contract BaseVaultRewardClaimer {
         rewardToken.safeTransferFrom(msg.sender, address(this), accrued);
     }
 
-    function _accrueUser(address _user) internal {
+    function _accrueUserReward(address _user) internal {
         address[] memory strategies = _getStrategies();
         uint len = strategies.length;
         for (uint i; i < len; ) {
             IERC20Upgradeable[] memory _tokens = IBaseAdapter(strategies[i]).getRewardTokens();
-            for (uint j; j < _tokens.length; ) {
+            for (uint j; j < _tokens.length; ++j) {
                 IERC20 _rewardToken = IERC20(address(_tokens[j]));
                 RewardInfo memory rewards = rewardInfos[_rewardToken];
                 uint256 oldIndex = userIndex[_user][_rewardToken];
@@ -91,12 +90,31 @@ abstract contract BaseVaultRewardClaimer {
                 userIndex[_user][_rewardToken] = rewards.index;
                 accruedRewards[_user][_rewardToken] += supplierDelta;
 
-                unchecked {
-                    ++j;
-                }
+//                unchecked {
+//                    ++j;
+//                }
             }
             unchecked {
                 ++i;
+            }
+        }
+    }
+
+    function _withdrawAccruedUserReward() internal {
+        _accrueUserReward(msg.sender);
+        address[] memory strategies = _getStrategies();
+        uint len = strategies.length;
+
+        for (uint i; i < len; ++i) {
+            IERC20Upgradeable[] memory _tokens = IBaseAdapter(strategies[i]).getRewardTokens();
+            for (uint j; j < _tokens.length; ++j) {
+                IERC20 _rewardToken = IERC20(address(_tokens[j]));
+
+                uint256 userReward = accruedRewards[msg.sender][_rewardToken];
+                if (userReward > 0) {
+                    accruedRewards[msg.sender][_rewardToken] = 0;
+                    _rewardToken.transfer(msg.sender, userReward);
+                }
             }
         }
     }

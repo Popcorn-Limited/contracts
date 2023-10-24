@@ -33,4 +33,16 @@ contract EllipsisRewardClaimer is EllipsisLpStakingAdapter, BaseStrategyRewardCl
     function _getRewardTokens() public view override returns (IERC20[] memory) {
         return getRewardTokens();
     }
+
+    function _totalDeposits() internal view override returns(uint256) {
+        return _totalAssets();
+    }
+
+    function _balanceOf(address vault) internal view override returns(uint256) {
+        return 0; // todo: refactor
+    }
+
+    function _decimals() internal view override returns(uint256) {
+        return 0; // todo: refactor
+    }
 }
