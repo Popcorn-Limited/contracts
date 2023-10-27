@@ -9,7 +9,7 @@ import {
     VaultFees,
     MockERC20,
     BaseVaultTest,
-    MockStrategyV2,
+    MockStrategy,
     BaseVaultConfig,
     AdapterConfig, ProtocolConfig
 } from "../base/BaseVaultTest.sol";
@@ -21,9 +21,9 @@ import "../../src/vaults/SingleStrategyVault.sol";
 contract SingleStrategyVaultTest is BaseVaultTest {
     IERC20[] public rewardTokens;
 
-    function _createAdapter() internal override returns (MockStrategyV2) {
+    function _createAdapter() internal override returns (MockStrategy) {
         if(adapterImplementation == address(0)) {
-            adapterImplementation = address(new MockStrategyV2());
+            adapterImplementation = address(new MockStrategy());
         }
 
         AdapterConfig memory adapterConfig = AdapterConfig({
@@ -40,8 +40,8 @@ contract SingleStrategyVaultTest is BaseVaultTest {
         });
 
         address adapterAddress = Clones.clone(adapterImplementation);
-        MockStrategyV2(adapterAddress).__MockAdapter_init(adapterConfig, protocolConfig);
-        return MockStrategyV2(adapterAddress);
+        MockStrategy(adapterAddress).__MockAdapter_init(adapterConfig, protocolConfig);
+        return MockStrategy(adapterAddress);
     }
 
     function _createVault() internal override returns (IVault) {

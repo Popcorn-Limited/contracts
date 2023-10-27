@@ -47,6 +47,8 @@ interface IBaseAdapter {
 
     function setRewardsToken(IERC20[] memory rewardTokens) external;
 
+    function withdrawVaultReward() external;
+
     function initialize(
         AdapterConfig memory _adapterConfig,
         ProtocolConfig memory _protocolConfig

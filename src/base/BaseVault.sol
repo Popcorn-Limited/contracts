@@ -157,7 +157,7 @@ abstract contract BaseVault is
     function deposit(
         uint256 assets,
         address receiver
-    ) public override nonReentrant returns (uint256 shares) {
+    ) public virtual override nonReentrant returns (uint256 shares) {
         if (receiver == address(0)) revert InvalidReceiver();
         if (assets > maxDeposit(receiver)) revert MaxError(assets);
 
@@ -196,10 +196,10 @@ abstract contract BaseVault is
     function mint(
         uint256 shares,
         address receiver
-    ) public override nonReentrant returns (uint256 assets) {
+    ) public virtual override nonReentrant returns (uint256 assets) {
         if (receiver == address(0)) revert InvalidReceiver();
 
-        // Inititalize account for managementFee on first deposit
+        // Initialize account for managementFee on first deposit
         if (totalSupply() == 0) feesUpdatedAt = block.timestamp;
 
         uint256 depositFee = uint256(fees.deposit);
@@ -246,7 +246,7 @@ abstract contract BaseVault is
         uint256 assets,
         address receiver,
         address owner
-    ) public override nonReentrant returns (uint256 shares) {
+    ) public virtual override nonReentrant returns (uint256 shares) {
         if (receiver == address(0)) revert InvalidReceiver();
         if (assets > maxWithdraw(owner)) revert MaxError(assets);
 
@@ -290,7 +290,7 @@ abstract contract BaseVault is
         uint256 shares,
         address receiver,
         address owner
-    ) public override nonReentrant returns (uint256 assets) {
+    ) public virtual override nonReentrant returns (uint256 assets) {
         if (receiver == address(0)) revert InvalidReceiver();
         if (shares > maxRedeem(owner)) revert MaxError(shares);
 
@@ -479,14 +479,14 @@ abstract contract BaseVault is
      *   HWM in a fee period, issue fee shares to the vault equal to the performance fee.
      */
     function accruedPerformanceFee(
-        uint256 performanceFee
+        uint256 _performanceFee
     ) public view returns (uint256) {
         uint256 highWaterMark_ = highWaterMark;
         uint256 shareValue = convertToAssets(1e18);
 
         return
-            performanceFee > 0 && shareValue > highWaterMark_
-                ? performanceFee.mulDiv(
+            _performanceFee > 0 && shareValue > highWaterMark_
+                ? _performanceFee.mulDiv(
                     (shareValue - highWaterMark_) * totalSupply(),
                     1e36,
                     Math.Rounding.Down

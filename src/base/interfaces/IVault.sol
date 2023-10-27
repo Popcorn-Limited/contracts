@@ -93,6 +93,8 @@ interface IVault is IERC4626 {
   function strategy() external view returns (IBaseAdapter);
 
   // HARVEST
+  function withdrawReward() external;
+
   function harvest() external;
 
   function toggleAutoHarvest() external;
@@ -131,4 +133,8 @@ interface IVault is IERC4626 {
     BaseVaultConfig memory _vaultConfig,
     address _strategy
   ) external;
+}
+
+interface IVaultRewardClaimer {
+  function accrueVaultReward(address rewardToken, uint amountAccrued) external;
 }

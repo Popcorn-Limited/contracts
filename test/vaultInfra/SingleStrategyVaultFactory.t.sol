@@ -8,7 +8,7 @@ import { MockERC20 } from "../utils/mocks/MockERC20.sol";
 import { SingleStrategyVaultFactory } from "../../src/SingleStrategyVaultFactory.sol";
 import { Clones } from "openzeppelin-contracts/proxy/Clones.sol";
 import { VaultRegistry } from "../../src/VaultRegistry.sol";
-import { MockStrategyV2 } from "../utils/mocks/MockStrategyV2.sol";
+import {MockStrategy} from "../utils/mocks/MockStrategy.sol";
 import { BaseVaultConfig, VaultFees} from "../base/BaseVaultTest.sol";
 import { IERC20, IVault } from "../../src/base/interfaces/IVault.sol";
 import { IVaultRegistry } from "../../src/base/interfaces/IVaultRegistry.sol";
@@ -164,7 +164,7 @@ contract SingleStrategyVaultFactoryTest is Test {
                               HELPERS
     //////////////////////////////////////////////////////////////*/
     function _createStrategy() internal returns (address) {
-        address adapterImplementation = address(new MockStrategyV2());
+        address adapterImplementation = address(new MockStrategy());
 
         AdapterConfig memory adapterConfig = AdapterConfig({
             underlying: IERC20(address(asset)),
@@ -180,7 +180,7 @@ contract SingleStrategyVaultFactoryTest is Test {
         });
 
         address adapterAddress = Clones.clone(adapterImplementation);
-        MockStrategyV2(adapterAddress).__MockAdapter_init(adapterConfig, protocolConfig);
+        MockStrategy(adapterAddress).__MockAdapter_init(adapterConfig, protocolConfig);
         return adapterAddress;
     }
 

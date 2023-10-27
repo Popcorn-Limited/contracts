@@ -8,7 +8,7 @@ import {
 import { Test } from "forge-std/Test.sol";
 import { MockERC20 } from "../utils/mocks/MockERC20.sol";
 import { Clones } from "openzeppelin-contracts/proxy/Clones.sol";
-import { MockStrategyV2 } from "../utils/mocks/MockStrategyV2.sol";
+import {MockStrategy} from "../utils/mocks/MockStrategy.sol";
 import { IVault } from "../../src/base/interfaces/IVault.sol";
 import { BaseVaultConfig, BaseVault, VaultFees } from "../../src/base/BaseVault.sol";
 import {
@@ -23,7 +23,7 @@ abstract contract BaseVaultTest is Test {
 
     IVault public vault;
     MockERC20 public asset;
-    MockStrategyV2 public adapter;
+    MockStrategy public adapter;
     address public vaultImplementation;
     address public adapterImplementation;
 
@@ -55,7 +55,7 @@ abstract contract BaseVaultTest is Test {
     /*//////////////////////////////////////////////////////////////
                               HELPERS
     //////////////////////////////////////////////////////////////*/
-    function _createAdapter() internal virtual returns (MockStrategyV2);
+    function _createAdapter() internal virtual returns (MockStrategy);
 
     function _createVault() internal virtual returns (IVault);
 

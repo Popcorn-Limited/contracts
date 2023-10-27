@@ -56,7 +56,7 @@ contract EllipsisLpStakingAdapter is BaseAdapter {
 
     /**
      * @notice Deposits underlying asset and converts it if necessary into an lpToken before depositing
-     * @dev This function must be overriden. Some farms require the user to into an lpToken before depositing others might use the underlying directly
+     * @dev This function must be overridden. Some farms require the user to into an lpToken before depositing others might use the underlying directly
      **/
     function _depositLP(uint256 amount) internal override {
         lpStaking.deposit(address(lpToken), amount, false);
