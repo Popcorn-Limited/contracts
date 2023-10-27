@@ -38,8 +38,8 @@ contract MockRewardClaimerStrategy is MockStrategy, BaseStrategyRewardClaimer {
     _accrueStrategyReward(rewardToken, reward);
   }
 
-  function getReward() onlyVault external {
-    _withdrawAccruedReward();
+  function withdrawVaultReward() external onlyVault {
+    _withdrawAccruedVaultReward();
   }
 
   function _getRewardTokens() public view override returns (IERC20[] memory) {

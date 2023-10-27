@@ -55,9 +55,10 @@ contract RewardClaimerVault is BaseVault, BaseVaultRewardClaimer {
     }
 
     /*//////////////////////////////////////////////////////////////
-                  REWARD CLAIMER LOGIC
+                        REWARD CLAIMER LOGIC
     //////////////////////////////////////////////////////////////*/
-    function getReward() external {
+    function withdrawReward() external {
+        strategy.withdrawVaultReward();
         _withdrawAccruedUserReward();
     }
 

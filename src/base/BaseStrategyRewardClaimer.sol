@@ -4,6 +4,7 @@
 pragma solidity ^0.8.15;
 import "./BaseHelper.sol";
 import { BaseAdapter } from "./BaseAdapter.sol";
+import { IVaultRewardClaimer } from "./interfaces/IVault.sol";
 import { Math } from "openzeppelin-contracts/utils/math/Math.sol";
 import { IERC20 } from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import { SafeCast } from "openzeppelin-contracts/utils/math/SafeCast.sol";
@@ -40,6 +41,8 @@ abstract contract BaseStrategyRewardClaimer {
                 totalAssetDeposited,
                 Math.Rounding.Down
             );
+        } else {
+            rewardIndex = reward * uint256(10 ** _decimals());
         }
 
         strategyRewardIndex[rewardToken] += rewardIndex;
@@ -74,7 +77,7 @@ abstract contract BaseStrategyRewardClaimer {
         }
     }
 
-    function _withdrawAccruedReward() internal {
+    function _withdrawAccruedVaultReward() internal {
         _accrueVaultReward(msg.sender);
         IERC20Upgradeable[] memory _tokens = _getRewardTokens();
 
@@ -84,7 +87,9 @@ abstract contract BaseStrategyRewardClaimer {
 
             if (vaultReward > 0) {
                 accruedVaultRewards[msg.sender][_rewardToken] = 0;
-                _rewardToken.transfer(msg.sender, vaultReward);
+                _rewardToken.safeApprove(msg.sender, vaultReward);
+                IVaultRewardClaimer(msg.sender).accrueVaultReward(address(_rewardToken), vaultReward);
+                //_rewardToken.transfer(msg.sender, vaultReward); -- allow the vault pull to update it's reward index
             }
 
             unchecked {

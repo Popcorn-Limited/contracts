@@ -27,7 +27,7 @@ contract EllipsisRewardClaimer is EllipsisLpStakingAdapter, BaseStrategyRewardCl
     }
 
     function getReward() onlyVault external {
-        _withdrawAccruedReward();
+        _withdrawAccruedVaultReward();
     }
 
     function _getRewardTokens() public view override returns (IERC20[] memory) {

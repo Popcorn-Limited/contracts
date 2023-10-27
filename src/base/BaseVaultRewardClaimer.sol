@@ -1,4 +1,5 @@
 pragma solidity 0.8.19;
+import "forge-std/Console.sol";
 import {IBaseAdapter} from "./interfaces/IBaseAdapter.sol";
 import {Math} from "openzeppelin-contracts/utils/math/Math.sol";
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
@@ -31,7 +32,8 @@ abstract contract BaseVaultRewardClaimer {
     // user => rewardToken -> accruedRewards
     mapping(address => mapping(IERC20 => uint256)) public accruedRewards;
 
-    function accrueVaultRewards(IERC20 rewardToken, uint accrued) public {
+    function accrueVaultReward(address rewardToken_, uint accrued) external {
+        IERC20 rewardToken = IERC20(rewardToken_);
         // we allow anybody to call this. To prevent someone from accruing rewards that are never
         // sent to the contract, we always transfer them ourselves. Primarily it will be called by a
         // strategy contract reporting its harvest.
@@ -77,6 +79,8 @@ abstract contract BaseVaultRewardClaimer {
                 }
 
                 uint256 deltaIndex = rewards.index - oldIndex;
+                console.log("delta index: ", deltaIndex, rewards.index, oldIndex);
+                console.log("user vault balance: ", _balanceOf(_user)); //5000000000000000000
 
                 // Accumulate rewards by multiplying user tokens by rewardsPerToken index and adding on unclaimed
                 uint256 supplierDelta = _balanceOf(_user).mulDiv(
@@ -128,7 +132,7 @@ abstract contract BaseVaultRewardClaimer {
     }
 
     function _balanceOf(address vault) internal view returns(uint256) {
-        return 5e18;
+        return 500;
     }
 
 }

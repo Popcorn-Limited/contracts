@@ -17,6 +17,7 @@ import {
 import {RewardClaimerVault} from "../../src/vaults/RewardClaimerVault.sol";
 import { MockERC20 } from "../utils/mocks/MockERC20.sol";
 import {MockRewardClaimerStrategy} from "../utils/mocks/MockRewardClaimerStrategy.sol";
+import "forge-std/Console.sol";
 
 contract RewardClaimerVaultTest is BaseVaultTest {
     IERC20[] public rewardTokens;
@@ -124,8 +125,19 @@ contract RewardClaimerVaultTest is BaseVaultTest {
         _rewardToken.approve(address(adapter), 1000e18);
         MockRewardClaimerStrategy(address(adapter)).updateRewardIndex(_rewardToken, 1000e18);
 
+//        vm.prank(bob);
+//        RewardClaimerVault(address(vault)).getReward();
+
+//        uint256 vaultReward = MockRewardClaimerStrategy(address(adapter))
+//            .accruedVaultRewards(address(vault), address(_rewardToken));
+
+//        vm.prank(address(vault));
+//        MockRewardClaimerStrategy(address(adapter)).withdrawVaultReward();
+//        uint vaultReward = _rewardToken.balanceOf(address(vault));
+//        console.log("vault reward is: ", vaultReward);
         vm.prank(bob);
-        RewardClaimerVault(address(vault)).getReward();
+        vault.withdrawReward();
+        console.log("reward in vault: ", _rewardToken.balanceOf(address(vault)));
     }
 
     //TODO: Add test cases for the following
