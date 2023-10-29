@@ -2,12 +2,12 @@
 pragma solidity ^0.8.15;
 import "openzeppelin-contracts/token/ERC20/IERC20.sol";
 
-interface RocketStorageInterface {
+interface IRocketStorage {
     // Getters
     function getAddress(bytes32 _key) external view returns (address);
 }
 
-interface RocketTokenRETHInterface is IERC20 {
+interface IrETH is IERC20 {
     function getEthValue(uint256 _rethAmount) external view returns (uint256);
     function getRethValue(uint256 _ethAmount) external view returns (uint256);
     function getExchangeRate() external view returns (uint256);
@@ -19,7 +19,7 @@ interface RocketTokenRETHInterface is IERC20 {
     function burn(uint256 _rethAmount) external;
 }
 
-interface RocketDepositPoolInterface {
+interface IRocketDepositPool {
     function getBalance() external view returns (uint256);
     function deposit() external payable;
 }
@@ -39,11 +39,11 @@ interface ICurveMetapool {
     ) external returns (uint256);
 }
 
-interface RocketDepositSettingsInterface {
+interface IRocketDepositSettings {
     function getDepositFee() external view returns (uint256);
     function getMinimumDeposit() external view returns (uint256);
 }
 
-interface RocketNetworkBalancesInterface {
+interface IRocketNetworkBalances {
     function getTotalETHBalance() external view returns (uint256);
 }

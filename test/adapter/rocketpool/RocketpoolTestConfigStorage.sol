@@ -4,12 +4,11 @@
 pragma solidity ^0.8.15;
 
 import {ITestConfigStorage, TestConfig} from "../../base/interfaces/ITestConfigStorage.sol";
-import {IERC20, IBaseAdapter, AdapterConfig, ProtocolConfig} from "../../base/BaseStrategyTest.sol";
+import {IERC20, IBaseAdapter, AdapterConfig} from "../../base/BaseStrategyTest.sol";
 
 contract RocketpoolTestConfigStorage is ITestConfigStorage {
     TestConfig[] public _testConfigs;
     AdapterConfig[] public adapterConfigs;
-    ProtocolConfig[] public protocolConfigs;
 
     IERC20 public constant WETH =
         IERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
@@ -40,17 +39,8 @@ contract RocketpoolTestConfigStorage is ITestConfigStorage {
                 lpToken: IERC20(address(0)),
                 useLpToken: false,
                 rewardTokens: rewardTokens,
-                owner: address(0x7777)
-            })
-        );
-        protocolConfigs.push(
-            ProtocolConfig({
-                registry: 0x1d8f8f00cfa6758d7bE78336684788Fb0ee0Fa46, // rocketPoolStorage
-                protocolInitData: abi.encode(
-                    address(WETH),
-                    0xE592427A0AEce92De3Edee1F18E0157C05861564, // UniRouter
-                    24 // UniSwapFee
-                )
+                owner: address(0x7777),
+                protocolData: ""
             })
         );
     }
@@ -71,12 +61,5 @@ contract RocketpoolTestConfigStorage is ITestConfigStorage {
     ) public view returns (AdapterConfig memory) {
         if(i > adapterConfigs.length) i = 0;
         return adapterConfigs[i];
-    }
-
-    function getProtocolConfig(
-        uint256 i
-    ) public view returns (ProtocolConfig memory) {
-        if(i > protocolConfigs.length) i = 0;
-        return protocolConfigs[i];
     }
 }

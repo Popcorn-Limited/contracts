@@ -3,14 +3,13 @@
 
 pragma solidity ^0.8.15;
 
-import {AcrossAdapter, IERC20, AdapterConfig, ProtocolConfig} from "./AcrossAdapter.sol";
+import {AcrossAdapter, IERC20, AdapterConfig} from "./AcrossAdapter.sol";
 
 contract AcrossDepositor is AcrossAdapter {
     function initialize(
-        AdapterConfig memory _adapterConfig,
-        ProtocolConfig memory _protocolConfig
+        AdapterConfig memory _adapterConfig
     ) external initializer {
-        __AcrossAdapter_init(_adapterConfig, _protocolConfig);
+        __AcrossAdapter_init(_adapterConfig);
     }
 
     function deposit(uint256 amount) external override onlyVault whenNotPaused {

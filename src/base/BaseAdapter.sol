@@ -7,9 +7,10 @@ import {IBaseHelper} from "./interfaces/IBaseHelper.sol";
 import {OwnedUpgradeable} from "../utils/OwnedUpgradeable.sol";
 import {PausableUpgradeable} from "openzeppelin-contracts-upgradeable/security/PausableUpgradeable.sol";
 import {IERC4626Upgradeable as IERC4626} from "openzeppelin-contracts-upgradeable/interfaces/IERC4626Upgradeable.sol";
-import {AdapterConfig, ProtocolConfig, IERC20} from "./interfaces/IBaseAdapter.sol";
+import {AdapterConfig, IERC20} from "./interfaces/IBaseAdapter.sol";
 
 abstract contract BaseAdapter is OwnedUpgradeable, PausableUpgradeable {
+    // TODO: what's this used for?
     address public constant FEE_RECIPIENT =
         address(0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E);
 

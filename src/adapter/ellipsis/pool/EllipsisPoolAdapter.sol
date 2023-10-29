@@ -4,7 +4,7 @@
 pragma solidity ^0.8.15;
 
 import {IEllipsis, ILpStaking, IAddressProvider} from "../IEllipsis.sol";
-import {BaseAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../../../base/BaseAdapter.sol";
+import {BaseAdapter, IERC20, AdapterConfig} from "../../../base/BaseAdapter.sol";
 import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
@@ -15,13 +15,12 @@ contract EllipsisPoolAdapter is BaseAdapter {
     //address public lpToken;
     address public ellipsisPool;
     address public addressProvider;
-    address public ellipsisLPStaking;
+    address public constant ellipsisLPStaking = 0x5B74C99AA2356B4eAa7B85dC486843eDff8Dfdbe;
 
     error LpTokenNotSupported();
 
     function __EllipsisPoolAdapter_init(
-        AdapterConfig memory _adapterConfig,
-        ProtocolConfig memory _protocolConfig
+        AdapterConfig memory _adapterConfig
     ) internal onlyInitializing {
         if (_adapterConfig.useLpToken) revert LpTokenNotSupported();
 
@@ -29,22 +28,22 @@ contract EllipsisPoolAdapter is BaseAdapter {
 
         (
             address _ellipsisPool,
-            address _addressProvider,
-            address _ellipsisLPStaking
+            address _addressProvider
         ) = abi.decode(
-            _protocolConfig.protocolInitData,
-            (address, address, address)
+            _adapterConfig.protocolData,
+            (address, address)
         );
 
         ellipsisPool = _ellipsisPool;
         addressProvider = _addressProvider;
-        ellipsisLPStaking = _ellipsisLPStaking;
         lpToken = IERC20(
             IAddressProvider(_addressProvider).get_lp_token(_ellipsisPool)
         );
 
+        // TODO: the check at the top of the function doesn't allow us to use lp tokens here.
+        // Why do we approve them to the lp staking contract?
         _adapterConfig.lpToken.approve(
-            address(_ellipsisLPStaking),
+            address(ellipsisLPStaking),
             type(uint256).max
         );
         _adapterConfig.underlying.approve(
@@ -84,6 +83,10 @@ contract EllipsisPoolAdapter is BaseAdapter {
             }
         }
         return 0;
+    }
+
+    function _totalLP() internal pure override returns (uint) {
+        revert("NO");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -142,6 +145,10 @@ contract EllipsisPoolAdapter is BaseAdapter {
         }
     }
 
+    function _depositLP(uint) internal pure override {
+        revert("NO");
+    }
+
     /*//////////////////////////////////////////////////////////////
                             WITHDRAWAL LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -181,6 +188,10 @@ contract EllipsisPoolAdapter is BaseAdapter {
                 break;
             }
         }
+    }
+
+    function _withdrawLP(uint) internal pure override {
+        revert("NO");
     }
 
     function convertToUnderlyingShares(

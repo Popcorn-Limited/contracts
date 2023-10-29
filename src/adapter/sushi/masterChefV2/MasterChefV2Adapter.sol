@@ -4,17 +4,14 @@
 pragma solidity ^0.8.15;
 
 import {IMasterChefV2, IRewarder} from "./IMasterChefV2.sol";
-import {BaseAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../../../base/BaseAdapter.sol";
+import {BaseAdapter, IERC20, AdapterConfig} from "../../../base/BaseAdapter.sol";
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
 contract MasterChefV2Adapter is BaseAdapter {
     using SafeERC20 for IERC20;
 
     // @notice The MasterChef contract
-    IMasterChefV2 public masterChef;
-
-    // @notice The address of the reward token
-    address public rewardsToken;
+    IMasterChefV2 public constant masterChef = IMasterChefV2(0xEF0881eC094552b2e128Cf945EF17a6752B4Ec5d);
 
     // @notice The pool ID
     uint256 public pid;
@@ -23,20 +20,17 @@ contract MasterChefV2Adapter is BaseAdapter {
     error LpTokenSupported();
 
     function __MasterChefV2Adapter_init(
-        AdapterConfig memory _adapterConfig,
-        ProtocolConfig memory _protocolConfig
+        AdapterConfig memory _adapterConfig
     ) internal onlyInitializing {
         if (!_adapterConfig.useLpToken) revert LpTokenSupported();
         __BaseAdapter_init(_adapterConfig);
 
-        (uint256 _pid, address _rewardsToken) = abi.decode(
-            _protocolConfig.protocolInitData,
-            (uint256, address)
+        (uint256 _pid) = abi.decode(
+            _adapterConfig.protocolData,
+            (uint256)
         );
 
         pid = _pid;
-        rewardsToken = _rewardsToken;
-        masterChef = IMasterChefV2(_protocolConfig.registry);
         address _lpToken = masterChef.lpToken(_pid);
 
         if (_lpToken != address(lpToken)) revert InvalidAsset();
@@ -59,6 +53,11 @@ contract MasterChefV2Adapter is BaseAdapter {
         return user.amount;
     }
 
+
+    function _totalUnderlying() internal pure override returns (uint) {
+        revert("NO");
+    }
+
     /*//////////////////////////////////////////////////////////////
                             DEPOSIT LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -76,6 +75,10 @@ contract MasterChefV2Adapter is BaseAdapter {
         masterChef.deposit(pid, amount, address(this));
     }
 
+    function _depositUnderlying(uint) internal pure override {
+        revert("NO");
+    }
+
     /*//////////////////////////////////////////////////////////////
                             WITHDRAWAL LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -91,6 +94,10 @@ contract MasterChefV2Adapter is BaseAdapter {
      **/
     function _withdrawLP(uint256 amount) internal override {
         masterChef.withdraw(pid, amount, address(this));
+    }
+
+    function _withdrawUnderlying(uint) internal pure override {
+        revert("NO");
     }
 
     /*//////////////////////////////////////////////////////////////

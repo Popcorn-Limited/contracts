@@ -4,28 +4,27 @@
 pragma solidity ^0.8.15;
 
 import {IEllipsis, ILpStaking, IAddressProvider} from "../IEllipsis.sol";
-import {BaseAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../../../base/BaseAdapter.sol";
+import {BaseAdapter, IERC20, AdapterConfig} from "../../../base/BaseAdapter.sol";
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
 contract EllipsisLpStakingAdapter is BaseAdapter {
     using SafeERC20 for IERC20;
 
-    ILpStaking public lpStaking;
+    /// @dev BSC address
+    ILpStaking public constant lpStaking = ILpStaking(0x5B74C99AA2356B4eAa7B85dC486843eDff8Dfdbe);
     address[] internal _rewardToken;
 
     error InvalidToken();
     error LpTokenSupported();
 
     function __EllipsisLpStakingAdapter_init(
-        AdapterConfig memory _adapterConfig,
-        ProtocolConfig memory _protocolConfig
+        AdapterConfig memory _adapterConfig
     ) internal onlyInitializing {
         if (!_adapterConfig.useLpToken) revert LpTokenSupported();
 
         __BaseAdapter_init(_adapterConfig);
 
-        uint256 pId = abi.decode(_protocolConfig.protocolInitData, (uint256));
-        lpStaking = ILpStaking(_protocolConfig.registry);
+        uint256 pId = abi.decode(_adapterConfig.protocolData, (uint256));
 
         if (lpStaking.registeredTokens(pId) != address(lpToken))
             revert InvalidToken();
@@ -46,12 +45,20 @@ contract EllipsisLpStakingAdapter is BaseAdapter {
             lpStaking.userInfo(address(lpToken), address(this)).depositAmount;
     }
 
+    function _totalUnderlying() internal pure override returns (uint) {
+        revert("NO");
+    }
+
     /*//////////////////////////////////////////////////////////////
                             DEPOSIT LOGIC
     //////////////////////////////////////////////////////////////*/
 
     function _deposit(uint256 amount, address caller) internal override {
         _depositLP(amount);
+    }
+
+    function _depositUnderlying(uint) internal pure override {
+        revert("NO");
     }
 
     /**
@@ -77,6 +84,10 @@ contract EllipsisLpStakingAdapter is BaseAdapter {
      **/
     function _withdrawLP(uint256 amount) internal override {
         lpStaking.withdraw(address(lpToken), amount, false);
+    }
+
+    function _withdrawUnderlying(uint) internal pure override {
+        revert("NO");
     }
 
     /*//////////////////////////////////////////////////////////////

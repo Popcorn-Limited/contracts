@@ -4,7 +4,7 @@
 pragma solidity ^0.8.15;
 
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
-import {BaseAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../../../base/BaseAdapter.sol";
+import {BaseAdapter, IERC20, AdapterConfig} from "../../../base/BaseAdapter.sol";
 import {ICToken, IComptroller} from "./ICompoundV2.sol";
 import {LibCompound} from "./LibCompound.sol";
 
@@ -15,33 +15,30 @@ contract CompoundV2Adapter is BaseAdapter {
     ICToken public cToken;
 
     /// @notice The Compound Comptroller contract
-    IComptroller public comptroller;
+    IComptroller public constant comptroller = IComptroller(0x3d9819210A31b4961b30EF54bE2aeD79B9c9Cd3B);
 
     /// @notice Check to see if cToken is cETH to wrap/unwarp on deposit/withdrawal
     bool public isCETH;
 
     error InvalidAsset(address asset);
+    error LpTokenNotSupported();
 
     error DifferentAssets(address asset, address underlying);
 
     function __CompoundV2Adapter_init(
-        AdapterConfig memory _adapterConfig,
-        ProtocolConfig memory _protocolConfig
+        AdapterConfig memory _adapterConfig
     ) internal onlyInitializing {
+        if (_adapterConfig.useLpToken) revert LpTokenNotSupported();
         __BaseAdapter_init(_adapterConfig);
 
-        (address _cToken, address _comptroller) = abi.decode(
-            _protocolConfig.protocolInitData,
-            (address, address)
+        (address _cToken) = abi.decode(
+            _adapterConfig.protocolData, 
+            (address)
         );
 
         cToken = ICToken(_cToken);
-        comptroller = IComptroller(_comptroller);
 
-        if (
-            keccak256(abi.encode(cToken.symbol())) !=
-            keccak256(abi.encode("cETH"))
-        ) {
+        if (address(cToken) != 0x4Ddc2D193948926D02f9B1fE9e1daa0718270ED5) {
             if (cToken.underlying() != address(_adapterConfig.underlying))
                 revert DifferentAssets(
                     cToken.underlying(),
@@ -50,7 +47,7 @@ contract CompoundV2Adapter is BaseAdapter {
         }
 
         (bool isListed, , ) = comptroller.markets(address(cToken));
-        if (isListed == false) revert InvalidAsset(address(cToken));
+        if (!isListed) revert InvalidAsset(address(cToken));
 
         _adapterConfig.underlying.approve(address(cToken), type(uint256).max);
     }
@@ -65,6 +62,10 @@ contract CompoundV2Adapter is BaseAdapter {
      */
     function _totalUnderlying() internal view override returns (uint256) {
         return LibCompound.viewUnderlyingBalanceOf(cToken, address(this));
+    }
+
+    function _totalLP() internal pure override returns (uint) {
+        revert("NO");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -84,6 +85,10 @@ contract CompoundV2Adapter is BaseAdapter {
         cToken.mint(amount);
     }
 
+    function _depositLP(uint) internal pure override {
+        revert("NO");
+    }
+
     /*//////////////////////////////////////////////////////////////
                             WITHDRAWAL LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -99,6 +104,10 @@ contract CompoundV2Adapter is BaseAdapter {
      **/
     function _withdrawUnderlying(uint256 amount) internal override {
         cToken.redeemUnderlying(amount);
+    }
+
+    function _withdrawLP(uint) internal pure override {
+        revert("NO");
     }
 
     /*//////////////////////////////////////////////////////////////

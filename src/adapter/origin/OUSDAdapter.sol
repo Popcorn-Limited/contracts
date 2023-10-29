@@ -2,53 +2,31 @@
 // Docgen-SOLC: 0.8.15
 
 pragma solidity ^0.8.15;
-import {IRToken, ILendingPool, IProtocolDataProvider, IIncentivesController} from "./IRadiant.sol";
-import {IERC20, BaseAdapter, AdapterConfig} from "../../base/BaseAdapter.sol";
+
+import {BaseAdapter, IERC20, AdapterConfig, IERC4626} from "../../base/BaseAdapter.sol";
 import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
-contract RadiantAdapter is BaseAdapter {
+contract OUSDAdapter is BaseAdapter {
     using SafeERC20 for IERC20;
     using Math for uint256;
 
-    /// @notice The Radiant rToken contract
-    IRToken public rToken;
+    /// @notice The wrapped oToken contract.
+    IERC4626 public constant wOUSD = IERC4626(0xDcEe70654261AF21C44c093C300eD3Bb97b78192);
 
-    /// @notice The Radiant LendingPool contract
-    /// @dev Lending Pool on Arbitrum
-    ILendingPool public constant lendingPool = ILendingPool(0xF4B1486DD74D07706052A33d31d7c0AAFD0659E1);
-
-    /// @notice The Radiant Incentives Controller contract
-    IIncentivesController public constant controller = IIncentivesController(0xebC85d44cefb1293707b11f707bd3CEc34B4D5fA);
-
+    error InvalidAsset();
     error LpTokenNotSupported();
-    error DifferentAssets(address asset, address underlying);
 
-    function __RadiantAdapter_init(
+    function __OriginAdapter_init(
         AdapterConfig memory _adapterConfig
     ) internal onlyInitializing {
         if (_adapterConfig.useLpToken) revert LpTokenNotSupported();
         __BaseAdapter_init(_adapterConfig);
 
-        address radiantDataProvider = abi.decode(
-            _adapterConfig.protocolData,
-            (address)
-        );
+        if (wOUSD.asset() != address(underlying))
+            revert InvalidAsset();
 
-        (address _rToken, , ) = IProtocolDataProvider(radiantDataProvider)
-            .getReserveTokensAddresses(address(underlying));
-
-        rToken = IRToken(_rToken);
-        if (rToken.UNDERLYING_ASSET_ADDRESS() != address(underlying))
-            revert DifferentAssets(
-                rToken.UNDERLYING_ASSET_ADDRESS(),
-                address(underlying)
-            );
-
-        _adapterConfig.underlying.approve(
-            address(lendingPool),
-            type(uint256).max
-        );
+        _adapterConfig.underlying.approve(address(wOUSD), type(uint256).max);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -60,7 +38,7 @@ contract RadiantAdapter is BaseAdapter {
      * @dev This function must be overriden. If the farm requires the usage of lpToken than this function must convert lpToken balance into underlying balance
      */
     function _totalUnderlying() internal view override returns (uint256) {
-        return rToken.balanceOf(address(this));
+        return wOUSD.convertToAssets(wOUSD.balanceOf(address(this)));
     }
 
     function _totalLP() internal pure override returns (uint) {
@@ -81,7 +59,7 @@ contract RadiantAdapter is BaseAdapter {
      * @dev This function must be overriden. Some farms require the user to into an lpToken before depositing others might use the underlying directly
      **/
     function _depositUnderlying(uint256 amount) internal override {
-        lendingPool.deposit(address(underlying), amount, address(this), 0);
+        wOUSD.deposit(amount, address(this));
     }
 
     function _depositLP(uint) internal pure override {
@@ -102,23 +80,12 @@ contract RadiantAdapter is BaseAdapter {
      * @dev This function must be overriden. Some farms require the user to into an lpToken before depositing others might use the underlying directly
      **/
     function _withdrawUnderlying(uint256 amount) internal override {
-        lendingPool.withdraw(address(underlying), amount, address(this));
+        wOUSD.withdraw(amount, address(this), address(this));
     }
 
     function _withdrawLP(uint) internal pure override {
         revert("NO");
     }
 
-    /*//////////////////////////////////////////////////////////////
-                            CLAIM LOGIC
-    //////////////////////////////////////////////////////////////*/
-
-    /**
-     * @notice Claims rewards
-     */
-    function _claim() internal override {
-        if (address(controller) == address(0)) return;
-
-        try controller.claimAll(address(this)) {} catch {}
-    }
+    function _claim() internal pure override {}
 }

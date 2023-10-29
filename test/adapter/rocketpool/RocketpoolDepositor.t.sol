@@ -6,21 +6,19 @@ import {Clones} from "openzeppelin-contracts/proxy/Clones.sol";
 import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
 import {
     RocketpoolAdapter,
-    RocketStorageInterface,
-    RocketTokenRETHInterface,
-    RocketDepositPoolInterface,
-    RocketDepositSettingsInterface,
-    RocketNetworkBalancesInterface
+    IRocketStorage,
+    IrETH,
+    IRocketNetworkBalances
 } from "../../../src/adapter/rocketpool/RocketpoolAdapter.sol";
 import {IOwned} from "../../../src/base/interfaces/IOwned.sol";
 import {IERC20, IBaseAdapter, BaseStrategyTest} from "../../base/BaseStrategyTest.sol";
 import {RocketpoolDepositor} from "../../../src/strategies/rocketpool/RocketpoolDepositor.sol";
-import {RocketpoolTestConfigStorage, ITestConfigStorage, AdapterConfig, ProtocolConfig} from "./RocketpoolTestConfigStorage.sol";
+import {RocketpoolTestConfigStorage, ITestConfigStorage, AdapterConfig} from "./RocketpoolTestConfigStorage.sol";
 
 contract RocketpoolDepositorTest is BaseStrategyTest {
     using Math for uint256;
 
-    RocketTokenRETHInterface public rETH = RocketTokenRETHInterface(0xae78736Cd615f374D3085123A210448E74Fc6393);
+    IrETH public rETH = IrETH(0xae78736Cd615f374D3085123A210448E74Fc6393);
 
     function setUp() public {
         _setUpBaseTest(0);
@@ -35,12 +33,9 @@ contract RocketpoolDepositorTest is BaseStrategyTest {
         AdapterConfig memory adapterConfig = RocketpoolTestConfigStorage(
             address(testConfigStorage)
         ).getAdapterConfig(i_);
-        ProtocolConfig memory protocolConfig = RocketpoolTestConfigStorage(
-            address(testConfigStorage)
-        ).getProtocolConfig(i_);
 
         vm.prank(owner_);
-        IBaseAdapter(strategy).initialize(adapterConfig, protocolConfig);
+        IBaseAdapter(strategy).initialize(adapterConfig);
 
         return strategy;
     }
@@ -57,11 +52,6 @@ contract RocketpoolDepositorTest is BaseStrategyTest {
         AdapterConfig memory adapterConfig = RocketpoolTestConfigStorage(
             address(testConfigStorage)
         ).getAdapterConfig(0);
-        ProtocolConfig memory protocolConfig = RocketpoolTestConfigStorage(
-            address(testConfigStorage)
-        ).getProtocolConfig(0);
-
-        address rocketStorage = protocolConfig.registry;
 
         IBaseAdapter _strategy = IBaseAdapter(
             Clones.clone(address(new RocketpoolDepositor()))
@@ -69,7 +59,7 @@ contract RocketpoolDepositorTest is BaseStrategyTest {
 
         // --- TEST SUCCESSFUL INIT ---
         vm.prank(owner);
-        _strategy.initialize(adapterConfig, protocolConfig);
+        _strategy.initialize(adapterConfig);
 
         // Verify Generic Config
         IERC20[] memory _rewardTokens = _strategy.getRewardTokens();
@@ -83,38 +73,10 @@ contract RocketpoolDepositorTest is BaseStrategyTest {
         assertEq(_strategy.useLpToken(), adapterConfig.useLpToken);
         assertEq(_rewardTokens.length, adapterConfig.rewardTokens.length);
 
-        // Verify Protocol Specific Config
-
-        (address _weth, address _uniRouter, uint24 _uniSwapFee) = abi.decode(
-            protocolConfig.protocolInitData,
-            (address, address, uint24)
-        );
-        assertEq(
-            address(
-                RocketpoolDepositor(payable(address(_strategy))).rocketStorage()
-            ),
-            protocolConfig.registry
-        );
-        assertEq(
-            address(RocketpoolDepositor(payable(address(_strategy))).WETH()),
-            _weth
-        );
-        assertEq(
-            address(
-                RocketpoolDepositor(payable(address(_strategy))).uniRouter()
-            ),
-            _uniRouter
-        );
-        assertEq(
-            uint24(
-                RocketpoolDepositor(payable(address(_strategy))).uniSwapFee()
-            ),
-            _uniSwapFee
-        );
 
         // Verify Allowances
         assertEq(
-            rETH.allowance(address(_strategy), address(_uniRouter)),
+            rETH.allowance(address(_strategy), RocketpoolAdapter(payable(address(_strategy))).uniRouter()),
             type(uint256).max,
             "allowance"
         );
@@ -140,56 +102,7 @@ contract RocketpoolDepositorTest is BaseStrategyTest {
                 RocketpoolAdapter.LpTokenNotSupported.selector
             )
         );
-        _strategy.initialize(adapterConfig, protocolConfig);
-
-        // Reset faulty Config
-        adapterConfig.useLpToken = false;
-
-        // ----------------------------------------------------------------------
-        // EXPECT ERROR - InvalidAddress (rocketDepositPoolAddress == address(0))
-
-        // Set faulty Config
-        vm.mockCall(
-            address(rocketStorage),
-            abi.encodeWithSelector(
-                RocketStorageInterface.getAddress.selector,
-                keccak256(
-                    abi.encodePacked("contract.address", "rocketDepositPool")
-                )
-            ),
-            abi.encode(address(0))
-        );
-
-        vm.expectRevert(
-            abi.encodeWithSelector(RocketpoolAdapter.InvalidAddress.selector)
-        );
-        _strategy.initialize(adapterConfig, protocolConfig);
-
-        // Reset faulty Config
-        vm.clearMockedCalls();
-
-        // ----------------------------------------------------------------------
-        // EXPECT ERROR - InvalidAddress (rocketTokenRETHAddress == address(0))
-
-        // Set faulty Config
-        vm.mockCall(
-            address(rocketStorage),
-            abi.encodeWithSelector(
-                RocketStorageInterface.getAddress.selector,
-                keccak256(
-                    abi.encodePacked("contract.address", "rocketTokenRETH")
-                )
-            ),
-            abi.encode(address(0))
-        );
-
-        vm.expectRevert(
-            abi.encodeWithSelector(RocketpoolAdapter.InvalidAddress.selector)
-        );
-        _strategy.initialize(adapterConfig, protocolConfig);
-
-        // Reset faulty Config
-        vm.clearMockedCalls();
+        _strategy.initialize(adapterConfig);
 
         vm.stopPrank();
     }
@@ -218,17 +131,17 @@ contract RocketpoolDepositorTest is BaseStrategyTest {
             rETH.getEthValue(rETH.balanceOf(address(strategy)))
         );
 
-        address rocketNetworkBalances = RocketStorageInterface(0x1d8f8f00cfa6758d7bE78336684788Fb0ee0Fa46)
+        address rocketNetworkBalances = IRocketStorage(0x1d8f8f00cfa6758d7bE78336684788Fb0ee0Fa46)
             .getAddress(keccak256(abi.encodePacked("contract.address", "rocketNetworkBalances"))
         );
 
-        uint256 initialTotalEthBalance = RocketNetworkBalancesInterface(rocketNetworkBalances).getTotalETHBalance();
+        uint256 initialTotalEthBalance = IRocketNetworkBalances(rocketNetworkBalances).getTotalETHBalance();
 
         // Increase TotalAssets
         vm.mockCall(
             rocketNetworkBalances,
             abi.encodeWithSelector(
-                RocketNetworkBalancesInterface.getTotalETHBalance.selector
+                IRocketNetworkBalances.getTotalETHBalance.selector
             ),
             abi.encode(initialTotalEthBalance * 100)
         );

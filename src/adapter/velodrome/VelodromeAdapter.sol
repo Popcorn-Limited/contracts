@@ -3,9 +3,10 @@
 
 pragma solidity ^0.8.15;
 import {IGauge, ILpToken} from "./IVelodrome.sol";
-import {BaseAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../../base/BaseAdapter.sol";
+import {BaseAdapter, IERC20, AdapterConfig} from "../../base/BaseAdapter.sol";
 import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
+import {IPermissionRegistry} from "../../base/interfaces/IPermissionRegistry.sol";
 
 contract VelodromeAdapter is BaseAdapter {
     using Math for uint256;
@@ -15,20 +16,23 @@ contract VelodromeAdapter is BaseAdapter {
     IGauge public gauge;
 
     error InvalidAsset();
-    error AssetMismatch();
+    error InvalidGauge();
     error LpTokenSupported();
 
     function __VelodromeAdapter_init(
-        AdapterConfig memory _adapterConfig,
-        ProtocolConfig memory _protocolConfig
+        AdapterConfig memory _adapterConfig
     ) internal onlyInitializing {
         if (!_adapterConfig.useLpToken) revert LpTokenSupported();
         __BaseAdapter_init(_adapterConfig);
 
-        address _gauge = abi.decode(
-            _protocolConfig.protocolInitData,
-            (address)
+        (address permissionRegistry, address _gauge) = abi.decode(
+            _adapterConfig.protocolData,
+            (address, address)
         );
+
+        if (!IPermissionRegistry(permissionRegistry).endorsed(_gauge)) {
+            revert InvalidGauge();
+        }
 
         gauge = IGauge(_gauge);
         if (gauge.stake() != address(lpToken)) revert InvalidAsset();
@@ -49,6 +53,10 @@ contract VelodromeAdapter is BaseAdapter {
         return gauge.balanceOf(address(this));
     }
 
+    function _totalUnderlying() internal pure override returns (uint) {
+        revert("NO");
+    }
+
     /*//////////////////////////////////////////////////////////////
                             DEPOSIT LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -64,7 +72,11 @@ contract VelodromeAdapter is BaseAdapter {
      * depositing others might use the lpToken directly
      **/
     function _depositLP(uint256 amount) internal override {
-        gauge.deposit(amount, 0);
+        gauge.deposit(amount);
+    }
+
+    function _depositUnderlying(uint) internal pure override {
+        revert("NO");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -84,6 +96,10 @@ contract VelodromeAdapter is BaseAdapter {
         gauge.withdraw(amount);
     }
 
+    function _withdrawUnderlying(uint) internal pure override {
+        revert("NO");
+    }
+
     /*//////////////////////////////////////////////////////////////
                             CLAIM LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -91,31 +107,7 @@ contract VelodromeAdapter is BaseAdapter {
     /**
      * @notice Claims rewards
      */
-    function claim() public returns (bool success) {
-        try gauge.getReward(address(this), _getRewardTokens()) {
-            success = true;
-        } catch {}
-    }
-
-    /**
-     * @notice Gets all the reward tokens for a protocol
-     * @dev This function converts all reward token types from IERC20[] to address[]
-     **/
-    function _getRewardTokens()
-        internal
-        view
-        virtual
-        returns (address[] memory)
-    {
-        uint256 len = rewardTokens.length;
-        address[] memory _rewardTokens = new address[](len);
-        for (uint256 i = 0; i < len; ) {
-            _rewardTokens[i] = address(rewardTokens[i]);
-            unchecked {
-                i++;
-            }
-        }
-
-        return _rewardTokens;
+    function _claim() internal override {
+        try gauge.getReward(address(this)) {} catch {}
     }
 }

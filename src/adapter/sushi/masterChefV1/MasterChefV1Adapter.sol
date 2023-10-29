@@ -4,17 +4,14 @@
 pragma solidity ^0.8.15;
 
 import {IMasterChefV1} from "./IMasterChefV1.sol";
-import {BaseAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../../../base/BaseAdapter.sol";
+import {BaseAdapter, IERC20, AdapterConfig} from "../../../base/BaseAdapter.sol";
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
 contract MasterChefV1Adapter is BaseAdapter {
     using SafeERC20 for IERC20;
 
     // @notice The MasterChef contract
-    IMasterChefV1 public masterChef;
-
-    // @notice The address of the reward token
-    address public rewardsToken;
+    IMasterChefV1 public masterChef = IMasterChefV1(0xc2EdaD668740f1aA35E4D8f227fB8E17dcA888Cd);
 
     // @notice The pool ID
     uint256 public pid;
@@ -23,20 +20,17 @@ contract MasterChefV1Adapter is BaseAdapter {
     error LpTokenSupported();
 
     function __MasterChefV1Adapter_init(
-        AdapterConfig memory _adapterConfig,
-        ProtocolConfig memory _protocolConfig
+        AdapterConfig memory _adapterConfig
     ) internal onlyInitializing {
         if (!_adapterConfig.useLpToken) revert LpTokenSupported();
         __BaseAdapter_init(_adapterConfig);
 
-        (uint256 _pid, address _rewardsToken) = abi.decode(
-            _protocolConfig.protocolInitData,
-            (uint256, address)
+        (uint256 _pid) = abi.decode(
+            _adapterConfig.protocolData,
+            (uint256)
         );
 
         pid = _pid;
-        rewardsToken = _rewardsToken;
-        masterChef = IMasterChefV1(_protocolConfig.registry);
         IMasterChefV1.PoolInfo memory pool = masterChef.poolInfo(_pid);
 
         if (pool.lpToken != address(lpToken)) revert InvalidAsset();
@@ -59,6 +53,10 @@ contract MasterChefV1Adapter is BaseAdapter {
         return user.amount;
     }
 
+    function _totalUnderlying() internal pure override returns (uint) {
+        revert("NO");
+    }
+
     /*//////////////////////////////////////////////////////////////
                             DEPOSIT LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -68,12 +66,12 @@ contract MasterChefV1Adapter is BaseAdapter {
         _depositLP(amount);
     }
 
-    /**
-     * @notice Deposits underlying asset and converts it if necessary into an lpToken before depositing
-     * @dev This function must be overriden. Some farms require the user to into an lpToken before depositing others might use the underlying directly
-     **/
     function _depositLP(uint256 amount) internal override {
         masterChef.deposit(pid, amount);
+    }
+
+    function _depositUnderlying(uint) internal pure override {
+        revert("NO");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -91,6 +89,10 @@ contract MasterChefV1Adapter is BaseAdapter {
      **/
     function _withdrawLP(uint256 amount) internal override {
         masterChef.withdraw(pid, amount);
+    }
+
+    function _withdrawUnderlying(uint) internal pure override {
+        revert("NO");
     }
 
     /*//////////////////////////////////////////////////////////////

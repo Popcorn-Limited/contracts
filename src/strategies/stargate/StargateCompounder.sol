@@ -3,21 +3,20 @@
 
 pragma solidity ^0.8.15;
 
-import {StargateAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../../adapter/stargate/StargateAdapter.sol";
+import {StargateAdapter, IERC20, AdapterConfig} from "../../adapter/stargate/StargateAdapter.sol";
 import {CurveCompounder, CurveRoute, HarvestConfig, CompounderConfig} from "../../helper/CurveCompounder.sol";
 
 contract StargateCompounder is StargateAdapter, CurveCompounder {
     
     function initialize(
         AdapterConfig memory _adapterConfig,
-        ProtocolConfig memory _protocolConfig,
         HarvestConfig memory _harvestConfig,
         CompounderConfig memory _compounderConfig,
         address _router,
         CurveRoute[] memory _toBaseAssetRoutes,
         CurveRoute memory _toAssetRoute
     ) external initializer {
-        __StargateAdapter_init(_adapterConfig, _protocolConfig);
+        __StargateAdapter_init(_adapterConfig);
         __CurveCompounder_init(
             _harvestConfig,
             _compounderConfig,

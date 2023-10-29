@@ -3,24 +3,12 @@
 
 pragma solidity ^0.8.15;
 
-import {AdapterConfig, ProtocolConfig, RocketpoolAdapter} from "../../adapter/rocketpool/RocketpoolAdapter.sol";
+import {AdapterConfig, RocketpoolAdapter} from "../../adapter/rocketpool/RocketpoolAdapter.sol";
 
 contract RocketpoolDepositor is RocketpoolAdapter {
     function initialize(
-        AdapterConfig memory _adapterConfig,
-        ProtocolConfig memory _protocolConfig
+        AdapterConfig memory _adapterConfig
     ) external initializer {
-        __RocketpoolAdapter_init(_adapterConfig, _protocolConfig);
-    }
-
-    function deposit(uint256 amount) external override onlyVault whenNotPaused {
-        _deposit(amount, msg.sender);
-    }
-
-    function withdraw(
-        uint256 amount,
-        address receiver
-    ) external override onlyVault {
-        _withdraw(amount, receiver);
+        __RocketpoolAdapter_init(_adapterConfig);
     }
 }

@@ -4,18 +4,18 @@
 pragma solidity ^0.8.15;
 
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
-import {BaseAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../../base/BaseAdapter.sol";
+import {BaseAdapter, IERC20, AdapterConfig} from "../../base/BaseAdapter.sol";
 import {ISToken, IStargateStaking, IStargateRouter} from "./IStargate.sol";
 
 contract StargateAdapter is BaseAdapter {
     using SafeERC20 for IERC20;
 
-    uint256 internal stakingPid;
-
     /// @notice The Stargate LpStaking contract
-    IStargateStaking internal stargateStaking;
+    IStargateStaking internal constant stargateStaking = IStargateStaking(0xB0D502E938ed5f4df2E681fE6E419ff29631d62b);
+    IStargateRouter internal constant stargateRouter = IStargateRouter(0x8731d54E9D02c286767d56ac03e8037C07e01e98);
+
+    uint256 internal stakingPid;
     ISToken internal sToken;
-    IStargateRouter internal stargateRouter;
 
     // TODO add fallback for eth
 
@@ -23,22 +23,19 @@ contract StargateAdapter is BaseAdapter {
     error DifferentAssets();
 
     function __StargateAdapter_init(
-        AdapterConfig memory _adapterConfig,
-        ProtocolConfig memory _protocolConfig
+        AdapterConfig memory _adapterConfig
     ) internal onlyInitializing {
         __BaseAdapter_init(_adapterConfig);
 
-        (uint256 _stakingPid, address _stargateRouter) = abi.decode(
-            _protocolConfig.protocolInitData,
-            (uint256, address)
+        (uint256 _stakingPid) = abi.decode(
+            _adapterConfig.protocolData,
+            (uint256)
         );
 
-        stargateStaking = IStargateStaking(_protocolConfig.registry);
         if (_stakingPid >= stargateStaking.poolLength())
             revert StakingIdOutOfBounds();
 
         stakingPid = _stakingPid;
-        stargateRouter = IStargateRouter(_stargateRouter);
 
         (address _sToken, , , ) = stargateStaking.poolInfo(_stakingPid);
         if (_sToken != address(_adapterConfig.lpToken)) revert DifferentAssets();
@@ -46,7 +43,7 @@ contract StargateAdapter is BaseAdapter {
         sToken = ISToken(_sToken);
 
         _adapterConfig.lpToken.approve(address(stargateStaking), type(uint256).max);
-        _adapterConfig.underlying.approve(_stargateRouter, type(uint256).max);
+        _adapterConfig.underlying.approve(address(stargateRouter), type(uint256).max);
     }
 
     /*//////////////////////////////////////////////////////////////

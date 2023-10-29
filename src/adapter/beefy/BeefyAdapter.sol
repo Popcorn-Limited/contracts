@@ -5,7 +5,7 @@ pragma solidity ^0.8.15;
 
 import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
-import {BaseAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../../base/BaseAdapter.sol";
+import {BaseAdapter, IERC20, AdapterConfig} from "../../base/BaseAdapter.sol";
 import {IBeefyVault, IBeefyBooster, IBeefyBalanceCheck, IBeefyStrat} from "./IBeefy.sol";
 
 contract BeefyAdapter is BaseAdapter {
@@ -24,15 +24,14 @@ contract BeefyAdapter is BaseAdapter {
     error LpTokenNotSupported();
 
     function __BeefyAdapter_init(
-        AdapterConfig memory _adapterConfig,
-        ProtocolConfig memory _protocolConfig
+        AdapterConfig memory _adapterConfig
     ) internal onlyInitializing {
         if (_adapterConfig.useLpToken) revert LpTokenNotSupported();
 
         __BaseAdapter_init(_adapterConfig);
 
         (address _beefyVault, address _beefyBooster) = abi.decode(
-            _protocolConfig.protocolInitData,
+            _adapterConfig.protocolData,
             (address, address)
         );
 
@@ -88,6 +87,10 @@ contract BeefyAdapter is BaseAdapter {
         return assets;
     }
 
+    function _totalLP() internal pure override returns (uint) {
+        revert("NO");
+    }
+
     /*//////////////////////////////////////////////////////////////
                             DEPOSIT LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -107,6 +110,10 @@ contract BeefyAdapter is BaseAdapter {
             beefyBooster.stake(beefyVault.balanceOf(address(this)));
     }
 
+    function _depositLP(uint) internal pure override {
+        revert("NO");
+    }
+
     /*//////////////////////////////////////////////////////////////
                             WITHDRAWAL LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -123,6 +130,10 @@ contract BeefyAdapter is BaseAdapter {
     function _withdrawUnderlying(uint256 amount) internal override {
         if (address(beefyBooster) != address(0)) beefyBooster.withdraw(amount);
         beefyVault.withdraw(amount);
+    }
+
+    function _withdrawLP(uint) internal pure override {
+        revert("NO");
     }
 
     /*//////////////////////////////////////////////////////////////

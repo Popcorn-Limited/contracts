@@ -15,7 +15,7 @@ import { IVaultRegistry } from "../../src/base/interfaces/IVaultRegistry.sol";
 import { TemplateRegistry } from "../../src/TemplateRegistry.sol";
 import { ITemplateRegistry } from "../../src/base/interfaces/ITemplateRegistry.sol";
 import { SingleStrategyVault } from "../../src/vaults/SingleStrategyVault.sol";
-import { AdapterConfig, ProtocolConfig } from "../../src/base/interfaces/IBaseAdapter.sol";
+import { AdapterConfig } from "../../src/base/interfaces/IBaseAdapter.sol";
 
 contract SingleStrategyVaultFactoryTest is Test {
 
@@ -171,16 +171,12 @@ contract SingleStrategyVaultFactoryTest is Test {
             lpToken: IERC20(address(0)),
             useLpToken: false,
             rewardTokens: rewardTokens,
-            owner: address(this)
-        });
-
-        ProtocolConfig memory protocolConfig = ProtocolConfig({
-            registry: address(0),
-            protocolInitData: ""
+            owner: address(this),
+            protocolData: ""
         });
 
         address adapterAddress = Clones.clone(adapterImplementation);
-        MockStrategyV2(adapterAddress).__MockAdapter_init(adapterConfig, protocolConfig);
+        MockStrategyV2(adapterAddress).__MockAdapter_init(adapterConfig);
         return adapterAddress;
     }
 

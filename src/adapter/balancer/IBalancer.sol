@@ -27,6 +27,6 @@ interface IMinter {
     function getGaugeController() external view returns (address);
 }
 
-interface IController {
+interface IGaugeController {
     function gauge_exists(address _gauge) external view returns (bool);
 }

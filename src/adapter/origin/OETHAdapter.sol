@@ -3,36 +3,30 @@
 
 pragma solidity ^0.8.15;
 
-import {BaseAdapter, IERC20, AdapterConfig, ProtocolConfig, IERC4626} from "../../base/BaseAdapter.sol";
+import {BaseAdapter, IERC20, AdapterConfig, IERC4626} from "../../base/BaseAdapter.sol";
 import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
-contract OriginAdapter is BaseAdapter {
+contract OETHAdapter is BaseAdapter {
     using SafeERC20 for IERC20;
     using Math for uint256;
 
     /// @notice The wrapped oToken contract.
-    IERC4626 public wAsset;
+    IERC4626 public constant wOETH = IERC4626(0xDcEe70654261AF21C44c093C300eD3Bb97b78192);
 
     error InvalidAsset();
     error LpTokenNotSupported();
 
     function __OriginAdapter_init(
-        AdapterConfig memory _adapterConfig,
-        ProtocolConfig memory _protocolConfig
+        AdapterConfig memory _adapterConfig
     ) internal onlyInitializing {
         if (_adapterConfig.useLpToken) revert LpTokenNotSupported();
         __BaseAdapter_init(_adapterConfig);
 
-        address _wAsset = abi.decode(
-            _protocolConfig.protocolInitData,
-            (address)
-        );
-
-        if (IERC4626(_wAsset).asset() != address(underlying))
+        if (wOETH.asset() != address(underlying))
             revert InvalidAsset();
 
-        _adapterConfig.underlying.approve(_wAsset, type(uint256).max);
+        _adapterConfig.underlying.approve(address(wOETH), type(uint256).max);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -44,7 +38,11 @@ contract OriginAdapter is BaseAdapter {
      * @dev This function must be overriden. If the farm requires the usage of lpToken than this function must convert lpToken balance into underlying balance
      */
     function _totalUnderlying() internal view override returns (uint256) {
-        return wAsset.convertToAssets(wAsset.balanceOf(address(this)));
+        return wOETH.convertToAssets(wOETH.balanceOf(address(this)));
+    }
+
+    function _totalLP() internal pure override returns (uint) {
+        revert("NO");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -61,7 +59,11 @@ contract OriginAdapter is BaseAdapter {
      * @dev This function must be overriden. Some farms require the user to into an lpToken before depositing others might use the underlying directly
      **/
     function _depositUnderlying(uint256 amount) internal override {
-        wAsset.deposit(amount, address(this));
+        wOETH.deposit(amount, address(this));
+    }
+
+    function _depositLP(uint) internal pure override {
+        revert("NO");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -78,6 +80,12 @@ contract OriginAdapter is BaseAdapter {
      * @dev This function must be overriden. Some farms require the user to into an lpToken before depositing others might use the underlying directly
      **/
     function _withdrawUnderlying(uint256 amount) internal override {
-        wAsset.withdraw(amount, address(this), address(this));
+        wOETH.withdraw(amount, address(this), address(this));
     }
+
+    function _withdrawLP(uint) internal pure override {
+        revert("NO");
+    }
+
+    function _claim() internal pure override {}
 }

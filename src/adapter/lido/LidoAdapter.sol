@@ -3,7 +3,7 @@
 
 pragma solidity ^0.8.15;
 
-import {BaseAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../../base/BaseAdapter.sol";
+import {BaseAdapter, IERC20, AdapterConfig} from "../../base/BaseAdapter.sol";
 import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
@@ -21,44 +21,49 @@ contract LidoAdapter is BaseAdapter {
 
     uint256 public slippage; // 1e18 = 100% slippage, 1e14 = 1 BPS slippage
 
-    /// @notice The poolId inside Convex booster for relevant Curve lpToken.
-    uint256 public pid;
+    // TODO: instead of swapping stETH for ETH and sending that to the user we could also
+    // just let them withdraw stETH
+    // 
+    // - even if stETH depegs from ETH, the amount of funds the user will receive in that scenario doesn't change.
+    //   Whether they get 1 stETH worth 0.8 ETH or just 0.8 ETH directly is the same thing.
+    // 
+    // But, we reduce gas costs for the strategy since we don't have to execute the expensive Curve swap.
+    //
+    // If the user wants to receive ETH, we let them do that through the frontend. That way we can handle the slippage
+    // better as well.
+    // 
+    // Another possibility would be to initiate a withdrawal and send the user the ERc721 withdrawal receipt
+    // https://docs.lido.fi/guides/lido-tokens-integration-guide/#withdrawals-unsteth
+    // Although I think that's the worst solution from a UX standpoint    
+    //
 
-    /// @notice The booster address for Convex
-    ILido public lido;
+    ILido public constant lido = ILido(0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84);
 
     // address public immutable weth;
-    IWETH public weth;
+    IWETH public constant weth = IWETH(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
 
     error LpTokenNotSupported();
 
     function __LidoAdapter_init(
-        AdapterConfig memory _adapterConfig,
-        ProtocolConfig memory _protocolConfig
+        AdapterConfig memory _adapterConfig
     ) internal onlyInitializing {
         if (_adapterConfig.useLpToken) revert LpTokenNotSupported();
         __BaseAdapter_init(_adapterConfig);
 
-        (uint256 _slippage, uint256 _pid, address _lidoAddress) = abi.decode(
-            _protocolConfig.protocolInitData,
-            (uint256, uint256, address)
+        (uint256 _slippage) = abi.decode(
+            _adapterConfig.protocolData,
+            (uint256)
         );
 
-        pid = _pid;
         slippage = _slippage;
-        lido = ILido(ILido(_lidoAddress).token());
-        weth = IWETH(ILido(_lidoAddress).weth());
 
         IERC20(address(lido)).approve(
             address(StableSwapSTETH),
             type(uint256).max
         );
 
-        _adapterConfig.underlying.approve(
-            address(StableSwapSTETH),
-            type(uint256).max
-        );
-        _adapterConfig.underlying.approve(address(lido), type(uint256).max);
+        // we send raw ETH to both the Lido stETH and the Curve pool so we don't have to
+        // execute any other approvals here
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -72,6 +77,10 @@ contract LidoAdapter is BaseAdapter {
     function _totalUnderlying() internal view override returns (uint256) {
         uint256 assets = lido.balanceOf(address(this));
         return assets - assets.mulDiv(slippage, 1e18, Math.Rounding.Up);
+    }
+
+    function _totalLP() internal pure override returns (uint) {
+        revert("NO");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -90,6 +99,10 @@ contract LidoAdapter is BaseAdapter {
     function _depositUnderlying(uint256 amount) internal override {
         weth.withdraw(amount); // Grab native Eth from Weth contract
         lido.submit{value: amount}(FEE_RECIPIENT); // Submit to Lido Contract
+    }
+
+    function _depositLP(uint) internal pure override {
+        revert("NO");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -115,6 +128,10 @@ contract LidoAdapter is BaseAdapter {
         weth.deposit{value: amountRecieved}(); // get wrapped eth back
     }
 
+    function _withdrawLP(uint) internal pure override {
+        revert("NO");
+    }
+
     function convertToUnderlyingShares(
         uint256 shares
     ) public view returns (uint256) {
@@ -130,4 +147,6 @@ contract LidoAdapter is BaseAdapter {
     }
 
     receive() external payable {}
+
+    function _claim() internal pure override {}
 }

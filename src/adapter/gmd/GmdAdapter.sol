@@ -3,7 +3,7 @@
 
 pragma solidity ^0.8.15;
 import "./IGmdVault.sol";
-import {BaseAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../../base/BaseAdapter.sol";
+import {BaseAdapter, IERC20, AdapterConfig} from "../../base/BaseAdapter.sol";
 import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
@@ -12,7 +12,7 @@ contract GmdAdapter is BaseAdapter {
     using SafeERC20 for IERC20;
 
     uint256 public poolId;
-    IGmdVault public gmdVault;
+    IGmdVault public constant gmdVault = IGmdVault(0x8080B5cE6dfb49a6B86370d6982B3e2A86FBBb08);
     IERC20 public receiptToken;
 
     error LpTokenSupported();
@@ -21,14 +21,12 @@ contract GmdAdapter is BaseAdapter {
     error AssetMismatch(uint poolId, address asset, address lpToken);
 
     function __GmdAdapter_init(
-        AdapterConfig memory _adapterConfig,
-        ProtocolConfig memory _protocolConfig
+        AdapterConfig memory _adapterConfig
     ) internal onlyInitializing {
         if (!_adapterConfig.useLpToken) revert LpTokenSupported();
         __BaseAdapter_init(_adapterConfig);
 
-        gmdVault = IGmdVault(_protocolConfig.registry);
-        poolId = abi.decode(_protocolConfig.protocolInitData, (uint256));
+        poolId = abi.decode(_adapterConfig.protocolData, (uint256));
 
         IGmdVault.PoolInfo memory poolInfo = gmdVault.poolInfo(poolId);
         receiptToken = IERC20(poolInfo.GDlptoken);
@@ -66,6 +64,10 @@ contract GmdAdapter is BaseAdapter {
         return asset.mulDiv(1e6, 1e18, Math.Rounding.Down);
     }
 
+    function _totalUnderlying() internal pure override returns (uint) {
+        revert("NO");
+    }
+
     /*//////////////////////////////////////////////////////////////
                             DEPOSIT LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -73,6 +75,10 @@ contract GmdAdapter is BaseAdapter {
     function _deposit(uint256 amount, address caller) internal override {
         lpToken.safeTransferFrom(caller, address(this), amount);
         _depositLP(amount);
+    }
+
+    function _depositUnderlying(uint) internal pure override {
+        revert("NO");
     }
 
     /**
@@ -109,6 +115,10 @@ contract GmdAdapter is BaseAdapter {
         gmdVault.leave(convertToUnderlyingShares(amount), poolId);
     }
 
+    function _withdrawUnderlying(uint) internal pure override {
+        revert("NO");
+    }
+
     function convertToUnderlyingShares(
         uint256 shares
     ) public view returns (uint256) {
@@ -123,4 +133,6 @@ contract GmdAdapter is BaseAdapter {
                     Math.Rounding.Up
                 );
     }
+
+    function _claim() internal override {}
 }

@@ -4,7 +4,7 @@
 pragma solidity ^0.8.15;
 
 import {IAlpacaLendV1Vault} from "./IAlpacaLendV1.sol";
-import {BaseAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../../../base/BaseAdapter.sol";
+import {BaseAdapter, IERC20, AdapterConfig} from "../../../base/BaseAdapter.sol";
 import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
@@ -20,16 +20,17 @@ contract AlpacaLendV1Adapter is BaseAdapter {
     error LpTokenNotSupported();
 
     function __AlpacaLendV1Adapter_init(
-        AdapterConfig memory _adapterConfig,
-        ProtocolConfig memory _protocolConfig
+        AdapterConfig memory _adapterConfig
     ) internal onlyInitializing {
         if (_adapterConfig.useLpToken) revert LpTokenNotSupported();
         __BaseAdapter_init(_adapterConfig);
 
         address _vault = abi.decode(
-            _protocolConfig.protocolInitData,
+            _adapterConfig.protocolData,
             (address)
         );
+
+        // TODO: add permission registry to verify vault is valid
 
         alpacaVault = IAlpacaLendV1Vault(_vault);
 
@@ -55,6 +56,10 @@ contract AlpacaLendV1Adapter is BaseAdapter {
             alpacaVault.totalSupply();
     }
 
+    function _totalLP() internal pure override returns (uint) {
+        revert("NO");
+    }
+
     /*//////////////////////////////////////////////////////////////
                             DEPOSIT LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -70,6 +75,10 @@ contract AlpacaLendV1Adapter is BaseAdapter {
      **/
     function _depositUnderlying(uint256 amount) internal override {
         alpacaVault.deposit(amount);
+    }
+
+    function _depositLP(uint) internal pure override {
+        revert("NO");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -89,6 +98,10 @@ contract AlpacaLendV1Adapter is BaseAdapter {
         alpacaVault.withdraw(convertToUnderlyingShares(0, amount));
     }
 
+    function _withdrawLP(uint) internal pure override {
+        revert("NO");
+    }
+
     /// @notice The amount of alapacaV1 shares to withdraw given an mount of adapter shares
     function convertToUnderlyingShares(
         uint256,
@@ -101,4 +114,7 @@ contract AlpacaLendV1Adapter is BaseAdapter {
                 Math.Rounding.Up
             );
     }
+
+    /// @dev no rewards on alpacalend v1
+    function _claim() internal pure override {}
 }

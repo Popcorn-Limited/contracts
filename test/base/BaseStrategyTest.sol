@@ -13,7 +13,7 @@ import {
     IERC20Upgradeable as IERC20,
     IERC20MetadataUpgradeable as IERC20Metadata
 } from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
-import {AdapterConfig, ProtocolConfig, IBaseAdapter} from "../../src/base/interfaces/IBaseAdapter.sol";
+import {AdapterConfig, IBaseAdapter} from "../../src/base/interfaces/IBaseAdapter.sol";
 
 abstract contract BaseStrategyTest is Test {
     using Math for uint256;

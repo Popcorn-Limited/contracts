@@ -3,7 +3,7 @@
 
 pragma solidity ^0.8.15;
 import {
-    AdapterConfig, ProtocolConfig
+    AdapterConfig
 } from "../../src/base/BaseAdapter.sol";
 import { Test } from "forge-std/Test.sol";
 import { MockERC20 } from "../utils/mocks/MockERC20.sol";
