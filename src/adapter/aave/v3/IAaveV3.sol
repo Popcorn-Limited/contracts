@@ -42,11 +42,37 @@ interface ILendingPool {
     uint16 referralCode
   ) external;
 
+  function borrow(
+    address asset,
+    uint256 amount,
+    uint256 interestRateMode,
+    uint16 referralCode,
+    address onBehalfOf
+  ) external;
+
+  function repay(
+    address asset,
+    uint256 amount,
+    uint256 rateMode,
+    address onBehalfOf
+  ) external;
+
   function withdraw(
     address asset,
     uint256 amount,
     address to
   ) external returns (uint256);
+
+  function getUserAccountData(
+    address user
+  ) external view returns (
+    uint256 totalCollateralBase,
+    uint256 totalDebtBase,
+    uint256 availableBorrowsBase,
+    uint256 currentLiquidationThreshold,
+    uint256 ltv,
+    uint256 healthFactor
+  );
 }
 
 // Aave protocol data provider
@@ -59,4 +85,18 @@ interface IProtocolDataProvider {
       address stableDebtTokenAddress,
       address variableDebtTokenAddress
     );
+}
+
+interface IPoolAddressProvider {
+  function getPriceOracle()
+  external
+  view
+  returns (address);
+}
+
+interface IProtocolOracle {
+  function getAssetPrice(address asset)
+  external
+  view
+  returns(uint256);
 }

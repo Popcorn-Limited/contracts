@@ -2,13 +2,16 @@
 // Docgen-SOLC: 0.8.15
 
 pragma solidity ^0.8.15;
-
+import {ERC20} from "openzeppelin-contracts/token/ERC20/ERC20.sol";
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import {BaseAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../../../base/BaseAdapter.sol";
-import {ILendingPool, IAaveIncentives, IAToken, IProtocolDataProvider} from "./IAaveV3.sol";
+import {ILendingPool, IAaveIncentives, IAToken, IProtocolDataProvider, IPoolAddressProvider, IProtocolOracle} from "./IAaveV3.sol";
 
 contract AaveV3Adapter is BaseAdapter {
     using SafeERC20 for IERC20;
+
+    /// @notice leveraged borrow buffer
+    uint public constant LEVERAGED_BORROW_BUFFER = 10; //wei
 
     /// @notice The Aave aToken contract
     IAToken public aToken;
@@ -20,6 +23,9 @@ contract AaveV3Adapter is BaseAdapter {
     ILendingPool public constant lendingPool = ILendingPool(0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2);
 
     IProtocolDataProvider public constant dataProvider = IProtocolDataProvider(0x7B4EB56E7CD4b454BA8ff71E4518426369a138a3);
+
+    IPoolAddressProvider public constant poolAddressProvider = IPoolAddressProvider(0x7B4EB56E7CD4b454BA8ff71E4518426369a138a3);
+
 
     error LpTokenNotSupported();
 
@@ -106,4 +112,49 @@ contract AaveV3Adapter is BaseAdapter {
             aaveIncentives.claimAllRewardsToSelf(_assets) returns (address[] memory, uint[] memory)
         {} catch {}
     }
+
+    /*//////////////////////////////////////////////////////////////
+                            BORROW LOGIC
+    //////////////////////////////////////////////////////////////*/
+    uint256 private constant USE_VARIABLE_DEBT = 2;
+
+    function _borrow(uint256 amount) internal  {
+        lendingPool.borrow(
+            address(underlying),
+            amount,
+            USE_VARIABLE_DEBT,
+            0,
+            address(this)
+        );
+    }
+
+    function _repayBorrow(uint256 amount) internal {
+        lendingPool.repay(
+            address(underlying),
+            amount,
+            USE_VARIABLE_DEBT,
+            address(this)
+        );
+    }
+
+    function _getAvailableBorrow(address user) internal view returns (uint256) {
+        (, , uint256 availableBorrowsBase, , , ) = lendingPool.getUserAccountData(user);
+        return (availableBorrowsBase * (10**ERC20(address(underlying)).decimals())) / _getAssetPrice();
+    }
+
+    function _getTotalDebt(address user) internal view returns (uint256) {
+        (, uint256 totalDebtBase, , , , ) = lendingPool.getUserAccountData(user);
+        return (totalDebtBase * (10**ERC20(address(underlying)).decimals())) / _getAssetPrice();
+    }
+
+    function _getAssetPrice() internal view returns (uint256) {
+        return IProtocolOracle(
+            poolAddressProvider.getPriceOracle()
+        ).getAssetPrice(address(underlying));
+    }
+
+    function _getUnderlyingBalance() internal view returns(uint256) {
+        return underlying.balanceOf(address(this));
+    }
+
 }
