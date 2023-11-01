@@ -66,22 +66,16 @@ contract BeefyAdapter is BaseAdapter {
      * @dev This function must be overriden. If the farm requires the usage of lpToken than this function must convert lpToken balance into underlying balance
      */
     function _totalUnderlying() internal view override returns (uint256) {
-        IBeefyStrat strat = IBeefyStrat(beefyVault.strategy());
+        uint beefyFee = _getBeefyWithdrawalFee();
 
-        uint256 beefyFee;
-        try strat.withdrawalFee() returns (uint256 _beefyFee) {
-            beefyFee = _beefyFee;
-        } catch {
-            beefyFee = strat.withdrawFee();
-        }
         uint256 assets = beefyBalanceCheck.balanceOf(address(this)).mulDiv(
             beefyVault.balance(),
             beefyVault.totalSupply(),
             Math.Rounding.Down
         );
         assets = assets.mulDiv(
-            BPS_DENOMINATOR,
             BPS_DENOMINATOR - beefyFee,
+            BPS_DENOMINATOR,
             Math.Rounding.Down
         );
         return assets;
@@ -89,6 +83,21 @@ contract BeefyAdapter is BaseAdapter {
 
     function _totalLP() internal pure override returns (uint) {
         revert("NO");
+    }
+
+    // converts assets to beefy vault shares
+    function _convertAssetsToShares(uint assets) internal view returns (uint) {
+       return assets.mulDiv(1e18, beefyVault.getPricePerFullShare());
+    }
+
+    function _getBeefyWithdrawalFee() internal view returns (uint fee) {
+        IBeefyStrat strat = IBeefyStrat(beefyVault.strategy());
+
+        try strat.withdrawalFee() returns (uint256 _beefyFee) {
+            fee = _beefyFee;
+        } catch {
+            fee = strat.withdrawFee();
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -128,8 +137,12 @@ contract BeefyAdapter is BaseAdapter {
      * @dev This function must be overriden. Some farms require the user to into an lpToken before depositing others might use the underlying directly
      **/
     function _withdrawUnderlying(uint256 amount) internal override {
-        if (address(beefyBooster) != address(0)) beefyBooster.withdraw(amount);
-        beefyVault.withdraw(amount);
+        /// @dev because we want to withdraw exactly `amount` we have to take into account the fees
+        // we have to pay when caclulating the share amount we'll send to the beefy vault.
+        // uint amountWithFees = amount + amount.mulDiv(BPS_DENOMINATOR, _getBeefyWithdrawalFee());
+        uint shares = _convertAssetsToShares(amount);
+        if (address(beefyBooster) != address(0)) beefyBooster.withdraw(shares);
+        beefyVault.withdraw(shares);
     }
 
     function _withdrawLP(uint) internal pure override {

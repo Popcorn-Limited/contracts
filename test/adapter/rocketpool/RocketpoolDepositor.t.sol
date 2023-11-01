@@ -24,24 +24,20 @@ contract RocketpoolDepositorTest is BaseStrategyTest {
         _setUpBaseTest(0);
     }
 
-    function _setUpStrategy(
-        uint256 i_,
-        address owner_
-    ) internal override returns (address) {
-        address strategy = Clones.clone(address(new RocketpoolDepositor()));
-
-        AdapterConfig memory adapterConfig = RocketpoolTestConfigStorage(
-            address(testConfigStorage)
-        ).getAdapterConfig(i_);
-
-        vm.prank(owner_);
-        IBaseAdapter(strategy).initialize(adapterConfig);
-
-        return strategy;
+    function _deployTestConfigStorage() internal override {
+        testConfigStorage = ITestConfigStorage(address(new RocketpoolTestConfigStorage()));
     }
 
-    function _setUpTestStorage() internal override returns (address) {
-        return address(new RocketpoolTestConfigStorage());
+    function _setUpStrategy(
+        AdapterConfig memory adapterConfig,
+        address owner_
+    ) internal override returns (IBaseAdapter) {
+        address _strategy = Clones.clone(address(new RocketpoolDepositor()));
+
+        vm.prank(owner_);
+        IBaseAdapter(_strategy).initialize(adapterConfig);
+
+        return IBaseAdapter(_strategy);
     }
 
     /*//////////////////////////////////////////////////////////////

@@ -7,7 +7,7 @@ import {
     BalancerGaugeAdapter, IERC20, AdapterConfig
 } from "../../adapter/balancer/BalancerGaugeAdapter.sol";
 
-contract BalanceDepositor is BalancerGaugeAdapter {
+contract BalancerDepositor is BalancerGaugeAdapter {
     function initialize(
         AdapterConfig memory _adapterConfig
     ) external initializer {

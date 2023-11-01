@@ -19,6 +19,7 @@ contract BalancerGaugeAdapter is BaseAdapter {
 
     error InvalidGauge();
     error LpTokenSupported();
+    error InvalidToken();
 
     function __BalanceGaugeAdapter_init(
         AdapterConfig memory _adapterConfig
@@ -33,9 +34,12 @@ contract BalancerGaugeAdapter is BaseAdapter {
         if (!gaugeController.gauge_exists(_gauge)) {
             revert InvalidGauge();
         }
+        
+        if (IGauge(_gauge).lp_token() != address(_adapterConfig.lpToken)) revert InvalidToken();
+
         gauge = IGauge(_gauge);
 
-        _adapterConfig.underlying.approve(address(gauge), type(uint256).max);
+        _adapterConfig.lpToken.approve(address(gauge), type(uint256).max);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -59,7 +63,7 @@ contract BalancerGaugeAdapter is BaseAdapter {
     //////////////////////////////////////////////////////////////*/
 
     function _deposit(uint256 amount, address caller) internal override {
-        underlying.safeTransferFrom(caller, address(this), amount);
+        lpToken.safeTransferFrom(caller, address(this), amount);
         _depositLP(amount);
     }
 
