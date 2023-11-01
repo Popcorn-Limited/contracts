@@ -6,14 +6,14 @@ import {AdapterConfig} from "../../../src/base/interfaces/IBaseAdapter.sol";
 
 contract AuraTestConfigStorage is BaseTestConfigStorage {
     IERC20[] public rewardTokens;
-    // AURA/BAL Balancer LP Token
+    // rETH/WETH Balancer Pool LP Token
     IERC20 public constant token = IERC20(0x1E19CF2D73a72Ef1332C882F20534B6519Be0276);
     constructor() {
         _testConfigs.push(TestConfig({
             asset: token,
             depositDelta: 0,
             withdrawDelta: 0,
-            testId: "Aura BAL/AURA",
+            testId: "Aura rETH/WETH",
             network: "mainnet",
             blockNumber: 0,
             defaultAmount: 1e18,
@@ -30,7 +30,7 @@ contract AuraTestConfigStorage is BaseTestConfigStorage {
             useLpToken: true,
             rewardTokens: rewardTokens,
             owner: msg.sender,
-            protocolData: abi.encode(101)
+            protocolData: abi.encode(109)
         }));
     }
 }
