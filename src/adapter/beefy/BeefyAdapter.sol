@@ -82,12 +82,13 @@ contract BeefyAdapter is BaseAdapter {
     }
 
     function _totalLP() internal pure override returns (uint) {
+        // TODO: could return `beefyBalanceCheck.balanceOf(address(this))` here
         revert("NO");
     }
 
     // converts assets to beefy vault shares
     function _convertAssetsToShares(uint assets) internal view returns (uint) {
-       return assets.mulDiv(1e18, beefyVault.getPricePerFullShare());
+       return assets.mulDiv(1e18, beefyVault.getPricePerFullShare(), Math.Rounding.Up);
     }
 
     function _getBeefyWithdrawalFee() internal view returns (uint fee) {
@@ -139,8 +140,8 @@ contract BeefyAdapter is BaseAdapter {
     function _withdrawUnderlying(uint256 amount) internal override {
         /// @dev because we want to withdraw exactly `amount` we have to take into account the fees
         // we have to pay when caclulating the share amount we'll send to the beefy vault.
-        // uint amountWithFees = amount + amount.mulDiv(BPS_DENOMINATOR, _getBeefyWithdrawalFee());
-        uint shares = _convertAssetsToShares(amount);
+        uint amountWithFees = amount.mulDiv(BPS_DENOMINATOR, BPS_DENOMINATOR - _getBeefyWithdrawalFee(), Math.Rounding.Down);
+        uint shares = _convertAssetsToShares(amountWithFees);
         if (address(beefyBooster) != address(0)) beefyBooster.withdraw(shares);
         beefyVault.withdraw(shares);
     }
