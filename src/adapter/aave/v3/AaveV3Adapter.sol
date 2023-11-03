@@ -112,49 +112,4 @@ contract AaveV3Adapter is BaseAdapter {
             aaveIncentives.claimAllRewardsToSelf(_assets) returns (address[] memory, uint[] memory)
         {} catch {}
     }
-
-    /*//////////////////////////////////////////////////////////////
-                            BORROW LOGIC
-    //////////////////////////////////////////////////////////////*/
-    uint256 private constant USE_VARIABLE_DEBT = 2;
-
-    function _borrow(uint256 amount) internal  {
-        lendingPool.borrow(
-            address(underlying),
-            amount,
-            USE_VARIABLE_DEBT,
-            0,
-            address(this)
-        );
-    }
-
-    function _repayBorrow(uint256 amount) internal {
-        lendingPool.repay(
-            address(underlying),
-            amount,
-            USE_VARIABLE_DEBT,
-            address(this)
-        );
-    }
-
-    function _getAvailableBorrow(address user) internal view returns (uint256) {
-        (, , uint256 availableBorrowsBase, , , ) = lendingPool.getUserAccountData(user);
-        return (availableBorrowsBase * (10**ERC20(address(underlying)).decimals())) / _getAssetPrice();
-    }
-
-    function _getTotalDebt(address user) internal view returns (uint256) {
-        (, uint256 totalDebtBase, , , , ) = lendingPool.getUserAccountData(user);
-        return (totalDebtBase * (10**ERC20(address(underlying)).decimals())) / _getAssetPrice();
-    }
-
-    function _getAssetPrice() internal view returns (uint256) {
-        return IProtocolOracle(
-            poolAddressProvider.getPriceOracle()
-        ).getAssetPrice(address(underlying));
-    }
-
-    function _getUnderlyingBalance() internal view returns(uint256) {
-        return underlying.balanceOf(address(this));
-    }
-
 }

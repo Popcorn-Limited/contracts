@@ -2,24 +2,28 @@
 // Docgen-SOLC: 0.8.15
 
 pragma solidity ^0.8.15;
-import {ILido, IWETH } from"../../adapter/lido/ILido.sol";
+import {IProtocolOracle} from "../../adapter/aave/v3/IAaveV3.sol";
+import {ERC20} from "openzeppelin-contracts/token/ERC20/ERC20.sol";
+import {ILido, IWETH, ICurveMetapool} from"../../adapter/lido/ILido.sol";
 import {BaseLeveragedStrategy} from "../../base/BaseLeveragedStrategy.sol";
 import {AaveV3Adapter, IERC20, AdapterConfig, ProtocolConfig} from "../../adapter/aave/v3/AaveV3Adapter.sol";
 
-contract AaveV3Leverage is AaveV3Adapter, BaseLeveragedStrategy {
-    /// @notice The booster address for Convex
-    ILido public lido;
 
-    // address public immutable weth;
-    IWETH public weth;
+contract AaveV3Leverage is AaveV3Adapter, BaseLeveragedStrategy {
+    int128 private constant WETH_ID = 0;
+    int128 private constant STETH_ID = 1;
+
+    ILido public constant lido = ILido(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
+    IWETH public constant weth = IWETH(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
+    ICurveMetapool public constant StableSwapSTETH =
+        ICurveMetapool(0xDC24316b9AE028F1497c275EB9192a3Ea0f67022);
+
 
     function initialize(
         AdapterConfig memory _adapterConfig,
         ProtocolConfig memory _protocolConfig
     ) external initializer {
         __AaveV3Adapter_init(_adapterConfig, _protocolConfig);
-        weth = IWETH(address(0));
-        lido = ILido(address(0));
     }
 
     function deposit(uint256 amount) external override onlyVault whenNotPaused {
@@ -33,31 +37,20 @@ contract AaveV3Leverage is AaveV3Adapter, BaseLeveragedStrategy {
     }
 
     function _onDeposit(uint256 amount, uint256 leverage) internal {
-        /*
-         TODO
-            1. borrow as much as leverage allows, or as close to it as possible
-            2. take a flashloan to open more leverage
-        */
         _enterLeveragedPosition(amount, leverage);
     }
 
     function _onWithdraw(uint256 leverage) internal {
-        /*
-         TODO
-            1. repay flashloan
-            2. repay borrowed amount
-        */
         _exitLeveragedPosition(leverage);
     }
 
     function _enterLeveragedPosition(uint256 amount, uint256 leverage) internal override {
-        //loop for entering leverage
-        for (uint256 i = 0; i < leverage; i++) {
-            _borrow(_getAvailableBorrow(msg.sender) - LEVERAGED_BORROW_BUFFER);
-            _depositUnderlying(_getUnderlyingBalance()); //supply to increase leverage
-        }
+        uint256 leverageAmount = amount * leverage;
+        uint256 loanToValueRatio = (leverageAmount - amount) / leverageAmount;
+
         //take a flash loan to enter a leverage and enter a position
-        _getFlashLoan(amount, leverage);
+        uint256 flashLoanAmount = loanToValueRatio * leverageAmount;
+        _getFlashLoan(flashLoanAmount, leverage);
     }
 
     function _exitLeveragedPosition(uint256 leverage) internal override {
@@ -74,8 +67,12 @@ contract AaveV3Leverage is AaveV3Adapter, BaseLeveragedStrategy {
     function _openLongPosition(uint256 amount, uint256 leverage) internal {
         weth.withdraw(amount);
         uint256 stETHAmount = lido.submit{value: amount}(FEE_RECIPIENT);
-        _depositUnderlying(stETHAmount);
-        //withdraw eth to repay to flash loan
+        StableSwapSTETH.exchange(
+            STETH_ID,
+            WETH_ID,
+            amount,
+            0
+        );
     }
 
     function _closeLongPosition() internal {
@@ -83,9 +80,7 @@ contract AaveV3Leverage is AaveV3Adapter, BaseLeveragedStrategy {
         _withdrawUnderlying(totalCollateralBase);
     }
 
-    function _getFlashLoan(uint256 amount, uint256 leverage) internal {
-        uint256 flashLoanAmount = amount * leverage;
-
+    function _getFlashLoan(uint256 flashLoanAmount, uint256 leverage) internal {
         bytes memory params = abi.encode(
             flashLoanAmount,
             leverage
@@ -95,7 +90,7 @@ contract AaveV3Leverage is AaveV3Adapter, BaseLeveragedStrategy {
         assets[0] = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2); //WETH
 
         uint[] memory amounts = new uint[](1);
-        amounts[0] = amount;
+        amounts[0] = flashLoanAmount;
 
         uint[] memory modes = new uint[](1);
         modes[0] = 0;
@@ -134,5 +129,48 @@ contract AaveV3Leverage is AaveV3Adapter, BaseLeveragedStrategy {
         IERC20(assets[0]).transfer(msg.sender, leftOver);
 
         return true;
+    }
+    /*//////////////////////////////////////////////////////////////
+                            BORROW LOGIC
+    //////////////////////////////////////////////////////////////*/
+    uint256 private constant USE_VARIABLE_DEBT = 2;
+
+    function _borrow(uint256 amount) internal  {
+        lendingPool.borrow(
+            address(underlying),
+            amount,
+            USE_VARIABLE_DEBT,
+            0,
+            address(this)
+        );
+    }
+
+    function _repayBorrow(uint256 amount) internal {
+        lendingPool.repay(
+            address(underlying),
+            amount,
+            USE_VARIABLE_DEBT,
+            address(this)
+        );
+    }
+
+    function _getAvailableBorrow(address user) internal view returns (uint256) {
+        (, , uint256 availableBorrowsBase, , , ) = lendingPool.getUserAccountData(user);
+        return (availableBorrowsBase * (10**ERC20(address(underlying)).decimals())) / _getAssetPrice();
+    }
+
+    function _getTotalDebt(address user) internal view returns (uint256) {
+        (, uint256 totalDebtBase, , , , ) = lendingPool.getUserAccountData(user);
+        return (totalDebtBase * (10**ERC20(address(underlying)).decimals())) / _getAssetPrice();
+    }
+
+    function _getAssetPrice() internal view returns (uint256) {
+        return IProtocolOracle(
+            poolAddressProvider.getPriceOracle()
+        ).getAssetPrice(address(underlying));
+    }
+
+    function _getUnderlyingBalance() internal view returns(uint256) {
+        return underlying.balanceOf(address(this));
     }
 }
