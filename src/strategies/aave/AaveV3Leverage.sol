@@ -10,6 +10,9 @@ import {AaveV3Adapter, IERC20, AdapterConfig, ProtocolConfig} from "../../adapte
 
 
 contract AaveV3Leverage is AaveV3Adapter, BaseLeveragedStrategy {
+    error CallerNotAave();
+    error CallerNotSelf();
+
     int128 private constant WETH_ID = 0;
     int128 private constant STETH_ID = 1;
 
@@ -113,6 +116,8 @@ contract AaveV3Leverage is AaveV3Adapter, BaseLeveragedStrategy {
         address initiator,
         bytes calldata params
     ) external returns (bool) {
+        if(msg.sender != address(lendingPool)) revert CallerNotAave();
+        if(initiator != address(this)) revert CallerNotSelf();
         //open long position
         (, uint256 leverage) = abi.decode(params, (uint256, uint256));
         _openLongPosition(amounts[0] , leverage);
