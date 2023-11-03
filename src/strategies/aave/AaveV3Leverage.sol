@@ -51,6 +51,12 @@ contract AaveV3Leverage is AaveV3Adapter, BaseLeveragedStrategy {
         uint256 leverageAmount = amount * leverage;
         uint256 loanToValueRatio = (leverageAmount - amount) / leverageAmount;
 
+        //loop for entering leverage
+        for (uint256 i = 0; i < leverage; i++) {
+            _borrow(_getAvailableBorrow(msg.sender) - LEVERAGED_BORROW_BUFFER);
+            _depositUnderlying(_getUnderlyingBalance()); //supply to increase leverage
+        }
+
         //take a flash loan to enter a leverage and enter a position
         uint256 flashLoanAmount = loanToValueRatio * leverageAmount;
         _getFlashLoan(flashLoanAmount, leverage);
