@@ -31,7 +31,7 @@ contract AaveV3Leverage is AaveV3Adapter, BaseLeveragedStrategy {
 
     function deposit(uint256 amount) external override onlyVault whenNotPaused {
         _deposit(amount, msg.sender);
-        _onDeposit(amount, 10);
+        _onDeposit(amount, amount);
     }
 
     function withdraw(uint256 amount, address receiver) external override onlyVault {
