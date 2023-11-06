@@ -11,11 +11,7 @@ struct AdapterConfig {
     bool useLpToken;
     IERC20[] rewardTokens;
     address owner;
-}
-
-struct ProtocolConfig {
-    address registry;
-    bytes protocolInitData;
+    bytes protocolData;
 }
 
 interface IBaseAdapter {
@@ -47,8 +43,5 @@ interface IBaseAdapter {
 
     function setRewardsToken(IERC20[] memory rewardTokens) external;
 
-    function initialize(
-        AdapterConfig memory _adapterConfig,
-        ProtocolConfig memory _protocolConfig
-    ) external;
+    function initialize(AdapterConfig memory _adapterConfig) external;
 }

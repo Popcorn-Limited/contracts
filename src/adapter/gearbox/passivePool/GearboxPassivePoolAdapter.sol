@@ -5,9 +5,9 @@ pragma solidity ^0.8.15;
 
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import {IPoolService, IContractRegistry, IAddressProvider} from "../IGearbox.sol";
-import {BaseAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../../../base/BaseAdapter.sol";
+import {BaseAdapter, IERC20, AdapterConfig} from "../../../base/BaseAdapter.sol";
 
-contract BeefyAdapter is BaseAdapter {
+contract GearboxPassivePoolAdapter is BaseAdapter {
     using SafeERC20 for IERC20;
 
     /// @notice The Pool Service Contract
@@ -20,14 +20,13 @@ contract BeefyAdapter is BaseAdapter {
     error LpTokenNotSupported();
 
     function __BeefyAdapter_init(
-        AdapterConfig memory _adapterConfig,
-        ProtocolConfig memory _protocolConfig
+        AdapterConfig memory _adapterConfig
     ) internal onlyInitializing {
         if (_adapterConfig.useLpToken) revert LpTokenNotSupported();
 
         __BaseAdapter_init(_adapterConfig);
         (uint256 _pid, address addressProvider) = abi.decode(
-            _protocolConfig.protocolInitData,
+            _adapterConfig.protocolData,
             (uint256, address)
         );
 
@@ -64,6 +63,10 @@ contract BeefyAdapter is BaseAdapter {
                 : poolService.fromDiesel(_totalDieselTokens);
     }
 
+    function _totalLP() internal pure override returns (uint) {
+        revert("NO");
+    }
+
     /*//////////////////////////////////////////////////////////////
                             DEPOSIT LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -79,6 +82,10 @@ contract BeefyAdapter is BaseAdapter {
      **/
     function _depositUnderlying(uint256 amount) internal override {
         poolService.addLiquidity(amount, address(this), 0);
+    }
+
+    function _depositLP(uint) internal pure override {
+        revert("NO");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -100,4 +107,10 @@ contract BeefyAdapter is BaseAdapter {
             address(this)
         );
     }
+
+    function _withdrawLP(uint) internal pure override {
+        revert("NO");
+    }
+
+    function _claim() internal override {}
 }

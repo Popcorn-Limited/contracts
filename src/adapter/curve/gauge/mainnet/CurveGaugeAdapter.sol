@@ -4,7 +4,7 @@
 pragma solidity ^0.8.15;
 
 import {IGauge, IMinter, IGaugeController} from "../../ICurve.sol";
-import {BaseAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../../../../base/BaseAdapter.sol";
+import {BaseAdapter, IERC20, AdapterConfig} from "../../../../base/BaseAdapter.sol";
 import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
@@ -15,28 +15,24 @@ contract CurveGaugeAdapter is BaseAdapter {
     IGauge public gauge;
 
     /// @notice The Curve Gauge contract
-    IMinter public minter;
-
-    address public crv;
+    IMinter public constant minter = IMinter(0xd061D61a4d941c39E5453435B6345Dc261C2fcE0);
+    IGaugeController public constant controller = IGaugeController(0x2F50D538606Fa9EDD2B11E2446BEb18C9D5846bB);
 
     error InvalidToken();
     error LpTokenSupported();
 
     function __CurveGaugeAdapter_init(
-        AdapterConfig memory _adapterConfig,
-        ProtocolConfig memory _protocolConfig
+        AdapterConfig memory _adapterConfig
     ) internal onlyInitializing {
         if (!_adapterConfig.useLpToken) revert LpTokenSupported();
         __BaseAdapter_init(_adapterConfig);
 
         uint256 _gaugeId = abi.decode(
-            _protocolConfig.protocolInitData,
+            _adapterConfig.protocolData,
             (uint256)
         );
-        minter = IMinter(_protocolConfig.registry);
-        gauge = IGauge(IGaugeController(minter.controller()).gauges(_gaugeId));
+        gauge = IGauge(controller.gauges(_gaugeId));
 
-        crv = minter.token();
         if (gauge.lp_token() != address(lpToken)) revert InvalidToken();
 
         _adapterConfig.lpToken.approve(address(gauge), type(uint256).max);
@@ -54,11 +50,16 @@ contract CurveGaugeAdapter is BaseAdapter {
         return gauge.balanceOf(address(this));
     }
 
+    function _totalUnderlying() internal pure override returns (uint) {
+        revert("NO");
+    }
+
     /*//////////////////////////////////////////////////////////////
                             DEPOSIT LOGIC
     //////////////////////////////////////////////////////////////*/
 
     function _deposit(uint256 amount, address caller) internal override {
+        lpToken.safeTransferFrom(caller, address(this), amount);
         _depositLP(amount);
     }
 
@@ -68,6 +69,10 @@ contract CurveGaugeAdapter is BaseAdapter {
      **/
     function _depositLP(uint256 amount) internal override {
         gauge.deposit(amount);
+    }
+
+    function _depositUnderlying(uint) internal pure override {
+        revert("NO");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -85,6 +90,10 @@ contract CurveGaugeAdapter is BaseAdapter {
      **/
     function _withdrawLP(uint256 amount) internal override {
         gauge.withdraw(amount);
+    }
+
+    function _withdrawUnderlying(uint) internal pure override {
+        revert("NO");
     }
 
     /*//////////////////////////////////////////////////////////////

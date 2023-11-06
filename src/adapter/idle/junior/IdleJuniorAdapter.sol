@@ -4,7 +4,7 @@
 pragma solidity ^0.8.15;
 
 import {IIdleCDO, IRegistry} from "../IIdle.sol";
-import {BaseAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../../../base/BaseAdapter.sol";
+import {BaseAdapter, IERC20, AdapterConfig} from "../../../base/BaseAdapter.sol";
 import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
@@ -20,14 +20,13 @@ contract IdleJuniorAdapter is BaseAdapter {
     error NotValidAsset(address asset);
 
     function __IdleJuniorAdapter_init(
-        AdapterConfig memory _adapterConfig,
-        ProtocolConfig memory _protocolConfig
+        AdapterConfig memory _adapterConfig
     ) internal onlyInitializing {
         if (_adapterConfig.useLpToken) revert LpTokenNotSupported();
         __BaseAdapter_init(_adapterConfig);
 
-        IRegistry _registry = IRegistry(_protocolConfig.registry);
-        address _cdo = abi.decode(_protocolConfig.protocolInitData, (address));
+        IRegistry _registry = IRegistry(0x84FDeE80F18957A041354E99C7eB407467D94d8E);
+        address _cdo = abi.decode(_adapterConfig.protocolData, (address));
 
         if (!_registry.isValidCdo(_cdo)) revert NotValidCDO(_cdo);
         if (IIdleCDO(_cdo).paused()) revert PausedCDO(_cdo);
@@ -57,6 +56,10 @@ contract IdleJuniorAdapter is BaseAdapter {
             );
     }
 
+    function _totalLP() internal pure override returns (uint) {
+        revert("NO");
+    }
+
     /*//////////////////////////////////////////////////////////////
                             DEPOSIT LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -72,6 +75,10 @@ contract IdleJuniorAdapter is BaseAdapter {
      **/
     function _depositUnderlying(uint256 amount) internal override {
         cdo.depositBBRef(amount, FEE_RECIPIENT);
+    }
+
+    function _depositLP(uint) internal pure override {
+        revert("NO");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -91,6 +98,10 @@ contract IdleJuniorAdapter is BaseAdapter {
         cdo.withdrawBB(convertToUnderlyingShares(amount));
     }
 
+    function _withdrawLP(uint) internal pure override {
+        revert("NO");
+    }
+
     /// @notice The amount of ellipsis shares to withdraw given an amount of adapter shares
     function convertToUnderlyingShares(
         uint256 shares
@@ -102,4 +113,7 @@ contract IdleJuniorAdapter is BaseAdapter {
                 ? shares
                 : shares.mulDiv(balance, supply, Math.Rounding.Up);
     }
+
+    /// @dev no rewards on idle
+    function _claim() internal override {}
 }

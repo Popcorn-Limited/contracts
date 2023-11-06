@@ -4,7 +4,7 @@
 pragma solidity ^0.8.15;
 
 import {IGauge, ILpToken} from "./ISolidly.sol";
-import {BaseAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../../base/BaseAdapter.sol";
+import {BaseAdapter, IERC20, AdapterConfig} from "../../base/BaseAdapter.sol";
 import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
@@ -19,17 +19,18 @@ contract GmdAdapter is BaseAdapter {
     error LpTokenSupported();
 
     function __GmdAdapter_init(
-        AdapterConfig memory _adapterConfig,
-        ProtocolConfig memory _protocolConfig
+        AdapterConfig memory _adapterConfig
     ) internal onlyInitializing {
         if (!_adapterConfig.useLpToken) revert LpTokenSupported();
         __BaseAdapter_init(_adapterConfig);
 
         address _gauge = abi.decode(
-            _protocolConfig.protocolInitData,
+            _adapterConfig.protocolData,
             (address)
         );
 
+        // TODO: can't find a registry where we can verify that
+        // the gauge is valid
         gauge = IGauge(_gauge);
         if (gauge.stake() != address(lpToken)) revert InvalidAsset();
         _adapterConfig.lpToken.approve(address(_gauge), type(uint256).max);
@@ -46,6 +47,10 @@ contract GmdAdapter is BaseAdapter {
      */
     function _totalLP() internal view override returns (uint256) {
         return gauge.balanceOf(address(this));
+    }
+
+    function _totalUnderlying() internal pure override returns (uint) {
+        revert("NO");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -66,6 +71,10 @@ contract GmdAdapter is BaseAdapter {
         gauge.depositAndOptIn(amount, 0, _getRewardTokens());
     }
 
+    function _depositUnderlying(uint) internal pure override {
+        revert("NO");
+    }
+
     /*//////////////////////////////////////////////////////////////
                             WITHDRAWAL LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -81,6 +90,10 @@ contract GmdAdapter is BaseAdapter {
      **/
     function _withdrawLP(uint256 amount) internal override {
         gauge.withdraw(amount);
+    }
+
+    function _withdrawUnderlying(uint) internal pure override {
+        revert("NO");
     }
 
     /*//////////////////////////////////////////////////////////////

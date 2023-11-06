@@ -4,7 +4,7 @@
 pragma solidity ^0.8.15;
 
 import {IGauge, IGaugeFactory} from "../../ICurve.sol";
-import {BaseAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../../../../base/BaseAdapter.sol";
+import {BaseAdapter, IERC20, AdapterConfig} from "../../../../base/BaseAdapter.sol";
 import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
@@ -17,30 +17,22 @@ contract CurveGaugeAdapter is BaseAdapter {
     /// @notice The Curve Gauge contract
     IGaugeFactory public gaugeFactory;
 
-    /// @notice The address of CRV
-    address public crv;
-
     error InvalidToken();
     error LpTokenSupported();
 
     event log_address(address);
 
     function __CurveGaugeAdapter_init(
-        AdapterConfig memory _adapterConfig,
-        ProtocolConfig memory _protocolConfig
+        AdapterConfig memory _adapterConfig
     ) internal onlyInitializing {
         if (!_adapterConfig.useLpToken) revert LpTokenSupported();
         __BaseAdapter_init(_adapterConfig);
 
-        address _crv = abi.decode(_protocolConfig.protocolInitData, (address));
-        crv = _crv;
-        gaugeFactory = IGaugeFactory(_protocolConfig.registry);
-        gauge = IGauge(gaugeFactory.get_gauge_from_lp_token(address(lpToken)));
+        (gaugeFactory) = abi.decode(_adapterConfig.protocolData, (IGaugeFactory));
 
-        emit log_address(address(crv));
-        emit log_address(address(gauge));
+        gauge = IGauge(gaugeFactory.get_gauge_from_lp_token(address(_adapterConfig.lpToken)));
+        if (address(gauge) == address(0)) revert InvalidToken();
 
-        if (gauge.lp_token() != address(lpToken)) revert InvalidToken();
         _adapterConfig.lpToken.approve(address(gauge), type(uint256).max);
     }
 
@@ -56,11 +48,16 @@ contract CurveGaugeAdapter is BaseAdapter {
         return gauge.balanceOf(address(this));
     }
 
+    function _totalUnderlying() internal pure override returns (uint) {
+        revert("NO");
+    }
+
     /*//////////////////////////////////////////////////////////////
                             DEPOSIT LOGIC
     //////////////////////////////////////////////////////////////*/
 
     function _deposit(uint256 amount, address caller) internal override {
+        lpToken.safeTransferFrom(caller, address(this), amount);
         _depositLP(amount);
     }
 
@@ -70,6 +67,10 @@ contract CurveGaugeAdapter is BaseAdapter {
      **/
     function _depositLP(uint256 amount) internal override {
         gauge.deposit(amount);
+    }
+
+    function _depositUnderlying(uint) internal pure override {
+        revert("NO");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -87,6 +88,10 @@ contract CurveGaugeAdapter is BaseAdapter {
      **/
     function _withdrawLP(uint256 amount) internal override {
         gauge.withdraw(amount);
+    }
+
+    function _withdrawUnderlying(uint) internal pure override {
+        revert("NO");
     }
 
     /*//////////////////////////////////////////////////////////////

@@ -4,7 +4,7 @@
 pragma solidity ^0.8.15;
 
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
-import {BaseAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../../../base/BaseAdapter.sol";
+import {BaseAdapter, IERC20, AdapterConfig} from "../../../base/BaseAdapter.sol";
 import {ILendingPool, IAaveIncentives, IAToken, IProtocolDataProvider} from "./IAaveV3.sol";
 
 contract AaveV3Adapter is BaseAdapter {
@@ -24,8 +24,7 @@ contract AaveV3Adapter is BaseAdapter {
     error LpTokenNotSupported();
 
     function __AaveV3Adapter_init(
-        AdapterConfig memory _adapterConfig,
-        ProtocolConfig memory _protocolConfig
+        AdapterConfig memory _adapterConfig
     ) internal onlyInitializing {
         if (_adapterConfig.useLpToken) revert LpTokenNotSupported();
 
@@ -52,6 +51,10 @@ contract AaveV3Adapter is BaseAdapter {
         return aToken.balanceOf(address(this));
     }
 
+    function _totalLP() internal pure override returns (uint) {
+        revert("NO");
+    }
+
     /*//////////////////////////////////////////////////////////////
                             DEPOSIT LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -69,6 +72,10 @@ contract AaveV3Adapter is BaseAdapter {
         lendingPool.supply(address(underlying), amount, address(this), 0);
     }
 
+    function _depositLP(uint) internal pure override {
+        revert("NO");
+    }
+
     /*//////////////////////////////////////////////////////////////
                             WITHDRAWAL LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -84,6 +91,10 @@ contract AaveV3Adapter is BaseAdapter {
      **/
     function _withdrawUnderlying(uint256 amount) internal override {
         lendingPool.withdraw(address(underlying), amount, address(this));
+    }
+
+    function _withdrawLP(uint) internal pure override {
+        revert("NO");
     }
 
     /*//////////////////////////////////////////////////////////////

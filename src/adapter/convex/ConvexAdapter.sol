@@ -3,7 +3,7 @@
 
 pragma solidity ^0.8.15;
 import {IConvexBooster, IConvexRewards, IRewards} from "./IConvex.sol";
-import {BaseAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../../base/BaseAdapter.sol";
+import {BaseAdapter, IERC20, AdapterConfig} from "../../base/BaseAdapter.sol";
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
 contract ConvexAdapter is BaseAdapter {
@@ -13,7 +13,7 @@ contract ConvexAdapter is BaseAdapter {
     uint256 public pid;
 
     /// @notice The booster address for Convex
-    IConvexBooster public convexBooster;
+    IConvexBooster public constant convexBooster = IConvexBooster(0xF403C135812408BFbE8713b5A23a04b3D48AAE31);
 
     /// @notice The Convex convexRewards.
     IConvexRewards public convexRewards;
@@ -22,14 +22,12 @@ contract ConvexAdapter is BaseAdapter {
     error LpTokenSupported();
 
     function __ConvexAdapter_init(
-        AdapterConfig memory _adapterConfig,
-        ProtocolConfig memory _protocolConfig
+        AdapterConfig memory _adapterConfig
     ) internal onlyInitializing {
         if (!_adapterConfig.useLpToken) revert LpTokenSupported();
         __BaseAdapter_init(_adapterConfig);
 
-        uint256 _pid = abi.decode(_protocolConfig.protocolInitData, (uint256));
-        convexBooster = IConvexBooster(_protocolConfig.registry);
+        uint256 _pid = abi.decode(_adapterConfig.protocolData, (uint256));
 
         (address _asset, , , address _convexRewards, , ) = convexBooster
             .poolInfo(_pid);
@@ -57,6 +55,10 @@ contract ConvexAdapter is BaseAdapter {
         return convexRewards.balanceOf(address(this));
     }
 
+    function _totalUnderlying() internal pure override returns (uint) {
+        revert("NO");
+    }
+
     /*//////////////////////////////////////////////////////////////
                             DEPOSIT LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -75,6 +77,10 @@ contract ConvexAdapter is BaseAdapter {
         convexBooster.deposit(pid, amount, true);
     }
 
+    function _depositUnderlying(uint) internal pure override {
+        revert("NO");
+    }
+
     /*//////////////////////////////////////////////////////////////
                             WITHDRAWAL LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -90,6 +96,10 @@ contract ConvexAdapter is BaseAdapter {
      **/
     function _withdrawLP(uint256 amount) internal override {
         convexRewards.withdrawAndUnwrap(amount, false);
+    }
+
+    function _withdrawUnderlying(uint) internal pure override {
+        revert("NO");
     }
 
     /*//////////////////////////////////////////////////////////////

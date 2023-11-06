@@ -2,8 +2,8 @@
 // Docgen-SOLC: 0.8.15
 
 pragma solidity ^0.8.15;
-import {IRToken, ILendingPool, IRewardMinter, IRadiantMining, IProtocolDataProvider, IIncentivesController, IMiddleFeeDistributor} from "./IRadiant.sol";
-import {IERC20, BaseAdapter, AdapterConfig, ProtocolConfig} from "../../base/BaseAdapter.sol";
+import {IRToken, ILendingPool, IProtocolDataProvider, IIncentivesController} from "./IRadiant.sol";
+import {IERC20, BaseAdapter, AdapterConfig} from "../../base/BaseAdapter.sol";
 import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
@@ -14,33 +14,24 @@ contract RadiantAdapter is BaseAdapter {
     /// @notice The Radiant rToken contract
     IRToken public rToken;
 
-    /// @notice Check to see if Radiant liquidity mining is active
-    bool public isActiveMining;
-
     /// @notice The Radiant LendingPool contract
-    ILendingPool public lendingPool;
+    /// @dev Lending Pool on Arbitrum
+    ILendingPool public constant lendingPool = ILendingPool(0xF4B1486DD74D07706052A33d31d7c0AAFD0659E1);
 
     /// @notice The Radiant Incentives Controller contract
-    IIncentivesController public controller;
-
-    /// @notice Fee managing contract for Radiant rewards
-    IMiddleFeeDistributor public middleFee;
-
-    uint256 internal constant RAY = 1e27;
-    uint256 internal constant halfRAY = RAY / 2;
+    IIncentivesController public constant controller = IIncentivesController(0xebC85d44cefb1293707b11f707bd3CEc34B4D5fA);
 
     error LpTokenNotSupported();
     error DifferentAssets(address asset, address underlying);
 
     function __RadiantAdapter_init(
-        AdapterConfig memory _adapterConfig,
-        ProtocolConfig memory _protocolConfig
+        AdapterConfig memory _adapterConfig
     ) internal onlyInitializing {
         if (_adapterConfig.useLpToken) revert LpTokenNotSupported();
         __BaseAdapter_init(_adapterConfig);
 
         address radiantDataProvider = abi.decode(
-            _protocolConfig.protocolInitData,
+            _adapterConfig.protocolData,
             (address)
         );
 
@@ -53,10 +44,6 @@ contract RadiantAdapter is BaseAdapter {
                 rToken.UNDERLYING_ASSET_ADDRESS(),
                 address(underlying)
             );
-
-        lendingPool = ILendingPool(rToken.POOL());
-        controller = IIncentivesController(rToken.getIncentivesController());
-        IRewardMinter minter = IRewardMinter(controller.rewardMinter());
 
         _adapterConfig.underlying.approve(
             address(lendingPool),
@@ -76,6 +63,10 @@ contract RadiantAdapter is BaseAdapter {
         return rToken.balanceOf(address(this));
     }
 
+    function _totalLP() internal pure override returns (uint) {
+        revert("NO");
+    }
+
     /*//////////////////////////////////////////////////////////////
                             DEPOSIT LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -93,6 +84,10 @@ contract RadiantAdapter is BaseAdapter {
         lendingPool.deposit(address(underlying), amount, address(this), 0);
     }
 
+    function _depositLP(uint) internal pure override {
+        revert("NO");
+    }
+
     /*//////////////////////////////////////////////////////////////
                             WITHDRAWAL LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -108,6 +103,10 @@ contract RadiantAdapter is BaseAdapter {
      **/
     function _withdrawUnderlying(uint256 amount) internal override {
         lendingPool.withdraw(address(underlying), amount, address(this));
+    }
+
+    function _withdrawLP(uint) internal pure override {
+        revert("NO");
     }
 
     /*//////////////////////////////////////////////////////////////

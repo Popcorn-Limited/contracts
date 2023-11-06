@@ -3,12 +3,12 @@
 
 pragma solidity ^0.8.15;
 
-import {BaseAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../../../base/BaseAdapter.sol";
+import {BaseAdapter, IERC20, AdapterConfig} from "../../../base/BaseAdapter.sol";
 import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import {IAlpacaLendV2Vault, IAlpacaLendV2Manger, IAlpacaLendV2MiniFL, IAlpacaLendV2IbToken} from "./IAlpacaLendV2.sol";
 
-contract AlpacaLendV1Adapter is BaseAdapter {
+contract AlpacaLendV2Adapter is BaseAdapter {
     using SafeERC20 for IERC20;
     using Math for uint256;
 
@@ -28,15 +28,15 @@ contract AlpacaLendV1Adapter is BaseAdapter {
     error LpTokenNotSupported();
 
     function __AlpacaLendV2Adapter_init(
-        AdapterConfig memory _adapterConfig,
-        ProtocolConfig memory _protocolConfig
+        AdapterConfig memory _adapterConfig
     ) internal onlyInitializing {
         if (_adapterConfig.useLpToken) revert LpTokenNotSupported();
         __BaseAdapter_init(_adapterConfig);
 
-        uint256 _pid = abi.decode(_protocolConfig.protocolInitData, (uint256));
+        uint256 _pid = abi.decode(_adapterConfig.protocolData, (uint256));
 
-        alpacaManager = IAlpacaLendV2Manger(_protocolConfig.registry);
+        // TODO: can use constants for this but I couldn't find the correct contracts.
+        alpacaManager = IAlpacaLendV2Manger(address(0));
         miniFL = IAlpacaLendV2MiniFL(alpacaManager.miniFL());
 
         ibToken = IAlpacaLendV2IbToken(miniFL.stakingTokens(_pid));
@@ -62,6 +62,10 @@ contract AlpacaLendV1Adapter is BaseAdapter {
         return ibToken.convertToAssets(ibToken.balanceOf(address(this)));
     }
 
+    function _totalLP() internal pure override returns (uint) {
+        revert("NO");
+    }
+
     /*//////////////////////////////////////////////////////////////
                             DEPOSIT LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -77,6 +81,10 @@ contract AlpacaLendV1Adapter is BaseAdapter {
      **/
     function _depositUnderlying(uint256 amount) internal override {
         alpacaManager.deposit(address(underlying), amount);
+    }
+
+    function _depositLP(uint) internal pure override {
+        revert("NO");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -98,4 +106,11 @@ contract AlpacaLendV1Adapter is BaseAdapter {
             ibToken.convertToShares(amount)
         );
     }
+
+    function _withdrawLP(uint) internal pure override {
+        revert("NO");
+    }
+
+    /// @dev no rewards on alpacalend v2
+    function _claim() internal pure override {}
 }

@@ -2,7 +2,7 @@
 // Docgen-SOLC: 0.8.15
 pragma solidity ^0.8.15;
 import {VaultAPI, IYearnRegistry} from "./IYearn.sol";
-import {BaseAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../../base/BaseAdapter.sol";
+import {BaseAdapter, IERC20, AdapterConfig} from "../../base/BaseAdapter.sol";
 import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
@@ -14,7 +14,12 @@ contract YearnAdapter is BaseAdapter {
     int128 private constant STETHID = 1;
 
     VaultAPI public yVault;
+    // TODO: maxLoss is not configurable. If the Yearn vault loses to many funds,
+    // the adapter could cause user funds to be locked up.
+    // Is there a way to use a dynamic value?
     uint256 public maxLoss;
+
+    IYearnRegistry public constant YEARN_REGISTRY = IYearnRegistry(0x50c1a2eA0a861A967D9d0FFE2AE4012c2E053804);
 
     uint256 constant DEGRADATION_COEFFICIENT = 10 ** 18;
 
@@ -22,18 +27,13 @@ contract YearnAdapter is BaseAdapter {
     error LpTokenNotSupported();
 
     function __YearnAdapter_init(
-        AdapterConfig memory _adapterConfig,
-        ProtocolConfig memory _protocolConfig
+        AdapterConfig memory _adapterConfig
     ) internal onlyInitializing {
         if (_adapterConfig.useLpToken) revert LpTokenNotSupported();
         __BaseAdapter_init(_adapterConfig);
 
-        maxLoss = abi.decode(_protocolConfig.protocolInitData, (uint256));
-        yVault = VaultAPI(
-            IYearnRegistry(_protocolConfig.registry).latestVault(
-                address(underlying)
-            )
-        );
+        maxLoss = abi.decode(_adapterConfig.protocolData, (uint256));
+        yVault = VaultAPI(YEARN_REGISTRY.latestVault(address(underlying)));
 
         if (maxLoss > 10_000) revert MaxLossTooHigh();
         _adapterConfig.underlying.approve(address(yVault), type(uint256).max);
@@ -49,6 +49,10 @@ contract YearnAdapter is BaseAdapter {
      */
     function _totalUnderlying() internal view override returns (uint256) {
         return _shareValue(yVault.balanceOf(address(this)));
+    }
+
+    function _totalLP() internal pure override returns (uint) {
+        revert("NO");
     }
 
     /// @notice Determines the current value of `yShares` in assets
@@ -108,6 +112,10 @@ contract YearnAdapter is BaseAdapter {
         yVault.deposit(amount);
     }
 
+    function _depositLP(uint) internal pure override {
+        revert("NO");
+    }
+
     /*//////////////////////////////////////////////////////////////
                             WITHDRAWAL LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -129,6 +137,10 @@ contract YearnAdapter is BaseAdapter {
         );
     }
 
+    function _withdrawLP(uint) internal pure override {
+        revert("NO");
+    }
+
     /// @notice The amount of aave shares to withdraw given an mount of adapter shares
     function convertToUnderlyingShares(
         uint256 shares
@@ -143,4 +155,6 @@ contract YearnAdapter is BaseAdapter {
                     Math.Rounding.Up
                 );
     }
+
+    function _claim() internal override {}
 }

@@ -6,7 +6,7 @@ pragma solidity ^0.8.15;
 import {IAcrossHop, IAcceleratingDistributor} from "./IAcross.sol";
 import {IPermissionRegistry} from "../../base/interfaces/IPermissionRegistry.sol";
 
-import {BaseAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../../base/BaseAdapter.sol";
+import {BaseAdapter, IERC20, AdapterConfig} from "../../base/BaseAdapter.sol";
 import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
@@ -22,22 +22,21 @@ contract AcrossAdapter is BaseAdapter {
 
     error Disabled();
     error NotEndorsed(address _acrossHop);
-
+    
     function __AcrossAdapter_init(
-        AdapterConfig memory _adapterConfig,
-        ProtocolConfig memory _protocolConfig
+        AdapterConfig memory _adapterConfig
     ) internal onlyInitializing {
         __BaseAdapter_init(_adapterConfig);
 
-        (address _acrossHop, address _acrossDistributor) = abi.decode(
-            _protocolConfig.protocolInitData,
-            (address, address)
+        (IPermissionRegistry permissionRegistry, address _acrossHop, address _acrossDistributor) = abi.decode(
+            _adapterConfig.protocolData,
+            (IPermissionRegistry, address, address)
         );
 
-        if (!IPermissionRegistry(_protocolConfig.registry).endorsed(_acrossHop))
+        if (!permissionRegistry.endorsed(_acrossHop))
             revert NotEndorsed(_acrossHop);
         if (
-            !IPermissionRegistry(_protocolConfig.registry).endorsed(
+            permissionRegistry.endorsed(
                 _acrossDistributor
             )
         ) revert NotEndorsed(_acrossDistributor);

@@ -8,11 +8,11 @@ interface IGauge {
 
     function balanceOf(address _user) external view returns (uint256);
 
-    function deposit(uint256 _amount, uint256 _tokenId) external;
+    function deposit(uint256 _amount) external;
 
     function withdraw(uint256 _amount) external;
 
-    function getReward(address _account, address[] memory _tokens) external;
+    function getReward(address _account) external;
 
     function rewards(uint256 _index) external view returns (address);
 }

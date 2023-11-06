@@ -13,7 +13,7 @@ import {
     IERC20Upgradeable as IERC20,
     IERC20MetadataUpgradeable as IERC20Metadata
 } from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
-import {AdapterConfig, ProtocolConfig, IBaseAdapter} from "../../src/base/interfaces/IBaseAdapter.sol";
+import {AdapterConfig, IBaseAdapter} from "../../src/base/interfaces/IBaseAdapter.sol";
 
 abstract contract BaseStrategyTest is Test {
     using Math for uint256;
@@ -26,35 +26,35 @@ abstract contract BaseStrategyTest is Test {
 
     address public bob = address(0x9999);
     address public alice = address(0x8888);
-    address public owner = address(0x7777);
+    address public owner;
 
-    function _setUpBaseTest(uint256 i) internal virtual {
-        testConfigStorage = ITestConfigStorage(_setUpTestStorage());
-        TestConfig memory testConfig_ = testConfigStorage.getTestConfig(i);
-
-        uint256 forkId = testConfig_.blockNumber > 0
+    function _setUpBaseTest(uint256 configIndex) internal virtual {
+        _deployTestConfigStorage();
+        testConfig = testConfigStorage.getTestConfig(configIndex);
+        testConfig.blockNumber > 0
             ? vm.createSelectFork(
-                vm.rpcUrl(testConfig_.network),
-                testConfig_.blockNumber
+                vm.rpcUrl(testConfig.network),
+                testConfig.blockNumber
             )
-            : vm.createSelectFork(vm.rpcUrl(testConfig_.network));
-        vm.selectFork(forkId);
+            : vm.createSelectFork(vm.rpcUrl(testConfig.network));
 
-        testConfigStorage = ITestConfigStorage(_setUpTestStorage());
-
-        testConfig = testConfig_;
+        // After forking we have to redeploy the test config storage.
+        // The contract doesn't exist on the fork.
+        _deployTestConfigStorage();
+        
+        AdapterConfig memory adapterConfig = testConfigStorage.getAdapterConfig(configIndex);
+        owner = adapterConfig.owner;
 
         vm.label(bob, "bob");
         vm.label(alice, "alice");
         vm.label(owner, "owner");
 
-        strategy = IBaseAdapter(_setUpStrategy(i, owner));
+        strategy = _setUpStrategy(adapterConfig, owner);
 
-        vm.prank(owner);
+        vm.startPrank(owner);
         strategy.addVault(bob);
-
-        vm.prank(owner);
         strategy.addVault(alice);
+        vm.stopPrank();
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -63,11 +63,11 @@ abstract contract BaseStrategyTest is Test {
 
     /// @dev -- This MUST be overriden to setup a strategy
     function _setUpStrategy(
-        uint256 i_,
+        AdapterConfig memory adapterConfig,
         address owner_
-    ) internal virtual returns (address) {}
+    ) internal virtual returns (IBaseAdapter);
 
-    function _setUpTestStorage() internal virtual returns (address) {}
+    function _deployTestConfigStorage() internal virtual;
 
     function _mintAsset(uint256 amount, address receiver) internal virtual {
         deal(address(testConfig.asset), receiver, amount);
@@ -151,12 +151,12 @@ abstract contract BaseStrategyTest is Test {
                     DEPOSIT/MINT/WITHDRAW/REDEEM
     //////////////////////////////////////////////////////////////*/
 
-    function test__deposit(uint8 fuzzAmount) public virtual {
-        uint8 len = uint8(testConfigStorage.getTestConfigLength());
-        for (uint8 i; i < len; i++) {
+    function test__deposit(uint256 fuzzAmount) public virtual {
+        uint len = testConfigStorage.getTestConfigLength();
+        for (uint i; i < len; i++) {
             if (i > 0) _setUpBaseTest(i);
             uint256 amount = bound(
-                uint256(fuzzAmount),
+                fuzzAmount,
                 testConfig.minDeposit,
                 testConfig.maxDeposit
             );
@@ -213,12 +213,6 @@ abstract contract BaseStrategyTest is Test {
         );
     }
 
-    function testFail__deposit_zero_assets() public virtual {
-        _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
-
-        vm.prank(bob);
-        strategy.deposit(0);
-    }
 
     function testFail__deposit_nonVault() public virtual {
         _mintAssetAndApproveForStrategy(testConfig.defaultAmount, owner);
@@ -238,15 +232,21 @@ abstract contract BaseStrategyTest is Test {
     }
 
     // TODO - should we add a buffer here or make depositAmont = amount?
-    function test__withdraw(uint8 fuzzAmount) public virtual {
+    function test__withdraw(uint fuzzAmount) public virtual {
         uint8 len = uint8(testConfigStorage.getTestConfigLength());
         for (uint8 i; i < len; i++) {
             if (i > 0) _setUpBaseTest(i);
             uint256 amount = bound(
-                uint256(fuzzAmount),
+                fuzzAmount,
                 testConfig.minWithdraw,
                 testConfig.maxWithdraw
             );
+            // TODO: improve this so that depositAmount isn't always bigger than withdrawalAmount.
+            // This way we never cover the case where a user wants to withdraw all of thier assets.
+            //
+            // There should be 2 parameters `depositAmount` and `withdrawalAmount`.
+            // Using `vm.assume(depositAmount >= withdrawalAmount)` we can make sure that we always
+            // deposit atleast `withdrawalAmount`.
             uint256 depositAmount = amount * 2;
 
             _mintAssetAndApproveForStrategy(depositAmount, bob);

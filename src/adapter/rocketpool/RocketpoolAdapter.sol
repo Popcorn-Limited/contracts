@@ -4,33 +4,36 @@
 pragma solidity ^0.8.15;
 
 import {UniswapV3Utils, IUniV3Pool} from "../../utils/UniswapV3Utils.sol";
-import {BaseAdapter, IERC20 as ERC20, AdapterConfig, ProtocolConfig} from "../../base/BaseAdapter.sol";
+import {BaseAdapter, IERC20 as ERC20, AdapterConfig} from "../../base/BaseAdapter.sol";
 import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import {
     IWETH,
     ICurveMetapool,
-    RocketStorageInterface,
-    RocketTokenRETHInterface,
-    RocketDepositPoolInterface,
-    RocketDepositSettingsInterface,
-    RocketNetworkBalancesInterface
+    IRocketStorage,
+    IrETH,
+    IRocketDepositPool,
+    IRocketDepositSettings,
+    IRocketNetworkBalances
 } from "./IRocketpool.sol";
 
 contract RocketpoolAdapter is BaseAdapter {
     using SafeERC20 for ERC20;
     using Math for uint256;
 
-    address public uniRouter;
-    uint24 public uniSwapFee;
+    address public constant uniRouter = 0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45;
+    IWETH public constant WETH = IWETH(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
+    IRocketStorage public constant rocketStorage = IRocketStorage(0x1d8f8f00cfa6758d7bE78336684788Fb0ee0Fa46);
 
     bytes32 public constant rocketDepositPoolKey =
         keccak256(abi.encodePacked("contract.address", "rocketDepositPool"));
     bytes32 public constant rETHKey =
         keccak256(abi.encodePacked("contract.address", "rocketTokenRETH"));
 
-    IWETH public WETH;
-    RocketStorageInterface public rocketStorage;
+
+    /// @dev the rETH/WETH 0.01% pool is the only one that's used:
+    /// https://info.uniswap.org/#/pools/0x553e9c493678d8606d6a5ba284643db2110df823
+    uint24 public constant uniSwapFee = 100;
 
     error NoSharesBurned();
     error InvalidAddress();
@@ -38,20 +41,10 @@ contract RocketpoolAdapter is BaseAdapter {
     error InsufficientSharesReceived();
 
     function __RocketpoolAdapter_init(
-        AdapterConfig memory _adapterConfig,
-        ProtocolConfig memory _protocolConfig
+        AdapterConfig memory _adapterConfig
     ) internal onlyInitializing {
         if (_adapterConfig.useLpToken) revert LpTokenNotSupported();
         __BaseAdapter_init(_adapterConfig);
-
-        rocketStorage = RocketStorageInterface(_protocolConfig.registry); // TODO what are the security assumptions here? Where does this data come from?
-        (address _weth, address _uniRouter, uint24 _uniSwapFee) = abi.decode(
-            _protocolConfig.protocolInitData,
-            (address, address, uint24)
-        ); // TODO what are the security assumptions here? Where does this data come from?
-        WETH = IWETH(_weth);
-        uniRouter = _uniRouter;
-        uniSwapFee = _uniSwapFee;
 
         address rocketDepositPoolAddress = rocketStorage.getAddress(
             rocketDepositPoolKey
@@ -61,9 +54,7 @@ contract RocketpoolAdapter is BaseAdapter {
         if (rocketDepositPoolAddress == address(0) || rETHAddress == address(0))
             revert InvalidAddress();
 
-        RocketTokenRETHInterface rETH = RocketTokenRETHInterface(rETHAddress);
-
-        rETH.approve(uniRouter, type(uint256).max);
+        IrETH(rETHAddress).approve(uniRouter, type(uint256).max);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -76,8 +67,12 @@ contract RocketpoolAdapter is BaseAdapter {
      * must convert lpToken balance into underlying balance
      */
     function _totalUnderlying() internal view override returns (uint256) {
-        RocketTokenRETHInterface rETH = _getRocketToken();
+        IrETH rETH = _getRocketToken();
         return rETH.getEthValue(rETH.balanceOf(address(this)));
+    }
+
+    function _totalLP() internal pure override returns (uint) {
+        revert("NO");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -99,6 +94,10 @@ contract RocketpoolAdapter is BaseAdapter {
         _getDepositPool().deposit{value: amount}();
     }
 
+    function _depositLP(uint) internal pure override {
+        revert("NO");
+    }
+
     /*//////////////////////////////////////////////////////////////
                             WITHDRAWAL LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -114,7 +113,7 @@ contract RocketpoolAdapter is BaseAdapter {
      * others might use the underlying directly
      **/
     function _withdrawUnderlying(uint256 amount) internal override {
-        RocketTokenRETHInterface rETH = _getRocketToken();
+        IrETH rETH = _getRocketToken();
         uint256 rETHShares = rETH.getRethValue(amount) + 1;
 
         if (rETH.getTotalCollateral() > amount) {
@@ -130,6 +129,10 @@ contract RocketpoolAdapter is BaseAdapter {
                 rETHShares
             );
         }
+    }
+
+    function _withdrawLP(uint) internal pure override {
+        revert("NO");
     }
 
     function convertToUnderlyingShares(
@@ -148,25 +151,26 @@ contract RocketpoolAdapter is BaseAdapter {
 
     receive() external payable {}
 
+    /// @dev you don't earn any RPL by holding rETH
+    function _claim() internal override {}
+
     /*//////////////////////////////////////////////////////////////
                             HELPERS
     //////////////////////////////////////////////////////////////*/
     function _getDepositPool()
         internal
         view
-        returns (RocketDepositPoolInterface)
+        returns (IRocketDepositPool)
     {
         return
-            RocketDepositPoolInterface(
-                rocketStorage.getAddress(rocketDepositPoolKey)
-            );
+            IRocketDepositPool(rocketStorage.getAddress(rocketDepositPoolKey));
     }
 
     function _getRocketToken()
         internal
         view
-        returns (RocketTokenRETHInterface)
+        returns (IrETH)
     {
-        return RocketTokenRETHInterface(rocketStorage.getAddress(rETHKey));
+        return IrETH(rocketStorage.getAddress(rETHKey));
     }
 }

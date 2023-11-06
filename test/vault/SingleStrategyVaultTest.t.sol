@@ -2,21 +2,21 @@
 // Docgen-SOLC: 0.8.15
 
 pragma solidity ^0.8.15;
+import { Clones } from "openzeppelin-contracts/proxy/Clones.sol";
+
 import {
     IERC20,
-    Clones,
-    IVault,
-    VaultFees,
-    MockERC20,
-    BaseVaultTest,
-    MockStrategyV2,
-    BaseVaultConfig,
-    AdapterConfig, ProtocolConfig
+    BaseVaultTest
 } from "../base/BaseVaultTest.sol";
+import {MockERC20} from "../utils/mocks/MockERC20.sol";
+import {IVault, VaultFees} from "../../src/base/interfaces/IVault.sol";
+import {BaseVaultConfig} from "../../src/base/BaseVault.sol";
+import {AdapterConfig} from "../../src/base/interfaces/IBaseAdapter.sol";
+import {MockStrategyV2} from "../utils/mocks/MockStrategyV2.sol";
 import {
     SafeERC20Upgradeable as SafeERC20
 } from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
-import "../../src/vaults/SingleStrategyVault.sol";
+import {SingleStrategyVault} from "../../src/vaults/SingleStrategyVault.sol";
 
 contract SingleStrategyVaultTest is BaseVaultTest {
     IERC20[] public rewardTokens;
@@ -31,16 +31,12 @@ contract SingleStrategyVaultTest is BaseVaultTest {
             lpToken: IERC20(address(0)),
             useLpToken: false,
             rewardTokens: rewardTokens,
-            owner: address(this)
-        });
-
-        ProtocolConfig memory protocolConfig = ProtocolConfig({
-            registry: address (0),
-            protocolInitData: abi.encode()
+            owner: address(this),
+            protocolData: ""
         });
 
         address adapterAddress = Clones.clone(adapterImplementation);
-        MockStrategyV2(adapterAddress).__MockAdapter_init(adapterConfig, protocolConfig);
+        MockStrategyV2(adapterAddress).__MockAdapter_init(adapterConfig);
         return MockStrategyV2(adapterAddress);
     }
 
@@ -51,7 +47,7 @@ contract SingleStrategyVaultTest is BaseVaultTest {
         return IVault(Clones.clone(vaultImplementation));
     }
 
-    function _getVaultConfig() internal override returns(BaseVaultConfig memory) {
+    function _getVaultConfig() internal view override returns(BaseVaultConfig memory) {
         return BaseVaultConfig ({
             asset_: IERC20(address(asset)),
             fees: VaultFees({

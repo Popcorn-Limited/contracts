@@ -7,9 +7,10 @@ import {IBaseHelper} from "./interfaces/IBaseHelper.sol";
 import {OwnedUpgradeable} from "../utils/OwnedUpgradeable.sol";
 import {PausableUpgradeable} from "openzeppelin-contracts-upgradeable/security/PausableUpgradeable.sol";
 import {IERC4626Upgradeable as IERC4626} from "openzeppelin-contracts-upgradeable/interfaces/IERC4626Upgradeable.sol";
-import {AdapterConfig, ProtocolConfig, IERC20} from "./interfaces/IBaseAdapter.sol";
+import {AdapterConfig, IERC20} from "./interfaces/IBaseAdapter.sol";
 
 abstract contract BaseAdapter is OwnedUpgradeable, PausableUpgradeable {
+    // TODO: what's this used for?
     address public constant FEE_RECIPIENT =
         address(0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E);
 
@@ -57,13 +58,13 @@ abstract contract BaseAdapter is OwnedUpgradeable, PausableUpgradeable {
      * @notice Returns the total amount of underlying assets.
      * @dev This function must be overriden. If the farm requires the usage of lpToken than this function must convert lpToken balance into underlying balance
      */
-    function _totalUnderlying() internal view virtual returns (uint256) {}
+    function _totalUnderlying() internal view virtual returns (uint256);
 
     /**
      * @notice Returns the total amount of lpToken
      * @dev This function is optional. Some farms might require the user to deposit lpTokens directly into the farm
      */
-    function _totalLP() internal view virtual returns (uint256) {}
+    function _totalLP() internal view virtual returns (uint256);
 
     function maxDeposit() public view virtual returns (uint256) {
         return paused() ? 0 : type(uint256).max;
@@ -86,19 +87,19 @@ abstract contract BaseAdapter is OwnedUpgradeable, PausableUpgradeable {
         _deposit(amount, msg.sender);
     }
 
-    function _deposit(uint256 amount, address caller) internal virtual {}
+    function _deposit(uint256 amount, address caller) internal virtual;
 
     /**
      * @notice Deposits underlying asset and converts it if necessary into an lpToken before depositing
      * @dev This function must be overriden. Some farms require the user to into an lpToken before depositing others might use the underlying directly
      **/
-    function _depositUnderlying(uint256 amount) internal virtual {}
+    function _depositUnderlying(uint256 amount) internal virtual;
 
     /**
      * @notice Deposits the lpToken directly into the farm
      * @dev This function is optional. Some farms might require the user to deposit lpTokens directly into the farm
      **/
-    function _depositLP(uint256 amount) internal virtual {}
+    function _depositLP(uint256 amount) internal virtual;
 
     /*//////////////////////////////////////////////////////////////
                             WITHDRAWAL LOGIC
@@ -116,19 +117,19 @@ abstract contract BaseAdapter is OwnedUpgradeable, PausableUpgradeable {
         _withdraw(amount, receiver);
     }
 
-    function _withdraw(uint256 amount, address receiver) internal virtual {}
+    function _withdraw(uint256 amount, address receiver) internal virtual;
 
     /**
      * @notice Withdraws underlying asset. If necessary it converts the lpToken into underlying before withdrawing
      * @dev This function must be overriden. Some farms require the user to into an lpToken before depositing others might use the underlying directly
      **/
-    function _withdrawUnderlying(uint256 amount) internal virtual {}
+    function _withdrawUnderlying(uint256 amount) internal virtual;
 
     /**
      * @notice Withdraws the lpToken directly from the farm
      * @dev This function is optional. Some farms might require the user to deposit lpTokens directly into the farm
      **/
-    function _withdrawLP(uint256 amount) internal virtual {}
+    function _withdrawLP(uint256 amount) internal virtual;
 
     /*//////////////////////////////////////////////////////////////
                             CLAIM LOGIC
@@ -137,7 +138,7 @@ abstract contract BaseAdapter is OwnedUpgradeable, PausableUpgradeable {
     /**
      * @notice Claims rewards
      */
-    function _claim() internal virtual {}
+    function _claim() internal virtual;
 
     /*//////////////////////////////////////////////////////////////
                             MANAGEMENT LOGIC

@@ -3,7 +3,7 @@
 
 pragma solidity ^0.8.15;
 import {IDotDotStaking} from "./IDotDot.sol";
-import {BaseAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../../base/BaseAdapter.sol";
+import {BaseAdapter, IERC20, AdapterConfig} from "../../base/BaseAdapter.sol";
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
 contract DotDotAdapter is BaseAdapter {
@@ -15,13 +15,12 @@ contract DotDotAdapter is BaseAdapter {
     error LpTokenNotSupported();
 
     function __DotDotAdapter_init(
-        AdapterConfig memory _adapterConfig,
-        ProtocolConfig memory _protocolConfig
+        AdapterConfig memory _adapterConfig
     ) internal onlyInitializing {
         if (!_adapterConfig.useLpToken) revert LpTokenNotSupported();
         __BaseAdapter_init(_adapterConfig);
 
-        lpStaking = IDotDotStaking(_protocolConfig.registry);
+        lpStaking = abi.decode(_adapterConfig.protocolData, (IDotDotStaking));
 
         if (lpStaking.depositTokens(address(lpToken)) == address(0))
             revert InvalidToken();
@@ -37,8 +36,12 @@ contract DotDotAdapter is BaseAdapter {
      * @notice Returns the total amount of underlying assets.
      * @dev This function must be overriden. If the farm requires the usage of lpToken than this function must convert lpToken balance into underlying balance
      */
-    function _totalAssets() internal view override returns (uint256) {
+    function _totalLP() internal view override returns (uint256) {
         return lpStaking.userBalances(address(this), address(lpToken));
+    }
+
+    function _totalUnderlying() internal pure override returns (uint) {
+        revert("NO");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -58,6 +61,10 @@ contract DotDotAdapter is BaseAdapter {
         lpStaking.deposit(address(this), address(lpToken), amount);
     }
 
+    function _depositUnderlying(uint) internal pure override {
+        revert("NO");
+    }
+
     /*//////////////////////////////////////////////////////////////
                             WITHDRAWAL LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -73,6 +80,10 @@ contract DotDotAdapter is BaseAdapter {
      **/
     function _withdrawLP(uint256 amount) internal override {
         lpStaking.withdraw(address(this), address(lpToken), amount);
+    }
+
+    function _withdrawUnderlying(uint) internal pure override {
+        revert("NO");
     }
 
     /*//////////////////////////////////////////////////////////////

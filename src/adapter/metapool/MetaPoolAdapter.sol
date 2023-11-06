@@ -5,7 +5,7 @@ pragma solidity ^0.8.15;
 import {IMetaPool} from "./IMetaPool.sol";
 import {IPermissionRegistry} from "../../base/interfaces/IPermissionRegistry.sol";
 import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
-import {BaseAdapter, IERC20, AdapterConfig, ProtocolConfig, IERC20Metadata} from "../../base/BaseAdapter.sol";
+import {BaseAdapter, IERC20, AdapterConfig, IERC20Metadata} from "../../base/BaseAdapter.sol";
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
 contract MetaPoolAdapter is BaseAdapter {
@@ -26,23 +26,24 @@ contract MetaPoolAdapter is BaseAdapter {
     error AssetMismatch();
     error LpTokenSupported();
 
+    // TODO: main liquidity seems to be on NEAR. Do we even use this?
+
     function __MetaPoolAdapter_init(
-        AdapterConfig memory _adapterConfig,
-        ProtocolConfig memory _protocolConfig
+        AdapterConfig memory _adapterConfig
     ) internal onlyInitializing {
         if (!_adapterConfig.useLpToken) revert LpTokenSupported();
         __BaseAdapter_init(_adapterConfig);
 
-        iPool = IMetaPool(_protocolConfig.registry);
+        iPool = abi.decode(_adapterConfig.protocolData, (IMetaPool));
         if (address(iPool.wNear()) != address(lpToken))
             revert NotValidAsset(address(lpToken));
 
         stNear = iPool.stNear();
         wNear = iPool.wNear();
 
-        IERC20(stNear).safeApprove(_protocolConfig.registry, type(uint256).max);
+        IERC20(stNear).safeApprove(address(iPool), type(uint256).max);
         _adapterConfig.lpToken.approve(
-            address(_protocolConfig.registry),
+            address(address(iPool)),
             type(uint256).max
         );
     }
@@ -65,6 +66,10 @@ contract MetaPoolAdapter is BaseAdapter {
             (10 ** stNearDecimals);
     }
 
+    function _totalUnderlying() internal pure override returns (uint) {
+        revert("NO");
+    }
+
     /*//////////////////////////////////////////////////////////////
                             DEPOSIT LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -81,6 +86,10 @@ contract MetaPoolAdapter is BaseAdapter {
      **/
     function _depositLP(uint256 amount) internal override {
         iPool.swapwNEARForstNEAR(amount);
+    }
+
+    function _depositUnderlying(uint) internal pure override {
+        revert("NO");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -100,6 +109,10 @@ contract MetaPoolAdapter is BaseAdapter {
         iPool.swapstNEARForwNEAR(convertToUnderlyingShares(amount));
     }
 
+    function _withdrawUnderlying(uint) internal pure override {
+        revert("NO");
+    }
+
     /// @notice The amount of ellipsis shares to withdraw given an amount of adapter shares
     function convertToUnderlyingShares(
         uint256 shares
@@ -114,4 +127,6 @@ contract MetaPoolAdapter is BaseAdapter {
                     Math.Rounding.Up
                 );
     }
+
+    function _claim() internal pure override {}
 }

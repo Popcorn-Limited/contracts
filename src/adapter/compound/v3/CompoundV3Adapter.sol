@@ -4,7 +4,7 @@
 pragma solidity ^0.8.15;
 
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
-import {BaseAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../../../base/BaseAdapter.sol";
+import {BaseAdapter, IERC20, AdapterConfig} from "../../../base/BaseAdapter.sol";
 import {ICToken, ICometRewarder, IGovernor, IAdmin, ICometConfigurator} from "./ICompoundV3.sol";
 
 contract CompoundV3Adapter is BaseAdapter {
@@ -14,27 +14,26 @@ contract CompoundV3Adapter is BaseAdapter {
     ICToken public cToken;
 
     /// @notice The Compound Comet rewarder contract.
-    ICometRewarder public cometRewarder;
+    ICometRewarder public constant cometRewarder = ICometRewarder(0x1B0e765F6224C21223AeA2af16c1C46E38885a40);
 
     /// @notice The Compound Comet configurator contract.
-    ICometConfigurator public cometConfigurator;
+    ICometConfigurator public constant cometConfigurator = ICometConfigurator(0x316f9708bB98af7dA9c68C1C3b5e79039cD336E3);
 
     error InvalidAsset(address asset);
+    error LpTokenNotSupported();
 
     function __CompoundV3Adapter_init(
-        AdapterConfig memory _adapterConfig,
-        ProtocolConfig memory _protocolConfig
+        AdapterConfig memory _adapterConfig
     ) internal onlyInitializing {
+        if (_adapterConfig.useLpToken) revert LpTokenNotSupported();
         __BaseAdapter_init(_adapterConfig);
 
-        (address _cToken, address _cometRewarder) = abi.decode(
-            _protocolConfig.protocolInitData,
-            (address, address)
+        (address _cToken) = abi.decode(
+            _adapterConfig.protocolData,
+            (address)
         );
 
         cToken = ICToken(_cToken);
-        cometRewarder = ICometRewarder(_cometRewarder);
-        cometConfigurator = ICometConfigurator(_protocolConfig.registry);
 
         address configuratorBaseToken = cometConfigurator
             .getConfiguration(address(cToken))
@@ -57,6 +56,10 @@ contract CompoundV3Adapter is BaseAdapter {
         return cToken.balanceOf(address(this));
     }
 
+    function _totalLP() internal pure override returns (uint) {
+        revert("NO");
+    }
+
     /*//////////////////////////////////////////////////////////////
                             DEPOSIT LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -76,6 +79,10 @@ contract CompoundV3Adapter is BaseAdapter {
         cToken.supply(address(underlying), amount);
     }
 
+    function _depositLP(uint) internal pure override {
+        revert("NO");
+    }
+
     /*//////////////////////////////////////////////////////////////
                             WITHDRAWAL LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -93,6 +100,10 @@ contract CompoundV3Adapter is BaseAdapter {
     function _withdrawUnderlying(uint256 amount) internal override {
         if (cToken.isWithdrawPaused() == true) revert WithdrawPaused();
         cToken.withdraw(address(underlying), amount);
+    }
+
+    function _withdrawLP(uint) internal pure override {
+        revert("NO");
     }
 
     /*//////////////////////////////////////////////////////////////

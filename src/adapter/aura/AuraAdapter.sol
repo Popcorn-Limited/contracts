@@ -4,14 +4,14 @@
 pragma solidity ^0.8.15;
 
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
-import {BaseAdapter, IERC20, AdapterConfig, ProtocolConfig} from "../../base/BaseAdapter.sol";
+import {BaseAdapter, IERC20, AdapterConfig} from "../../base/BaseAdapter.sol";
 import {IAuraBooster, IAuraRewards, IAuraStaking} from "./IAura.sol";
 
 contract AuraAdapter is BaseAdapter {
     using SafeERC20 for IERC20;
 
     /// @notice The Aura booster contract
-    IAuraBooster public auraBooster;
+    IAuraBooster public constant auraBooster = IAuraBooster(0xA57b8d98dAE62B26Ec3bcC4a365338157060B234);
 
     /// @notice The reward contract for Aura gauge
     IAuraRewards public auraRewards;
@@ -19,18 +19,22 @@ contract AuraAdapter is BaseAdapter {
     /// @notice The pool ID
     uint256 public pid;
 
+    error LpTokenSupported();
+    error InvalidAsset();
+
     function __AuraAdapter_init(
-        AdapterConfig memory _adapterConfig,
-        ProtocolConfig memory _protocolConfig
+        AdapterConfig memory _adapterConfig
     ) internal onlyInitializing {
+        if (!_adapterConfig.useLpToken) revert LpTokenSupported();
         __BaseAdapter_init(_adapterConfig);
 
-        pid = abi.decode(_protocolConfig.protocolInitData, (uint256));
-        auraBooster = IAuraBooster(_protocolConfig.registry);
+        pid = abi.decode(_adapterConfig.protocolData, (uint256));
 
         (address balancerLpToken, , , address _auraRewards, , ) = auraBooster
             .poolInfo(pid);
         auraRewards = IAuraRewards(_auraRewards);
+
+        if (balancerLpToken != address(_adapterConfig.lpToken)) revert InvalidAsset();
 
         _adapterConfig.lpToken.approve(address(auraBooster), type(uint256).max);
     }
@@ -45,6 +49,10 @@ contract AuraAdapter is BaseAdapter {
      */
     function _totalLP() internal view override returns (uint256) {
         return auraRewards.balanceOf(address(this));
+    }
+
+    function _totalUnderlying() internal pure override returns (uint) {
+        revert("NO");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -64,6 +72,10 @@ contract AuraAdapter is BaseAdapter {
         auraBooster.deposit(pid, amount, true);
     }
 
+    function _depositUnderlying(uint) internal pure override {
+        revert("NO");
+    }
+
     /*//////////////////////////////////////////////////////////////
                             WITHDRAWAL LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -79,6 +91,10 @@ contract AuraAdapter is BaseAdapter {
      **/
     function _withdrawLP(uint256 amount) internal override {
         auraRewards.withdrawAndUnwrap(amount, true);
+    }
+
+    function _withdrawUnderlying(uint) internal pure override {
+        revert("NO");
     }
 
     /*//////////////////////////////////////////////////////////////
