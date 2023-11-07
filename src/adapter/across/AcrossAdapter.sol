@@ -4,7 +4,6 @@
 pragma solidity ^0.8.15;
 
 import {IAcrossHop, IAcceleratingDistributor} from "./IAcross.sol";
-import {IPermissionRegistry} from "../../base/interfaces/IPermissionRegistry.sol";
 
 import {BaseAdapter, IERC20, AdapterConfig} from "../../base/BaseAdapter.sol";
 import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
@@ -26,20 +25,8 @@ contract AcrossAdapter is BaseAdapter {
     function __AcrossAdapter_init(
         AdapterConfig memory _adapterConfig
     ) internal onlyInitializing {
+        (address _acrossHop, address _acrossDistributor) = abi.decode(_adapterConfig.protocolData, (address, address));
         __BaseAdapter_init(_adapterConfig);
-
-        (IPermissionRegistry permissionRegistry, address _acrossHop, address _acrossDistributor) = abi.decode(
-            _adapterConfig.protocolData,
-            (IPermissionRegistry, address, address)
-        );
-
-        if (!permissionRegistry.endorsed(_acrossHop))
-            revert NotEndorsed(_acrossHop);
-        if (
-            permissionRegistry.endorsed(
-                _acrossDistributor
-            )
-        ) revert NotEndorsed(_acrossDistributor);
 
         if (!IAcrossHop(_acrossHop).pooledTokens(address(underlying)).isEnabled)
             revert Disabled();
@@ -51,12 +38,9 @@ contract AcrossAdapter is BaseAdapter {
             IAcrossHop(acrossHop).pooledTokens(address(underlying)).lpToken
         );
 
+        lpToken.approve(address(_acrossDistributor), type(uint256).max);
         _adapterConfig.underlying.approve(
             address(_acrossHop),
-            type(uint256).max
-        );
-        _adapterConfig.lpToken.approve(
-            address(_acrossDistributor),
             type(uint256).max
         );
     }
