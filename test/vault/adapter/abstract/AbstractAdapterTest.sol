@@ -337,13 +337,16 @@ abstract contract AbstractAdapterTest is PropertyTest {
             uint256 reqAssets = adapter.previewMint(
                 adapter.previewWithdraw(amount)
             ) * 10;
+
             _mintAssetAndApproveForAdapter(reqAssets, bob);
+
             vm.prank(bob);
             adapter.deposit(reqAssets, bob);
 
             prop_withdraw(bob, bob, amount, testId);
 
             _mintAssetAndApproveForAdapter(reqAssets, bob);
+
             vm.prank(bob);
             adapter.deposit(reqAssets, bob);
 
