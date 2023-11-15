@@ -2,17 +2,17 @@
 // Docgen-SOLC: 0.8.15
 
 pragma solidity ^0.8.15;
-
+import "forge-std/Console.sol";
 import {AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20, Math, IStrategy, IAdapter} from "../abstracts/AdapterBase.sol";
 import {WithRewards, IWithRewards} from "../abstracts/WithRewards.sol";
 import {IVault} from "./ISommelier.sol";
 
 /**
  * @title   Sommelier Adapter
- * @notice  ERC4626 wrapper for Sommelier Vaults.
+ * @notice  ERC4626 wrapper for Sommelier Cellar Vaults
  *
- * An ERC4626 compliant Wrapper for Sommelier Vaults
- * Allows wrapping Sommelier Vaults.
+ * An ERC4626 compliant Wrapper for Sommelier Cellar Vaults
+ * Allows wrapping Sommelier Cellar Vaults
  */
 contract SommelierAdapter is AdapterBase, WithRewards {
     using SafeERC20 for IERC20;
@@ -87,9 +87,14 @@ contract SommelierAdapter is AdapterBase, WithRewards {
     /// @return The total amount of underlying tokens the Vault holds.
 
     function _totalAssets() internal view override returns (uint256) {
-        uint256 shares = vault.balanceOf(address(this));
-        uint256 assets = vault.convertToAssets(shares);
-        return assets;
+        console.log("shares in cellar: ", vault.balanceOf(address(this)));
+//        uint256 shares = vault.balanceOf(address(this));
+//        uint256 assets = vault.convertToAssets(shares);
+//        console.log("assets: ", assets);
+
+        return vault.balanceOf(address(this));
+
+//        return assets;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -99,19 +104,14 @@ contract SommelierAdapter is AdapterBase, WithRewards {
         vault.deposit(amount, address(this));
     }
 
-    error DING();
-
     function _protocolWithdraw(uint256 amount, uint256) internal override {
-        uint256 shares = vault.convertToShares(amount);
-
-        // revert PING(amount, shares);
-
-        vault.redeem(shares, address(this), address(this));
+        console.log("shares to withdraw: ", amount);
+        vault.redeem(amount, address(this), address(this));
     }
 
     /*//////////////////////////////////////////////////////////////
                       EIP-165 LOGIC
-  //////////////////////////////////////////////////////////////*/
+    //////////////////////////////////////////////////////////////*/
 
     function supportsInterface(
         bytes4 interfaceId
