@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.15;
-
 import {Test} from "forge-std/Test.sol";
-
 import {SommelierAdapter, SafeERC20, IERC20, IERC20Metadata, Math, IVault} from "../../../../src/vault/adapter/sommelier/SommelierAdapter.sol";
 import {SommelierTestConfigStorage, SommelierTestConfig} from "./SommelierTestConfigStorage.sol";
 import {AbstractAdapterTest, ITestConfigStorage, IAdapter} from "../abstract/AbstractAdapterTest.sol";
@@ -75,7 +73,6 @@ contract SommelierAdapterTest is AbstractAdapterTest {
 
     // Verify that totalAssets returns the expected amount
     function verify_totalAssets() public override {
-        // Make sure totalAssets isnt 0
         deal(address(asset), bob, defaultAmount);
         vm.startPrank(bob);
         asset.approve(address(adapter), defaultAmount);
@@ -124,23 +121,51 @@ contract SommelierAdapterTest is AbstractAdapterTest {
     }
 
     /*//////////////////////////////////////////////////////////////
-                          INITIALIZATION
+                                   PAUSE
     //////////////////////////////////////////////////////////////*/
 
-    // function test__RT_deposit_withdraw() public override {
-    //     _mintAssetAndApproveForAdapter(defaultAmount, bob);
 
-    //     vm.startPrank(bob);
-    //     uint256 shares1 = adapter.deposit(defaultAmount, bob);
+    function test__unpause() public override {
+        _mintAssetAndApproveForAdapter(defaultAmount * 3, bob);
 
-    //     vm.warp(block.timestamp + 1200000);
+        vm.prank(bob);
+        adapter.deposit(defaultAmount, bob);
 
-    //     uint256 shares2 = adapter.withdraw(adapter.maxWithdraw(bob), bob, bob);
-    //     vm.stopPrank();
+        uint256 oldTotalAssets = adapter.totalAssets();
+        uint256 oldTotalSupply = adapter.totalSupply();
+        uint256 oldIouBalance = iouBalance();
 
-    //     // Pass the test if maxWithdraw is smaller than deposit since round trips are impossible
-    //     if (adapter.maxWithdraw(bob) == defaultAmount) {
-    //         assertGe(shares2, shares1, testId);
-    //     }
-    // }
+        adapter.pause();
+        adapter.unpause();
+
+        // We simply deposit back into the external protocol
+        // TotalSupply and Assets dont change
+        uint256 feeDifference = oldTotalAssets - adapter.totalAssets();
+        assertApproxEqAbs(
+            oldTotalAssets,
+            adapter.totalAssets(),
+            feeDifference,
+            "totalAssets"
+        );
+        assertApproxEqAbs(
+            oldTotalSupply,
+            adapter.totalSupply(),
+            _delta_,
+            "totalSupply"
+        );
+        assertApproxEqAbs(
+            asset.balanceOf(address(adapter)),
+            0,
+            _delta_,
+            "asset balance"
+        );
+        assertApproxEqAbs(iouBalance(), oldIouBalance, _delta_, "iou balance");
+
+        // Deposit and mint dont revert
+        vm.startPrank(bob);
+        adapter.deposit(defaultAmount, bob);
+        adapter.mint(defaultAmount, bob);
+    }
+
+    function test__harvest() public override {}
 }

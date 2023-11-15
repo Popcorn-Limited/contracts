@@ -2,7 +2,6 @@
 // Docgen-SOLC: 0.8.15
 
 pragma solidity ^0.8.15;
-import "forge-std/Console.sol";
 import {AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20, Math, IStrategy, IAdapter} from "../abstracts/AdapterBase.sol";
 import {WithRewards, IWithRewards} from "../abstracts/WithRewards.sol";
 import {IVault} from "./ISommelier.sol";
@@ -87,14 +86,7 @@ contract SommelierAdapter is AdapterBase, WithRewards {
     /// @return The total amount of underlying tokens the Vault holds.
 
     function _totalAssets() internal view override returns (uint256) {
-        console.log("shares in cellar: ", vault.balanceOf(address(this)));
-//        uint256 shares = vault.balanceOf(address(this));
-//        uint256 assets = vault.convertToAssets(shares);
-//        console.log("assets: ", assets);
-
-        return vault.balanceOf(address(this));
-
-//        return assets;
+        return vault.convertToAssets(vault.balanceOf(address(this)));
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -105,8 +97,7 @@ contract SommelierAdapter is AdapterBase, WithRewards {
     }
 
     function _protocolWithdraw(uint256 amount, uint256) internal override {
-        console.log("shares to withdraw: ", amount);
-        vault.redeem(amount, address(this), address(this));
+        vault.withdraw(amount, address(this), address(this));
     }
 
     /*//////////////////////////////////////////////////////////////
