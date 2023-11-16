@@ -43,7 +43,7 @@ contract CurveCompounder is BaseCompounder {
         uint256 len = rewardTokens.length;
         for (uint256 i; i < len; i++) {
             uint256 rewardBal = rewardTokens[i].balanceOf(address(this));
-            if (rewardBal >= minTradeAmounts[i])
+            if (rewardBal != 0 && rewardBal >= minTradeAmounts[i])
                 ICurveRouter(router).exchange_multiple(
                     _toBaseAssetRoutes[i].route,
                     _toBaseAssetRoutes[i].swapParams,
