@@ -19,6 +19,10 @@ contract StakingVault {
     ERC20 public immutable rewardToken;
     uint public immutable decimals;
     uint public immutable MAX_LOCK_TIME;
+    address public constant PROTOCOL_FEE_RECIPIENT = 0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E;
+    uint public constant PROTOCOL_FEE = 10;
+    
+    uint protocolFees;
     
     mapping(address => Lock) public locks;
     mapping(address => uint) public accruedRewards;
@@ -111,8 +115,11 @@ contract StakingVault {
     }
 
     function distributeRewards(uint amount) external {
+        uint fee = amount * PROTOCOL_FEE / 10_000;
+        protocolFees += fee;
+
         // amount of reward tokens that will be distributed per share
-        uint delta = amount.mulDivDown(10 ** decimals, totalSupply);
+        uint delta = (amount - fee).mulDivDown(10 ** decimals, totalSupply);
         /// @dev if delta == 0, no one will receive any rewards.
         require(delta != 0, "LOW_AMOUNT") ;
         currIndex += delta;
@@ -145,5 +152,11 @@ contract StakingVault {
         rewardToken.safeTransfer(user, rewards);
 
         emit Claimed(msg.sender, rewards);
+    }
+
+    function claimProtocolFees() external {
+        uint amount = protocolFees;
+        protocolFees = 0;
+        rewardToken.safeTransfer(PROTOCOL_FEE_RECIPIENT, amount);
     }
 }

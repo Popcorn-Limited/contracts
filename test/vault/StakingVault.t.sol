@@ -88,8 +88,9 @@ contract StakingVaultTest is Test {
         vault.accrueUser(alice);
         vault.accrueUser(bob);
 
-        assertEq(vault.accruedRewards(alice), amount * 4 / 5, "Alice got wrong reward amount");
-        assertEq(vault.accruedRewards(bob), amount / 5, "Bob got wrong reward amount");
+        uint amountAfterFees = amount - amount * vault.PROTOCOL_FEE() / 10_000;
+        assertEq(vault.accruedRewards(alice), amountAfterFees * 4 / 5, "Alice got wrong reward amount");
+        assertEq(vault.accruedRewards(bob), amountAfterFees / 5, "Bob got wrong reward amount");
     }
 
     function test_lock_changes_affect_distribution() public {
@@ -97,21 +98,22 @@ contract StakingVaultTest is Test {
         _deposit(bob, 1e18, MAX_LOCK_TIME / 4);
 
         uint amount = 100e18;
+        uint amountAfterFees = amount - amount * vault.PROTOCOL_FEE() / 10_000;
 
         _distribute(amount);
 
         vm.prank(bob);
         vault.increaseLockTime(MAX_LOCK_TIME / 2);
 
-        assertEq(vault.accruedRewards(bob), amount / 5, "Bob got wrong reward amount");
+        assertEq(vault.accruedRewards(bob), amountAfterFees / 5, "Bob got wrong reward amount");
 
         _distribute(amount);
 
         vault.accrueUser(alice);
         vault.accrueUser(bob);
 
-        uint aliceExpectedRewards = amount * 4 / 5 + amount * 4 / 6;
-        uint bobExpectedRewards = amount / 5 + amount * 2 / 6;
+        uint aliceExpectedRewards = amountAfterFees * 4 / 5 + amountAfterFees * 4 / 6;
+        uint bobExpectedRewards = amountAfterFees / 5 + amountAfterFees * 2 / 6;
 
         assertEq(vault.accruedRewards(alice), aliceExpectedRewards, "Alice got wrong reward amount");
         assertEq(vault.accruedRewards(bob), bobExpectedRewards, "Bob got wrong reward amount");
@@ -124,8 +126,11 @@ contract StakingVaultTest is Test {
         vault.accrueUser(alice);
         vault.claim(alice);
 
-        assertEq(rewardToken.balanceOf(alice), 100e18, "didn't claim rewards");
+        uint amountAfterFees = 100e18 - 100e18 * vault.PROTOCOL_FEE() / 10_000;
+
+        assertEq(rewardToken.balanceOf(alice), amountAfterFees, "didn't claim rewards");
     }
+
 
     function test_accrue_before_amount_increase() public {
         _deposit(alice, 1e18, MAX_LOCK_TIME);
@@ -138,9 +143,10 @@ contract StakingVaultTest is Test {
         vault.increaseLockAmount(1e18);
         vm.stopPrank();
 
-        // with the initial balances, alice should receive half of the total reward amount (100e18)
+        uint amountAfterFees = 100e18 - 100e18 * vault.PROTOCOL_FEE() / 10_000;
+        // with the initial balances, alice should receive half of the total reward amount.
         // The increase in her lock amount shouldn't have an affect here.
-        assertEq(vault.accruedRewards(alice), 50e18, "Alice got wrong reward amount");
+        assertEq(vault.accruedRewards(alice), amountAfterFees / 2, "Alice got wrong reward amount");
     }
 
     function test_accrue_before_lock_time_increase() public {
@@ -152,8 +158,9 @@ contract StakingVaultTest is Test {
         vault.increaseLockTime(365 days * 2);
         vm.stopPrank();
 
+        uint amountAfterFees = 100e18 - 100e18 * vault.PROTOCOL_FEE() / 10_000;
         // with the initial lock times, alice should receive half of the total reward amount (100e18)
-        assertEq(vault.accruedRewards(alice), 50e18, "Alice got wrong reward amount");
+        assertEq(vault.accruedRewards(alice), amountAfterFees / 2, "Alice got wrong reward amount");
     }
 
     function test_cannot_lock_for_more_than_max() public {
