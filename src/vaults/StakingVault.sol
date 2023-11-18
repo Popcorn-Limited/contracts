@@ -26,6 +26,7 @@ contract StakingVault {
     
     mapping(address => Lock) public locks;
     mapping(address => uint) public accruedRewards;
+    mapping(address => mapping(address => bool)) public approvals;
     uint public totalSupply;
     uint public currIndex;
 
@@ -44,14 +45,14 @@ contract StakingVault {
         rewardToken = ERC20(_rewardToken);
     }
 
-    function deposit(uint amount, uint lockTime) external returns (uint shares){
-        require(locks[msg.sender].unlockTime == 0, "LOCK_EXISTS");
+    function deposit(address recipient, uint amount, uint lockTime) external returns (uint shares){
+        require(locks[recipient].unlockTime == 0, "LOCK_EXISTS");
 
         shares = toShares(amount, lockTime);
         require(shares != 0, "NO_SHARES");
 
         totalSupply += shares;
-        locks[msg.sender] = Lock({
+        locks[recipient] = Lock({
             unlockTime: block.timestamp + lockTime,
             rewardIndex: currIndex,
             amount: amount,
@@ -60,53 +61,61 @@ contract StakingVault {
 
         asset.safeTransferFrom(msg.sender, address(this), amount);
 
-        emit LockCreated(msg.sender, amount, lockTime);
+        emit LockCreated(recipient, amount, lockTime);
     }
 
-    function withdraw() external {
-        accrueUser(msg.sender);
-        require(block.timestamp > locks[msg.sender].unlockTime, "LOCKED");
+    function withdraw(address owner, address recipient) external {
+        _isApproved(owner);
 
-        totalSupply -= locks[msg.sender].shares;
-        uint amount = locks[msg.sender].amount;
-        delete locks[msg.sender];
-
-        asset.safeTransfer(msg.sender, amount);
-    
-        emit Withdrawal(msg.sender, amount);
-    }
-
-    function increaseLockTime(uint newLockTime) external {
-        accrueUser(msg.sender);
-
-        uint amount = locks[msg.sender].amount;
+        uint amount = locks[owner].amount;
         require(amount != 0, "NO_LOCK");
-        require(newLockTime > locks[msg.sender].unlockTime, "INCREASE_LOCK_TIME");
 
-        uint newShares = toShares(locks[msg.sender].amount, newLockTime);
+        accrueUser(owner);
+        require(block.timestamp > locks[owner].unlockTime, "LOCKED");
 
-        totalSupply = totalSupply - locks[msg.sender].shares + newShares;
-        locks[msg.sender].unlockTime = block.timestamp + newLockTime;
-        locks[msg.sender].shares = newShares;
+        totalSupply -= locks[owner].shares;
+        delete locks[owner];
+
+        asset.safeTransfer(recipient, amount);
     
-        emit IncreaseLockTime(msg.sender, newLockTime);
+        emit Withdrawal(owner, amount);
     }
 
-    function increaseLockAmount(uint amount) external {
-        accrueUser(msg.sender);
+    function increaseLockTime(address owner, uint newLockTime) external {
+        _isApproved(owner);
 
-        uint currAmount = locks[msg.sender].amount;
+        accrueUser(owner);
+
+        uint amount = locks[owner].amount;
+        require(amount != 0, "NO_LOCK");
+        require(newLockTime > locks[owner].unlockTime, "INCREASE_LOCK_TIME");
+
+        uint newShares = toShares(locks[owner].amount, newLockTime);
+
+        totalSupply = totalSupply - locks[owner].shares + newShares;
+        locks[owner].unlockTime = block.timestamp + newLockTime;
+        locks[owner].shares = newShares;
+    
+        emit IncreaseLockTime(owner, newLockTime);
+    }
+
+    function increaseLockAmount(address owner, uint amount) external {
+        _isApproved(owner);
+
+        accrueUser(owner);
+
+        uint currAmount = locks[owner].amount;
         require(currAmount != 0, "NO_LOCK");
 
-        uint newShares = toShares(currAmount + amount, locks[msg.sender].unlockTime - block.timestamp);
+        uint newShares = toShares(currAmount + amount, locks[owner].unlockTime - block.timestamp);
 
-        totalSupply = totalSupply - locks[msg.sender].shares + newShares;
-        locks[msg.sender].amount = currAmount + amount;
-        locks[msg.sender].shares = newShares;
+        totalSupply = totalSupply - locks[owner].shares + newShares;
+        locks[owner].amount = currAmount + amount;
+        locks[owner].shares = newShares;
 
         asset.safeTransferFrom(msg.sender, address(this), amount);
     
-        emit IncreaseLockAmount(msg.sender, amount);
+        emit IncreaseLockAmount(owner, amount);
     }
 
     function toShares(uint amount, uint lockTime) public view returns (uint) {
@@ -154,9 +163,17 @@ contract StakingVault {
         emit Claimed(msg.sender, rewards);
     }
 
+    function approve(address spender, bool value) external {
+        approvals[msg.sender][spender] = value;
+    }
+
     function claimProtocolFees() external {
         uint amount = protocolFees;
         protocolFees = 0;
         rewardToken.safeTransfer(PROTOCOL_FEE_RECIPIENT, amount);
+    }
+
+    function _isApproved(address user) internal {
+        require(user == msg.sender || approvals[user][msg.sender] == true, "UNAUTHORIZED");
     }
 }

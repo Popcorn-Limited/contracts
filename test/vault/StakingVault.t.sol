@@ -26,7 +26,7 @@ contract StakingVaultTest is Test {
 
         vm.startPrank(alice);
         asset.approve(address(vault), amount);
-        uint shares = vault.deposit(amount, 365 days * 4);
+        uint shares = vault.deposit(alice, amount, 365 days * 4);
         vm.stopPrank();
 
         (uint unlockTime, uint rewardIndex, uint lockAmount, uint lockShares) = vault.locks(alice);
@@ -47,8 +47,8 @@ contract StakingVaultTest is Test {
 
         vm.startPrank(alice);
         asset.approve(address(vault), 1e18);
-        vault.deposit(1e18, 1 days);
-        vault.increaseLockTime(newUnlockTime);
+        vault.deposit(alice, 1e18, 1 days);
+        vault.increaseLockTime(alice, newUnlockTime);
         vm.stopPrank();
 
         uint expectedShares = 1e18 * newUnlockTime / MAX_LOCK_TIME;
@@ -65,8 +65,8 @@ contract StakingVaultTest is Test {
 
         vm.startPrank(alice);
         asset.approve(address(vault), 1e18 + amount);
-        vault.deposit(1e18, MAX_LOCK_TIME);
-        vault.increaseLockAmount(amount);
+        vault.deposit(alice, 1e18, MAX_LOCK_TIME);
+        vault.increaseLockAmount(alice, amount);
         vm.stopPrank();
     
         (,,uint lockAmount, uint lockShares) = vault.locks(alice);
@@ -103,7 +103,7 @@ contract StakingVaultTest is Test {
         _distribute(amount);
 
         vm.prank(bob);
-        vault.increaseLockTime(MAX_LOCK_TIME / 2);
+        vault.increaseLockTime(bob, MAX_LOCK_TIME / 2);
 
         assertEq(vault.accruedRewards(bob), amountAfterFees / 5, "Bob got wrong reward amount");
 
@@ -140,7 +140,7 @@ contract StakingVaultTest is Test {
         deal(address(asset), alice, 1e18);
         vm.startPrank(alice);
         asset.approve(address(vault), 1e18);
-        vault.increaseLockAmount(1e18);
+        vault.increaseLockAmount(alice, 1e18);
         vm.stopPrank();
 
         uint amountAfterFees = 100e18 - 100e18 * vault.PROTOCOL_FEE() / 10_000;
@@ -155,7 +155,7 @@ contract StakingVaultTest is Test {
         _distribute(100e18);
 
         vm.startPrank(alice);
-        vault.increaseLockTime(365 days * 2);
+        vault.increaseLockTime(alice, 365 days * 2);
         vm.stopPrank();
 
         uint amountAfterFees = 100e18 - 100e18 * vault.PROTOCOL_FEE() / 10_000;
@@ -168,7 +168,7 @@ contract StakingVaultTest is Test {
         vm.startPrank(alice);
         asset.approve(address(vault), 1e18);
         vm.expectRevert("LOCK_TIME");
-        vault.deposit(1e18, MAX_LOCK_TIME + 1);
+        vault.deposit(alice, 1e18, MAX_LOCK_TIME + 1);
         vm.stopPrank();
     }
 
@@ -177,8 +177,76 @@ contract StakingVaultTest is Test {
         _deposit(alice, 1e18, 365 days);
         vm.startPrank(alice);
         vm.expectRevert("LOCK_TIME");
-        vault.increaseLockTime(MAX_LOCK_TIME + 1);
+        vault.increaseLockTime(alice, MAX_LOCK_TIME + 1);
         vm.stopPrank();
+    }
+
+    function test_only_authorized_can_withdraw() public {
+        _deposit(alice, 1e18, 365 days);
+        vm.warp(block.timestamp + 365 days + 1);
+        vm.startPrank(bob);
+        vm.expectRevert("UNAUTHORIZED");
+        vault.withdraw(alice, bob);
+        vm.stopPrank();
+
+        vm.prank(alice);
+        vault.approve(bob, true);
+
+        vm.prank(bob);
+        vault.withdraw(alice, bob);
+
+        assertEq(asset.balanceOf(bob), 1e18, "Bob didn't receive the funds");
+    }
+
+    function test_cannot_withdraw_twice() public {
+        _deposit(alice, 1e18, 365 days);
+        vm.warp(block.timestamp + 365 days + 1);
+
+        vm.startPrank(alice);
+        vault.withdraw(alice, alice);
+
+        assertEq(asset.balanceOf(alice), 1e18, "Alice didn't receive the funds");
+
+        vm.expectRevert("NO_LOCK");
+        vault.withdraw(alice, alice);
+    }
+
+    function test_only_authorized_can_increase_lock_time() public {
+        _deposit(alice, 1e18, 365 days);
+
+        vm.startPrank(bob);
+        vm.expectRevert("UNAUTHORIZED");
+        vault.increaseLockTime(alice, 365 days * 2);
+        vm.stopPrank();
+
+        vm.prank(alice);
+        vault.approve(bob, true);
+
+        vm.prank(bob);
+        vault.increaseLockTime(alice, 365 days * 2);
+
+        (uint unlockTime,,,) = vault.locks(alice);
+        assertEq(unlockTime, block.timestamp + 365 days * 2, "lock time didn't change");
+    }
+
+    function test_only_authorized_can_increase_lock_amount() public {
+        _deposit(alice, 1e18, 365 days);
+
+        deal(address(asset), bob, 1e18);
+        vm.startPrank(bob);
+        asset.approve(address(vault), 1e18);
+        vm.expectRevert("UNAUTHORIZED");
+        vault.increaseLockAmount(alice, 1e18);
+        vm.stopPrank();
+
+        vm.prank(alice);
+        vault.approve(bob, true);
+
+        vm.prank(bob);
+        vault.increaseLockAmount(alice, 1e18);
+
+        (,,uint amount,) = vault.locks(alice);
+        assertEq(amount, 2e18, "lock amount didn't change");
     }
 
     //
@@ -189,7 +257,7 @@ contract StakingVaultTest is Test {
         deal(address(asset), user, amount);
         vm.startPrank(user);
         asset.approve(address(vault), amount);
-        vault.deposit(amount, lockTime);
+        vault.deposit(user, amount, lockTime);
         vm.stopPrank();
     }
 
