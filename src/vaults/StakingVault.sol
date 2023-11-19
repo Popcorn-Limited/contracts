@@ -107,11 +107,11 @@ contract StakingVault {
         uint currAmount = locks[owner].amount;
         require(currAmount != 0, "NO_LOCK");
 
-        uint newShares = toShares(currAmount + amount, locks[owner].unlockTime - block.timestamp);
+        uint newShares = toShares(amount, locks[owner].unlockTime - block.timestamp);
 
-        totalSupply = totalSupply - locks[owner].shares + newShares;
+        totalSupply = totalSupply + newShares;
         locks[owner].amount = currAmount + amount;
-        locks[owner].shares = newShares;
+        locks[owner].shares += newShares;
 
         asset.safeTransferFrom(msg.sender, address(this), amount);
     

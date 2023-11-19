@@ -66,12 +66,13 @@ contract StakingVaultTest is Test {
         vm.startPrank(alice);
         asset.approve(address(vault), 1e18 + amount);
         vault.deposit(alice, 1e18, MAX_LOCK_TIME);
+        vm.warp(block.timestamp + 365 days * 2);
         vault.increaseLockAmount(alice, amount);
         vm.stopPrank();
     
         (,,uint lockAmount, uint lockShares) = vault.locks(alice);
 
-        uint expectedShares = vault.toShares(1e18 + amount, MAX_LOCK_TIME);
+        uint expectedShares = vault.toShares(1e18, MAX_LOCK_TIME) + vault.toShares(amount, MAX_LOCK_TIME / 2);
         assertEq(1e18 + amount, lockAmount, "wrong lock amount");
         assertEq(expectedShares, lockShares, "wrong shares");
     }
