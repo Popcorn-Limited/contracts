@@ -4,6 +4,7 @@ pragma solidity 0.8.19;
 import {ERC20} from "solmate/tokens/ERC20.sol";
 import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
 import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
+import {IAdapter} from "../interfaces/vault/IAdapter.sol";
 
 struct Lock {
     uint unlockTime;
@@ -17,6 +18,8 @@ contract StakingVault {
     using FixedPointMathLib for uint256;
     ERC20 public immutable asset;
     ERC20 public immutable rewardToken;
+    IAdapter public immutable strategy;
+
     uint public immutable decimals;
     uint public immutable MAX_LOCK_TIME;
     address public constant PROTOCOL_FEE_RECIPIENT = 0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E;
@@ -37,12 +40,15 @@ contract StakingVault {
     event Claimed(address indexed user, uint amount);
     event DistributeRewards(address indexed distributor, uint amount);
 
-    constructor(address _asset, uint _maxLockTime, address _rewardToken) {
+    constructor(address _asset, uint _maxLockTime, address _rewardToken, address _strategy) {
         asset = ERC20(_asset);
         MAX_LOCK_TIME = _maxLockTime;
         decimals = ERC20(_asset).decimals();
 
         rewardToken = ERC20(_rewardToken);
+
+        strategy = IAdapter(_strategy);
+        ERC20(_asset).approve(_strategy, type(uint).max);
     }
 
     function deposit(address recipient, uint amount, uint lockTime) external returns (uint shares){
@@ -61,22 +67,25 @@ contract StakingVault {
 
         asset.safeTransferFrom(msg.sender, address(this), amount);
 
+        strategy.deposit(amount, address(this));
+
         emit LockCreated(recipient, amount, lockTime);
     }
 
     function withdraw(address owner, address recipient) external {
         _isApproved(owner);
 
-        uint amount = locks[owner].amount;
-        require(amount != 0, "NO_LOCK");
-
-        accrueUser(owner);
+        uint shares = locks[owner].shares;
+        require(shares != 0, "NO_LOCK");
         require(block.timestamp > locks[owner].unlockTime, "LOCKED");
 
-        totalSupply -= locks[owner].shares;
+        accrueUser(owner);
+        uint amount = shares.mulDivDown(strategy.totalAssets(), totalSupply);
+
+        totalSupply -= shares;
         delete locks[owner];
 
-        asset.safeTransfer(recipient, amount);
+        strategy.withdraw(amount, recipient, address(this));
     
         emit Withdrawal(owner, amount);
     }
@@ -88,7 +97,7 @@ contract StakingVault {
 
         uint amount = locks[owner].amount;
         require(amount != 0, "NO_LOCK");
-        require(newLockTime > locks[owner].unlockTime, "INCREASE_LOCK_TIME");
+        require(newLockTime + block.timestamp > locks[owner].unlockTime, "INCREASE_LOCK_TIME");
 
         uint newShares = toShares(locks[owner].amount, newLockTime);
 
@@ -114,13 +123,22 @@ contract StakingVault {
         locks[owner].shares += newShares;
 
         asset.safeTransferFrom(msg.sender, address(this), amount);
+
+        strategy.deposit(amount, address(this));
     
         emit IncreaseLockAmount(owner, amount);
     }
 
     function toShares(uint amount, uint lockTime) public view returns (uint) {
         require(lockTime <= MAX_LOCK_TIME, "LOCK_TIME");
-        return amount.mulDivDown(lockTime, MAX_LOCK_TIME);
+        uint totalAssets = strategy.totalAssets();
+        uint shares;
+        if (totalAssets == 0) {
+            shares = amount;
+        } else {
+            shares = amount.mulDivDown(totalSupply, strategy.totalAssets());
+        }
+        return shares.mulDivDown(lockTime, MAX_LOCK_TIME);
     }
 
     function distributeRewards(uint amount) external {

@@ -1,7 +1,11 @@
 pragma solidity ^0.8.0;
 import "forge-std/Test.sol";
 
+import { Clones } from "openzeppelin-contracts/proxy/Clones.sol";
+
 import {MockERC20} from "../utils/mocks/MockERC20.sol";
+import { MockERC4626 } from "../utils/mocks/MockERC4626.sol";
+import { IERC20Upgradeable as IERC20 } from "openzeppelin-contracts-upgradeable/interfaces/IERC4626Upgradeable.sol";
 
 import {StakingVault} from "../../src/vaults/StakingVault.sol";
 
@@ -10,6 +14,7 @@ contract StakingVaultTest is Test {
 
     MockERC20 asset = new MockERC20("A", "Asset", 18);
     MockERC20 rewardToken = new MockERC20("R", "Reward", 18);
+    MockERC4626 strategy;
 
     address alice = vm.addr(1);
     address bob = vm.addr(2);
@@ -17,7 +22,10 @@ contract StakingVaultTest is Test {
     uint MAX_LOCK_TIME = 365 days * 4;
 
     function setUp() public {
-        vault = new StakingVault(address(asset), MAX_LOCK_TIME, address(rewardToken));
+        address adapterImplementation = address(new MockERC4626());
+        strategy = MockERC4626(Clones.clone(adapterImplementation));
+        strategy.initialize(IERC20(address(asset)), "Mock Token Vault", "vwTKN");
+        vault = new StakingVault(address(asset), MAX_LOCK_TIME, address(rewardToken), address(strategy));
     }
 
     function test_deposit(uint amount) public {
