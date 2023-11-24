@@ -11,8 +11,8 @@ contract AaveV3TestConfigStorage is BaseTestConfigStorage {
     constructor() {
         _testConfigs.push(TestConfig({
             asset: WETH,
-            depositDelta: 0,
-            withdrawDelta: 0,
+            depositDelta: 1,
+            withdrawDelta: 1,
             testId: "AaveV3 WETH",
             network: "mainnet",
             blockNumber: 0,
