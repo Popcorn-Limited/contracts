@@ -10,7 +10,7 @@ import {IERC4626Upgradeable as IERC4626} from "openzeppelin-contracts-upgradeabl
 import {AdapterConfig, IERC20} from "./interfaces/IBaseAdapter.sol";
 
 abstract contract BaseAdapter is OwnedUpgradeable, PausableUpgradeable {
-    // TODO: what's this used for?
+    // @dev in case we add some fees on adapter level
     address public constant FEE_RECIPIENT =
         address(0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E);
 
@@ -152,7 +152,6 @@ abstract contract BaseAdapter is OwnedUpgradeable, PausableUpgradeable {
     }
 
     /// @dev This function needs to be called by a trusted contract on initialization of a new vault that wants to use this strategy
-    // TODO -- allow owner to remove vaults ?
     function addVault(address _vault) external onlyOwner {
         isVault[_vault] = true;
     }

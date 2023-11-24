@@ -5,15 +5,8 @@ pragma solidity ^0.8.15;
 
 import {VaultFees} from "./interfaces/IVault.sol";
 import {OwnedUpgradeable} from "../utils/OwnedUpgradeable.sol";
-import {
-    IERC4626Upgradeable as IERC4626,
-    IERC20Upgradeable as IERC20
-} from "openzeppelin-contracts-upgradeable/interfaces/IERC4626Upgradeable.sol";
-import {
-    ERC4626Upgradeable,
-    IERC20MetadataUpgradeable as IERC20Metadata,
-    ERC20Upgradeable as ERC20
-} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
+import {IERC4626Upgradeable as IERC4626, IERC20Upgradeable as IERC20} from "openzeppelin-contracts-upgradeable/interfaces/IERC4626Upgradeable.sol";
+import {ERC4626Upgradeable, IERC20MetadataUpgradeable as IERC20Metadata, ERC20Upgradeable as ERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "openzeppelin-contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
@@ -49,7 +42,6 @@ abstract contract BaseVault is
     uint256 internal constant SECONDS_PER_YEAR = 365.25 days;
 
     uint8 internal _decimals;
-    uint8 public constant decimalOffset = 9;
 
     string internal _name;
     string internal _symbol;
@@ -72,16 +64,7 @@ abstract contract BaseVault is
         __ERC4626_init(IERC20Metadata(address(vaultConfig.asset_)));
         __Owned_init(vaultConfig.owner);
 
-        // TODO cleanup init
-
         if (address(vaultConfig.asset_) == address(0)) revert InvalidAsset();
-
-        _decimals =
-            IERC20Metadata(address(vaultConfig.asset_)).decimals() +
-            decimalOffset; // Asset decimals + decimal offset to combat inflation attacks
-
-        INITIAL_CHAIN_ID = block.chainid;
-        INITIAL_DOMAIN_SEPARATOR = computeDomainSeparator();
 
         if (
             vaultConfig.fees.deposit >= 1e18 ||
@@ -95,23 +78,27 @@ abstract contract BaseVault is
             revert InvalidFeeRecipient();
         feeRecipient = vaultConfig.feeRecipient;
 
-        contractName = keccak256(
-            abi.encodePacked("VaultCraft", name(), block.timestamp, " Vault")
-        );
-
-        highWaterMark = 1e9;
+        highWaterMark = 1; // TODO set hwm correct
         quitPeriod = 3 days;
         depositLimit = vaultConfig.depositLimit;
-
-        PROTOCOL_OWNER = vaultConfig.protocolOwner;
-
-        emit VaultInitialized(contractName, address(vaultConfig.asset_));
 
         _name = vaultConfig.name;
         _symbol = string.concat(
             "vc-",
             IERC20Metadata(address(vaultConfig.asset_)).symbol()
         );
+        _decimals = IERC20Metadata(address(vaultConfig.asset_)).decimals();
+
+        contractName = keccak256(
+            abi.encodePacked("VaultCraft", name(), block.timestamp, " Vault")
+        );
+
+        PROTOCOL_OWNER = vaultConfig.protocolOwner;
+
+        INITIAL_CHAIN_ID = block.chainid;
+        INITIAL_DOMAIN_SEPARATOR = computeDomainSeparator();
+
+        emit VaultInitialized(contractName, address(vaultConfig.asset_));
     }
 
     function name()
@@ -330,7 +317,6 @@ abstract contract BaseVault is
         return _totalAssets();
     }
 
-    // TODO Does total assets work if multiple vaults use the same strategy?
     function _totalAssets() internal view virtual returns (uint256) {}
 
     /**
@@ -415,7 +401,6 @@ abstract contract BaseVault is
     function maxDeposit(address user) public view override returns (uint256) {
         uint256 assets = totalAssets();
         uint256 depositLimit_ = depositLimit;
-        //if (paused() || assets >= depositLimit_) return 0; //TODO: paused() is not defined and makes the build fail
         return Math.min(depositLimit_ - assets, _maxDeposit(user));
     }
 
@@ -427,7 +412,6 @@ abstract contract BaseVault is
     function maxMint(address user) public view override returns (uint256) {
         uint256 assets = totalAssets();
         uint256 depositLimit_ = depositLimit;
-        //if (paused() || assets >= depositLimit_) return 0; //TODO: paused() is not defined and makes the build fail
         return Math.min(depositLimit_ - assets, _maxMint(user));
     }
 
@@ -657,12 +641,9 @@ abstract contract BaseVault is
      * @notice Set a quitPeriod for rage quitting after new adapter or fees are proposed. Caller must be Owner.
      * @param _quitPeriod Time to rage quit after proposal.
      */
-    function setQuitPeriod(uint256 _quitPeriod) external onlyOwner {
-        uint256 proposedAdapterTime; //TODO: this value was unset and makes the build fail, please initialise
-        if (
-            block.timestamp < proposedAdapterTime + quitPeriod ||
-            block.timestamp < proposedFeeTime + quitPeriod
-        ) revert NotPassedQuitPeriod(quitPeriod);
+    function setQuitPeriod(uint256 _quitPeriod) external virtual onlyOwner {
+        if (block.timestamp < proposedFeeTime + quitPeriod)
+            revert NotPassedQuitPeriod(quitPeriod);
         if (_quitPeriod < 1 days || _quitPeriod > 7 days)
             revert InvalidQuitPeriod();
 
