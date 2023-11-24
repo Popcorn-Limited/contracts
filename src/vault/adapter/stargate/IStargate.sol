@@ -21,9 +21,11 @@ interface ISToken {
 
   function totalLiquidity() external view returns (uint256);
 
-  function poolId() external view returns (uint256);
+  function poolId() external view returns (uint16);
 
   function localDecimals() external view returns (uint256);
+
+  function amountLPtoLD(uint256 amount) external view returns (uint256);
 }
 
 interface IStargateStaking {
