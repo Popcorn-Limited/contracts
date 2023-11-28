@@ -59,8 +59,7 @@ contract StakingVaultTest is Test {
         vm.stopPrank();
 
         (
-            uint128 lockTime,
-            uint128 unlockTime,
+            uint256 unlockTime,
             uint256 rewardIndex,
             uint256 lockAmount,
             uint256 lockRewardShares
@@ -104,8 +103,7 @@ contract StakingVaultTest is Test {
         vm.stopPrank();
 
         (
-            uint128 lockTime,
-            uint128 unlockTime,
+            uint256 unlockTime,
             uint256 rewardIndex,
             uint256 lockAmount,
             uint256 lockRewardShares
@@ -253,9 +251,7 @@ contract StakingVaultTest is Test {
         vault.increaseLockAmount(alice, amount);
         vm.stopPrank();
 
-        (, , , uint256 lockAmount, uint256 lockRewardShares) = vault.locks(
-            alice
-        );
+        (, , uint256 lockAmount, uint256 lockRewardShares) = vault.locks(alice);
         assertEq(initalDeposit + amount, lockAmount, "wrong lock amount");
         assertEq(expectedRewardShares, lockRewardShares, "wrong reward shares");
         assertEq(expectedShares, vault.balanceOf(alice), "wrong shares");
@@ -272,46 +268,8 @@ contract StakingVaultTest is Test {
         vault.increaseLockAmount(alice, amount);
         vm.stopPrank();
 
-        (, , , uint256 deposit, ) = vault.locks(alice);
+        (, , uint256 deposit, ) = vault.locks(alice);
         assertEq(deposit, amount * 2, "lock amount didn't change");
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                            INCREASE LOCK TIME
-    //////////////////////////////////////////////////////////////*/
-
-    function test_increase_lock_time(uint256 newUnlockTime) public {
-        // initial lock time is 1 day. `increaseLockTime()` forces you to increase
-        // the lock time so limit the min value as well
-        vm.assume(newUnlockTime > 2 days && newUnlockTime <= MAX_LOCK_TIME);
-
-        deal(address(asset), alice, 1e18);
-
-        vm.startPrank(alice);
-        asset.approve(address(vault), 1e18);
-        vault.deposit(alice, 1e18, 1 days);
-        vault.increaseLockTime(newUnlockTime);
-        vm.stopPrank();
-
-        uint256 expectedShares = (1e18 * newUnlockTime) / MAX_LOCK_TIME;
-        (uint128 lockTime, uint128 unlockTime, , , uint256 lockShares) = vault
-            .locks(alice);
-        assertEq(
-            unlockTime,
-            block.timestamp + newUnlockTime,
-            "wrong unlock time"
-        );
-        assertEq(lockShares, expectedShares, "wrong shares");
-    }
-
-    function test_cannot_increase_lock_for_more_than_max() public {
-        vm.expectRevert("LOCK_TIME");
-        _deposit(alice, 1e18, 365 days);
-
-        vm.startPrank(alice);
-        vm.expectRevert("LOCK_TIME");
-        vault.increaseLockTime(MAX_LOCK_TIME + 1);
-        vm.stopPrank();
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -357,9 +315,12 @@ contract StakingVaultTest is Test {
 
         _distribute(amount);
 
-        vm.prank(bob);
-        vault.increaseLockTime(MAX_LOCK_TIME / 2);
-
+        deal(address(asset), bob, 1e18);
+        vm.startPrank(bob);
+        asset.approve(address(vault), 1e18);
+        vault.increaseLockAmount(bob, 1e18);
+        vm.stopPrank();
+        
         assertEq(
             vault.accruedRewards(bob),
             amountAfterFees / 5,
@@ -408,26 +369,6 @@ contract StakingVaultTest is Test {
             10_000;
         // with the initial balances, alice should receive half of the total reward amount.
         // The increase in her lock amount shouldn't have an affect here.
-        assertEq(
-            vault.accruedRewards(alice),
-            amountAfterFees / 2,
-            "Alice got wrong reward amount"
-        );
-    }
-
-    function test_accrue_before_lock_time_increase() public {
-        _deposit(alice, 1e18, 365 days);
-        _deposit(bob, 1e18, 365 days);
-        _distribute(100e18);
-
-        vm.startPrank(alice);
-        vault.increaseLockTime(365 days * 2);
-        vm.stopPrank();
-
-        uint256 amountAfterFees = 100e18 -
-            (100e18 * vault.PROTOCOL_FEE()) /
-            10_000;
-        // with the initial lock times, alice should receive half of the total reward amount (100e18)
         assertEq(
             vault.accruedRewards(alice),
             amountAfterFees / 2,

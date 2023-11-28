@@ -7,8 +7,7 @@ import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
 import {IERC4626} from "../interfaces/vault/IAdapter.sol";
 
 struct Lock {
-    uint128 lockTime;
-    uint128 unlockTime;
+    uint256 unlockTime;
     uint256 rewardIndex;
     uint256 amount;
     uint256 rewardShares;
@@ -101,8 +100,7 @@ contract StakingVault is ERC20 {
         _mint(recipient, shares);
 
         locks[recipient] = Lock({
-            lockTime: uint128(block.timestamp),
-            unlockTime: uint128(block.timestamp + lockTime),
+            unlockTime: block.timestamp + lockTime,
             rewardIndex: currIndex,
             amount: amount,
             rewardShares: rewardShares
@@ -183,32 +181,6 @@ contract StakingVault is ERC20 {
         totalRewardSupply += newRewardShares;
 
         emit IncreaseLockAmount(recipient, amount);
-    }
-
-    function increaseLockTime(uint256 newLockTime) external {
-        accrueUser(msg.sender);
-
-        uint256 amount = locks[msg.sender].amount;
-        require(amount != 0, "NO_LOCK");
-        require(
-            newLockTime + block.timestamp > locks[msg.sender].unlockTime,
-            "INCREASE_LOCK_TIME"
-        );
-
-        uint256 timeLeft = (block.timestamp - locks[msg.sender].lockTime);
-
-        uint256 newRewardShares = toRewardShares(
-            locks[msg.sender].amount,
-            timeLeft + newLockTime
-        );
-
-        totalRewardSupply += (newRewardShares - locks[msg.sender].rewardShares);
-
-        locks[msg.sender].lockTime = uint128(block.timestamp);
-        locks[msg.sender].unlockTime = uint128(block.timestamp + newLockTime);
-        locks[msg.sender].rewardShares = newRewardShares;
-
-        emit IncreaseLockTime(msg.sender, newLockTime);
     }
 
     /*//////////////////////////////////////////////////////////////
