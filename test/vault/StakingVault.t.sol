@@ -19,7 +19,7 @@ contract StakingVaultTest is Test {
     address alice = vm.addr(1);
     address bob = vm.addr(2);
 
-    uint MAX_LOCK_TIME = 365 days * 4;
+    uint256 MAX_LOCK_TIME = 365 days * 4;
 
     function setUp() public {
         address adapterImplementation = address(new MockERC4626());
@@ -43,23 +43,27 @@ contract StakingVaultTest is Test {
                             DEPOSIT / WITHDRAW
     //////////////////////////////////////////////////////////////*/
 
-    function test_deposit(uint amount) public {
+    function test_deposit(uint256 amount) public {
         vm.assume(amount != 0 && amount <= 100_000e18);
         deal(address(asset), alice, amount);
 
-        uint expectedShares = vault.toShares(amount);
-        uint expectedRewardShares = vault.toRewardShares(amount, MAX_LOCK_TIME);
+        uint256 expectedShares = vault.toShares(amount);
+        uint256 expectedRewardShares = vault.toRewardShares(
+            amount,
+            MAX_LOCK_TIME
+        );
 
         vm.startPrank(alice);
         asset.approve(address(vault), amount);
-        uint shares = vault.deposit(alice, amount, MAX_LOCK_TIME);
+        uint256 shares = vault.deposit(alice, amount, MAX_LOCK_TIME);
         vm.stopPrank();
 
         (
-            uint unlockTime,
-            uint rewardIndex,
-            uint lockAmount,
-            uint lockRewardShares
+            uint128 lockTime,
+            uint128 unlockTime,
+            uint256 rewardIndex,
+            uint256 lockAmount,
+            uint256 lockRewardShares
         ) = vault.locks(alice);
 
         assertEq(
@@ -85,22 +89,26 @@ contract StakingVaultTest is Test {
     }
 
     function test_deposit_for_others() public {
-        uint amount = 1e18;
+        uint256 amount = 1e18;
         deal(address(asset), alice, amount);
 
-        uint expectedShares = vault.toShares(amount);
-        uint expectedRewardShares = vault.toRewardShares(amount, MAX_LOCK_TIME);
+        uint256 expectedShares = vault.toShares(amount);
+        uint256 expectedRewardShares = vault.toRewardShares(
+            amount,
+            MAX_LOCK_TIME
+        );
 
         vm.startPrank(alice);
         asset.approve(address(vault), amount);
-        uint shares = vault.deposit(bob, amount, MAX_LOCK_TIME);
+        uint256 shares = vault.deposit(bob, amount, MAX_LOCK_TIME);
         vm.stopPrank();
 
         (
-            uint unlockTime,
-            uint rewardIndex,
-            uint lockAmount,
-            uint lockRewardShares
+            uint128 lockTime,
+            uint128 unlockTime,
+            uint256 rewardIndex,
+            uint256 lockAmount,
+            uint256 lockRewardShares
         ) = vault.locks(bob);
 
         assertEq(
@@ -126,7 +134,7 @@ contract StakingVaultTest is Test {
     }
 
     function test_deposit_with_increased_share_price() public {
-        uint amount = 1e18;
+        uint256 amount = 1e18;
         _deposit(alice, amount, MAX_LOCK_TIME);
 
         deal(address(asset), address(alice), amount);
@@ -173,7 +181,7 @@ contract StakingVaultTest is Test {
     }
 
     function test_withdraw_with_increased_share_price() public {
-        uint amount = 1e18;
+        uint256 amount = 1e18;
         _deposit(alice, amount, MAX_LOCK_TIME);
 
         deal(address(asset), address(bob), amount);
@@ -227,32 +235,34 @@ contract StakingVaultTest is Test {
                             INCREASE LOCK AMOUNT
     //////////////////////////////////////////////////////////////*/
 
-    function test_increase_amount(uint amount) public {
+    function test_increase_amount(uint256 amount) public {
         vm.assume(amount > 1e9 && amount <= 100_000e18);
 
-        uint initalDeposit = 1e18;
+        uint256 initalDeposit = 1e18;
         deal(address(asset), alice, initalDeposit + amount);
 
         vm.startPrank(alice);
         asset.approve(address(vault), initalDeposit + amount);
         vault.deposit(alice, initalDeposit, MAX_LOCK_TIME);
 
-        uint expectedShares = (initalDeposit) + vault.toShares(amount);
-        uint expectedRewardShares = initalDeposit +
+        uint256 expectedShares = (initalDeposit) + vault.toShares(amount);
+        uint256 expectedRewardShares = initalDeposit +
             vault.toRewardShares(amount, MAX_LOCK_TIME / 2);
 
         vm.warp(block.timestamp + 365 days * 2);
         vault.increaseLockAmount(alice, amount);
         vm.stopPrank();
 
-        (, , uint lockAmount, uint lockRewardShares) = vault.locks(alice);
+        (, , , uint256 lockAmount, uint256 lockRewardShares) = vault.locks(
+            alice
+        );
         assertEq(initalDeposit + amount, lockAmount, "wrong lock amount");
         assertEq(expectedRewardShares, lockRewardShares, "wrong reward shares");
         assertEq(expectedShares, vault.balanceOf(alice), "wrong shares");
     }
 
     function test_increase_lock_amount_for() public {
-        uint amount = 1e18;
+        uint256 amount = 1e18;
         _deposit(alice, amount, 365 days);
 
         deal(address(asset), bob, amount);
@@ -262,7 +272,7 @@ contract StakingVaultTest is Test {
         vault.increaseLockAmount(alice, amount);
         vm.stopPrank();
 
-        (, , uint deposit, ) = vault.locks(alice);
+        (, , , uint256 deposit, ) = vault.locks(alice);
         assertEq(deposit, amount * 2, "lock amount didn't change");
     }
 
@@ -270,7 +280,7 @@ contract StakingVaultTest is Test {
                             INCREASE LOCK TIME
     //////////////////////////////////////////////////////////////*/
 
-    function test_increase_lock_time(uint newUnlockTime) public {
+    function test_increase_lock_time(uint256 newUnlockTime) public {
         // initial lock time is 1 day. `increaseLockTime()` forces you to increase
         // the lock time so limit the min value as well
         vm.assume(newUnlockTime > 2 days && newUnlockTime <= MAX_LOCK_TIME);
@@ -283,8 +293,9 @@ contract StakingVaultTest is Test {
         vault.increaseLockTime(newUnlockTime);
         vm.stopPrank();
 
-        uint expectedShares = (1e18 * newUnlockTime) / MAX_LOCK_TIME;
-        (uint unlockTime, , , uint lockShares) = vault.locks(alice);
+        uint256 expectedShares = (1e18 * newUnlockTime) / MAX_LOCK_TIME;
+        (uint128 lockTime, uint128 unlockTime, , , uint256 lockShares) = vault
+            .locks(alice);
         assertEq(
             unlockTime,
             block.timestamp + newUnlockTime,
@@ -307,9 +318,9 @@ contract StakingVaultTest is Test {
                             REWARDS
     //////////////////////////////////////////////////////////////*/
 
-    function test_distribute_rewards(uint amount) public {
-        //vm.assume(amount > 10e18 && amount < 100_000_000_000e18);
-        amount = 10e18;
+    function test_distribute_rewards(uint256 amount) public {
+        vm.assume(amount > 10e18 && amount < 100_000_000_000e18);
+
         _deposit(alice, 1e18, MAX_LOCK_TIME);
         _deposit(bob, 1e18, MAX_LOCK_TIME / 4);
 
@@ -320,7 +331,7 @@ contract StakingVaultTest is Test {
         vault.accrueUser(alice);
         vault.accrueUser(bob);
 
-        uint amountAfterFees = amount -
+        uint256 amountAfterFees = amount -
             ((amount * vault.PROTOCOL_FEE()) / 10_000);
 
         assertEq(
@@ -339,8 +350,8 @@ contract StakingVaultTest is Test {
         _deposit(alice, 1e18, MAX_LOCK_TIME);
         _deposit(bob, 1e18, MAX_LOCK_TIME / 4);
 
-        uint amount = 100e18;
-        uint amountAfterFees = amount -
+        uint256 amount = 100e18;
+        uint256 amountAfterFees = amount -
             (amount * vault.PROTOCOL_FEE()) /
             10_000;
 
@@ -360,11 +371,11 @@ contract StakingVaultTest is Test {
         vault.accrueUser(alice);
         vault.accrueUser(bob);
 
-        uint aliceExpectedRewards = (amountAfterFees * 4) /
+        uint256 aliceExpectedRewards = (amountAfterFees * 4) /
             5 +
             (amountAfterFees * 4) /
             6;
-        uint bobExpectedRewards = amountAfterFees /
+        uint256 bobExpectedRewards = amountAfterFees /
             5 +
             (amountAfterFees * 2) /
             6;
@@ -392,7 +403,7 @@ contract StakingVaultTest is Test {
         vault.increaseLockAmount(alice, 1e18);
         vm.stopPrank();
 
-        uint amountAfterFees = 100e18 -
+        uint256 amountAfterFees = 100e18 -
             (100e18 * vault.PROTOCOL_FEE()) /
             10_000;
         // with the initial balances, alice should receive half of the total reward amount.
@@ -413,7 +424,7 @@ contract StakingVaultTest is Test {
         vault.increaseLockTime(365 days * 2);
         vm.stopPrank();
 
-        uint amountAfterFees = 100e18 -
+        uint256 amountAfterFees = 100e18 -
             (100e18 * vault.PROTOCOL_FEE()) /
             10_000;
         // with the initial lock times, alice should receive half of the total reward amount (100e18)
@@ -431,7 +442,7 @@ contract StakingVaultTest is Test {
         vault.accrueUser(alice);
         vault.claim(alice);
 
-        uint amountAfterFees = 100e18 -
+        uint256 amountAfterFees = 100e18 -
             (100e18 * vault.PROTOCOL_FEE()) /
             10_000;
 
@@ -467,7 +478,7 @@ contract StakingVaultTest is Test {
                             HELPER FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    function _deposit(address user, uint amount, uint lockTime) internal {
+    function _deposit(address user, uint256 amount, uint256 lockTime) internal {
         deal(address(asset), user, amount);
         vm.startPrank(user);
         asset.approve(address(vault), amount);
@@ -475,7 +486,7 @@ contract StakingVaultTest is Test {
         vm.stopPrank();
     }
 
-    function _distribute(uint amount) internal {
+    function _distribute(uint256 amount) internal {
         deal(address(rewardToken), address(this), amount);
         rewardToken.approve(address(vault), amount);
         vault.distributeRewards(amount);
