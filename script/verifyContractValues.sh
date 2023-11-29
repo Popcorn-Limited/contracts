@@ -60,7 +60,7 @@ echo "3.5 Ago should be" $OracleAgo
 cast call $BalancerOracle "ago()"
 echo "3.6 MinPrice should be" $OracleMinPrice
 cast call $BalancerOracle "minPrice()"
-echo "3.7 MinPrice should be ???"
+echo "3.7 Price should be" $OracleMinPrice
 cast call $BalancerOracle "getPrice()"
 
 echo "4. OptionToken:"
@@ -107,9 +107,9 @@ cast call $VotingEscrowDelegation "admin()"
 
 echo "9. GaugeController:"
 echo "9.1 VOTING_ESCROW should be" $VE_VCX
-cast call $GaugeController "VOTING_ESCROW()"
-echo "9.2 TOKEN should be" $VCX
-cast call $GaugeController "TOKEN()"
+cast call $GaugeController "voting_escrow()"
+echo "9.2 TOKEN should be" $BalancerPool
+cast call $GaugeController "token()"
 echo "9.3 Owner should be" $ADMIN
 cast call $GaugeController "admin()"
 
@@ -130,7 +130,7 @@ echo "11.2 minter should be" $Minter
 cast call $TokenAdmin "minter()"
 echo "11.3 Owner should be" $ADMIN
 cast call $TokenAdmin "owner()"
-echo "11.4 INITIAL_RATE should be 2M Token per week (in 1e18)"
+echo "11.4 INITIAL_RATE should be 2M Token per week (in 1e18) '(2_000_000*1e18)/(86400 * 7)'"
 cast call $TokenAdmin "INITIAL_RATE()"
 echo "11.5 RATE_REDUCTION_TIME should be 91 days"
 cast call $TokenAdmin "RATE_REDUCTION_TIME()"
