@@ -18,7 +18,6 @@ readonly GaugeController="0xD57d8EEC36F0Ba7D8Fd693B9D97e02D8353EB1F4"
 readonly GaugeFactory="0x32a33CC9dC61352E70cb557927E5F9544ddb0a26"
 readonly SmartWalletChecker="0x8427155770f7e6b973249E2f9D140a495aBE4f90"
 readonly VotingEscrowProxy="0x9B12C90BAd388B7e417271eb20678D1a7759507c"
-readonly VotingEscrowDelegation="0xa2e88993a0f0dc6e6020431477f3a70c86109bbf"
 readonly VaultRouter="0x8aed8Ea73044910760E8957B6c5b28Ac51f8f809"
 readonly FeeRecipient="0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E"
 readonly BalancerVault="0xba12222222228d8ba445958a75a0704d566bf2c8"
@@ -38,6 +37,12 @@ echo "1.1 Admin should be" $ADMIN
 cast call $VCX "owner()"
 echo "1.2 endOfMigrationTs should be 31.01.24"
 cast call $VCX "endOfMigrationTs()"
+echo "1.3 Symbol should be ???"
+cast call $VCX "symbol()"
+echo "1.4 Name should be ???"
+cast call $VCX "name()"
+echo "1.5 Decimals should be ???"
+cast call $VCX "decimals()"
 
 echo "2. BalancerPool:"
 echo "2.1 Assets should be" $VCX "and" $WETH
@@ -76,6 +81,12 @@ echo "4.5 underlyingToken should be" $VCX
 cast call $oVCX "underlyingToken()"
 echo "4.6 treasury should be" $FeeRecipient
 cast call $oVCX "treasury()"
+echo "4.7 Symbol should be ???"
+cast call $oVCX "symbol()"
+echo "4.8 Name should be ???"
+cast call $oVCX "name()"
+echo "4.9 Decimals should be ???"
+cast call $oVCX "decimals()"
 
 echo "5. VotingEscrow:"
 echo "5.1 TOKEN should be" $BalancerPool
@@ -84,6 +95,12 @@ echo "5.2 Owner should be" $ADMIN
 cast call $VE_VCX "admin()"
 echo "5.3 smart_wallet_checker should be" $SmartWalletChecker
 cast call $VE_VCX "smart_wallet_checker()"
+echo "5.4 Symbol should be ???"
+cast call $VE_VCX "symbol()"
+echo "5.5 Name should be ???"
+cast call $VE_VCX "name()"
+echo "5.6 Decimals should be ???"
+cast call $VE_VCX "decimals()"
 
 echo "6. BoostV2:"
 echo "6.1 VE should be" $VE_VCX
@@ -96,59 +113,53 @@ echo "7.2 ownership_admin should be" $ADMIN
 cast call $VotingEscrowProxy "ownership_admin()"
 echo "7.2 emergency_admin should be" $ADMIN
 cast call $VotingEscrowProxy "emergency_admin()"
-echo "7.2 delegation should be" $VotingEscrowDelegation
+echo "7.2 delegation should be" $BoostV2
 cast call $VotingEscrowProxy "delegation()"
 
-echo "8. VotingEscrowDelegation:"
+echo "8. GaugeController:"
 echo "8.1 VOTING_ESCROW should be" $VE_VCX
-cast call $VotingEscrowDelegation "VOTING_ESCROW()"
-echo "8.2 Owner should be" $ADMIN
-cast call $VotingEscrowDelegation "admin()"
-
-echo "9. GaugeController:"
-echo "9.1 VOTING_ESCROW should be" $VE_VCX
 cast call $GaugeController "voting_escrow()"
-echo "9.2 TOKEN should be" $BalancerPool
+echo "8.2 TOKEN should be" $BalancerPool
 cast call $GaugeController "token()"
-echo "9.3 Owner should be" $ADMIN
+echo "8.3 Owner should be" $ADMIN
 cast call $GaugeController "admin()"
 
-echo "10. GaugeFactory:"
-echo "10.1 popcornVaultRegistry should be" $VaultRegistry
+echo "9. GaugeFactory:"
+echo "9.1 popcornVaultRegistry should be" $VaultRegistry
 cast call $GaugeFactory "popcornVaultRegistry()"
-echo "10.2 gaugeImplementation should be ???"
+echo "9.2 gaugeImplementation should be ???"
 cast call $GaugeFactory "getGaugeImplementation()"
-echo "10.3 Owner should be" $ADMIN
+echo "9.3 Owner should be" $ADMIN
 cast call $GaugeFactory "owner()"
-echo "10.4 gaugeAdmin should be" $ADMIN
+echo "9.4 gaugeAdmin should be" $ADMIN
 cast call $GaugeFactory "gaugeAdmin()"
 
-echo "11. TokenAdmin:"
-echo "11.1 token should be" $oVCX
+echo "10. TokenAdmin:"
+echo "10.1 token should be" $oVCX
 cast call $TokenAdmin "getToken()"
-echo "11.2 minter should be" $Minter
+echo "10.2 minter should be" $Minter
 cast call $TokenAdmin "minter()"
-echo "11.3 Owner should be" $ADMIN
+echo "10.3 Owner should be" $ADMIN
 cast call $TokenAdmin "owner()"
-echo "11.4 INITIAL_RATE should be 2M Token per week (in 1e18) '(2_000_000*1e18)/(86400 * 7)'"
+echo "10.4 INITIAL_RATE should be 2M Token per week (in 1e18) '(2_000_000*1e18)/(86400 * 7)'"
 cast call $TokenAdmin "INITIAL_RATE()"
-echo "11.5 RATE_REDUCTION_TIME should be 91 days"
+echo "10.5 RATE_REDUCTION_TIME should be 91 days"
 cast call $TokenAdmin "RATE_REDUCTION_TIME()"
-echo "11.6 RATE_REDUCTION_COEFFICIENT should be 2.71% (in 1e18)"
+echo "10.6 RATE_REDUCTION_COEFFICIENT should be 2.71% (in 1e18)"
 cast call $TokenAdmin "RATE_REDUCTION_COEFFICIENT()"
-echo "11.7 _miningEpoch should be 0"
+echo "10.7 _miningEpoch should be 0"
 cast call $TokenAdmin "getMiningEpoch()"
-echo "11.8 _startEpochTime should be max uint256"
+echo "10.8 _startEpochTime should be max uint256"
 cast call $TokenAdmin "getStartEpochTime()"
-echo "11.9 _startEpochSupply should be 0"
+echo "10.9 _startEpochSupply should be 0"
 cast call $TokenAdmin "getStartEpochSupply()"
-echo "11.10 _rate should be 0"
+echo "10.10 _rate should be 0"
 cast call $TokenAdmin "getInflationRate()"
 
-echo "12. Minter:"
-echo "12.1 token should be" $oVCX
+echo "11. Minter:"
+echo "11.1 token should be" $oVCX
 cast call $Minter "getToken()"
-echo "12.2 tokenAdmin should be" $TokenAdmin
+echo "11.2 tokenAdmin should be" $TokenAdmin
 cast call $Minter "getTokenAdmin()"
-echo "12.3 _gaugeController should be" $GaugeController
+echo "11.3 _gaugeController should be" $GaugeController
 cast call $Minter "getGaugeController()"
