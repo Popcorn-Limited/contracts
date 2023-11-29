@@ -78,8 +78,8 @@ echo "4.6 treasury should be" $FeeRecipient
 cast call $oVCX "treasury()"
 
 echo "5. VotingEscrow:"
-echo "5.1 TOKEN should be" $VCX
-cast call $VE_VCX "TOKEN()"
+echo "5.1 TOKEN should be" $BalancerPool
+cast call $VE_VCX "token()"
 echo "5.2 Owner should be" $ADMIN
 cast call $VE_VCX "admin()"
 echo "5.3 smart_wallet_checker should be" $SmartWalletChecker
