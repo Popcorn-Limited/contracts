@@ -17,7 +17,8 @@
     "vault:addTemplate": "forge script ./script/AddTemplate.s.sol --rpc-url https://eth-mainnet.g.alchemy.com/v2/KsuP431uPWKR3KFb-K_0MT1jcwpUnjAg --broadcast",
     "vault:proposeVaultFees": "forge script ./script/ProposeVaultFees.s.sol --rpc-url https://eth-mainnet.g.alchemy.com/v2/KsuP431uPWKR3KFb-K_0MT1jcwpUnjAg --broadcast",
     "vault:setPermission": "forge script ./script/SetPermission.s.sol --rpc-url https://eth-mainnet.g.alchemy.com/v2/KsuP431uPWKR3KFb-K_0MT1jcwpUnjAg --broadcast",
-    "verify": "./script/verifyContract.sh"
+    "verify": "./script/verifyContract.sh",
+    "verifyContractValues":"./script/verifyContractValues.sh"
   },
   "dependencies": {}
 }
