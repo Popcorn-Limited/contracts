@@ -49,12 +49,12 @@ contract IporAdapter is AdapterBase, WithRewards {
      */
     function initialize(
         bytes memory adapterInitData,
-        bytes memory iporInitData,
-        bytes memory
+        bytes memory,
+        bytes memory iporInitData
     ) external initializer {
         __AdapterBase_init(adapterInitData);
 
-        (address _ammPoolService, address _ammPoolsLens)= abi.decode(iporInitData, (address, address));
+        (address _ammPoolService, address _ammPoolsLens,  ) = abi.decode(iporInitData, (address, address, address));
         ammPoolsService = IAmmPoolsService(_ammPoolService);
         ammPoolsLens = IAmmPoolsLens(_ammPoolsLens);
 
