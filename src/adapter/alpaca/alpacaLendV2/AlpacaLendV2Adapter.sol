@@ -35,8 +35,10 @@ contract AlpacaLendV2Adapter is BaseAdapter {
 
         uint256 _pid = abi.decode(_adapterConfig.protocolData, (uint256));
 
-        // TODO: can use constants for this but I couldn't find the correct contracts.
-        alpacaManager = IAlpacaLendV2Manger(address(0));
+        // @dev IAlpacaLendV2Manger of bsc
+        alpacaManager = IAlpacaLendV2Manger(
+            0xD20B887654dB8dC476007bdca83d22Fa51e93407
+        ); // @dev change the IAlpacaLendV2Manger address depending on the deployed chain
         miniFL = IAlpacaLendV2MiniFL(alpacaManager.miniFL());
 
         ibToken = IAlpacaLendV2IbToken(miniFL.stakingTokens(_pid));
@@ -71,7 +73,8 @@ contract AlpacaLendV2Adapter is BaseAdapter {
     //////////////////////////////////////////////////////////////*/
 
     function _deposit(uint256 amount, address caller) internal override {
-        underlying.safeTransferFrom(caller, address(this), amount);
+        if (caller != address(this))
+            underlying.safeTransferFrom(caller, address(this), amount);
         _depositUnderlying(amount);
     }
 

@@ -7,6 +7,7 @@ import {IGauge, ILpToken} from "./ISolidly.sol";
 import {BaseAdapter, IERC20, AdapterConfig} from "../../base/BaseAdapter.sol";
 import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
+import {IPermissionRegistry} from "../../base/interfaces/IPermissionRegistry.sol";
 
 contract GmdAdapter is BaseAdapter {
     using Math for uint256;
@@ -15,6 +16,7 @@ contract GmdAdapter is BaseAdapter {
     /// @notice The Solidly contract
     IGauge public gauge;
 
+    error NotEndorsed(address _gauge);
     error InvalidAsset();
     error LpTokenSupported();
 
@@ -24,12 +26,15 @@ contract GmdAdapter is BaseAdapter {
         if (!_adapterConfig.useLpToken) revert LpTokenSupported();
         __BaseAdapter_init(_adapterConfig);
 
-        address _gauge = abi.decode(
-            _adapterConfig.protocolData,
-            (address)
-        );
+        address _gauge = abi.decode(_adapterConfig.protocolData, (address));
 
-        // TODO: can't find a registry where we can verify that
+        // @dev permissionRegistry of eth
+        // @dev change the registry address depending on the deployed chain
+        if (
+            !IPermissionRegistry(0x7a33b5b57C8b235A3519e6C010027c5cebB15CB4)
+                .endorsed(_gauge)
+        ) revert NotEndorsed(_gauge);
+
         // the gauge is valid
         gauge = IGauge(_gauge);
         if (gauge.stake() != address(lpToken)) revert InvalidAsset();

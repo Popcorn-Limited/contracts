@@ -7,29 +7,23 @@ import {UniswapV3Utils, IUniV3Pool} from "../../utils/UniswapV3Utils.sol";
 import {BaseAdapter, IERC20 as ERC20, AdapterConfig} from "../../base/BaseAdapter.sol";
 import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
-import {
-    IWETH,
-    ICurveMetapool,
-    IRocketStorage,
-    IrETH,
-    IRocketDepositPool,
-    IRocketDepositSettings,
-    IRocketNetworkBalances
-} from "./IRocketpool.sol";
+import {IWETH, ICurveMetapool, IRocketStorage, IrETH, IRocketDepositPool, IRocketDepositSettings, IRocketNetworkBalances} from "./IRocketpool.sol";
 
 contract RocketpoolAdapter is BaseAdapter {
     using SafeERC20 for ERC20;
     using Math for uint256;
 
-    address public constant uniRouter = 0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45;
-    IWETH public constant WETH = IWETH(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
-    IRocketStorage public constant rocketStorage = IRocketStorage(0x1d8f8f00cfa6758d7bE78336684788Fb0ee0Fa46);
+    address public constant uniRouter =
+        0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45;
+    IWETH public constant WETH =
+        IWETH(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
+    IRocketStorage public constant rocketStorage =
+        IRocketStorage(0x1d8f8f00cfa6758d7bE78336684788Fb0ee0Fa46);
 
     bytes32 public constant rocketDepositPoolKey =
         keccak256(abi.encodePacked("contract.address", "rocketDepositPool"));
     bytes32 public constant rETHKey =
         keccak256(abi.encodePacked("contract.address", "rocketTokenRETH"));
-
 
     /// @dev the rETH/WETH 0.01% pool is the only one that's used:
     /// https://info.uniswap.org/#/pools/0x553e9c493678d8606d6a5ba284643db2110df823
@@ -80,7 +74,8 @@ contract RocketpoolAdapter is BaseAdapter {
     //////////////////////////////////////////////////////////////*/
 
     function _deposit(uint256 amount, address caller) internal override {
-        underlying.safeTransferFrom(caller, address(this), amount); // TODO -- if caller is address(this) (from unpause) we shouldnt call this
+        if (caller != address(this))
+            underlying.safeTransferFrom(caller, address(this), amount);
         _depositUnderlying(amount);
     }
 
@@ -157,20 +152,12 @@ contract RocketpoolAdapter is BaseAdapter {
     /*//////////////////////////////////////////////////////////////
                             HELPERS
     //////////////////////////////////////////////////////////////*/
-    function _getDepositPool()
-        internal
-        view
-        returns (IRocketDepositPool)
-    {
+    function _getDepositPool() internal view returns (IRocketDepositPool) {
         return
             IRocketDepositPool(rocketStorage.getAddress(rocketDepositPoolKey));
     }
 
-    function _getRocketToken()
-        internal
-        view
-        returns (IrETH)
-    {
+    function _getRocketToken() internal view returns (IrETH) {
         return IrETH(rocketStorage.getAddress(rETHKey));
     }
 }

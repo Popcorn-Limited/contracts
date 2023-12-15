@@ -7,6 +7,7 @@ import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import {BaseAdapter, IERC20, AdapterConfig} from "../../base/BaseAdapter.sol";
 import {IBeefyVault, IBeefyBooster, IBeefyBalanceCheck, IBeefyStrat} from "./IBeefy.sol";
+import {IPermissionRegistry} from "../../base/interfaces/IPermissionRegistry.sol";
 
 contract BeefyAdapter is BaseAdapter {
     using SafeERC20 for IERC20;
@@ -18,7 +19,7 @@ contract BeefyAdapter is BaseAdapter {
 
     uint256 public constant BPS_DENOMINATOR = 10_000;
 
-    error NotEndorsed(address beefyVault);
+    error NotEndorsed(address beefyContract);
     error InvalidBeefyVault(address beefyVault);
     error InvalidBeefyBooster(address beefyBooster);
     error LpTokenNotSupported();
@@ -34,6 +35,18 @@ contract BeefyAdapter is BaseAdapter {
             _adapterConfig.protocolData,
             (address, address)
         );
+
+        // @dev permissionRegistry of eth
+        // @dev change the registry address depending on the deployed chain
+        if (
+            !IPermissionRegistry(0x7a33b5b57C8b235A3519e6C010027c5cebB15CB4)
+                .endorsed(_beefyVault)
+        ) revert NotEndorsed(_beefyVault);
+        if (
+            _beefyBooster != address(0) &&
+            !IPermissionRegistry(0x7a33b5b57C8b235A3519e6C010027c5cebB15CB4)
+                .endorsed(_beefyBooster)
+        ) revert NotEndorsed(_beefyBooster);
 
         if (
             IBeefyVault(_beefyVault).want() !=
@@ -82,13 +95,17 @@ contract BeefyAdapter is BaseAdapter {
     }
 
     function _totalLP() internal pure override returns (uint) {
-        // TODO: could return `beefyBalanceCheck.balanceOf(address(this))` here
         revert("NO");
     }
 
     // converts assets to beefy vault shares
     function _convertAssetsToShares(uint assets) internal view returns (uint) {
-       return assets.mulDiv(1e18, beefyVault.getPricePerFullShare(), Math.Rounding.Up);
+        return
+            assets.mulDiv(
+                1e18,
+                beefyVault.getPricePerFullShare(),
+                Math.Rounding.Up
+            );
     }
 
     function _getBeefyWithdrawalFee() internal view returns (uint fee) {
@@ -106,7 +123,8 @@ contract BeefyAdapter is BaseAdapter {
     //////////////////////////////////////////////////////////////*/
 
     function _deposit(uint256 amount, address caller) internal override {
-        underlying.safeTransferFrom(caller, address(this), amount);
+        if (caller != address(this))
+            underlying.safeTransferFrom(caller, address(this), amount);
         _depositUnderlying(amount);
     }
 
@@ -140,7 +158,11 @@ contract BeefyAdapter is BaseAdapter {
     function _withdrawUnderlying(uint256 amount) internal override {
         /// @dev because we want to withdraw exactly `amount` we have to take into account the fees
         // we have to pay when caclulating the share amount we'll send to the beefy vault.
-        uint amountWithFees = amount.mulDiv(BPS_DENOMINATOR, BPS_DENOMINATOR - _getBeefyWithdrawalFee(), Math.Rounding.Down);
+        uint amountWithFees = amount.mulDiv(
+            BPS_DENOMINATOR,
+            BPS_DENOMINATOR - _getBeefyWithdrawalFee(),
+            Math.Rounding.Down
+        );
         uint shares = _convertAssetsToShares(amountWithFees);
         if (address(beefyBooster) != address(0)) beefyBooster.withdraw(shares);
         beefyVault.withdraw(shares);

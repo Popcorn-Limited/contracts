@@ -14,12 +14,11 @@ contract YearnAdapter is BaseAdapter {
     int128 private constant STETHID = 1;
 
     VaultAPI public yVault;
-    // TODO: maxLoss is not configurable. If the Yearn vault loses to many funds,
-    // the adapter could cause user funds to be locked up.
-    // Is there a way to use a dynamic value?
+    
     uint256 public maxLoss;
 
-    IYearnRegistry public constant YEARN_REGISTRY = IYearnRegistry(0x50c1a2eA0a861A967D9d0FFE2AE4012c2E053804);
+    IYearnRegistry public constant YEARN_REGISTRY =
+        IYearnRegistry(0x50c1a2eA0a861A967D9d0FFE2AE4012c2E053804);
 
     uint256 constant DEGRADATION_COEFFICIENT = 10 ** 18;
 
@@ -100,7 +99,8 @@ contract YearnAdapter is BaseAdapter {
     //////////////////////////////////////////////////////////////*/
 
     function _deposit(uint256 amount, address caller) internal override {
-        underlying.safeTransferFrom(caller, address(this), amount);
+        if (caller != address(this))
+            underlying.safeTransferFrom(caller, address(this), amount);
         _depositUnderlying(amount);
     }
 
@@ -157,4 +157,16 @@ contract YearnAdapter is BaseAdapter {
     }
 
     function _claim() internal override {}
+
+    /*//////////////////////////////////////////////////////////////
+                            MANAGEMENT LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    event MaxLossChanged(uint256 oldMaxLoss, uint256 newMaxLoss);
+
+    function setMaxLoss(uint256 _maxLoss) external {
+        if (_maxLoss > 10_000) revert MaxLossTooHigh();
+        emit MaxLossChanged(maxLoss, _maxLoss);
+        maxLoss = _maxLoss;
+    }
 }

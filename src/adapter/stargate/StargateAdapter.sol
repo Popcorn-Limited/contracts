@@ -17,8 +17,6 @@ contract StargateAdapter is BaseAdapter {
     uint256 internal stakingPid;
     ISToken internal sToken;
 
-    // TODO add fallback for eth
-
     error StakingIdOutOfBounds();
     error DifferentAssets();
 
@@ -76,6 +74,7 @@ contract StargateAdapter is BaseAdapter {
             lpToken.safeTransferFrom(caller, address(this), amount);
             _depositLP(amount);
         } else {
+            if (caller != address(this))
             underlying.safeTransferFrom(caller, address(this), amount);
             _depositUnderlying(amount);
         }

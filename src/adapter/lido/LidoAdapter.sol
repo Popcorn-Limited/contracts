@@ -23,7 +23,7 @@ contract LidoAdapter is BaseAdapter {
 
     // TODO: instead of swapping stETH for ETH and sending that to the user we could also
     // just let them withdraw stETH
-    // 
+    
     // - even if stETH depegs from ETH, the amount of funds the user will receive in that scenario doesn't change.
     //   Whether they get 1 stETH worth 0.8 ETH or just 0.8 ETH directly is the same thing.
     // 
@@ -88,7 +88,8 @@ contract LidoAdapter is BaseAdapter {
     //////////////////////////////////////////////////////////////*/
 
     function _deposit(uint256 amount, address caller) internal override {
-        underlying.safeTransferFrom(caller, address(this), amount);
+        if (caller != address(this))
+            underlying.safeTransferFrom(caller, address(this), amount);
         _depositUnderlying(amount);
     }
 

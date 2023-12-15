@@ -7,6 +7,7 @@ import {IAlpacaLendV1Vault} from "./IAlpacaLendV1.sol";
 import {BaseAdapter, IERC20, AdapterConfig} from "../../../base/BaseAdapter.sol";
 import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
 import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
+import {IPermissionRegistry} from "../../../base/interfaces/IPermissionRegistry.sol";
 
 contract AlpacaLendV1Adapter is BaseAdapter {
     using SafeERC20 for IERC20;
@@ -15,7 +16,7 @@ contract AlpacaLendV1Adapter is BaseAdapter {
     /// @notice The Alpaca Lend V1 Vault contract
     IAlpacaLendV1Vault public alpacaVault;
 
-    error NotEndorsed();
+    error NotEndorsed(address vault);
     error InvalidAsset();
     error LpTokenNotSupported();
 
@@ -25,12 +26,14 @@ contract AlpacaLendV1Adapter is BaseAdapter {
         if (_adapterConfig.useLpToken) revert LpTokenNotSupported();
         __BaseAdapter_init(_adapterConfig);
 
-        address _vault = abi.decode(
-            _adapterConfig.protocolData,
-            (address)
-        );
+        address _vault = abi.decode(_adapterConfig.protocolData, (address));
 
-        // TODO: add permission registry to verify vault is valid
+        // @dev permissionRegistry of bsc
+        // @dev change the registry address depending on the deployed chain
+        if (
+            !IPermissionRegistry(0x8c76AA6B65D0619042EAd6DF748f782c89a06357)
+                .endorsed(_vault)
+        ) revert NotEndorsed(_vault);
 
         alpacaVault = IAlpacaLendV1Vault(_vault);
 
@@ -65,7 +68,8 @@ contract AlpacaLendV1Adapter is BaseAdapter {
     //////////////////////////////////////////////////////////////*/
 
     function _deposit(uint256 amount, address caller) internal override {
-        underlying.safeTransferFrom(caller, address(this), amount);
+        if (caller != address(this))
+            underlying.safeTransferFrom(caller, address(this), amount);
         _depositUnderlying(amount);
     }
 

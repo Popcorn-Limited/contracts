@@ -22,23 +22,26 @@ contract AcrossAdapter is BaseAdapter {
 
     error Disabled();
     error NotEndorsed(address _acrossHop);
-    
+
     function __AcrossAdapter_init(
         AdapterConfig memory _adapterConfig
     ) internal onlyInitializing {
         __BaseAdapter_init(_adapterConfig);
 
-        (IPermissionRegistry permissionRegistry, address _acrossHop, address _acrossDistributor) = abi.decode(
+        (address _acrossHop, address _acrossDistributor) = abi.decode(
             _adapterConfig.protocolData,
-            (IPermissionRegistry, address, address)
+            (address, address)
         );
 
-        if (!permissionRegistry.endorsed(_acrossHop))
-            revert NotEndorsed(_acrossHop);
+        // @dev permissionRegistry of eth
+        // @dev change the registry address depending on the deployed chain
         if (
-            permissionRegistry.endorsed(
-                _acrossDistributor
-            )
+            !IPermissionRegistry(0x7a33b5b57C8b235A3519e6C010027c5cebB15CB4)
+                .endorsed(_acrossHop)
+        ) revert NotEndorsed(_acrossHop);
+        if (
+            !IPermissionRegistry(0x7a33b5b57C8b235A3519e6C010027c5cebB15CB4)
+                .endorsed(_acrossDistributor)
         ) revert NotEndorsed(_acrossDistributor);
 
         if (!IAcrossHop(_acrossHop).pooledTokens(address(underlying)).isEnabled)
@@ -167,6 +170,7 @@ contract AcrossAdapter is BaseAdapter {
             lpToken.safeTransferFrom(caller, address(this), amount);
             _depositLP(amount);
         } else {
+            if (caller != address(this))
             underlying.safeTransferFrom(caller, address(this), amount);
             _depositUnderlying(amount);
         }

@@ -15,7 +15,8 @@ contract EllipsisPoolAdapter is BaseAdapter {
     //address public lpToken;
     address public ellipsisPool;
     address public addressProvider;
-    address public constant ellipsisLPStaking = 0x5B74C99AA2356B4eAa7B85dC486843eDff8Dfdbe;
+    address public constant ellipsisLPStaking =
+        0x5B74C99AA2356B4eAa7B85dC486843eDff8Dfdbe;
 
     error LpTokenNotSupported();
 
@@ -26,10 +27,7 @@ contract EllipsisPoolAdapter is BaseAdapter {
 
         __BaseAdapter_init(_adapterConfig);
 
-        (
-            address _ellipsisPool,
-            address _addressProvider
-        ) = abi.decode(
+        (address _ellipsisPool, address _addressProvider) = abi.decode(
             _adapterConfig.protocolData,
             (address, address)
         );
@@ -40,12 +38,6 @@ contract EllipsisPoolAdapter is BaseAdapter {
             IAddressProvider(_addressProvider).get_lp_token(_ellipsisPool)
         );
 
-        // TODO: the check at the top of the function doesn't allow us to use lp tokens here.
-        // Why do we approve them to the lp staking contract?
-        _adapterConfig.lpToken.approve(
-            address(ellipsisLPStaking),
-            type(uint256).max
-        );
         _adapterConfig.underlying.approve(
             address(_ellipsisPool),
             type(uint256).max
@@ -94,7 +86,8 @@ contract EllipsisPoolAdapter is BaseAdapter {
     //////////////////////////////////////////////////////////////*/
 
     function _deposit(uint256 amount, address caller) internal override {
-        underlying.safeTransferFrom(caller, address(this), amount);
+        if (caller != address(this))
+            underlying.safeTransferFrom(caller, address(this), amount);
         _depositUnderlying(amount);
     }
 

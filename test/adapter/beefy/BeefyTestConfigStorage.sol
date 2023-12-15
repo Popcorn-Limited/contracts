@@ -6,14 +6,14 @@ import {AdapterConfig} from "../../../src/base/interfaces/IBaseAdapter.sol";
 
 contract BeefyTestConfigStorage is BaseTestConfigStorage {
     IERC20[] public rewardTokens;
-    // wstETH/rETH/sfrxETH Balancer LP token
-    IERC20 public constant token = IERC20(0x42ED016F826165C2e5976fe5bC3df540C5aD0Af7);
+    // ETH/oETH Balancer LP token
+    IERC20 public constant token = IERC20(0x94B17476A93b3262d87B9a326965D1E91f9c13E7);
     constructor() {
         _testConfigs.push(TestConfig({
             asset: token,
             depositDelta: 1e16,
             withdrawDelta: 1e16,
-            testId: "Beefy TriCryptoUSDC",
+            testId: "Beefy ETH LP",
             network: "mainnet",
             blockNumber: 0,
             defaultAmount: 1e18,
@@ -30,8 +30,8 @@ contract BeefyTestConfigStorage is BaseTestConfigStorage {
             useLpToken: false,
             rewardTokens: rewardTokens,
             owner: msg.sender,
-            // Beefy wstETH/​rETH/​sfrxETH V3 Vault
-            protocolData: abi.encode(0xd4D620B23E91031fa08045b6083878f42558d6b9, address(0))
+            // Beefy ETH/oETH Balancer LP Vault
+            protocolData: abi.encode(0x31C0dac4c896cb84adFEF2F8e41cb9295EEc93c2, address(0))
         }));
     }
 }
