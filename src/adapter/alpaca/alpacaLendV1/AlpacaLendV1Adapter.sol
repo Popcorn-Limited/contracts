@@ -2,7 +2,6 @@
 // Docgen-SOLC: 0.8.15
 
 pragma solidity ^0.8.15;
-
 import {IAlpacaLendV1Vault} from "./IAlpacaLendV1.sol";
 import {BaseAdapter, IERC20, AdapterConfig} from "../../../base/BaseAdapter.sol";
 import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
@@ -30,10 +29,7 @@ contract AlpacaLendV1Adapter is BaseAdapter {
             (address)
         );
 
-        // TODO: add permission registry to verify vault is valid
-
         alpacaVault = IAlpacaLendV1Vault(_vault);
-
         if (alpacaVault.token() != address(underlying)) revert InvalidAsset();
 
         _adapterConfig.underlying.approve(
@@ -65,7 +61,8 @@ contract AlpacaLendV1Adapter is BaseAdapter {
     //////////////////////////////////////////////////////////////*/
 
     function _deposit(uint256 amount, address caller) internal override {
-        underlying.safeTransferFrom(caller, address(this), amount);
+        if(caller != address(this))
+            underlying.safeTransferFrom(caller, address(this), amount);
         _depositUnderlying(amount);
     }
 
