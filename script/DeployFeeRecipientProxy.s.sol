@@ -3,7 +3,7 @@
 pragma solidity ^0.8.15;
 
 import { Script } from "forge-std/Script.sol";
-import { FeeRecipientProxy } from "../src/vault/FeeRecipientProxy.sol";
+import { FeeRecipientProxy } from "../src/FeeRecipientProxy.sol";
 
 contract Deploy is Script {
   address deployer;
