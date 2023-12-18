@@ -78,7 +78,7 @@ abstract contract BaseVault is
             revert InvalidFeeRecipient();
         feeRecipient = vaultConfig.feeRecipient;
 
-        highWaterMark = 1; // TODO set hwm correct
+        highWaterMark = 1e18;
         quitPeriod = 3 days;
         depositLimit = vaultConfig.depositLimit;
 
