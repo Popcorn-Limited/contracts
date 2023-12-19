@@ -131,6 +131,22 @@ contract IporAdapter is AdapterBase, WithRewards {
             );
     }
 
+    /// @notice The amount of ip shares to withdraw given an amount of adapter shares
+    function convertToUnderlyingShares(
+        uint256,
+        uint256 shares
+    ) public view override returns (uint256) {
+        uint256 supply = totalSupply();
+        return
+            supply == 0
+                ? shares
+                : shares.mulDiv(
+                    ipToken.balanceOf(address(this)),
+                    supply,
+                    Math.Rounding.Up
+                );
+    }
+
     /*//////////////////////////////////////////////////////////////
                           INTERNAL HOOKS LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -152,14 +168,15 @@ contract IporAdapter is AdapterBase, WithRewards {
     /// @notice Withdraw from lending pool
     function _protocolWithdraw(
         uint256 assets,
-        uint256
+        uint256 shares
     ) internal virtual override {
+        uint256 amount = convertToUnderlyingShares(assets, shares);
         if (poolAsset == PoolAsset.DAI) {
-            ammPoolsService.redeemFromAmmPoolDai(address(this), assets);
+            ammPoolsService.redeemFromAmmPoolDai(address(this), amount);
         } else if (poolAsset == PoolAsset.USDC) {
-            ammPoolsService.redeemFromAmmPoolUsdc(address(this), assets);
+            ammPoolsService.redeemFromAmmPoolUsdc(address(this), amount);
         } else if (poolAsset == PoolAsset.USDT) {
-            ammPoolsService.redeemFromAmmPoolUsdt(address(this), assets);
+            ammPoolsService.redeemFromAmmPoolUsdt(address(this), amount);
         }
     }
 

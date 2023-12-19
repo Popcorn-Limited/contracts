@@ -208,4 +208,7 @@ interface IIpToken is IERC20 {
     /// @notice Emitted when Token Manager address is changed by its owner.
     /// @param newTokenManager new address of Token Manager
     event TokenManagerChanged(address indexed newTokenManager);
+
+        /// @notice Returns the amount of tokens owned by `account`.
+    function balanceOf(address account) external view returns (uint256);
 }
