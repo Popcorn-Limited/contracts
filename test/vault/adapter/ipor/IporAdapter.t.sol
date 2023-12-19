@@ -3,24 +3,14 @@
 
 pragma solidity ^0.8.15;
 
-import "forge-std/Console.sol";
 import {Test} from "forge-std/Test.sol";
-import {
-    Math,
-    IERC20,
-    SafeERC20,
-    IERC20Metadata,
-    IporAdapter,
-    IAmmPoolsLens,
-    IAmmPoolsService
-} from "../../../../src/vault/adapter/ipor/IporAdapter.sol";
+import {Math, IERC20, SafeERC20, IERC20Metadata, IporAdapter, IAmmPoolsLens, IAmmPoolsService} from "../../../../src/vault/adapter/ipor/IporAdapter.sol";
 import {IporProtocolTestConfigStorage, IporProtocolTestConfig} from "./IporProtocolTestConfigStorage.sol";
 import {AbstractAdapterTest, ITestConfigStorage, IAdapter} from "../abstract/AbstractAdapterTest.sol";
 
 import {PermissionRegistry} from "../../../../src/vault/PermissionRegistry.sol";
 import {IPermissionRegistry, Permission} from "../../../../src/interfaces/vault/IPermissionRegistry.sol";
 import {Clones} from "openzeppelin-contracts/proxy/Clones.sol";
-
 
 contract IporAdapterTest is AbstractAdapterTest {
     using Math for uint256;
@@ -45,7 +35,8 @@ contract IporAdapterTest is AbstractAdapterTest {
     }
 
     function _setUpTest(bytes memory testConfig) internal {
-        (address _ammPoolService, address _ammPoolsLens, address _asset) = abi.decode(testConfig, (address, address, address ));
+        (address _ammPoolService, address _ammPoolsLens, address _asset) = abi
+            .decode(testConfig, (address, address, address));
 
         ammPoolsService = IAmmPoolsService(_ammPoolService);
         ammPoolsLens = IAmmPoolsLens(_ammPoolsLens);
@@ -68,15 +59,20 @@ contract IporAdapterTest is AbstractAdapterTest {
 
         vm.label(address(this), "test");
         vm.label(address(asset), "asset");
-        vm.label(address(ammPoolsLens), "amm pool lens");
-        vm.label(address(ammPoolsService), "amm pool service");
-
+        vm.label(address(ammPoolsLens), "ammPoolLens");
+        vm.label(address(ammPoolsService), "ammPoolService");
 
         adapter.initialize(
-            abi.encode(asset, address(this), address(strategy), 0, sigs, ""),
+            abi.encode(asset, address(this), address(0), 0, sigs, ""),
             externalRegistry,
-            testConfig
+            abi.encode(_ammPoolService, _ammPoolsLens)
         );
+
+        defaultAmount = 10 ** IERC20Metadata(address(asset)).decimals();
+        minFuzz = defaultAmount * 10_000;
+        raise = defaultAmount * 100_000_000;
+        maxAssets = defaultAmount * 1_000_000;
+        maxShares = maxAssets / 2;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -84,13 +80,12 @@ contract IporAdapterTest is AbstractAdapterTest {
     //////////////////////////////////////////////////////////////*/
 
     function increasePricePerShare(uint256 amount) public override {
-//        deal(
-//            address(asset),
-//            address(vault),
-//            asset.balanceOf(address(vault)) + amount
-//        );
+        //        deal(
+        //            address(asset),
+        //            address(vault),
+        //            asset.balanceOf(address(vault)) + amount
+        //        );
     }
-
 
     // Verify that totalAssets returns the expected amount
     function verify_totalAssets() public override {
