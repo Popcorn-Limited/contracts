@@ -4,27 +4,28 @@ import {StakingVault} from "./vaults/StakingVault.sol";
 
 contract StakingVaultFactory {
     address[] public allVaults;
-    event VaultDeployed(address indexed asset, address indexed rewardToken);
+
+    event VaultDeployed(address indexed asset);
 
     function deploy(
         address asset,
-        address rewardToken,
-        uint maxLockTime,
+        address[] memory rewardTokens,
         address strategy,
+        uint256 maxLockTime,
         string memory name,
         string memory symbol
     ) external {
         StakingVault vault = new StakingVault(
             asset,
-            maxLockTime,
-            rewardToken,
+            rewardTokens,
             strategy,
+            maxLockTime,
             name,
             symbol
         );
         allVaults.push(address(vault));
 
-        emit VaultDeployed(asset, rewardToken);
+        emit VaultDeployed(asset);
     }
 
     function getTotalVaults() external view returns (uint256) {

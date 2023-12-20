@@ -8,7 +8,6 @@ import {IERC4626} from "../interfaces/vault/IAdapter.sol";
 
 struct Lock {
     uint256 unlockTime;
-    uint256 rewardIndex;
     uint256 amount;
     uint256 rewardShares;
 }
@@ -16,22 +15,25 @@ struct Lock {
 contract StakingVault is ERC20 {
     using SafeTransferLib for ERC20;
     using FixedPointMathLib for uint256;
+
     ERC20 public immutable asset;
-    ERC20 public immutable rewardToken;
-    IERC4626 public immutable strategy;
+
+    IERC4626 public strategy;
+    ERC20[] public rewardTokens;
 
     uint256 public immutable MAX_LOCK_TIME;
     address public constant PROTOCOL_FEE_RECIPIENT =
         0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E;
     uint256 public constant PROTOCOL_FEE = 10;
 
-    uint256 protocolFees;
+    uint256[] public protocolFees;
 
     mapping(address => Lock) public locks;
-    mapping(address => uint256) public accruedRewards;
+    mapping(address => uint256[]) public accruedRewards;
+    mapping(address => uint256[]) public rewardIndices;
 
     uint256 public totalRewardSupply;
-    uint256 public currIndex;
+    uint256[] public currIndices;
 
     uint256 internal toShareDivider = 1;
 
@@ -39,28 +41,77 @@ contract StakingVault is ERC20 {
     event Withdrawal(address indexed user, uint256 amount);
     event IncreaseLockTime(address indexed user, uint256 newLockTime);
     event IncreaseLockAmount(address indexed user, uint256 amount);
-    event Claimed(address indexed user, uint256 amount);
-    event DistributeRewards(address indexed distributor, uint256 amount);
+    event Claimed(address indexed user, ERC20 rewardToken, uint256 amount);
+    event DistributeRewards(
+        address indexed distributor,
+        ERC20 rewardToken,
+        uint256 amount
+    );
 
     constructor(
         address _asset,
-        uint256 _maxLockTime,
-        address _rewardToken,
+        address[] memory _rewardTokens,
         address _strategy,
+        uint256 _maxLockTime,
         string memory _name,
         string memory _symbol
     ) ERC20(_name, _symbol, ERC20(_asset).decimals()) {
+        uint256 len = _rewardTokens.length;
+
+        require(len > 0, "REWARD_TOKENS");
+        require(_asset != address(0), "ASSET");
+        require(_maxLockTime > 0, "MAX_LOCK_TIME");
+
         asset = ERC20(_asset);
         MAX_LOCK_TIME = _maxLockTime;
 
-        rewardToken = ERC20(_rewardToken);
+        for (uint256 i; i < len; i++) {
+            require(_rewardTokens[i] != address(0), "REWARD");
+            rewardTokens.push(ERC20(_rewardTokens[i]));
+            currIndices.push(0);
+            protocolFees.push(0);
+        }
 
-        strategy = IERC4626(_strategy);
+        if (_strategy != address(0)) {
+            strategy = IERC4626(_strategy);
 
-        uint8 stratDecimals = strategy.decimals();
-        if (stratDecimals > 18) toShareDivider = 10 ** (stratDecimals - 18);
+            uint256 stratDecimals = strategy.decimals();
+            if (stratDecimals > 18) toShareDivider = 10 ** (stratDecimals - 18);
 
-        ERC20(_asset).approve(_strategy, type(uint256).max);
+            ERC20(_asset).approve(_strategy, type(uint256).max);
+        }
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                                VIEWS
+    //////////////////////////////////////////////////////////////*/
+
+    function getRewardLength() external view returns (uint256) {
+        return rewardTokens.length;
+    }
+
+    function getRewardTokens() external view returns (ERC20[] memory) {
+        return rewardTokens;
+    }
+
+    function getCurrIndices() external view returns (uint256[] memory) {
+        return currIndices;
+    }
+
+    function getUserIndices(
+        address user
+    ) external view returns (uint256[] memory) {
+        return rewardIndices[user];
+    }
+
+    function getAccruedRewards(
+        address user
+    ) external view returns (uint256[] memory) {
+        return accruedRewards[user];
+    }
+
+    function getProtocolFees() external view returns (uint256[] memory) {
+        return protocolFees;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -76,7 +127,10 @@ contract StakingVault is ERC20 {
     }
 
     function toShares(uint256 amount) public view returns (uint256) {
-        return strategy.previewDeposit(amount) / toShareDivider;
+        return
+            address(strategy) == address(0)
+                ? amount
+                : strategy.previewDeposit(amount) / toShareDivider;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -87,21 +141,26 @@ contract StakingVault is ERC20 {
         address recipient,
         uint256 amount,
         uint256 lockTime
-    ) external returns (uint256 shares) {
+    ) external returns (uint256) {
         require(locks[recipient].unlockTime == 0, "LOCK_EXISTS");
 
-        uint256 rewardShares;
-        (shares, rewardShares) = _getShares(amount, lockTime);
+        (uint256 shares, uint256 rewardShares) = _getShares(amount, lockTime);
 
         asset.safeTransferFrom(msg.sender, address(this), amount);
 
-        strategy.deposit(amount, address(this));
+        if (address(strategy) != address(0))
+            strategy.deposit(amount, address(this));
 
         _mint(recipient, shares);
 
+        uint256 len = rewardTokens.length;
+        for (uint256 i; i < len; i++) {
+            rewardIndices[recipient].push(currIndices[i]);
+            accruedRewards[recipient].push(0);
+        }
+
         locks[recipient] = Lock({
             unlockTime: block.timestamp + lockTime,
-            rewardIndex: currIndex,
             amount: amount,
             rewardShares: rewardShares
         });
@@ -109,6 +168,8 @@ contract StakingVault is ERC20 {
         totalRewardSupply += rewardShares;
 
         emit LockCreated(recipient, amount, lockTime);
+
+        return shares;
     }
 
     function withdraw(
@@ -128,20 +189,26 @@ contract StakingVault is ERC20 {
         }
 
         accrueUser(owner);
+        _claim(owner);
 
-        amount = shares.mulDivDown(
-            strategy.balanceOf(address(this)),
-            totalSupply
-        );
-
+        uint256 _totalSupply = totalSupply;
         _burn(owner, shares);
 
         totalRewardSupply -= locks[owner].rewardShares;
 
         delete locks[owner];
+        delete rewardIndices[owner];
 
-        strategy.redeem(amount, recipient, address(this));
-
+        if (address(strategy) != address(0)) {
+            amount = shares.mulDivDown(
+                strategy.balanceOf(address(this)),
+                _totalSupply
+            );
+            strategy.redeem(amount, recipient, address(this));
+        } else {
+            amount = shares;
+            asset.transfer(recipient, amount);
+        }
         emit Withdrawal(owner, amount);
     }
 
@@ -171,7 +238,8 @@ contract StakingVault is ERC20 {
 
         asset.safeTransferFrom(msg.sender, address(this), amount);
 
-        strategy.deposit(amount, address(this));
+        if (address(strategy) != address(0))
+            strategy.deposit(amount, address(this));
 
         _mint(recipient, shares);
 
@@ -187,49 +255,75 @@ contract StakingVault is ERC20 {
                             REWARDS LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function distributeRewards(uint256 amount) external {
-        uint256 fee = (amount * PROTOCOL_FEE) / 10_000;
-        protocolFees += fee;
+    function distributeRewards(uint256[] calldata amounts) external {
+        uint256 len = amounts.length;
+        require(len == rewardTokens.length, "WRONG_AMOUNTS");
 
-        // amount of reward tokens that will be distributed per share
-        uint256 delta = (amount - fee).mulDivDown(
-            10 ** decimals,
-            totalRewardSupply
-        );
+        uint256 totalDelta;
 
-        /// @dev if delta == 0, no one will receive any rewards.
-        require(delta != 0, "LOW_AMOUNT");
+        for (uint256 i; i < len; i++) {
+            uint256 fee = (amounts[i] * PROTOCOL_FEE) / 10_000;
+            protocolFees[i] += fee;
 
-        currIndex += delta;
+            // amount of reward tokens that will be distributed per share
+            uint256 delta = (amounts[i] - fee).mulDivDown(
+                10 ** decimals,
+                totalRewardSupply
+            );
 
-        rewardToken.safeTransferFrom(msg.sender, address(this), amount);
+            if (delta > 0) {
+                ERC20(rewardTokens[i]).safeTransferFrom(
+                    msg.sender,
+                    address(this),
+                    amounts[i]
+                );
 
-        emit DistributeRewards(msg.sender, amount);
+                currIndices[i] += delta;
+                totalDelta += delta;
+
+                emit DistributeRewards(msg.sender, rewardTokens[i], amounts[i]);
+            }
+        }
+
+        /// @dev if totalDelta == 0, no one will receive any rewards.
+        require(totalDelta > 0, "LOW_AMOUNT");
     }
 
     function accrueUser(address user) public {
-        uint256 rewardShares = locks[user].rewardShares;
-        if (rewardShares == 0) return;
+        Lock memory lock = locks[user];
+        if (lock.rewardShares == 0) return;
 
-        uint256 userIndex = locks[user].rewardIndex;
+        uint256 len = rewardTokens.length;
+        for (uint256 i; i < len; i++) {
+            uint256 delta = currIndices[i] - rewardIndices[user][i];
 
-        uint256 delta = currIndex - userIndex;
+            rewardIndices[user][i] = currIndices[i];
 
-        locks[user].rewardIndex = currIndex;
-        accruedRewards[user] += (rewardShares * delta) / (10 ** decimals);
+            accruedRewards[user][i] +=
+                (lock.rewardShares * delta) /
+                (10 ** decimals);
+        }
     }
 
     function claim(address user) external {
         accrueUser(user);
+        _claim(user);
+    }
 
-        uint256 rewards = accruedRewards[user];
-        require(rewards != 0, "NO_REWARDS");
+    function _claim(address user) internal {
+        uint256[] memory rewards = accruedRewards[user];
 
-        accruedRewards[user] = 0;
+        delete accruedRewards[user];
 
-        rewardToken.safeTransfer(user, rewards);
+        uint256 len = rewardTokens.length;
+        for (uint256 i; i < len; i++) {
+            uint256 reward = rewards[i];
 
-        emit Claimed(msg.sender, rewards);
+            if (reward > 0) {
+                rewardTokens[i].safeTransfer(user, reward);
+                emit Claimed(msg.sender, rewardTokens[i], reward);
+            }
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -237,11 +331,16 @@ contract StakingVault is ERC20 {
     //////////////////////////////////////////////////////////////*/
 
     function claimProtocolFees() external {
-        uint256 amount = protocolFees;
+        uint256[] memory fees = protocolFees;
 
         delete protocolFees;
 
-        rewardToken.safeTransfer(PROTOCOL_FEE_RECIPIENT, amount);
+        uint256 len = fees.length;
+        for (uint256 i; i < len; i++) {
+            uint256 fee = fees[i];
+            if (fee > 0)
+                rewardTokens[i].safeTransfer(PROTOCOL_FEE_RECIPIENT, fee);
+        }
     }
 
     /*//////////////////////////////////////////////////////////////

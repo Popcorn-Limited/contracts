@@ -13,7 +13,11 @@ contract StakingVaultTest is Test {
     StakingVault vault;
 
     MockERC20 asset = new MockERC20("A", "Asset", 18);
-    MockERC20 rewardToken = new MockERC20("R", "Reward", 18);
+    MockERC20 rewardToken1 = new MockERC20("R1", "Reward1", 18);
+    MockERC20 rewardToken2 = new MockERC20("R2", "Reward2", 18);
+
+    MockERC20[] rewardTokens;
+
     MockERC4626 strategy;
 
     address alice = vm.addr(1);
@@ -29,11 +33,116 @@ contract StakingVaultTest is Test {
             "Mock Token Vault",
             "vwTKN"
         );
+
+        rewardTokens.push(rewardToken1);
+        rewardTokens.push(rewardToken2);
+
+        address[] memory _rewardTokens = new address[](2);
+        _rewardTokens[0] = address(rewardToken1);
+        _rewardTokens[1] = address(rewardToken2);
+
         vault = new StakingVault(
             address(asset),
-            MAX_LOCK_TIME,
-            address(rewardToken),
+            _rewardTokens,
             address(strategy),
+            MAX_LOCK_TIME,
+            "VaultName",
+            "v"
+        );
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                                INIT
+    //////////////////////////////////////////////////////////////*/
+
+    function test_init() public {
+        assertEq(address(vault.asset()), address(asset));
+        assertEq(address(vault.strategy()), address(strategy));
+        assertEq(vault.MAX_LOCK_TIME(), MAX_LOCK_TIME);
+
+        assertEq(vault.name(), "VaultName");
+        assertEq(vault.symbol(), "v");
+
+        assertEq(vault.getRewardLength(), 2);
+        assertEq(address(vault.rewardTokens(0)), address(rewardToken1));
+        assertEq(address(vault.rewardTokens(1)), address(rewardToken2));
+        assertEq(
+            asset.allowance(address(vault), address(strategy)),
+            type(uint256).max
+        );
+    }
+
+    function test_init_without_strategy() public {
+        address[] memory _rewardTokens = new address[](2);
+        _rewardTokens[0] = address(rewardToken1);
+        _rewardTokens[1] = address(rewardToken2);
+
+        vault = new StakingVault(
+            address(asset),
+            _rewardTokens,
+            address(0),
+            MAX_LOCK_TIME,
+            "VaultName",
+            "v"
+        );
+
+        assertEq(address(vault.strategy()), address(0));
+        assertEq(asset.allowance(address(vault), address(strategy)), 0);
+    }
+
+    function testFail_init_without_asset() public {
+        address[] memory _rewardTokens = new address[](2);
+        _rewardTokens[0] = address(rewardToken1);
+        _rewardTokens[1] = address(rewardToken2);
+
+        vault = new StakingVault(
+            address(0),
+            _rewardTokens,
+            address(strategy),
+            MAX_LOCK_TIME,
+            "VaultName",
+            "v"
+        );
+    }
+
+    function testFail_init_without_rewardTokens() public {
+        address[] memory _rewardTokens = new address[](0);
+
+        vault = new StakingVault(
+            address(asset),
+            _rewardTokens,
+            address(strategy),
+            MAX_LOCK_TIME,
+            "VaultName",
+            "v"
+        );
+    }
+
+    function testFail_init_without_maxLockTime() public {
+        address[] memory _rewardTokens = new address[](2);
+        _rewardTokens[0] = address(rewardToken1);
+        _rewardTokens[1] = address(rewardToken2);
+
+        vault = new StakingVault(
+            address(asset),
+            _rewardTokens,
+            address(strategy),
+            0,
+            "VaultName",
+            "v"
+        );
+    }
+
+    function testFail_init_with_empty_rewardToken() public {
+        address[] memory rewards = new address[](2);
+        rewards[0] = address(rewardToken1);
+        rewards[1] = address(0);
+
+        vault = new StakingVault(
+            address(asset),
+            rewards,
+            address(strategy),
+            MAX_LOCK_TIME,
             "VaultName",
             "v"
         );
@@ -60,17 +169,19 @@ contract StakingVaultTest is Test {
 
         (
             uint256 unlockTime,
-            uint256 rewardIndex,
             uint256 lockAmount,
             uint256 lockRewardShares
         ) = vault.locks(alice);
+        uint256[] memory rewardIndices = vault.getUserIndices(alice);
 
         assertEq(
             unlockTime,
             block.timestamp + MAX_LOCK_TIME,
             "wrong unlock time"
         );
-        assertEq(rewardIndex, vault.currIndex(), "wrong reward index");
+        assertEq(rewardIndices[0], vault.currIndices(0), "wrong reward index1");
+        assertEq(rewardIndices[1], vault.currIndices(1), "wrong reward index2");
+
         assertEq(lockAmount, amount, "wrong lock amount");
         assertEq(lockRewardShares, expectedRewardShares, "wrong rewardShares");
         assertEq(shares, expectedShares, "wrong shares");
@@ -85,6 +196,55 @@ contract StakingVaultTest is Test {
             amount * 1e9,
             "wrong strat bal in vault"
         );
+    }
+
+    function test_deposit_without_strategy(uint256 amount) public {
+        vm.assume(amount != 0 && amount <= 100_000e18);
+        deal(address(asset), alice, amount);
+
+        address[] memory _rewardTokens = new address[](2);
+        _rewardTokens[0] = address(rewardToken1);
+        _rewardTokens[1] = address(rewardToken2);
+
+        vault = new StakingVault(
+            address(asset),
+            _rewardTokens,
+            address(0),
+            MAX_LOCK_TIME,
+            "VaultName",
+            "v"
+        );
+
+        uint256 expectedShares = vault.toShares(amount);
+        uint256 expectedRewardShares = vault.toRewardShares(
+            amount,
+            MAX_LOCK_TIME
+        );
+
+        vm.startPrank(alice);
+        asset.approve(address(vault), amount);
+        uint256 shares = vault.deposit(alice, amount, MAX_LOCK_TIME);
+        vm.stopPrank();
+
+        (
+            uint256 unlockTime,
+            uint256 lockAmount,
+            uint256 lockRewardShares
+        ) = vault.locks(alice);
+        uint256[] memory rewardIndices = vault.getUserIndices(alice);
+
+        assertEq(
+            unlockTime,
+            block.timestamp + MAX_LOCK_TIME,
+            "wrong unlock time"
+        );
+        assertEq(rewardIndices[0], vault.currIndices(0), "wrong reward index1");
+        assertEq(rewardIndices[1], vault.currIndices(1), "wrong reward index2");
+
+        assertEq(lockAmount, amount, "wrong lock amount");
+        assertEq(lockRewardShares, expectedRewardShares, "wrong rewardShares");
+        assertEq(shares, expectedShares, "wrong shares");
+        assertEq(asset.balanceOf(alice), 0, "wrong asset bal");
     }
 
     function test_deposit_for_others() public {
@@ -104,17 +264,20 @@ contract StakingVaultTest is Test {
 
         (
             uint256 unlockTime,
-            uint256 rewardIndex,
             uint256 lockAmount,
             uint256 lockRewardShares
         ) = vault.locks(bob);
+        uint256[] memory rewardIndices = vault.getUserIndices(bob);
 
         assertEq(
             unlockTime,
             block.timestamp + MAX_LOCK_TIME,
             "wrong unlock time"
         );
-        assertEq(rewardIndex, vault.currIndex(), "wrong reward index");
+
+        assertEq(rewardIndices[0], vault.currIndices(0), "wrong reward index");
+        assertEq(rewardIndices[1], vault.currIndices(1), "wrong reward index");
+
         assertEq(lockAmount, amount, "wrong lock amount");
         assertEq(lockRewardShares, expectedRewardShares, "wrong rewardShares");
         assertEq(shares, expectedShares, "wrong shares");
@@ -157,6 +320,91 @@ contract StakingVaultTest is Test {
         vm.expectRevert("LOCK_TIME");
         vault.deposit(alice, 1e18, MAX_LOCK_TIME + 1);
         vm.stopPrank();
+    }
+
+    function test_withdraw() public {
+        _deposit(alice, 1e18, 365 days);
+
+        vm.warp(block.timestamp + 365 days + 1);
+
+        vm.prank(alice);
+        vault.withdraw(alice, alice);
+
+        (
+            uint256 unlockTime,
+            uint256 lockAmount,
+            uint256 lockRewardShares
+        ) = vault.locks(alice);
+
+        assertEq(asset.balanceOf(alice), 1e18, "asset");
+        assertEq(vault.balanceOf(alice), 0, "shares");
+        assertEq(unlockTime, 0, "unlockTime");
+        assertEq(lockAmount, 0, "lockAmount");
+        assertEq(lockRewardShares, 0, "reward shares");
+    }
+
+    function test_withdraw_without_strategy() public {
+        address[] memory _rewardTokens = new address[](2);
+        _rewardTokens[0] = address(rewardToken1);
+        _rewardTokens[1] = address(rewardToken2);
+
+        vault = new StakingVault(
+            address(asset),
+            _rewardTokens,
+            address(0),
+            MAX_LOCK_TIME,
+            "VaultName",
+            "v"
+        );
+
+        _deposit(alice, 1e18, 365 days);
+
+        vm.warp(block.timestamp + 365 days + 1);
+
+        vm.prank(alice);
+        vault.withdraw(alice, alice);
+
+        (
+            uint256 unlockTime,
+            uint256 lockAmount,
+            uint256 lockRewardShares
+        ) = vault.locks(alice);
+
+        assertEq(asset.balanceOf(alice), 1e18, "asset");
+        assertEq(vault.balanceOf(alice), 0, "shares");
+        assertEq(unlockTime, 0, "unlockTime");
+        assertEq(lockAmount, 0, "lockAmount");
+        assertEq(lockRewardShares, 0, "reward shares");
+    }
+
+    function test_withdraw_claims() public {
+        _deposit(alice, 1e18, 365 days);
+
+        vm.warp(block.timestamp + 365 days + 1);
+
+        uint256[] memory amounts = new uint256[](2);
+        amounts[0] = 10e18;
+
+        _distribute(amounts);
+
+        vm.prank(alice);
+        vault.withdraw(alice, alice);
+
+        (
+            uint256 unlockTime,
+            uint256 lockAmount,
+            uint256 lockRewardShares
+        ) = vault.locks(alice);
+        uint256[] memory rewardIndices = vault.getUserIndices(alice);
+
+        assertEq(asset.balanceOf(alice), 1e18, "asset");
+        assertEq(vault.balanceOf(alice), 0, "shares");
+        assertEq(unlockTime, 0, "unlockTime");
+        assertEq(lockAmount, 0, "lockAmount");
+        assertEq(lockRewardShares, 0, "reward shares");
+
+        assertEq(rewardToken1.balanceOf(alice), 9.99e18, "reward");
+        assertEq(rewardIndices.length, 0, "rewardIndices.length");
     }
 
     function test_only_authorized_can_withdraw() public {
@@ -251,7 +499,7 @@ contract StakingVaultTest is Test {
         vault.increaseLockAmount(alice, amount);
         vm.stopPrank();
 
-        (, , uint256 lockAmount, uint256 lockRewardShares) = vault.locks(alice);
+        (, uint256 lockAmount, uint256 lockRewardShares) = vault.locks(alice);
         assertEq(initalDeposit + amount, lockAmount, "wrong lock amount");
         assertEq(expectedRewardShares, lockRewardShares, "wrong reward shares");
         assertEq(expectedShares, vault.balanceOf(alice), "wrong shares");
@@ -268,8 +516,8 @@ contract StakingVaultTest is Test {
         vault.increaseLockAmount(alice, amount);
         vm.stopPrank();
 
-        (, , uint256 deposit, ) = vault.locks(alice);
-        assertEq(deposit, amount * 2, "lock amount didn't change");
+        (, uint256 lockAmount, ) = vault.locks(alice);
+        assertEq(lockAmount, amount * 2, "lock amount didn't change");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -282,9 +530,12 @@ contract StakingVaultTest is Test {
         _deposit(alice, 1e18, MAX_LOCK_TIME);
         _deposit(bob, 1e18, MAX_LOCK_TIME / 4);
 
-        deal(address(rewardToken), address(this), amount);
-        rewardToken.approve(address(vault), amount);
-        vault.distributeRewards(amount);
+        uint256[] memory amounts = new uint256[](2);
+        amounts[0] = amount;
+
+        deal(address(rewardToken1), address(this), amount);
+        rewardToken1.approve(address(vault), amount);
+        vault.distributeRewards(amounts);
 
         vault.accrueUser(alice);
         vault.accrueUser(bob);
@@ -293,14 +544,65 @@ contract StakingVaultTest is Test {
             ((amount * vault.PROTOCOL_FEE()) / 10_000);
 
         assertEq(
-            vault.accruedRewards(alice),
+            vault.accruedRewards(alice, 0),
             (amountAfterFees * 4) / 5,
             "Alice got wrong reward amount"
         );
         assertEq(
-            vault.accruedRewards(bob),
+            vault.accruedRewards(bob, 0),
             amountAfterFees / 5,
             "Bob got wrong reward amount"
+        );
+    }
+
+    function test_distribute_multiple_rewards(uint256 amount) public {
+        vm.assume(amount > 10e18 && amount < 100_000_000_000e18);
+
+        uint256 amount2 = amount / 2;
+
+        _deposit(alice, 1e18, MAX_LOCK_TIME);
+        _deposit(bob, 1e18, MAX_LOCK_TIME / 4);
+
+        uint256[] memory amounts = new uint256[](2);
+        amounts[0] = amount;
+        amounts[1] = amount2;
+
+        deal(address(rewardToken1), address(this), amount);
+        rewardToken1.approve(address(vault), amount);
+
+        deal(address(rewardToken2), address(this), amount2);
+        rewardToken2.approve(address(vault), amount2);
+
+        vault.distributeRewards(amounts);
+
+        vault.accrueUser(alice);
+        vault.accrueUser(bob);
+
+        uint256 amountAfterFees = amount -
+            ((amount * vault.PROTOCOL_FEE()) / 10_000);
+        uint256 amountAfterFees2 = amount2 -
+            ((amount2 * vault.PROTOCOL_FEE()) / 10_000);
+
+        assertEq(
+            vault.accruedRewards(alice, 0),
+            (amountAfterFees * 4) / 5,
+            "Alice got wrong reward amount"
+        );
+        assertEq(
+            vault.accruedRewards(alice, 1),
+            (amountAfterFees2 * 4) / 5,
+            "Alice got wrong reward amount2"
+        );
+
+        assertEq(
+            vault.accruedRewards(bob, 0),
+            amountAfterFees / 5,
+            "Bob got wrong reward amount"
+        );
+        assertEq(
+            vault.accruedRewards(bob, 1),
+            amountAfterFees2 / 5,
+            "Bob got wrong reward amount2"
         );
     }
 
@@ -313,21 +615,24 @@ contract StakingVaultTest is Test {
             (amount * vault.PROTOCOL_FEE()) /
             10_000;
 
-        _distribute(amount);
+        uint256[] memory amounts = new uint256[](2);
+        amounts[0] = amount;
+
+        _distribute(amounts);
 
         deal(address(asset), bob, 1e18);
         vm.startPrank(bob);
         asset.approve(address(vault), 1e18);
         vault.increaseLockAmount(bob, 1e18);
         vm.stopPrank();
-        
+
         assertEq(
-            vault.accruedRewards(bob),
+            vault.accruedRewards(bob, 0),
             amountAfterFees / 5,
-            "Bob got wrong reward amount"
+            "Bob got wrong reward amount 1"
         );
 
-        _distribute(amount);
+        _distribute(amounts);
 
         vault.accrueUser(alice);
         vault.accrueUser(bob);
@@ -342,35 +647,46 @@ contract StakingVaultTest is Test {
             6;
 
         assertEq(
-            vault.accruedRewards(alice),
+            vault.accruedRewards(alice, 0),
             aliceExpectedRewards,
             "Alice got wrong reward amount"
         );
         assertEq(
-            vault.accruedRewards(bob),
+            vault.accruedRewards(bob, 0),
             bobExpectedRewards,
-            "Bob got wrong reward amount"
+            "Bob got wrong reward amount 2"
         );
     }
 
     function test_accrue_before_amount_increase() public {
         _deposit(alice, 1e18, MAX_LOCK_TIME);
+        emit log_string("got here1");
         _deposit(bob, 1e18, MAX_LOCK_TIME);
-        _distribute(100e18);
+        emit log_string("got here2");
+
+        uint256[] memory amounts = new uint256[](2);
+        amounts[0] = 100e18;
+        emit log_string("got here3");
+
+        _distribute(amounts);
+        emit log_string("got here4");
 
         deal(address(asset), alice, 1e18);
         vm.startPrank(alice);
         asset.approve(address(vault), 1e18);
         vault.increaseLockAmount(alice, 1e18);
         vm.stopPrank();
+        emit log_string("got here5");
 
         uint256 amountAfterFees = 100e18 -
             (100e18 * vault.PROTOCOL_FEE()) /
             10_000;
+        emit log_string("got here6");
+
         // with the initial balances, alice should receive half of the total reward amount.
         // The increase in her lock amount shouldn't have an affect here.
         assertEq(
-            vault.accruedRewards(alice),
+            vault.accruedRewards(alice, 0),
             amountAfterFees / 2,
             "Alice got wrong reward amount"
         );
@@ -378,9 +694,13 @@ contract StakingVaultTest is Test {
 
     function test_claim() public {
         _deposit(alice, 1e18, MAX_LOCK_TIME);
-        _distribute(100e18);
 
-        vault.accrueUser(alice);
+        uint256[] memory amounts = new uint256[](2);
+        amounts[0] = 100e18;
+        amounts[1] = 0;
+
+        _distribute(amounts);
+
         vault.claim(alice);
 
         uint256 amountAfterFees = 100e18 -
@@ -388,9 +708,39 @@ contract StakingVaultTest is Test {
             10_000;
 
         assertEq(
-            rewardToken.balanceOf(alice),
+            rewardToken1.balanceOf(alice),
             amountAfterFees,
             "didn't claim rewards"
+        );
+    }
+
+    function test_claim_multiple_rewards() public {
+        _deposit(alice, 1e18, MAX_LOCK_TIME);
+
+        uint256[] memory amounts = new uint256[](2);
+        amounts[0] = 100e18;
+        amounts[1] = 10e18;
+
+        _distribute(amounts);
+
+        vault.claim(alice);
+
+        uint256 amountAfterFees = 100e18 -
+            (100e18 * vault.PROTOCOL_FEE()) /
+            10_000;
+        uint256 amountAfterFees2 = 10e18 -
+            (10e18 * vault.PROTOCOL_FEE()) /
+            10_000;
+
+        assertEq(
+            rewardToken1.balanceOf(alice),
+            amountAfterFees,
+            "didn't claim rewards"
+        );
+        assertEq(
+            rewardToken2.balanceOf(alice),
+            amountAfterFees2,
+            "didn't claim rewards2"
         );
     }
 
@@ -427,9 +777,11 @@ contract StakingVaultTest is Test {
         vm.stopPrank();
     }
 
-    function _distribute(uint256 amount) internal {
-        deal(address(rewardToken), address(this), amount);
-        rewardToken.approve(address(vault), amount);
-        vault.distributeRewards(amount);
+    function _distribute(uint256[] memory amounts) internal {
+        for (uint256 i; i < amounts.length; i++) {
+            deal(address(rewardTokens[i]), address(this), amounts[i]);
+            rewardTokens[i].approve(address(vault), amounts[i]);
+        }
+        vault.distributeRewards(amounts);
     }
 }
