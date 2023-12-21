@@ -290,8 +290,8 @@ contract StakingVault is ERC20 {
     }
 
     function accrueUser(address user) public {
-        Lock memory lock = locks[user];
-        if (lock.rewardShares == 0) return;
+        uint256 rewardShares = locks[user].rewardShares;
+        if (rewardShares == 0) return;
 
         uint256 len = rewardTokens.length;
         for (uint256 i; i < len; i++) {
@@ -300,7 +300,7 @@ contract StakingVault is ERC20 {
             rewardIndices[user][i] = currIndices[i];
 
             accruedRewards[user][i] +=
-                (lock.rewardShares * delta) /
+                (rewardShares * delta) /
                 (10 ** decimals);
         }
     }
