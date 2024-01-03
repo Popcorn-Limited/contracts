@@ -8,16 +8,14 @@ import {Clones} from "openzeppelin-contracts/proxy/Clones.sol";
 import {BalancerGaugeAdapter, SafeERC20, IERC20, IERC20Metadata, Math, IGauge, IStrategy} from "../../../../../src/vault/adapter/balancer/BalancerGaugeAdapter.sol";
 import {BalancerLpCompounder, IBalancerVault, SwapKind, IAsset, BatchSwapStep, FundManagement, JoinPoolRequest, BalancerRoute} from "../../../../../src/vault/strategy/compounder/balancer/BalancerLpCompounder.sol";
 
-// TODO - update test using the new BalancerLpCompounder
-
 contract BalancerLpCompounderTest is Test {
     address vault = address(0xBA12222222228d8Ba445958a75a0704d566BF2C8);
-    address baseAsset = address(0x82aF49447D8a07e3bd95BD0d56f35241523fBab1);
+    address baseAsset = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
     bytes32 poolId =
-        0x32df62dc3aed2cd6224193052ce665dc181658410002000000000000000003bd;
-    address weth = address(0x82aF49447D8a07e3bd95BD0d56f35241523fBab1);
+        0xe7e2c68d3b13d905bbb636709cf4dfd21076b9d20000000000000000000005ca;
+    address weth = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
     bytes32 balWethPoolId =
-        0xcc65a812ce382ab909a11e434dbf75b34f1cc59d000200000000000000000001;
+        0x5c6ee304399dbdb9c8ef030ab642b10820db8f56000200000000000000000014;
 
     BalancerGaugeAdapter adapter;
 
@@ -33,8 +31,10 @@ contract BalancerLpCompounderTest is Test {
     IAsset[] assets;
     int256[] limits;
 
+    uint256[] amounts;
+
     function setUp() public {
-        uint256 forkId = vm.createSelectFork(vm.rpcUrl("arbitrum"));
+        uint256 forkId = vm.createSelectFork(vm.rpcUrl("mainnet"));
         vm.selectFork(forkId);
 
         address impl = address(new BalancerGaugeAdapter());
@@ -42,10 +42,10 @@ contract BalancerLpCompounderTest is Test {
         adapter = BalancerGaugeAdapter(Clones.clone(impl));
 
         IGauge gauge = IGauge(
-            address(0xcf9f895296F5e1D66a7D4dcf1d92e1B435E9f999)
+            address(0xee01c0d9c0439c94D314a6ecAE0490989750746C)
         );
         asset = gauge.lp_token();
-        bal = gauge.bal_token();
+        bal = address(0xba100000625a3754423978a60c9317c58a424e3D);
 
         vm.label(address(asset), "asset");
 
@@ -77,10 +77,10 @@ contract BalancerLpCompounderTest is Test {
                         new int256[](0)
                     ),
                     minTradeAmounts,
-                    abi.encode(poolId, 1)
+                    abi.encode(poolId, 0, 2)
                 )
             ),
-            address(0xc3ccacE87f6d3A81724075ADcb5ddd85a8A1bB68),
+            address(0x239e55F427D44C3cc793f49bFB507ebe76638a2b),
             abi.encode(address(gauge))
         );
     }
@@ -95,21 +95,39 @@ contract BalancerLpCompounderTest is Test {
         );
 
         assertEq(
-            IERC20(address(0x040d1EdC9569d4Bab2D15287Dc5A4F10F56a56B8))
-                .allowance(address(adapter), address(vault)),
+            IERC20(bal).allowance(address(adapter), address(vault)),
             type(uint256).max
         );
+
+        (
+            address baseAsset,
+            address vault,
+            BalancerRoute[] memory toBaseAssetRoutes,
+            BalancerRoute memory toAssetRoute,
+            uint256[] memory minTradeAmounts,
+            bytes memory optionalData
+        ) = abi.decode(
+                adapter.strategyConfig(),
+                (
+                    address,
+                    address,
+                    BalancerRoute[],
+                    BalancerRoute,
+                    uint256[],
+                    bytes
+                )
+            );
     }
 
     function test__compound() public {
-        deal(address(asset), address(this), 1e18);
+        deal(address(asset), address(this), 10e18);
         IERC20(address(asset)).approve(address(adapter), type(uint256).max);
-        adapter.deposit(1e18, address(this));
+        adapter.deposit(10e18, address(this));
 
         uint256 oldTa = adapter.totalAssets();
 
-        vm.roll(block.number + 10_000);
-        vm.warp(block.timestamp + 150_000);
+        vm.roll(block.number + 1000_000);
+        vm.warp(block.timestamp + 15000_000);
 
         adapter.harvest();
 
@@ -122,7 +140,11 @@ contract BalancerLpCompounderTest is Test {
 
         adapter.harvest();
 
-        assertEq(IERC20(bal).balanceOf(address(this)), 0, "should trade whole balance");
+        assertEq(
+            IERC20(bal).balanceOf(address(this)),
+            0,
+            "should trade whole balance"
+        );
     }
 
     function test__should_hold_no_tokens() public {

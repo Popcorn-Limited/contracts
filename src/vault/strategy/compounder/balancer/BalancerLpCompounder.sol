@@ -17,9 +17,9 @@ contract BalancerLpCompounder is BalancerCompounder {
         BalancerRoute memory toAssetRoute,
         bytes memory optionalData
     ) internal override {
-        (bytes32 poolId, uint8 indexIn) = abi.decode(
+        (bytes32 poolId, uint8 indexIn, uint8 amountsInLen) = abi.decode(
             optionalData,
-            (bytes32, uint8)
+            (bytes32, uint8, uint8)
         );
 
         // Verify that the lpToken matches the asset
@@ -60,9 +60,9 @@ contract BalancerLpCompounder is BalancerCompounder {
         BalancerRoute memory toAssetRoute,
         bytes memory optionalData
     ) internal override {
-        (bytes32 poolId, uint8 indexIn) = abi.decode(
+        (bytes32 poolId, uint8 indexIn, uint8 amountsInLen) = abi.decode(
             optionalData,
-            (bytes32, uint8)
+            (bytes32, uint8, uint8)
         );
         (address[] memory underlyings, , ) = IBalancerVault(vault)
             .getPoolTokens(poolId);
@@ -88,19 +88,26 @@ contract BalancerLpCompounder is BalancerCompounder {
             );
         }
 
-        uint256[] memory amounts = new uint256[](underlyings.length);
-        amounts[indexIn] = IERC20(depositToken).balanceOf(address(this));
+        uint256 amountIn = IERC20(depositToken).balanceOf(address(this));
+        if (amountIn > 0) {
+            uint256[] memory amounts = new uint256[](underlyings.length);
+            amounts[indexIn] = amountIn;
 
-        IBalancerVault(vault).joinPool(
-            poolId,
-            address(this),
-            address(this),
-            JoinPoolRequest(
-                underlyings,
-                amounts,
-                abi.encode(1, amounts, 0), // Exact In Enum, inAmounts, minOut
-                false
-            )
-        );
+            bytes memory userData;
+            if (underlyings.length != amountsInLen) {
+                uint256[] memory amountsIn = new uint256[](amountsInLen);
+                amountsIn[indexIn] = amountIn;
+                userData = abi.encode(1, amountsIn, 0); // Exact In Enum, inAmounts, minOut
+            } else {
+                userData = abi.encode(1, amounts, 0); // Exact In Enum, inAmounts, minOut
+            }
+
+            IBalancerVault(vault).joinPool(
+                poolId,
+                address(this),
+                address(this),
+                JoinPoolRequest(underlyings, amounts, userData, false)
+            );
+        }
     }
 }

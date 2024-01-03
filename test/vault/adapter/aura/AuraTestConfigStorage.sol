@@ -10,7 +10,7 @@ contract AuraTestConfigStorage is ITestConfigStorage {
   AuraTestConfig[] internal testConfigs;
 
   constructor() {
-    testConfigs.push(AuraTestConfig(101));
+    testConfigs.push(AuraTestConfig(152));
   }
 
   function getTestConfig(uint256 i) public view returns (bytes memory) {
