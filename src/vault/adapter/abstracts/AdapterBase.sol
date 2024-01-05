@@ -271,7 +271,7 @@ abstract contract AdapterBase is
      * @dev Delegatecall to strategy's harvest() function. All necessary data is passed via `strategyConfig`.
      * @dev Delegatecall is used to in case any logic requires the adapters address as a msg.sender. (e.g. Synthetix staking)
      */
-    function harvest() public takeFees {
+    function harvest() public virtual takeFees {
         if (
             address(strategy) != address(0) &&
             ((lastHarvest + harvestCooldown) < block.timestamp)

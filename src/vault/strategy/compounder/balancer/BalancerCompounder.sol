@@ -207,11 +207,12 @@ contract BalancerCompounder is StrategyBase {
 
         _getAsset(baseAsset, asset, vault, toAssetRoute, optionalData);
 
+        uint256 depositAmount = IERC20(asset).balanceOf(address(this)) -
+            balBefore;
+
         // Deposit new assets into adapter
-        IAdapter(address(this)).strategyDeposit(
-            IERC20(asset).balanceOf(address(this)) - balBefore,
-            0
-        );
+        if (depositAmount > 0)
+            IAdapter(address(this)).strategyDeposit(depositAmount, 0);
 
         emit Harvest();
     }

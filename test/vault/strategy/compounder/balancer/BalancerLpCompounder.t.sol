@@ -58,7 +58,7 @@ contract BalancerLpCompounderTest is Test {
         BalancerRoute[] memory toBaseAssetRoutes = new BalancerRoute[](1);
         toBaseAssetRoutes[0] = BalancerRoute(swaps, assets, limits);
 
-        minTradeAmounts.push(uint256(100));
+        minTradeAmounts.push(uint256(0));
 
         adapter.initialize(
             abi.encode(
@@ -134,9 +134,25 @@ contract BalancerLpCompounderTest is Test {
         assertGt(adapter.totalAssets(), oldTa);
     }
 
+    function test__compound_zero_rewards() public {
+        deal(address(asset), address(this), 1e18);
+        IERC20(address(asset)).approve(address(adapter), type(uint256).max);
+        adapter.deposit(1e18, address(this));
+
+        uint256 oldTa = adapter.totalAssets();
+
+        vm.roll(block.number + 10);
+        vm.warp(block.timestamp + 150);
+
+        adapter.harvest();
+
+        assertGt(adapter.totalAssets(), oldTa);
+    }
+
     function test__should_trade_whole_balance() public {
         // when trading, it should use all the available funds
-        vm.warp(block.timestamp + 30 days);
+        vm.roll(block.number + 1000_000);
+        vm.warp(block.timestamp + 15000_000);
 
         adapter.harvest();
 
@@ -153,7 +169,8 @@ contract BalancerLpCompounderTest is Test {
         // so oldBalance = newBalance for the underlying asset
         uint oldBal = IERC20(asset).balanceOf(address(adapter));
 
-        vm.warp(block.timestamp + 30 days);
+        vm.roll(block.number + 1000_000);
+        vm.warp(block.timestamp + 15000_000);
 
         adapter.harvest();
 
