@@ -141,15 +141,12 @@ contract VelodromeCompounder is AdapterBase, WithRewards {
         return _rewardTokens;
     }
 
-    event log_named_uint(string, uint256);
-
     function harvest() public override takeFees {
         if ((lastHarvest + harvestCooldown) < block.timestamp) {
             claim();
 
             uint256 rewardBal = gauge.earned(address(this));
             if (rewardBal >= minTradeAmount) {
-                emit log_named_uint("rewardBal", rewardBal);
                 // Trade to lpAssets
                 trade();
 
@@ -157,9 +154,6 @@ contract VelodromeCompounder is AdapterBase, WithRewards {
                 uint256 amount1 = IERC20(lpTokens[1]).balanceOf(address(this));
 
                 if (amount0 > 0 && amount1 > 0) {
-                    emit log_named_uint("amount0", amount0);
-                    emit log_named_uint("amount1", amount1);
-
                     // Pool assets
                     ISolidlyRouter(solidlyRouter).addLiquidity(
                         lpTokens[0],
@@ -178,8 +172,6 @@ contract VelodromeCompounder is AdapterBase, WithRewards {
                     address(this)
                 );
                 if (depositAmount > 0) {
-                    emit log_named_uint("depositAmount", depositAmount);
-
                     // redeposit
                     _protocolDeposit(depositAmount, 0);
                 }
