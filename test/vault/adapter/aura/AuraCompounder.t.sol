@@ -128,6 +128,10 @@ contract AuraCompounderTest is AbstractAdapterTest {
         );
     }
 
+    /*//////////////////////////////////////////////////////////////
+                                HARVEST
+    //////////////////////////////////////////////////////////////*/
+
     BatchSwapStep[][2] swaps;
     IAsset[][2] assets;
     int256[][2] limits;
@@ -187,10 +191,10 @@ contract AuraCompounderTest is AbstractAdapterTest {
 
         _mintAssetAndApproveForAdapter(100e18, bob);
 
+        uint256 oldTa = adapter.totalAssets();
+
         vm.prank(bob);
         adapter.deposit(100e18, bob);
-
-        uint256 oldTa = adapter.totalAssets();
 
         vm.roll(block.number + 1000_000);
         vm.warp(block.timestamp + 15000_000);
@@ -253,10 +257,10 @@ contract AuraCompounderTest is AbstractAdapterTest {
 
         _mintAssetAndApproveForAdapter(100e18, bob);
 
+        uint256 oldTa = adapter.totalAssets();
+
         vm.prank(bob);
         adapter.deposit(100e18, bob);
-
-        uint256 oldTa = adapter.totalAssets();
 
         vm.roll(block.number + 10);
         vm.warp(block.timestamp + 150);

@@ -3,13 +3,13 @@ pragma solidity ^0.8.15;
 
 import {Test} from "forge-std/Test.sol";
 
-import {VelodromeAdapter, SafeERC20, IERC20, IERC20Metadata, Math, IGauge, ILpToken} from "../../../../src/vault/adapter/velodrome/VelodromeAdapter.sol";
-import {VelodromeTestConfigStorage, VelodromeTestConfig} from "./VelodromeTestConfigStorage.sol";
+import {VelodromeCompounder, SafeERC20, IERC20, IERC20Metadata, Math, IGauge, ILpToken, Route} from "../../../../src/vault/adapter/velodrome/VelodromeCompounder.sol";
+import {VelodromeCompounderTestConfigStorage} from "./VelodromeCompounderTestConfigStorage.sol";
 import {AbstractAdapterTest, ITestConfigStorage, IAdapter} from "../abstract/AbstractAdapterTest.sol";
 import {IPermissionRegistry, Permission} from "../../../../src/interfaces/vault/IPermissionRegistry.sol";
 import {PermissionRegistry} from "../../../../src/vault/PermissionRegistry.sol";
 
-contract VelodromeAdapterTest is AbstractAdapterTest {
+contract VelodromeCompounderTest is AbstractAdapterTest {
     using Math for uint256;
 
     IGauge gauge;
@@ -22,7 +22,7 @@ contract VelodromeAdapterTest is AbstractAdapterTest {
         vm.selectFork(forkId);
 
         testConfigStorage = ITestConfigStorage(
-            address(new VelodromeTestConfigStorage())
+            address(new VelodromeCompounderTestConfigStorage())
         );
 
         _setUpTest(testConfigStorage.getTestConfig(0));
@@ -33,7 +33,10 @@ contract VelodromeAdapterTest is AbstractAdapterTest {
     }
 
     function _setUpTest(bytes memory testConfig) internal {
-        address _gauge = abi.decode(testConfig, (address));
+        (address _gauge, address _solidlyRouter) = abi.decode(
+            testConfig,
+            (address, address)
+        );
 
         IGauge gauge = IGauge(_gauge);
         ILpToken lpToken = ILpToken(gauge.stakingToken());
@@ -47,11 +50,11 @@ contract VelodromeAdapterTest is AbstractAdapterTest {
 
         setUpBaseTest(
             IERC20(asset),
-            address(new VelodromeAdapter()),
+            address(new VelodromeCompounder()),
             address(permissionRegistry),
             10,
             "Velodrome",
-            true
+            false
         );
 
         vm.label(address(velo), "VELO");
@@ -127,5 +130,98 @@ contract VelodromeAdapterTest is AbstractAdapterTest {
             string.concat("vcVelo-", IERC20Metadata(address(asset)).symbol()),
             "symbol"
         );
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                                HARVEST
+    //////////////////////////////////////////////////////////////*/
+
+    Route[][2] routes;
+    uint256 minTradeAmount;
+
+    function test__harvest() public override {
+        // add VELO -> KUJI route
+        routes[0].push(
+            Route(
+                0x9560e827aF36c94D2Ac33a39bCE1Fe78631088Db,
+                0x3A18dcC9745eDcD1Ef33ecB93b0b6eBA5671e7Ca,
+                false,
+                address(0)
+            )
+        );
+
+        // add VELO -> VELO route
+        routes[1].push(
+            Route(
+                0x9560e827aF36c94D2Ac33a39bCE1Fe78631088Db,
+                0x9560e827aF36c94D2Ac33a39bCE1Fe78631088Db,
+                false,
+                address(0)
+            )
+        );
+
+        minTradeAmount = 1e8;
+
+        VelodromeCompounder(address(adapter)).setHarvestValues(
+            routes,
+            minTradeAmount,
+            0xa062aE8A9c5e11aaA026fc2670B0D65cCc8B2858
+        );
+
+        _mintAssetAndApproveForAdapter(100e18, bob);
+
+        uint256 oldTa = adapter.totalAssets();
+
+        vm.prank(bob);
+        adapter.deposit(100e18, bob);
+
+        vm.roll(block.number + 1000_000);
+        vm.warp(block.timestamp + 15000_000);
+
+        adapter.harvest();
+
+        assertGt(adapter.totalAssets(), oldTa);
+    }
+
+    function test__harvest_no_rewards() public {
+        // add VELO -> KUJI route
+        routes[0].push(
+            Route(
+                0x9560e827aF36c94D2Ac33a39bCE1Fe78631088Db,
+                0x3A18dcC9745eDcD1Ef33ecB93b0b6eBA5671e7Ca,
+                false,
+                address(0)
+            )
+        );
+
+        // add VELO -> VELO route
+        routes[1].push(
+            Route(
+                0x9560e827aF36c94D2Ac33a39bCE1Fe78631088Db,
+                0x9560e827aF36c94D2Ac33a39bCE1Fe78631088Db,
+                false,
+                address(0)
+            )
+        );
+
+        VelodromeCompounder(address(adapter)).setHarvestValues(
+            routes,
+            minTradeAmount,
+            0xa062aE8A9c5e11aaA026fc2670B0D65cCc8B2858
+        );
+
+        _mintAssetAndApproveForAdapter(100e18, bob);
+
+        uint256 oldTa = adapter.totalAssets();
+
+        vm.prank(bob);
+        adapter.deposit(100e18, bob);
+
+        vm.roll(block.number + 10);
+        vm.warp(block.timestamp + 150);
+
+        adapter.harvest();
+
+        assertGt(adapter.totalAssets(), oldTa);
     }
 }

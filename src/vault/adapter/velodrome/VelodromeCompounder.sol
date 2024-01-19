@@ -5,7 +5,7 @@ pragma solidity ^0.8.15;
 
 import {AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20, Math, IStrategy, IAdapter} from "../abstracts/AdapterBase.sol";
 import {WithRewards, IWithRewards} from "../abstracts/WithRewards.sol";
-import {IGauge, ILpToken} from "./IVelodrome.sol";
+import {IGauge, ILpToken, Route, ISolidlyRouter} from "./IVelodrome.sol";
 import {IPermissionRegistry} from "../../../interfaces/vault/IPermissionRegistry.sol";
 
 /**
@@ -15,7 +15,7 @@ import {IPermissionRegistry} from "../../../interfaces/vault/IPermissionRegistry
  *
  * Allows wrapping Velodrome Vaults.
  */
-contract VelodromeAdapter is AdapterBase, WithRewards {
+contract VelodromeCompounder is AdapterBase, WithRewards {
     using SafeERC20 for IERC20;
     using Math for uint256;
 
@@ -25,7 +25,10 @@ contract VelodromeAdapter is AdapterBase, WithRewards {
     /// @notice The Velodrome contract
     IGauge public gauge;
 
+    address internal _rewardToken;
     address[] internal _rewardTokens;
+
+    address[2] internal lpTokens;
 
     /*//////////////////////////////////////////////////////////////
                             INITIALIZATION
@@ -49,7 +52,10 @@ contract VelodromeAdapter is AdapterBase, WithRewards {
     ) external initializer {
         __AdapterBase_init(adapterInitData);
 
-        address _gauge = abi.decode(velodromeInitData, (address));
+        (address _gauge, address _solidlyRouter) = abi.decode(
+            velodromeInitData,
+            (address, address)
+        );
 
         if (!IPermissionRegistry(registry).endorsed(_gauge))
             revert NotEndorsed(_gauge);
@@ -58,7 +64,13 @@ contract VelodromeAdapter is AdapterBase, WithRewards {
 
         if (gauge.stakingToken() != asset()) revert InvalidAsset();
 
-        _rewardTokens.push(gauge.rewardToken()); // velo
+        address rewardToken = gauge.rewardToken(); // velo
+        _rewardToken = rewardToken;
+        _rewardTokens.push(rewardToken);
+
+        (address lp0, address lp1) = ILpToken(asset()).tokens();
+        lpTokens[0] = lp0;
+        lpTokens[1] = lp1;
 
         _name = string.concat(
             "VaultCraft Velodrome ",
@@ -68,6 +80,9 @@ contract VelodromeAdapter is AdapterBase, WithRewards {
         _symbol = string.concat("vcVelo-", IERC20Metadata(asset()).symbol());
 
         IERC20(asset()).approve(address(gauge), type(uint256).max);
+        IERC20(rewardToken).approve(_solidlyRouter, type(uint256).max);
+        IERC20(lp0).approve(_solidlyRouter, type(uint256).max);
+        IERC20(lp1).approve(_solidlyRouter, type(uint256).max);
     }
 
     function name()
@@ -113,8 +128,9 @@ contract VelodromeAdapter is AdapterBase, WithRewards {
     /*//////////////////////////////////////////////////////////////
                             STRATEGY LOGIC
     //////////////////////////////////////////////////////////////*/
+
     /// @notice Claim rewards from the Velodrome gauge
-    function claim() public override onlyStrategy returns (bool success) {
+    function claim() public override returns (bool success) {
         try gauge.getReward(address(this)) {
             success = true;
         } catch {}
@@ -123,6 +139,102 @@ contract VelodromeAdapter is AdapterBase, WithRewards {
     /// @notice The tokens rewarded
     function rewardTokens() external view override returns (address[] memory) {
         return _rewardTokens;
+    }
+
+    event log_named_uint(string, uint256);
+
+    function harvest() public override takeFees {
+        if ((lastHarvest + harvestCooldown) < block.timestamp) {
+            claim();
+
+            uint256 rewardBal = gauge.earned(address(this));
+            if (rewardBal >= minTradeAmount) {
+                emit log_named_uint("rewardBal", rewardBal);
+                // Trade to lpAssets
+                trade();
+
+                uint256 amount0 = IERC20(lpTokens[0]).balanceOf(address(this));
+                uint256 amount1 = IERC20(lpTokens[1]).balanceOf(address(this));
+
+                if (amount0 > 0 && amount1 > 0) {
+                    emit log_named_uint("amount0", amount0);
+                    emit log_named_uint("amount1", amount1);
+
+                    // Pool assets
+                    ISolidlyRouter(solidlyRouter).addLiquidity(
+                        lpTokens[0],
+                        lpTokens[1],
+                        false,
+                        amount0,
+                        amount1,
+                        1,
+                        1,
+                        address(this),
+                        block.timestamp
+                    );
+                }
+
+                uint256 depositAmount = IERC20(asset()).balanceOf(
+                    address(this)
+                );
+                if (depositAmount > 0) {
+                    emit log_named_uint("depositAmount", depositAmount);
+
+                    // redeposit
+                    _protocolDeposit(depositAmount, 0);
+                }
+            }
+
+            lastHarvest = block.timestamp;
+        }
+
+        emit Harvested();
+    }
+
+    function trade() internal {
+        uint256 outputBal = IERC20(_rewardToken).balanceOf(address(this));
+        uint256 amount = outputBal / 2;
+
+        for (uint256 i; i < 2; i++) {
+            if (i == 1) amount = outputBal - amount;
+            if (lpTokens[i] != _rewardToken) {
+                ISolidlyRouter(solidlyRouter).swapExactTokensForTokens(
+                    amount,
+                    0,
+                    routes[lpTokens[i]],
+                    address(this),
+                    block.timestamp
+                );
+            }
+        }
+    }
+
+    mapping(address => Route[]) routes;
+    uint256 internal minTradeAmount;
+    address internal solidlyRouter;
+
+    function setHarvestValues(
+        Route[][2] memory routes_,
+        uint256 minTradeAmount_,
+        address solidlyRouter_
+    ) external onlyOwner {
+        _setRoute(lpTokens[0], routes_[0]);
+        _setRoute(lpTokens[1], routes_[1]);
+
+        minTradeAmount = minTradeAmount_;
+        solidlyRouter = solidlyRouter_;
+    }
+
+    function _setRoute(address key, Route[] memory routes_) internal {
+        uint256 storageLen = routes[key].length;
+        uint256 len = routes_.length;
+        for (uint256 i; i < len; i++) {
+            if (i >= storageLen) {
+                routes[key].push(routes_[i]);
+            } else {
+                routes[key][i] = routes_[i];
+            }
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
