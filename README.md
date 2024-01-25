@@ -3,45 +3,23 @@
 This protocols goal is to make vault creation easy, safe and all without compromising on flexibility. It allows anyone to spin up their own Yearn in minutes.
 
 **Vaults** can be created permissionlessly based on any underlying protocol and execute arbitrary strategies. 
-The factory uses only endorsed **Adapters** and **Strategies** with minimal user input to reduce complexity for a creator and ensure safety of the created clones. It gives vault creators a quick and easy way to spin up any **Vault** they need and end users the guarantee that the created **Vault** will be safe. For some more context checkout the [whitepaper](./WhitePaper.pdf)
+It gives vault creators a quick and easy way to spin up any **Vault** they need and end users the guarantee that the created **Vault** will be safe. For some more context checkout the [whitepaper](./WhitePaper.pdf)
 
-The protocol consists of 2 parts. The Vault Factory and the actual Vaults and Adapters.
+The protocol consists of 2 parts. The Vault Factory and the actual Vaults and Strategies.
 
-## Vault Factory
-The Vault Factory part consists of a mix of Registry and Execution contracts. All contracts are immutable but execution contracts can be swapped out if requirements change or additional functionality should be added.
+In this audit we are gonna focus on the Vault contract, its abstracts and two strategies with their abstracts first. Later on we will have a second audit for the **VaultFactory** and **VaultRegistry** and potential other infrastructure contracts that will be required to deploy **Vaults** and **Strategies** ppermissionlessly.
 
--   **CloneFactory:** A simple factory that clones and initializes new contracts based on a **Template**.
--   **CloneRegistry:** A minimal registry which saves the address of each newly created clone.
--   **TemplateRegistry:** A registry for **Templates**. Each Template contains an implementation and some metadata to ensure proper initialization of the clone. **Templates** need to be endorsed before they can be used to create new clones. Anyone can add a new **Template** but only the contract owner can endorse them if they are deemed correct and safe.
--   **DeploymentController:** This contract bundles **CloneFactory**, **CloneRegistry** and **TemplateRegistry** to simplify the creation of new clones and ensure their safety.
--   **PermissionRegistry:** A simple registry to endorse or reject certain addresses from being used. Currently this is only used to reject potentially unsafe assets and in the creation of beefy adapters.
--   **VaulRegistry:** This registry safes new **Vaults** with additional metadata. The metadata can be used by any frontend and supply it with additional informations about the vault.
--   **VaultController:** This contract bundles all previously mentioned contracts. It adds additional ux and safety measures to the creation of **Vaults**, **Adapters** and **Staking** contracts. Any management function in the protocol must be executed via the **VaultController**.
--   **AdminProxy:** This contract owns any clone and most infrastructure contracts. Its used to make ownership transfers easy in case the **VaultController** should get updated. This contracts forwards almost all calls from the **VaultController**.
-
-**Note:** This system ensures that minimal user input is needed and executions are handled with valid inputs and in the correct order. The goal is to minimize human error and the attack surface. A lot of configurations for **Adapters** and **Strategies** is very protocol specific. These are therefore mainly handled in the implementations itself. **Adapters** should receive all there critical data from an on-chain registry of the underlying protocol. As its nearly impossible to tell otherwise if the passed in configuration is malicious. There is still a need for some kind of governance to ensure that only correct and safe **Templates** are added and dangerous assets get rejected. 
-![vaultInfraFlow](./vaultInfraFlow.PNG)
-## Vault, Adapter & Strategy
+## Vault & Strategy
 -   **Vault:** A simple ERC-4626 implementation which allows the creator to add various types of fees and interact with other protocols via any ERC-4626 compliant **Adapter**. Fees and **Adapter** can be changed by the creator after a ragequit period.
--   **Adapter:** An immutable wrapper for existing contract to allow for ERC-4626 compatability. Optionally adapters can utilize a **Strategy** to perform various additional tasks besides simply depositing and withdrawing token from the wrapped protocol. PopcornDAO will collect management fees via these **Adapter**.
--   **Strategy:** An arbitrary module to perform various tasks from compouding, leverage or simply forwarding rewards. Strategies can be attached to an **Adapter** to give it additionaly utility.
+-   **Strategy:** An immutable wrapper for existing contract to allow for ERC-4626 compatability. Optionally adapters can utilize a **Strategy** to perform various additional tasks besides simply depositing and withdrawing token from the wrapped protocol. PopcornDAO will collect management fees via these **Adapter**.
 
-![vaultFlow](./vaultFlow.PNG)
 
 ## Utility Contracts
 Additionally we included 2 utility contracts that are used alongside the vault system.
 -   **MultiRewardStaking:** A simple ERC-4626 implementation of a staking contract. A user can provide an asset and receive rewards in multiple tokens. Adding these rewards is done by the contract owner. They can be either paid out over time or instantly. Rewards can optionally also be vested on claim.
 -   **MultiRewardEscrow:** Allows anyone to lock up and vest arbitrary tokens over a given time. Will be used mainly in conjuction with **MultiRewardStaking**.
 
-
-# Additional Context
-
-**Note:** The `AdapterBase.sol` still has a TODO to use a deterministic address for `feeRecipient`. As we didnt deploy this proxy yet on our target chains it remains a placeholder value for the moment. Once the proxy exists we will simply switch out the palceholder address.
-
 All `Adapters`, `Vaults`, `Strategies` and `MultiRewardStaking` contracts are intended to be deployed as non-upgradeable clones.
-
-Contracts in `src/vault/strategy` are intended as samples of how strategies could look like but are in the current state still wip. They are NOT part of the audit.
-
 
 # Security
 There are multiple possible targets for attacks.
@@ -51,10 +29,6 @@ There are multiple possible targets for attacks.
 4. Grieving of management functions
 
 ### Dangerous Attacks
-- Attack infrastructure to insert malicious assets / adapters / strategies
-  - Set malicious `deploymentController`
-  - Get malicious `Template` endorsed
-  - Get malicious `asset` endorsed
 - Initial Deposit exploit (See the test in `YearnAdapter.t.sol`)
 - Change `fees` of a vault to the max amount and change the `feeRecipient` to the attacker
 - Exchange the adapter of a vault for a malicious adapter
