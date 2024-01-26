@@ -660,28 +660,22 @@ contract StakingVaultTest is Test {
 
     function test_accrue_before_amount_increase() public {
         _deposit(alice, 1e18, MAX_LOCK_TIME);
-        emit log_string("got here1");
         _deposit(bob, 1e18, MAX_LOCK_TIME);
-        emit log_string("got here2");
 
         uint256[] memory amounts = new uint256[](2);
         amounts[0] = 100e18;
-        emit log_string("got here3");
 
         _distribute(amounts);
-        emit log_string("got here4");
 
         deal(address(asset), alice, 1e18);
         vm.startPrank(alice);
         asset.approve(address(vault), 1e18);
         vault.increaseLockAmount(alice, 1e18);
         vm.stopPrank();
-        emit log_string("got here5");
 
         uint256 amountAfterFees = 100e18 -
             (100e18 * vault.PROTOCOL_FEE()) /
             10_000;
-        emit log_string("got here6");
 
         // with the initial balances, alice should receive half of the total reward amount.
         // The increase in her lock amount shouldn't have an affect here.
@@ -742,6 +736,31 @@ contract StakingVaultTest is Test {
             amountAfterFees2,
             "didn't claim rewards2"
         );
+    }
+
+    function test_claim_doesnt_break_withdraw_nor_deposit() public {
+        _deposit(alice, 1e18, MAX_LOCK_TIME);
+
+        uint256[] memory amounts = new uint256[](2);
+        amounts[0] = 100e18;
+        amounts[1] = 0;
+
+        _distribute(amounts);
+
+        vault.claim(alice);
+
+        vm.warp(block.timestamp + MAX_LOCK_TIME + 1);
+
+        vm.prank(alice);
+        vault.withdraw(alice, alice);
+
+        assertEq(
+            asset.balanceOf(alice),
+            1e18,
+            "Alice didn't receive the funds"
+        );
+
+        _deposit(alice, 1e18, MAX_LOCK_TIME);
     }
 
     /*//////////////////////////////////////////////////////////////
