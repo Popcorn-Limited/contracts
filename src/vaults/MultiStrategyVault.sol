@@ -274,9 +274,7 @@ contract MultiStrategyVault is
 
         if (feeShares > 0) _mint(feeRecipient, feeShares);
 
-        _withdrawStrategyFunds(assets);
-
-        IERC20(asset()).safeTransfer(receiver, assets);
+        _withdrawStrategyFunds(assets, receiver);
 
         emit Withdraw(msg.sender, receiver, owner, assets, shares);
     }
@@ -316,21 +314,23 @@ contract MultiStrategyVault is
 
         if (feeShares > 0) _mint(feeRecipient, feeShares);
 
-        _withdrawStrategyFunds(assets);
-
-        IERC20(asset()).safeTransfer(receiver, assets);
+        _withdrawStrategyFunds(assets, receiver);
 
         emit Withdraw(msg.sender, receiver, owner, assets, shares);
     }
 
-    event log_named_uint(string, uint256);
+    function _withdrawStrategyFunds(uint256 amount, address receiver) internal {
+        // caching
+        IERC20 asset_ = IERC20(asset());
 
-    function _withdrawStrategyFunds(uint256 amount) internal {
         // Get the Vault's floating balance.
-        uint256 float = IERC20(asset()).balanceOf(address(this));
+        uint256 float = asset_.balanceOf(address(this));
 
         // If the amount is greater than the float, withdraw from strategies.
         if (amount > float) {
+            if (float > 0) {
+                asset_.safeTransfer(receiver, float);
+            }
             // We'll start at the tip of the stack and traverse backwards.
             uint256 currentIndex = strategies.length - 1;
 
@@ -346,12 +346,12 @@ contract MultiStrategyVault is
                 );
 
                 if (withdrawableAssets >= missing) {
-                    strategy.withdraw(missing, address(this), address(this));
+                    strategy.withdraw(missing, receiver, address(this));
                     break;
                 } else if (withdrawableAssets > 0) {
                     strategy.withdraw(
                         withdrawableAssets,
-                        address(this),
+                        receiver,
                         address(this)
                     );
                     float += withdrawableAssets;
