@@ -61,10 +61,12 @@ contract AuraCompounder is AdapterBase, WithRewards {
     ) external initializer {
         __AdapterBase_init(adapterInitData);
 
-        (uint256 _pid, address _balVault, bytes32 _balPoolId, address _weth) = abi.decode(
-            auraInitData,
-            (uint256, address, bytes32, address)
-        );
+        (
+            uint256 _pid,
+            address _balVault,
+            bytes32 _balPoolId,
+            address _weth
+        ) = abi.decode(auraInitData, (uint256, address, bytes32, address));
 
         auraBooster = IAuraBooster(registry);
         pid = _pid;
@@ -96,18 +98,9 @@ contract AuraCompounder is AdapterBase, WithRewards {
             address(auraBooster),
             type(uint256).max
         );
-         IERC20(crv).approve(
-            _balVault,
-            type(uint256).max
-        );
-         IERC20(cvx).approve(
-            _balVault,
-            type(uint256).max
-        );
-         IERC20(_weth).approve(
-            _balVault,
-            type(uint256).max
-        );
+        IERC20(crv).approve(_balVault, type(uint256).max);
+        IERC20(cvx).approve(_balVault, type(uint256).max);
+        IERC20(_weth).approve(_balVault, type(uint256).max);
     }
 
     function name()
@@ -266,15 +259,13 @@ contract AuraCompounder is AdapterBase, WithRewards {
         IAsset[] memory assets_,
         int256[] memory limits_
     ) internal {
-        uint256 storageLen = swaps[key].length;
+        delete swaps[key];
+
         uint256 len = swaps_.length;
         for (uint256 i; i < len; i++) {
-            if (i >= storageLen) {
-                swaps[key].push(swaps_[i]);
-            } else {
-                swaps[key][i] = swaps_[i];
-            }
+            swaps[key].push(swaps_[i]);
         }
+        
         limits[key] = limits_;
         assets[key] = assets_;
     }
