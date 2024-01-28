@@ -313,11 +313,10 @@ contract StakingVault is ERC20 {
     function _claim(address user) internal {
         uint256[] memory rewards = accruedRewards[user];
 
-        delete accruedRewards[user];
-
         uint256 len = rewardTokens.length;
         for (uint256 i; i < len; i++) {
             uint256 reward = rewards[i];
+            delete accruedRewards[user][i];
 
             if (reward > 0) {
                 rewardTokens[i].safeTransfer(user, reward);
