@@ -265,11 +265,11 @@ contract AuraCompounder is AdapterBase, WithRewards {
         for (uint256 i; i < len; i++) {
             swaps[key].push(swaps_[i]);
         }
-        
+
         limits[key] = limits_;
         assets[key] = assets_;
     }
-
+    
     /*//////////////////////////////////////////////////////////////
                       EIP-165 LOGIC
   //////////////////////////////////////////////////////////////*/
