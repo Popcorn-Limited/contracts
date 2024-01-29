@@ -9,7 +9,6 @@ import {IConvexBooster, IConvexRewards, IRewards} from "./IConvex.sol";
 import {ICurveMetapool} from "../../../interfaces/external/curve/ICurveMetapool.sol";
 import {ICurveRouter} from "../../../interfaces/external/curve/ICurveRouter.sol";
 
-
 struct CurveRoute {
     address[9] route;
     uint256[3][4] swapParams;
@@ -153,25 +152,31 @@ contract ConvexCompounder is AdapterBase, WithRewards {
     //////////////////////////////////////////////////////////////*/
 
     uint256[] internal minTradeAmounts; // ordered as in rewardsTokens()
-    address curveRouter;
-    address baseAsset;
+    address internal curveRouter;
+    address internal baseAsset;
 
-    mapping(address => CurveRoute) rewardRoutes; // to swap reward token to baseAsset
-    CurveRoute lpRoute; // to add liquidity (ie swapping from baseAsset to lpToken via curve router)
+    mapping(address => CurveRoute) internal rewardRoutes; // to swap reward token to baseAsset
+    CurveRoute internal lpRoute; // to add liquidity (ie swapping from baseAsset to lpToken via curve router)
 
     error InvalidHarvestValues();
 
     function setHarvestValues(
         address curveRouter_,
-        address baseAsset_, 
-        uint256[] memory minTradeAmounts_, 
-        CurveRoute memory lpRoute_, 
+        address baseAsset_,
+        uint256[] memory minTradeAmounts_,
+        CurveRoute memory lpRoute_,
         CurveRoute[] memory routes_
     ) public onlyOwner {
         address[] memory rewTokens = this.rewardTokens();
         uint256 len = rewTokens.length;
 
-        _verifyRewardData(rewTokens, minTradeAmounts_, len, routes_, baseAsset_);
+        _verifyRewardData(
+            rewTokens,
+            minTradeAmounts_,
+            len,
+            routes_,
+            baseAsset_
+        );
 
         _verifyLpRoute(baseAsset_, lpRoute_);
 
@@ -183,7 +188,7 @@ contract ConvexCompounder is AdapterBase, WithRewards {
         baseAsset = baseAsset_;
         IERC20(baseAsset).approve(curveRouter, type(uint256).max);
 
-        for(uint256 i=0; i<len; i++) {
+        for (uint256 i = 0; i < len; i++) {
             rewardRoutes[rewTokens[i]] = routes_[i];
         }
     }
@@ -212,7 +217,10 @@ contract ConvexCompounder is AdapterBase, WithRewards {
         emit Harvested();
     }
 
-    function _verifyLpRoute(address base, CurveRoute memory toLpRoute) internal view {
+    function _verifyLpRoute(
+        address base,
+        CurveRoute memory toLpRoute
+    ) internal view {
         address asset = asset();
 
         // Verify base asset to lp token path
@@ -230,22 +238,21 @@ contract ConvexCompounder is AdapterBase, WithRewards {
     }
 
     function _verifyRewardData(
-        address[] memory rewTokens, 
+        address[] memory rewTokens,
         uint256[] memory minAmounts,
-        uint256 len, 
-        CurveRoute[] memory toBaseAssetRoutes, 
+        uint256 len,
+        CurveRoute[] memory toBaseAssetRoutes,
         address base
     ) internal pure {
-        if (toBaseAssetRoutes.length != len)
-            revert InvalidHarvestValues();
-        
+        if (toBaseAssetRoutes.length != len) revert InvalidHarvestValues();
+
         for (uint256 i; i < len; i++) {
             // verify min amount
             require(minAmounts[i] != 0, "min trade amount must be > 0");
-            
+
             // Verify base asset to asset path
-            if(toBaseAssetRoutes[i].route[0] != rewTokens[i])
-                revert InvalidHarvestValues();    
+            if (toBaseAssetRoutes[i].route[0] != rewTokens[i])
+                revert InvalidHarvestValues();
 
             // Loop through the route until there are no more token or the array is over
             uint8 y = 1;
@@ -255,13 +262,13 @@ contract ConvexCompounder is AdapterBase, WithRewards {
                 y++;
             }
             if (toBaseAssetRoutes[i].route[y] != base)
-                revert InvalidHarvestValues();    
+                revert InvalidHarvestValues();
         }
-    }   
+    }
 
     /// @notice Leverage the curve router to add liquidity
     function _addLiquidity(ICurveRouter router) internal {
-         router.exchange_multiple(
+        router.exchange_multiple(
             lpRoute.route,
             lpRoute.swapParams,
             IERC20(baseAsset).balanceOf(address(this)),
@@ -274,14 +281,19 @@ contract ConvexCompounder is AdapterBase, WithRewards {
         address[] memory rewTokens = this.rewardTokens();
 
         uint256 rewLen = rewTokens.length;
-        
-        for(uint256 i=0; i<rewLen; i++) {
+
+        for (uint256 i = 0; i < rewLen; i++) {
             IERC20 rewToken = IERC20(rewTokens[i]);
             uint256 inputBalance = rewToken.balanceOf(address(this));
 
-            if(inputBalance > minTradeAmounts[i]) {
+            if (inputBalance > minTradeAmounts[i]) {
                 CurveRoute memory routeData = rewardRoutes[address(rewToken)];
-                router.exchange_multiple(routeData.route, routeData.swapParams, inputBalance, 0);       
+                router.exchange_multiple(
+                    routeData.route,
+                    routeData.swapParams,
+                    inputBalance,
+                    0
+                );
             }
         }
     }
@@ -294,7 +306,7 @@ contract ConvexCompounder is AdapterBase, WithRewards {
     }
 
     function _approveRewards(address[] memory rewTokens) internal {
-        for(uint256 i=0; i<rewTokens.length; i++) {
+        for (uint256 i = 0; i < rewTokens.length; i++) {
             IERC20(rewTokens[i]).approve(curveRouter, type(uint256).max);
         }
     }
