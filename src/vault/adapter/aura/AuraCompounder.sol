@@ -224,9 +224,9 @@ contract AuraCompounder is AdapterBase, WithRewards {
         emit Harvested();
     }
 
-    mapping(address => BatchSwapStep[]) swaps;
-    mapping(address => IAsset[]) assets;
-    mapping(address => int256[]) limits;
+    mapping(address => BatchSwapStep[]) internal swaps;
+    mapping(address => IAsset[]) internal assets;
+    mapping(address => int256[]) internal limits;
     uint256[] internal minTradeAmounts;
     IERC20 internal baseAsset;
     address[] internal underlyings;
