@@ -83,6 +83,7 @@ contract ConvexAdapterTest is AbstractAdapterTest {
     function _setHarvestValues() internal {
         CurveRoute[] memory rewardRoutes = new CurveRoute[](2);
         uint256[] memory minTradeAmounts = new uint256[](2);
+        uint256[] memory maxSlippages = new uint256[](3);
 
         uint256[3][4] memory swapParams;
 
@@ -105,6 +106,7 @@ contract ConvexAdapterTest is AbstractAdapterTest {
 
         rewardRoutes[0] = CurveRoute(rewardRoute, swapParams);
         minTradeAmounts[0] = uint256(1e16);
+        maxSlippages[0] = uint256(1e17);
 
         // cvx swap route
         rewardRoute = [
@@ -121,6 +123,7 @@ contract ConvexAdapterTest is AbstractAdapterTest {
 
         rewardRoutes[1] = CurveRoute(rewardRoute, swapParams);
         minTradeAmounts[1] = uint256(1e16);
+        maxSlippages[1] = uint256(1e17);
 
         rewardRoute = [
             usdc,
@@ -138,10 +141,9 @@ contract ConvexAdapterTest is AbstractAdapterTest {
 
         swapLPParams[0] = [uint256(1), 0, 3];
         swapLPParams[1] = [uint256(0), 0, 7];
-        
         lpRoute = CurveRoute({route:rewardRoute, swapParams:swapLPParams});
 
-        adapterContract.setHarvestValues(router, usdc, minTradeAmounts, lpRoute, rewardRoutes);
+        adapterContract.setHarvestValues(router, usdc, minTradeAmounts, maxSlippages, lpRoute, rewardRoutes);
     }
 
     /*//////////////////////////////////////////////////////////////

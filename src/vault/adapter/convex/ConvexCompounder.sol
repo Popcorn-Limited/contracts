@@ -6,7 +6,6 @@ pragma solidity ^0.8.15;
 import {AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20, Math, IStrategy, IAdapter} from "../abstracts/AdapterBase.sol";
 import {WithRewards, IWithRewards} from "../abstracts/WithRewards.sol";
 import {IConvexBooster, IConvexRewards, IRewards} from "./IConvex.sol";
-import {ICurveMetapool} from "../../../interfaces/external/curve/ICurveMetapool.sol";
 import {ICurveRouter} from "../../../interfaces/external/curve/ICurveRouter.sol";
 
 struct CurveRoute {
@@ -80,6 +79,7 @@ contract ConvexCompounder is AdapterBase, WithRewards {
         _symbol = string.concat("vcCvx-", IERC20Metadata(_asset).symbol());
 
         IERC20(_asset).approve(address(convexBooster), type(uint256).max);
+
     }
 
     function name()
@@ -152,8 +152,9 @@ contract ConvexCompounder is AdapterBase, WithRewards {
     //////////////////////////////////////////////////////////////*/
 
     uint256[] internal minTradeAmounts; // ordered as in rewardsTokens()
-    address internal curveRouter;
-    address internal baseAsset;
+    uint256[] internal maxSlippages; // Max slippage in 1e18. (1e18 = 100%, 1e14 = 1 BPS)
+    address curveRouter;
+    address baseAsset;
 
     mapping(address => CurveRoute) internal rewardRoutes; // to swap reward token to baseAsset
     CurveRoute internal lpRoute; // to add liquidity (ie swapping from baseAsset to lpToken via curve router)
@@ -162,9 +163,10 @@ contract ConvexCompounder is AdapterBase, WithRewards {
 
     function setHarvestValues(
         address curveRouter_,
-        address baseAsset_,
+        address baseAsset_, 
         uint256[] memory minTradeAmounts_,
-        CurveRoute memory lpRoute_,
+        uint256[] memory maxSlippages_,
+        CurveRoute memory lpRoute_, 
         CurveRoute[] memory routes_
     ) public onlyOwner {
         address[] memory rewTokens = this.rewardTokens();
@@ -183,6 +185,7 @@ contract ConvexCompounder is AdapterBase, WithRewards {
         lpRoute = lpRoute_;
         curveRouter = curveRouter_;
         minTradeAmounts = minTradeAmounts_;
+        maxSlippages = maxSlippages_;
         _approveRewards(rewTokens);
 
         baseAsset = baseAsset_;
@@ -268,12 +271,15 @@ contract ConvexCompounder is AdapterBase, WithRewards {
 
     /// @notice Leverage the curve router to add liquidity
     function _addLiquidity(ICurveRouter router) internal {
-        router.exchange_multiple(
-            lpRoute.route,
-            lpRoute.swapParams,
-            IERC20(baseAsset).balanceOf(address(this)),
-            0
-        );
+        uint256 bal = IERC20(baseAsset).balanceOf(address(this));
+        if(bal > 0) {
+            router.exchange_multiple(
+                lpRoute.route,
+                lpRoute.swapParams,
+                bal,
+                0
+            );
+        }
     }
 
     /// @notice Leverage the curve router to swap all rewards into a base asset
@@ -288,12 +294,17 @@ contract ConvexCompounder is AdapterBase, WithRewards {
 
             if (inputBalance > minTradeAmounts[i]) {
                 CurveRoute memory routeData = rewardRoutes[address(rewToken)];
+
+                // anti slippage param 
+                uint256 minAmountOut = router.get_exchange_multiple_amount(routeData.route, routeData.swapParams, inputBalance);
+                minAmountOut = minAmountOut - minAmountOut.mulDiv(maxSlippages[i], 1e18, Math.Rounding.Down);
+
                 router.exchange_multiple(
-                    routeData.route,
-                    routeData.swapParams,
-                    inputBalance,
-                    0
-                );
+                    routeData.route, 
+                    routeData.swapParams, 
+                    inputBalance, 
+                    minAmountOut
+                );       
             }
         }
     }
