@@ -9,7 +9,7 @@ IConvexRewards, IWithRewards, IStrategy} from "../../../../src/vault/adapter/con
 import {ConvexTestConfigStorage, ConvexTestConfig} from "./ConvexTestConfigStorage.sol";
 import {AbstractAdapterTest, ITestConfigStorage, IAdapter} from "../abstract/AbstractAdapterTest.sol";
 
-contract ConvexAdapterTest is AbstractAdapterTest {
+contract ConvexCompounderTest is AbstractAdapterTest {
     using Math for uint256;
 
     IConvexBooster convexBooster =
@@ -63,7 +63,7 @@ contract ConvexAdapterTest is AbstractAdapterTest {
             address(convexBooster),
             10,
             "Convex",
-            true
+            false
         );
 
         vm.label(address(convexBooster), "convexBooster");

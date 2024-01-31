@@ -79,7 +79,6 @@ contract ConvexCompounder is AdapterBase, WithRewards {
         _symbol = string.concat("vcCvx-", IERC20Metadata(_asset).symbol());
 
         IERC20(_asset).approve(address(convexBooster), type(uint256).max);
-
     }
 
     function name()
@@ -163,10 +162,10 @@ contract ConvexCompounder is AdapterBase, WithRewards {
 
     function setHarvestValues(
         address curveRouter_,
-        address baseAsset_, 
+        address baseAsset_,
         uint256[] memory minTradeAmounts_,
         uint256[] memory maxSlippages_,
-        CurveRoute memory lpRoute_, 
+        CurveRoute memory lpRoute_,
         CurveRoute[] memory routes_
     ) public onlyOwner {
         address[] memory rewTokens = this.rewardTokens();
@@ -272,13 +271,8 @@ contract ConvexCompounder is AdapterBase, WithRewards {
     /// @notice Leverage the curve router to add liquidity
     function _addLiquidity(ICurveRouter router) internal {
         uint256 bal = IERC20(baseAsset).balanceOf(address(this));
-        if(bal > 0) {
-            router.exchange_multiple(
-                lpRoute.route,
-                lpRoute.swapParams,
-                bal,
-                0
-            );
+        if (bal > 0) {
+            router.exchange_multiple(lpRoute.route, lpRoute.swapParams, bal, 0);
         }
     }
 
@@ -295,22 +289,32 @@ contract ConvexCompounder is AdapterBase, WithRewards {
             if (inputBalance > minTradeAmounts[i]) {
                 CurveRoute memory routeData = rewardRoutes[address(rewToken)];
 
-                // anti slippage param 
-                uint256 minAmountOut = router.get_exchange_multiple_amount(routeData.route, routeData.swapParams, inputBalance);
-                minAmountOut = minAmountOut - minAmountOut.mulDiv(maxSlippages[i], 1e18, Math.Rounding.Down);
+                // anti slippage param
+                uint256 minAmountOut = router.get_exchange_multiple_amount(
+                    routeData.route,
+                    routeData.swapParams,
+                    inputBalance
+                );
+                minAmountOut =
+                    minAmountOut -
+                    minAmountOut.mulDiv(
+                        maxSlippages[i],
+                        1e18,
+                        Math.Rounding.Down
+                    );
 
                 router.exchange_multiple(
-                    routeData.route, 
-                    routeData.swapParams, 
-                    inputBalance, 
+                    routeData.route,
+                    routeData.swapParams,
+                    inputBalance,
                     minAmountOut
-                );       
+                );
             }
         }
     }
 
     /// @notice Claim liquidity mining rewards given that it's active
-    function claim() public override onlyStrategy returns (bool success) {
+    function claim() public override returns (bool success) {
         try convexRewards.getReward(address(this), true) {
             success = true;
         } catch {}
