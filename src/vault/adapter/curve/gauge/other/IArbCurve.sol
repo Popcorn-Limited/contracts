@@ -9,6 +9,11 @@ interface ICurveLp {
         int128 i
     ) external view returns (uint256);
 
+    function calc_token_amount(
+        uint256[] calldata amounts,
+        bool isDeposit
+    ) external view returns (uint256);
+
     function add_liquidity(uint256[] calldata amounts, uint256 minOut) external;
 
     function remove_liquidity_one_coin(
@@ -24,6 +29,11 @@ interface IGauge {
     function withdraw(uint256 burnAmount) external;
 
     function claim_rewards() external;
+
+    function claimable_rewards(
+        address user,
+        address rewardToken
+    ) external view returns (uint256);
 }
 
 interface ICurveRouter {

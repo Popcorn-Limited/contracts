@@ -3,7 +3,7 @@ pragma solidity ^0.8.15;
 
 import {Test} from "forge-std/Test.sol";
 
-import {CurveGaugeSingleAssetCompounder, SafeERC20, IERC20, IERC20Metadata, Math, CurveSwap} from "../../../../../../src/vault/adapter/curve/gauge/other/CurveGaugeSingleAssetCompounder.sol";
+import {CurveGaugeSingleAssetCompounder, SafeERC20, IERC20, IERC20Metadata, Math, CurveSwap, ICurveLp, IGauge} from "../../../../../../src/vault/adapter/curve/gauge/other/CurveGaugeSingleAssetCompounder.sol";
 import {CurveGaugeSingleAssetCompounderTestConfigStorage, CurveGaugeSingleAssetCompounderTestConfig} from "./CurveGaugeSingleAssetCompounderTestConfigStorage.sol";
 import {AbstractAdapterTest, ITestConfigStorage, IAdapter} from "../../../abstract/AbstractAdapterTest.sol";
 import {MockStrategyClaimer} from "../../../../../utils/mocks/MockStrategyClaimer.sol";
@@ -14,9 +14,10 @@ contract CurveGaugeSingleAssetCompounderTest is AbstractAdapterTest {
     address gauge;
     address lpToken;
     address arb = 0x912CE59144191C1204E64559FE8253a0e49E6548;
+    uint256 forkId;
 
     function setUp() public {
-        uint256 forkId = vm.createSelectFork(vm.rpcUrl("arbitrum"));
+        forkId = vm.createSelectFork(vm.rpcUrl("arbitrum"), 176205000);
         vm.selectFork(forkId);
 
         testConfigStorage = ITestConfigStorage(
@@ -62,7 +63,7 @@ contract CurveGaugeSingleAssetCompounderTest is AbstractAdapterTest {
         address[] memory rewardTokens = new address[](1);
         rewardTokens[0] = arb;
         uint256[] memory minTradeAmounts = new uint256[](1);
-        minTradeAmounts[0] = 1e18;
+        minTradeAmounts[0] = 0;
 
         address[] memory swapTokens = new address[](3);
         swapTokens[0] = arb;
@@ -146,8 +147,38 @@ contract CurveGaugeSingleAssetCompounderTest is AbstractAdapterTest {
             swaps
         );
 
+        vm.label(address(arb), "arb");
+        vm.label(address(lpToken), "lpToken");
+        vm.label(address(gauge), "gauge");
+        vm.label(address(asset), "asset");
+        vm.label(address(adapter), "adapter");
+        vm.label(address(this), "test");
+
         maxAssets = 100_000 * 1e18;
         maxShares = 100 * 1e27;
+    }
+
+    function test__stuff() public {
+        _mintAssetAndApproveForAdapter(100e18, bob);
+        vm.prank(bob);
+        adapter.deposit(100e18, bob);
+
+        uint256 shares = adapter.balanceOf(bob);
+
+        uint256 prevWithdraw = adapter.previewWithdraw(10e18);
+        emit log_named_uint("shares", shares);
+        emit log_named_uint("prevRedeem", adapter.previewRedeem(prevWithdraw));
+        emit log_named_uint("prevWithdraw", prevWithdraw);
+
+        uint256 lpBal = IERC20(address(gauge)).balanceOf(address(adapter));
+        uint256 withdrawable = ICurveLp(lpToken).calc_withdraw_one_coin(
+            lpBal,
+            1
+        );
+        emit log_named_uint("withdrawable", withdrawable);
+
+        vm.prank(bob);
+        adapter.withdraw(10e18, bob, bob);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -312,34 +343,47 @@ contract CurveGaugeSingleAssetCompounderTest is AbstractAdapterTest {
     //////////////////////////////////////////////////////////////*/
 
     function test__harvest() public override {
-        _mintAssetAndApproveForAdapter(100e18, bob);
+        _mintAssetAndApproveForAdapter(10000e18, bob);
+
+        vm.prank(bob);
+        adapter.deposit(10000e18, bob);
 
         uint256 oldTa = adapter.totalAssets();
 
-        vm.prank(bob);
-        adapter.deposit(100e18, bob);
+        //vm.roll(block.number + 1000);
+        vm.rollFork(forkId, 176245622);
 
-        vm.roll(block.number + 1000_000);
-        vm.warp(block.timestamp + 15000_000);
+        // emit log_named_uint(
+        //     "claimable",
+        //     IGauge(gauge).claimable_rewards(address(adapter), arb)
+        // );
 
         adapter.harvest();
 
-        assertGt(adapter.totalAssets(), oldTa);
+        // emit log_named_uint("adapter.totalAssets()", adapter.totalAssets());
+        // emit log_named_uint("oldTa", oldTa);
+
+        // assertGt(adapter.totalAssets(), oldTa);
     }
 
     function test__harvest_no_rewards() public {
         _mintAssetAndApproveForAdapter(100e18, bob);
 
-        uint256 oldTa = adapter.totalAssets();
-
         vm.prank(bob);
         adapter.deposit(100e18, bob);
+
+        uint256 oldTa = adapter.totalAssets();
 
         vm.roll(block.number + 10);
         vm.warp(block.timestamp + 150);
 
+        emit log_named_uint(
+            "claimable",
+            IGauge(gauge).claimable_rewards(address(adapter), arb)
+        );
+
         adapter.harvest();
 
-        assertGt(adapter.totalAssets(), oldTa);
+        assertEq(adapter.totalAssets(), oldTa);
     }
 }

@@ -95,6 +95,42 @@ contract CurveGaugeSingleAssetCompounder is AdapterBase, WithRewards {
         return _rewardTokens;
     }
 
+    /**
+     * @notice Simulate the effects of a deposit at the current block, given current on-chain conditions.
+     * @dev Return 0 if paused since no further deposits are allowed.
+     * @dev Override this function if the underlying protocol has a unique deposit logic and/or deposit fees.
+     */
+    function previewDeposit(
+        uint256 assets
+    ) public view virtual override returns (uint256) {
+        return paused() ? 0 : _convertToShares(assets, Math.Rounding.Down);
+    }
+
+    /**
+     * @notice Simulate the effects of a mint at the current block, given current on-chain conditions.
+     * @dev Return 0 if paused since no further deposits are allowed.
+     * @dev Override this function if the underlying protocol has a unique deposit logic and/or deposit fees.
+     */
+    function previewMint(
+        uint256 shares
+    ) public view virtual override returns (uint256) {
+        return paused() ? 0 : _convertToAssets(shares, Math.Rounding.Up);
+    }
+
+    /** @dev See {IERC4626-previewWithdraw}. */
+    function previewWithdraw(
+        uint256 assets
+    ) public view virtual override returns (uint256) {
+        return _convertToShares(assets, Math.Rounding.Up);
+    }
+
+    /** @dev See {IERC4626-previewRedeem}. */
+    function previewRedeem(
+        uint256 shares
+    ) public view virtual override returns (uint256) {
+        return _convertToAssets(shares, Math.Rounding.Down);
+    }
+
     // TODO override max views
 
     /*//////////////////////////////////////////////////////////////
@@ -111,18 +147,34 @@ contract CurveGaugeSingleAssetCompounder is AdapterBase, WithRewards {
         gauge.deposit(IERC20(lpToken).balanceOf(address(this)));
     }
 
-    function _protocolWithdraw(uint256 amount, uint256) internal override {
-        gauge.withdraw(amount);
+    event log_named_uint(string, uint256);
+
+    function _protocolWithdraw(
+        uint256 assets,
+        uint256 shares
+    ) internal override {
+        uint256 lpBal = IERC20(address(gauge)).balanceOf(address(this));
+
+        uint256 lpWithdraw = shares.mulDiv(
+            lpBal,
+            totalSupply(),
+            Math.Rounding.Up
+        );
+        emit log_named_uint("assets", assets);
+        emit log_named_uint("shares", shares);
+
+        emit log_named_uint("lpBal", lpBal);
+        emit log_named_uint("lpWithdraw", lpWithdraw);
+
+        gauge.withdraw(lpWithdraw);
         // _exchange(
         //     curveRouter,
         //     swaps[lpToken],
         //     IERC20(lpToken).balanceOf(address(this))
         // );
-        ICurveLp(lpToken).remove_liquidity_one_coin(
-            IERC20(lpToken).balanceOf(address(this)),
-            indexIn,
-            0
-        );
+        ICurveLp(lpToken).remove_liquidity_one_coin(lpWithdraw, indexIn, 0);
+        uint256 assetBal = IERC20(asset()).balanceOf(address(this));
+        emit log_named_uint("assetBal", assetBal);
     }
 
     /*//////////////////////////////////////////////////////////////
