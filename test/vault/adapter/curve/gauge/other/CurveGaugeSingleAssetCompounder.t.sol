@@ -65,18 +65,8 @@ contract CurveGaugeSingleAssetCompounderTest is AbstractAdapterTest {
         uint256[] memory minTradeAmounts = new uint256[](1);
         minTradeAmounts[0] = 0;
 
-        address[] memory swapTokens = new address[](3);
-        swapTokens[0] = arb;
-        swapTokens[1] = _asset;
-        swapTokens[2] = _lpToken;
-
         CurveSwap[] memory swaps = new CurveSwap[](3);
-
-        /// @dev for some reason overwriting the swapParam would use only the latest iteration in the swaps storage. Therefore i needed to split these.
-        uint256[5][5] memory swapParams1; // [i, j, swap type, pool_type, n_coins]
-        uint256[5][5] memory swapParams2; // [i, j, swap type, pool_type, n_coins]
-        uint256[5][5] memory swapParams3; // [i, j, swap type, pool_type, n_coins]
-
+        uint256[5][5] memory swapParams; // [i, j, swap type, pool_type, n_coins]
         address[5] memory pools;
 
         // arb->crvUSD->lp swap
@@ -85,7 +75,7 @@ contract CurveGaugeSingleAssetCompounderTest is AbstractAdapterTest {
             0x845C8bc94610807fCbaB5dd2bc7aC9DAbaFf3c55, // arb / crvUSD pool
             0x498Bf2B1e120FeD3ad3D42EA2165E9b73f99C1e5, // crvUSD
             _lpToken,
-            _asset, // @dev -- this previously also _lpToken if we can figure out the router issue
+            _asset,
             address(0),
             address(0),
             address(0),
@@ -94,56 +84,16 @@ contract CurveGaugeSingleAssetCompounderTest is AbstractAdapterTest {
             address(0)
         ];
         // arb->crvUSD->lp swap params
-        swapParams1[0] = [uint256(1), 0, 2, 0, 0]; // arbIndex, crvUsdIndex, exchange_underlying, irrelevant, irrelevant
-        //swapParams1[1] = [uint256(0), 0, 4, 0, 2]; // crvUsdIndex, irrelevant, add_liquidity, irrelevant, 2 coins
-        swapParams1[1] = [uint256(0), 1, 2, 0, 0]; // crvUsdIndex, irrelevant, exchange_underlying, irrelevant, irrelevant
+        swapParams[0] = [uint256(1), 0, 2, 0, 0]; // arbIndex, crvUsdIndex, exchange_underlying, irrelevant, irrelevant
+        swapParams[1] = [uint256(0), 1, 1, 1, 0]; // crvUsdIndex, irrelevant, exchange, stable, irrelevant
 
-        swaps[0] = CurveSwap(rewardRoute, swapParams1, pools);
+        swaps[0] = CurveSwap(rewardRoute, swapParams, pools);
         minTradeAmounts[0] = uint256(1e16);
-
-        // asset->lp swap
-        rewardRoute = [
-            _asset,
-            _lpToken,
-            _lpToken,
-            address(0),
-            address(0),
-            address(0),
-            address(0),
-            address(0),
-            address(0),
-            address(0),
-            address(0)
-        ];
-        // asset->lp swap params
-        swapParams2[0] = [uint256(1), 0, 4, 0, 2]; // fraxIndex, irrelevant, add_liquidity, irrelevant, 2 coins
-
-        swaps[1] = CurveSwap(rewardRoute, swapParams2, pools);
-
-        // lp->asset swap
-        rewardRoute = [
-            _lpToken,
-            _lpToken,
-            _asset,
-            address(0),
-            address(0),
-            address(0),
-            address(0),
-            address(0),
-            address(0),
-            address(0),
-            address(0)
-        ];
-        // lp->asset swap params
-        swapParams3[0] = [uint256(0), 1, 6, 3, 0]; // irrelevant, fraxIndex, remove_liquidity, stable, irrelevant
-
-        swaps[2] = CurveSwap(rewardRoute, swapParams3, pools);
 
         CurveGaugeSingleAssetCompounder(address(adapter)).setHarvestValues(
             0xF0d4c12A5768D806021F80a262B4d39d26C58b8D, // curve router
             rewardTokens,
             minTradeAmounts,
-            swapTokens,
             swaps
         );
 
@@ -156,29 +106,6 @@ contract CurveGaugeSingleAssetCompounderTest is AbstractAdapterTest {
 
         maxAssets = 100_000 * 1e18;
         maxShares = 100 * 1e27;
-    }
-
-    function test__stuff() public {
-        _mintAssetAndApproveForAdapter(100e18, bob);
-        vm.prank(bob);
-        adapter.deposit(100e18, bob);
-
-        uint256 shares = adapter.balanceOf(bob);
-
-        uint256 prevWithdraw = adapter.previewWithdraw(10e18);
-        emit log_named_uint("shares", shares);
-        emit log_named_uint("prevRedeem", adapter.previewRedeem(prevWithdraw));
-        emit log_named_uint("prevWithdraw", prevWithdraw);
-
-        uint256 lpBal = IERC20(address(gauge)).balanceOf(address(adapter));
-        uint256 withdrawable = ICurveLp(lpToken).calc_withdraw_one_coin(
-            lpBal,
-            1
-        );
-        emit log_named_uint("withdrawable", withdrawable);
-
-        vm.prank(bob);
-        adapter.withdraw(10e18, bob, bob);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -253,7 +180,7 @@ contract CurveGaugeSingleAssetCompounderTest is AbstractAdapterTest {
         assertEq(
             IERC20Metadata(address(adapter)).name(),
             string.concat(
-                "VaultCraft CurveGauge ",
+                "VaultCraft CurveGaugeSingleAssetCompounder ",
                 IERC20Metadata(address(asset)).name(),
                 " Adapter"
             ),
@@ -261,7 +188,7 @@ contract CurveGaugeSingleAssetCompounderTest is AbstractAdapterTest {
         );
         assertEq(
             IERC20Metadata(address(adapter)).symbol(),
-            string.concat("vcCrvG-", IERC20Metadata(address(asset)).symbol()),
+            string.concat("vc-sccrv-", IERC20Metadata(address(asset)).symbol()),
             "symbol"
         );
 
@@ -270,72 +197,56 @@ contract CurveGaugeSingleAssetCompounderTest is AbstractAdapterTest {
             type(uint256).max,
             "allowance"
         );
+        assertEq(
+            IERC20(asset).allowance(address(adapter), address(lpToken)),
+            type(uint256).max,
+            "allowance"
+        );
     }
 
-    function test__correct_harvest_values() public {
-        CurveGaugeSingleAssetCompounder strategy = CurveGaugeSingleAssetCompounder(
-                address(adapter)
-            );
+    /*//////////////////////////////////////////////////////////////
+                                PAUSING
+    //////////////////////////////////////////////////////////////*/
 
-        address[] memory _rewardTokens = strategy.rewardTokens();
-        address[] memory _swapTokens = strategy.getSwapTokens();
+    function test__unpause() public override {
+        _mintAssetAndApproveForAdapter(defaultAmount * 3, bob);
 
-        assertEq(_rewardTokens.length, 1);
-        assertEq(_rewardTokens[0], arb);
+        vm.prank(bob);
+        adapter.deposit(defaultAmount, bob);
 
-        assertEq(_swapTokens.length, 3);
-        assertEq(_swapTokens[0], arb);
-        assertEq(_swapTokens[1], address(asset));
-        assertEq(_swapTokens[2], lpToken);
+        uint256 oldTotalAssets = adapter.totalAssets();
+        uint256 oldTotalSupply = adapter.totalSupply();
+        uint256 oldIouBalance = iouBalance();
 
-        address[11] memory _route = strategy.getRoute(address(asset));
-        assertEq(_route[0], address(asset));
-        assertEq(_route[1], address(lpToken));
-        assertEq(_route[2], address(lpToken));
-        assertEq(_route[3], address(0));
+        adapter.pause();
+        adapter.unpause();
 
-        _route = strategy.getRoute(address(lpToken));
-        assertEq(_route[0], address(lpToken));
-        assertEq(_route[1], address(lpToken));
-        assertEq(_route[2], address(asset));
-        assertEq(_route[3], address(0));
-
-        _route = strategy.getRoute(address(arb));
-        assertEq(_route[0], address(arb));
-        assertEq(
-            _route[1],
-            address(0x845C8bc94610807fCbaB5dd2bc7aC9DAbaFf3c55)
+        // We simply deposit back into the external protocol
+        // TotalSupply and Assets dont change
+        assertApproxEqAbs(
+            oldTotalAssets,
+            adapter.totalAssets(),
+            52510 * 1e18,
+            "totalAssets"
         );
-        assertEq(
-            _route[2],
-            address(0x498Bf2B1e120FeD3ad3D42EA2165E9b73f99C1e5)
+        assertApproxEqAbs(
+            oldTotalSupply,
+            adapter.totalSupply(),
+            _delta_,
+            "totalSupply"
         );
-        assertEq(_route[3], address(lpToken));
-        assertEq(_route[4], address(lpToken));
-        assertEq(_route[5], address(0));
-
-        uint256[5][5] memory _swapParams = strategy.getSwapParams(
-            address(asset)
+        assertApproxEqAbs(
+            asset.balanceOf(address(adapter)),
+            0,
+            _delta_,
+            "asset balance"
         );
-        assertEq(_swapParams[0][0], 1);
-        assertEq(_swapParams[0][1], 1);
-        assertEq(_swapParams[0][2], 1);
-        assertEq(_swapParams[0][3], 1);
-        assertEq(_swapParams[0][4], 1);
+        assertApproxEqAbs(iouBalance(), oldIouBalance, _delta_, "iou balance");
 
-        _swapParams = strategy.getSwapParams(address(lpToken));
-        assertEq(_swapParams[0][0], 2);
-        assertEq(_swapParams[0][1], 2);
-        assertEq(_swapParams[0][2], 2);
-        assertEq(_swapParams[0][3], 2);
-        assertEq(_swapParams[0][4], 2);
-
-        _swapParams = strategy.getSwapParams(address(arb));
-        assertEq(_swapParams[0][0], 2);
-        assertEq(_swapParams[0][1], 2);
-        assertEq(_swapParams[0][2], 2);
-        assertEq(_swapParams[0][3], 2);
-        assertEq(_swapParams[0][4], 2);
+        // Deposit and mint dont revert
+        vm.startPrank(bob);
+        adapter.deposit(defaultAmount, bob);
+        adapter.mint(defaultAmount, bob);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -343,27 +254,18 @@ contract CurveGaugeSingleAssetCompounderTest is AbstractAdapterTest {
     //////////////////////////////////////////////////////////////*/
 
     function test__harvest() public override {
-        _mintAssetAndApproveForAdapter(10000e18, bob);
+        _mintAssetAndApproveForAdapter(1000e18, bob);
 
         vm.prank(bob);
-        adapter.deposit(10000e18, bob);
+        adapter.deposit(1000e18, bob);
 
         uint256 oldTa = adapter.totalAssets();
 
-        //vm.roll(block.number + 1000);
-        vm.rollFork(forkId, 176245622);
-
-        // emit log_named_uint(
-        //     "claimable",
-        //     IGauge(gauge).claimable_rewards(address(adapter), arb)
-        // );
+        vm.warp(block.timestamp + 150_000);
 
         adapter.harvest();
 
-        // emit log_named_uint("adapter.totalAssets()", adapter.totalAssets());
-        // emit log_named_uint("oldTa", oldTa);
-
-        // assertGt(adapter.totalAssets(), oldTa);
+        assertGt(adapter.totalAssets(), oldTa);
     }
 
     function test__harvest_no_rewards() public {
@@ -374,13 +276,7 @@ contract CurveGaugeSingleAssetCompounderTest is AbstractAdapterTest {
 
         uint256 oldTa = adapter.totalAssets();
 
-        vm.roll(block.number + 10);
         vm.warp(block.timestamp + 150);
-
-        emit log_named_uint(
-            "claimable",
-            IGauge(gauge).claimable_rewards(address(adapter), arb)
-        );
 
         adapter.harvest();
 

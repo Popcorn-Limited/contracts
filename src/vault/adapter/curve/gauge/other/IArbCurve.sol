@@ -30,7 +30,7 @@ interface IGauge {
 
     function claim_rewards() external;
 
-    function claimable_rewards(
+    function claimable_reward(
         address user,
         address rewardToken
     ) external view returns (uint256);
