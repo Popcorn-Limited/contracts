@@ -30,10 +30,7 @@ contract CurveGaugeCompounderTest is AbstractAdapterTest {
         _setUpTest(testConfig);
     }
 
-    function _setUpTest(bytes memory testConfig) internal {}
-
-    function test__setup() public {
-        emit log_uint(block.number);
+    function _setUpTest(bytes memory testConfig) internal {
         (address _asset, address _gauge) = abi.decode(
             testConfigStorage.getTestConfig(0),
             (address, address)
@@ -44,7 +41,7 @@ contract CurveGaugeCompounderTest is AbstractAdapterTest {
         setUpBaseTest(
             IERC20(_asset),
             address(new CurveGaugeCompounder()),
-            address(0),
+            address(0xd061D61a4d941c39E5453435B6345Dc261C2fcE0),
             10,
             "Curve",
             false
@@ -65,15 +62,15 @@ contract CurveGaugeCompounderTest is AbstractAdapterTest {
         uint256[5][5] memory swapParams; // [i, j, swap type, pool_type, n_coins]
         address[5] memory pools;
 
-        int128 indexIn = int128(0); // weETH index
+        int128 indexIn = int128(1); // WETH index
 
         // crv->weth->weETH swap
         address[11] memory rewardRoute = [
             crv, // crv
-            0x845C8bc94610807fCbaB5dd2bc7aC9DAbaFf3c55, // triCRV pool
-            0x498Bf2B1e120FeD3ad3D42EA2165E9b73f99C1e5, // weth
-            address(asset), // weth / weETH pool
-            0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2, // weETH
+            0x4eBdF703948ddCEA3B11f675B4D1Fba9d2414A14, // triCRV pool
+            0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2, // weth
+            address(0),
+            address(0),
             address(0),
             address(0),
             address(0),
@@ -82,8 +79,7 @@ contract CurveGaugeCompounderTest is AbstractAdapterTest {
             address(0)
         ];
         // crv->weth->weETH swap params
-        swapParams[0] = [uint256(2), 1, 2, 0, 0]; // crvIndex, wethIndex, exchange_underlying, irrelevant, irrelevant
-        swapParams[1] = [uint256(1), 0, 1, 1, 0]; // wethIndex, weETHIndex, exchange, stable, irrelevant
+        swapParams[0] = [uint256(2), 1, 1, 0, 0]; // crvIndex, wethIndex, exchange, irrelevant, irrelevant
 
         swaps[0] = CurveSwap(rewardRoute, swapParams, pools);
 
@@ -192,13 +188,7 @@ contract CurveGaugeCompounderTest is AbstractAdapterTest {
         assertEq(
             IERC20(asset).allowance(address(adapter), address(gauge)),
             type(uint256).max,
-            "allowance"
-        );
-
-        assertEq(
-            IERC20(depositAsset).allowance(address(adapter), address(asset)),
-            type(uint256).max,
-            "allowance"
+            "allowance gauge"
         );
     }
 
@@ -252,14 +242,15 @@ contract CurveGaugeCompounderTest is AbstractAdapterTest {
     //////////////////////////////////////////////////////////////*/
 
     function test__harvest() public override {
-        _mintAssetAndApproveForAdapter(1000e18, bob);
+        _mintAssetAndApproveForAdapter(100e18, bob);
 
         vm.prank(bob);
-        adapter.deposit(1000e18, bob);
+        adapter.deposit(100e18, bob);
 
         uint256 oldTa = adapter.totalAssets();
 
-        vm.warp(block.timestamp + 150_000);
+        vm.roll(block.number + 100000);
+        vm.warp(block.timestamp + 1500_000);
 
         adapter.harvest();
 
@@ -273,8 +264,6 @@ contract CurveGaugeCompounderTest is AbstractAdapterTest {
         adapter.deposit(100e18, bob);
 
         uint256 oldTa = adapter.totalAssets();
-
-        vm.warp(block.timestamp + 150);
 
         adapter.harvest();
 

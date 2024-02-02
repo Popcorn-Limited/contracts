@@ -5,7 +5,7 @@ pragma solidity ^0.8.15;
 
 import {AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20, Math, IStrategy, IAdapter} from "../../../abstracts/AdapterBase.sol";
 import {WithRewards, IWithRewards} from "../../../abstracts/WithRewards.sol";
-import {ICurveLp, IGauge, ICurveRouter, CurveSwap} from "../../ICurve.sol";
+import {ICurveLp, IGauge, ICurveRouter, CurveSwap, IMinter} from "../../ICurve.sol";
 
 /**
  * @title   Curve Child Gauge Adapter
@@ -21,6 +21,7 @@ contract CurveGaugeCompounder is AdapterBase, WithRewards {
     string internal _name;
     string internal _symbol;
 
+    IMinter internal minter;
     IGauge public gauge;
     uint256 internal nCoins;
 
@@ -32,13 +33,14 @@ contract CurveGaugeCompounder is AdapterBase, WithRewards {
 
     function initialize(
         bytes memory adapterInitData,
-        address,
+        address registry,
         bytes memory curveInitData
     ) external initializer {
         __AdapterBase_init(adapterInitData);
 
         address _gauge = abi.decode(curveInitData, (address));
 
+        minter = IMinter(registry);
         gauge = IGauge(_gauge);
 
         nCoins = ICurveLp(asset()).N_COINS();
@@ -130,9 +132,11 @@ contract CurveGaugeCompounder is AdapterBase, WithRewards {
         }
 
         address asset_ = asset();
-        address depositAsset_ = ICurveLp(asset_).coins(uint256(uint128(indexIn_)));
+        address depositAsset_ = ICurveLp(asset_).coins(
+            uint256(uint128(indexIn_))
+        );
         if (depositAsset != address(0)) IERC20(depositAsset).approve(asset_, 0);
-        IERC20(depositAsset_).approve(asset_, 0);
+        IERC20(depositAsset_).approve(asset_, type(uint256).max);
 
         depositAsset = depositAsset_;
         indexIn = indexIn_;
@@ -205,9 +209,9 @@ contract CurveGaugeCompounder is AdapterBase, WithRewards {
 
     /// @notice Claim rewards from the gauge
     function claim() public override returns (bool success) {
-        try gauge.claim_rewards() {
-            success = true;
-        } catch {}
+        gauge.claim_rewards();
+        minter.mint(address(gauge));
+        return true;
     }
 
     /*//////////////////////////////////////////////////////////////

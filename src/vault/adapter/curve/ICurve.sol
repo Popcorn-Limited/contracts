@@ -18,6 +18,8 @@ interface IGauge {
 
     function claim_rewards() external;
 
+    function claim_rewards(address user) external;
+
     function claimable_reward(
         address user,
         address rewardToken

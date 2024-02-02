@@ -14,11 +14,11 @@ contract CurveGaugeCompounderTestConfigStorage is ITestConfigStorage {
     CurveGaugeCompounderTestConfig[] internal testConfigs;
 
     constructor() {
-        // MAINNET - weeTH / rswETH
+        // MAINNET - weETH / WETH
         testConfigs.push(
             CurveGaugeCompounderTestConfig(
-                0x278cfB6f06B1EFc09d34fC7127d6060C61d629Db,
-                0x0Bfb387B87e8Bf173a10A7DCf786B0b7875F6771
+                0x13947303F63b363876868D070F14dc865C36463b,
+                0x1CAC1a0Ed47E2e0A313c712b2dcF85994021a365
             )
         );
     }
