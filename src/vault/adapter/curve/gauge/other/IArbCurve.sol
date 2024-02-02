@@ -21,6 +21,8 @@ interface ICurveLp {
         int128 indexOut,
         uint256 minOut
     ) external;
+
+    function N_COINS() external view returns (uint256);
 }
 
 interface IGauge {

@@ -24,6 +24,7 @@ contract CurveGaugeSingleAssetCompounder is AdapterBase, WithRewards {
     address public lpToken;
     IGauge public gauge;
     int128 internal indexIn;
+    uint256 internal nCoins;
 
     /*//////////////////////////////////////////////////////////////
                             INITIALIZATION
@@ -46,6 +47,7 @@ contract CurveGaugeSingleAssetCompounder is AdapterBase, WithRewards {
         lpToken = _lpToken;
         gauge = IGauge(_gauge);
         indexIn = _indexIn;
+        nCoins = ICurveLp(_lpToken).N_COINS();
 
         _name = string.concat(
             "VaultCraft CurveGaugeSingleAssetCompounder ",
@@ -101,7 +103,7 @@ contract CurveGaugeSingleAssetCompounder is AdapterBase, WithRewards {
     //////////////////////////////////////////////////////////////*/
 
     function _protocolDeposit(uint256 amount, uint256) internal override {
-        uint256[] memory amounts = new uint256[](2);
+        uint256[] memory amounts = new uint256[](nCoins);
         amounts[uint256(uint128(indexIn))] = amount;
 
         ICurveLp(lpToken).add_liquidity(amounts, 0);
