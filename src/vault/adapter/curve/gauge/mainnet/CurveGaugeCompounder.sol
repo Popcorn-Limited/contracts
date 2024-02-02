@@ -5,7 +5,7 @@ pragma solidity ^0.8.15;
 
 import {AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20, Math, IStrategy, IAdapter} from "../../../abstracts/AdapterBase.sol";
 import {WithRewards, IWithRewards} from "../../../abstracts/WithRewards.sol";
-import {ICurveLp, IGauge, ICurveRouter, CurveSwap} from "./IArbCurve.sol";
+import {ICurveLp, IGauge, ICurveRouter, CurveSwap} from "../../ICurve.sol";
 
 /**
  * @title   Curve Child Gauge Adapter
@@ -14,16 +14,15 @@ import {ICurveLp, IGauge, ICurveRouter, CurveSwap} from "./IArbCurve.sol";
  * An ERC4626 compliant Wrapper for https://github.com/curvefi/curve-xchain-factory/blob/master/contracts/implementations/ChildGauge.vy.
  * Allows wrapping Curve Child Gauge Vaults.
  */
-contract CurveGaugeSingleAssetCompounder is AdapterBase, WithRewards {
+contract CurveGaugeCompounder is AdapterBase, WithRewards {
     using SafeERC20 for IERC20;
     using Math for uint256;
 
     string internal _name;
     string internal _symbol;
 
-    address public lpToken;
     IGauge public gauge;
-    int128 internal indexIn;
+    uint256 internal nCoins;
 
     /*//////////////////////////////////////////////////////////////
                             INITIALIZATION
@@ -38,24 +37,20 @@ contract CurveGaugeSingleAssetCompounder is AdapterBase, WithRewards {
     ) external initializer {
         __AdapterBase_init(adapterInitData);
 
-        (address _lpToken, address _gauge, int128 _indexIn) = abi.decode(
-            curveInitData,
-            (address, address, int128)
-        );
+        address _gauge = abi.decode(curveInitData, (address));
 
-        lpToken = _lpToken;
         gauge = IGauge(_gauge);
-        indexIn = _indexIn;
+
+        nCoins = ICurveLp(asset()).N_COINS();
 
         _name = string.concat(
-            "VaultCraft CurveGaugeSingleAssetCompounder ",
+            "VaultCraft CurveGaugeCompounder ",
             IERC20Metadata(asset()).name(),
             " Adapter"
         );
         _symbol = string.concat("vc-sccrv-", IERC20Metadata(asset()).symbol());
 
-        IERC20(_lpToken).approve(_gauge, type(uint256).max);
-        IERC20(asset()).approve(_lpToken, type(uint256).max);
+        IERC20(asset()).approve(_gauge, type(uint256).max);
     }
 
     function name()
@@ -115,13 +110,17 @@ contract CurveGaugeSingleAssetCompounder is AdapterBase, WithRewards {
 
     mapping(address => CurveSwap) internal swaps; // to swap reward token to baseAsset
 
+    address internal depositAsset;
+    int128 internal indexIn;
+
     error InvalidHarvestValues();
 
     function setHarvestValues(
         address curveRouter_,
         address[] memory rewardTokens_,
         uint256[] memory minTradeAmounts_, // must be ordered like rewardTokens_
-        CurveSwap[] memory swaps_ // must be ordered like rewardTokens_
+        CurveSwap[] memory swaps_, // must be ordered like rewardTokens_
+        int128 indexIn_
     ) public onlyOwner {
         curveRouter = ICurveRouter(curveRouter_);
 
@@ -129,6 +128,14 @@ contract CurveGaugeSingleAssetCompounder is AdapterBase, WithRewards {
         for (uint256 i = 0; i < rewardTokens_.length; i++) {
             swaps[rewardTokens_[i]] = swaps_[i];
         }
+
+        address asset_ = asset();
+        address depositAsset_ = ICurveLp(asset_).coins(uint256(uint128(indexIn_)));
+        if (depositAsset != address(0)) IERC20(depositAsset).approve(asset_, 0);
+        IERC20(depositAsset_).approve(asset_, 0);
+
+        depositAsset = depositAsset_;
+        indexIn = indexIn_;
 
         _rewardTokens = rewardTokens_;
         minTradeAmounts = minTradeAmounts_;
@@ -169,9 +176,17 @@ contract CurveGaugeSingleAssetCompounder is AdapterBase, WithRewards {
                 }
             }
 
-            uint256 depositAmount = IERC20(asset()).balanceOf(address(this));
-            
-            if (depositAmount > 0) _protocolDeposit(depositAmount, 0);
+            amount = IERC20(depositAsset).balanceOf(address(this));
+            if (amount > 0) {
+                uint256[] memory amounts = new uint256[](nCoins);
+                amounts[uint256(uint128(indexIn))] = amount;
+
+                address asset_ = asset();
+
+                ICurveLp(asset_).add_liquidity(amounts, 0);
+
+                _protocolDeposit(IERC20(asset_).balanceOf(address(this)), 0);
+            }
 
             lastHarvest = block.timestamp;
         }
