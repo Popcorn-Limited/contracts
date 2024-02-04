@@ -143,19 +143,6 @@ contract CurveGaugeSingleAssetCompounder is AdapterBase, WithRewards {
     ) public onlyOwner {
         curveRouter = ICurveRouter(curveRouter_);
 
-        _approveSwapTokens(rewardTokens_, curveRouter_);
-        for (uint256 i = 0; i < rewardTokens_.length; i++) {
-            swaps[rewardTokens_[i]] = swaps_[i];
-        }
-
-        _rewardTokens = rewardTokens_;
-        minTradeAmounts = minTradeAmounts_;
-    }
-
-    function _approveSwapTokens(
-        address[] memory rewardTokens_,
-        address curveRouter_
-    ) internal {
         uint256 rewardTokenLen = _rewardTokens.length;
         if (rewardTokenLen > 0) {
             // void approvals
@@ -166,7 +153,11 @@ contract CurveGaugeSingleAssetCompounder is AdapterBase, WithRewards {
 
         for (uint256 i = 0; i < rewardTokens_.length; i++) {
             IERC20(rewardTokens_[i]).approve(curveRouter_, type(uint256).max);
+            swaps[rewardTokens_[i]] = swaps_[i];
         }
+
+        _rewardTokens = rewardTokens_;
+        minTradeAmounts = minTradeAmounts_;
     }
 
     /**
