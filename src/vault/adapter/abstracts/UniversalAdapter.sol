@@ -185,7 +185,7 @@ contract UniversalAdapter is AdapterBase {
         return res;
     }
 
-    function _encodeContractCall(ExecutionData memory execData, bytes[2] memory dynamicValues) internal view returns (bytes memory encodedCalldata) {
+    function _encodeContractCall(ExecutionData memory execData, bytes[2] memory dynamicValues) internal pure returns (bytes memory encodedCalldata) {
         // encode and store dynamic params
         for(uint i=0; i<execData.dynamicParams.length; i++) {
             DynamicParam memory dynamicParam = execData.dynamicParams[i];
