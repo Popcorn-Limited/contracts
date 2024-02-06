@@ -4,6 +4,7 @@ fs_permissions = [{ access = "read-write", path = "./"}]
 verbosity = 2
 fuzz_runs = 256
 fuzz_max_global_rejects = 100000000
+evm_version = "shanghai"
 
 remappings = [
   'ds-test/=lib/forge-std/lib/ds-test/src/',

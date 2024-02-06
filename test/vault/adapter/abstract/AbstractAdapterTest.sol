@@ -336,7 +336,7 @@ abstract contract AbstractAdapterTest is PropertyTest {
 
             uint256 reqAssets = adapter.previewMint(
                 adapter.previewWithdraw(amount)
-            ) * 10;
+            );
             _mintAssetAndApproveForAdapter(reqAssets, bob);
             vm.prank(bob);
             adapter.deposit(reqAssets, bob);
@@ -366,7 +366,7 @@ abstract contract AbstractAdapterTest is PropertyTest {
             if (i > 0) overrideSetup(testConfigStorage.getTestConfig(i));
             uint256 amount = bound(uint256(fuzzAmount), minShares, maxShares);
 
-            uint256 reqAssets = adapter.previewMint(amount) * 10;
+            uint256 reqAssets = adapter.previewMint(amount);
             _mintAssetAndApproveForAdapter(reqAssets, bob);
 
             vm.prank(bob);
