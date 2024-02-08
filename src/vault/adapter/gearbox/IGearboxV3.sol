@@ -44,7 +44,6 @@ struct FullCheckParams {
     bool useSafePrices;
 }
 
-
 uint8 constant BOT_PERMISSIONS_SET_FLAG = 1;
 
 uint8 constant DEFAULT_MAX_ENABLED_TOKENS = 4;
@@ -382,4 +381,14 @@ interface ICreditFacadeV3Multicall {
     function revokeAdapterAllowances(
         RevocationPair[] calldata revocations
     ) external;
+}
+
+interface ICreditManagerV3 {
+    function calcTotalValue(
+        address creditAccount
+    ) external view returns (uint256 total, uint256 twv);
+
+    function calcCreditAccountHealthFactor(
+        address creditAccount
+    ) external view returns (uint256 hf); // health factory of 1 means liquiditation
 }
