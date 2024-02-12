@@ -209,9 +209,11 @@ contract CurveGaugeCompounder is AdapterBase, WithRewards {
 
     /// @notice Claim rewards from the gauge
     function claim() public override returns (bool success) {
-        gauge.claim_rewards();
-        minter.mint(address(gauge));
-        return true;
+        try gauge.claim_rewards() {
+            try minter.mint(address(gauge)) {
+                success = true;
+            } catch {}
+        } catch {}
     }
 
     /*//////////////////////////////////////////////////////////////
