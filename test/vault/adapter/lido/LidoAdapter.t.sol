@@ -6,16 +6,14 @@ pragma solidity ^0.8.15;
 import {Test} from "forge-std/Test.sol";
 
 import {LidoAdapter, SafeERC20, IERC20, IERC20Metadata, Math, VaultAPI, ILido} from "../../../../src/vault/adapter/lido/LidoAdapter.sol";
-import {IERC4626Upgradeable as IERC4626, IERC20Upgradeable as IERC20} from "openzeppelin-contracts-upgradeable/interfaces/IERC4626Upgradeable.sol";
+import {IERC4626Upgradeable as IERC4626, IERC20Upgradeable as IERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import {LidoTestConfigStorage, LidoTestConfig} from "./LidoTestConfigStorage.sol";
 import {AbstractAdapterTest, ITestConfigStorage, IAdapter} from "../abstract/AbstractAdapterTest.sol";
-import {SafeMath} from "openzeppelin-contracts/utils/math/SafeMath.sol";
 import {ICurveMetapool} from "../../../../src/interfaces/external/curve/ICurveMetapool.sol";
 import {Clones} from "openzeppelin-contracts/proxy/Clones.sol";
 
 contract LidoAdapterTest is AbstractAdapterTest {
     using Math for uint256;
-    using SafeMath for uint256;
 
     VaultAPI lidoVault;
     VaultAPI lidoBooster;

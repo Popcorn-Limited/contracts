@@ -4,10 +4,10 @@
 pragma solidity ^0.8.15;
 
 import {ERC4626Upgradeable, IERC20Upgradeable as IERC20, IERC20MetadataUpgradeable as IERC20Metadata, ERC20Upgradeable as ERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
-import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
-import {ReentrancyGuardUpgradeable} from "openzeppelin-contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
-import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
-import {PausableUpgradeable} from "openzeppelin-contracts-upgradeable/security/PausableUpgradeable.sol";
+import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
+import {ReentrancyGuardUpgradeable} from "openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
+import {MathUpgradeable as Math} from "openzeppelin-contracts/contracts/utils/math/Math.sol";
+import {PausableUpgradeable} from "openzeppelin-contracts/contracts/utils/Pausable.sol";
 import {IStrategy} from "../../../interfaces/vault/IStrategy.sol";
 import {IAdapter, IERC4626} from "../../../interfaces/vault/IAdapter.sol";
 import {EIP165} from "../../../utils/EIP165.sol";
