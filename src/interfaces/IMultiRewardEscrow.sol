@@ -2,7 +2,7 @@
 // Docgen-SOLC: 0.8.15
 pragma solidity ^0.8.15;
 
-import { IERC20Upgradeable as IERC20 } from "openzeppelin-contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+import { IERC20Upgradeable as IERC20 } from "openzeppelin-contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 
 struct Escrow {
   /// @notice The escrowed token

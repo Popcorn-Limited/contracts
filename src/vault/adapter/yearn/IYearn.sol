@@ -3,7 +3,7 @@
 
 pragma solidity ^0.8.15;
 
-import {IERC20Upgradeable as IERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+import {IERC20Upgradeable as IERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 
 interface VaultAPI is IERC20 {
     function deposit(uint256 amount) external returns (uint256);

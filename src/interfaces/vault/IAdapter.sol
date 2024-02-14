@@ -4,7 +4,7 @@
 pragma solidity ^0.8.15;
 
 import {IOwned} from "../IOwned.sol";
-import {IERC4626Upgradeable as IERC4626} from "openzeppelin-contracts-upgradeable/interfaces/IERC4626Upgradeable.sol";
+import {IERC4626Upgradeable as IERC4626} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import {IPermit} from "../IPermit.sol";
 import {IPausable} from "../IPausable.sol";
 

@@ -9,7 +9,7 @@ import {YearnFactoryAdapter, IERC20, IERC20Metadata, VaultAPI, IVaultFactory} fr
 import {IYearnStrategy} from "../../../../../src/vault/adapter/yearn/IYearn.sol";
 import {YearnFactoryTestConfigStorage, YearnFactoryTestConfig} from "./YearnFactoryTestConfigStorage.sol";
 import {AbstractAdapterTest, ITestConfigStorage, IAdapter} from "../../abstract/AbstractAdapterTest.sol";
-import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
+import {MathUpgradeable as Math} from "openzeppelin-contracts/contracts/utils/math/Math.sol";
 import {IGauge} from "../../../../../src/vault/adapter/balancer/IBalancer.sol";
 
 contract YearnFactoryAdapterTest is AbstractAdapterTest {

@@ -3,8 +3,8 @@
 
 pragma solidity ^0.8.15;
 
-import { SafeERC20Upgradeable as SafeERC20 } from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
-import { IERC20Upgradeable as IERC20 } from "openzeppelin-contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+import { SafeERC20Upgradeable as SafeERC20 } from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
+import { IERC20Upgradeable as IERC20 } from "openzeppelin-contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import { Math } from "openzeppelin-contracts/utils/math/Math.sol";
 import { Owned } from "./Owned.sol";
 import { SafeCastLib } from "solmate/utils/SafeCastLib.sol";
