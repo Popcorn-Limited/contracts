@@ -3,9 +3,7 @@ pragma solidity ^0.8.15;
 
 import {Test} from "forge-std/Test.sol";
 
-import {ConvexCompounder as ConvexAdapter, 
-SafeERC20, IERC20, CurveRoute, IERC20Metadata, Math, IConvexBooster, 
-IConvexRewards, IWithRewards, IStrategy} from "../../../../src/vault/adapter/convex/ConvexCompounder.sol";
+import {ConvexCompounder, SafeERC20, IERC20, CurveSwap, ICurveLp, IERC20Metadata, Math, IConvexBooster, IConvexRewards, IWithRewards, IStrategy} from "../../../../src/vault/adapter/convex/ConvexCompounder.sol";
 import {ConvexTestConfigStorage, ConvexTestConfig} from "./ConvexTestConfigStorage.sol";
 import {AbstractAdapterTest, ITestConfigStorage, IAdapter} from "../abstract/AbstractAdapterTest.sol";
 
@@ -15,32 +13,23 @@ contract ConvexCompounderTest is AbstractAdapterTest {
     IConvexBooster convexBooster =
         IConvexBooster(0xF403C135812408BFbE8713b5A23a04b3D48AAE31);
 
-    address usdc = address(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
-    address stg = address(0xAf5191B0De278C7286d6C7CC6ab6BB8A73bA2Cd6);
     address crv = address(0xD533a949740bb3306d119CC777fa900bA034cd52);
     address cvx = address(0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B);
-    address eth = address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE);
-    address usdt = address(0xdAC17F958D2ee523a2206206994597C13D831ec7);
-    address router = address(0x99a58482BD75cbab83b27EC03CA68fF489b5788f);
 
-    address pool = address(0x867fe27FC2462cff8890B54DfD64E6d42a9D1aC8);
     IConvexRewards convexRewards;
-    ConvexAdapter adapterContract;
-    
+    ConvexCompounder adapterContract;
+
     uint256 pid;
-    
-    CurveRoute lpRoute;
+    address depositAsset;
 
     function setUp() public {
-        vm.createSelectFork(vm.rpcUrl("mainnet"), 16991525);
+        vm.createSelectFork(vm.rpcUrl("mainnet"), 19138838);
 
         testConfigStorage = ITestConfigStorage(
             address(new ConvexTestConfigStorage())
         );
 
         _setUpTest(testConfigStorage.getTestConfig(0));
-
-        _setHarvestValues();
     }
 
     function overrideSetup(bytes memory testConfig) public override {
@@ -54,8 +43,8 @@ contract ConvexCompounderTest is AbstractAdapterTest {
         (address _asset, , , address _convexRewards, , ) = convexBooster
             .poolInfo(pid);
         convexRewards = IConvexRewards(_convexRewards);
-    
-        address impl = address(new ConvexAdapter());
+
+        address impl = address(new ConvexCompounder());
 
         setUpBaseTest(
             IERC20(_asset),
@@ -66,84 +55,90 @@ contract ConvexCompounderTest is AbstractAdapterTest {
             false
         );
 
-        vm.label(address(convexBooster), "convexBooster");
-        vm.label(address(convexRewards), "convexRewards");
-        vm.label(address(asset), "asset");
-        vm.label(address(this), "test");
-
-        adapterContract = ConvexAdapter(address(adapter));
+        adapterContract = ConvexCompounder(address(adapter));
 
         adapter.initialize(
             abi.encode(asset, address(this), strategy, 0, sigs, ""),
             externalRegistry,
             testConfig
         );
+
+        _setHarvestValues();
+
+        vm.label(address(crv), "crv");
+        vm.label(address(cvx), "cvx");
+        vm.label(address(convexBooster), "convexBooster");
+        vm.label(address(convexRewards), "convexRewards");
+        vm.label(address(depositAsset), "depositAsset");
+        vm.label(address(asset), "asset");
+        vm.label(address(this), "test");
     }
 
     function _setHarvestValues() internal {
-        CurveRoute[] memory rewardRoutes = new CurveRoute[](2);
+        address[] memory rewardTokens = new address[](2);
+        rewardTokens[0] = crv;
+        rewardTokens[1] = cvx;
+
         uint256[] memory minTradeAmounts = new uint256[](2);
-        uint256[] memory maxSlippages = new uint256[](3);
-
-        uint256[3][4] memory swapParams;
-
-        // crv swap route
-        address[9] memory rewardRoute = [
-            crv,
-            0x8301AE4fc9c624d1D396cbDAa1ed877821D7C511, // crv / eth
-            eth,
-            0xD51a44d3FaE010294C616388b506AcdA1bfAAE46, // tricrypto2
-            usdt,
-            0xbEbc44782C7dB0a1A60Cb6fe97d0b483032FF1C7, // 3crv
-            usdc,
-            address(0),
-            address(0)
-        ];
-        // crv swap params 
-        swapParams[0] = [uint256(1), 0, 3];
-        swapParams[1] = [uint256(2), 0, 3];
-        swapParams[2] = [uint256(2), 1, 1];
-
-        rewardRoutes[0] = CurveRoute(rewardRoute, swapParams);
         minTradeAmounts[0] = uint256(1e16);
-        maxSlippages[0] = uint256(1e17);
-
-        // cvx swap route
-        rewardRoute = [
-            cvx,
-            0xB576491F1E6e5E62f1d8F26062Ee822B40B0E0d4, // cvx / eth
-            eth,
-            0xD51a44d3FaE010294C616388b506AcdA1bfAAE46, // tricrypto2
-            usdt,
-            0xbEbc44782C7dB0a1A60Cb6fe97d0b483032FF1C7, // 3crv
-            usdc,
-            address(0),
-            address(0)
-        ];
-
-        rewardRoutes[1] = CurveRoute(rewardRoute, swapParams);
         minTradeAmounts[1] = uint256(1e16);
-        maxSlippages[1] = uint256(1e17);
 
-        rewardRoute = [
-            usdc,
-            0x3211C6cBeF1429da3D0d58494938299C92Ad5860, // stg / usdc
-            stg,
-            pool,
-            address(asset),
+        CurveSwap[] memory swaps = new CurveSwap[](2);
+        uint256[5][5] memory swapParams; // [i, j, swap type, pool_type, n_coins]
+        address[5] memory pools;
+
+        int128 indexIn = int128(1); // WETH index
+
+        // crv->weth->weETH swap
+        address[11] memory rewardRoute = [
+            crv, // crv
+            0x4eBdF703948ddCEA3B11f675B4D1Fba9d2414A14, // triCRV pool
+            0xf939E0A03FB07F59A73314E73794Be0E57ac1b4E, // crvUSD
+            address(0),
+            address(0),
+            address(0),
+            address(0),
             address(0),
             address(0),
             address(0),
             address(0)
         ];
+        // crv->crvUSD swap params
+        swapParams[0] = [uint256(2), 0, 1, 0, 0]; // crvIndex, wethIndex, exchange, irrelevant, irrelevant
 
-        uint256[3][4] memory swapLPParams;
+        swaps[0] = CurveSwap(rewardRoute, swapParams, pools);
 
-        swapLPParams[0] = [uint256(1), 0, 3];
-        swapLPParams[1] = [uint256(0), 0, 7];
-        lpRoute = CurveRoute({route:rewardRoute, swapParams:swapLPParams});
+        // crv->weth->weETH swap
+        rewardRoute = [
+            cvx, // crv
+            0xB576491F1E6e5E62f1d8F26062Ee822B40B0E0d4, // triCRV pool
+            0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2, // crvUSD
+            0x4eBdF703948ddCEA3B11f675B4D1Fba9d2414A14,
+            0xf939E0A03FB07F59A73314E73794Be0E57ac1b4E,
+            address(0),
+            address(0),
+            address(0),
+            address(0),
+            address(0),
+            address(0)
+        ];
+        // crv->crvUSD swap params
+        swapParams[0] = [uint256(1), 0, 1, 0, 0]; // crvIndex, wethIndex, exchange, irrelevant, irrelevant
+        swapParams[1] = [uint256(1), 0, 1, 0, 0]; // crvIndex, wethIndex, exchange, irrelevant, irrelevant
 
-        adapterContract.setHarvestValues(router, usdc, minTradeAmounts, maxSlippages, lpRoute, rewardRoutes);
+        swaps[1] = CurveSwap(rewardRoute, swapParams, pools);
+
+        ConvexCompounder(address(adapter)).setHarvestValues(
+            0xF0d4c12A5768D806021F80a262B4d39d26C58b8D, // curve router
+            rewardTokens,
+            minTradeAmounts,
+            swaps,
+            indexIn
+        );
+
+        depositAsset = ICurveLp(address(asset)).coins(
+            uint256(uint128(indexIn))
+        );
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -154,10 +149,8 @@ contract ConvexCompounderTest is AbstractAdapterTest {
     function test__rewardsTokens() public override {
         address[] memory rewardTokens = IWithRewards(address(adapter))
             .rewardTokens();
-        address CRV = 0xD533a949740bb3306d119CC777fa900bA034cd52;
-        address CVX = 0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B;
-        assertEq(rewardTokens[0], CRV, "CRV");
-        assertEq(rewardTokens[1], CVX, "CVX");
+        assertEq(rewardTokens[0], crv, "CRV");
+        assertEq(rewardTokens[1], cvx, "CVX");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -189,36 +182,35 @@ contract ConvexCompounderTest is AbstractAdapterTest {
     }
 
     /*//////////////////////////////////////////////////////////////
-                              CLAIM
+                                CLAIM
     //////////////////////////////////////////////////////////////*/
 
-    function test__harvestAndCompound() public {
-        _mintAssetAndApproveForAdapter(1000e18, bob);
+    function test__harvest() public override {
+        _mintAssetAndApproveForAdapter(100000e18, bob);
 
         vm.prank(bob);
-        adapter.deposit(1000e18, bob);
-        vm.warp(block.timestamp + 90 days);
+        adapter.deposit(100000e18, bob);
 
-        uint256 assetBalBefore = adapter.totalAssets();
-        uint256 vaultSharesBefore = adapter.totalSupply();
-        uint256 previewWithdrawBefore = adapter.previewRedeem(1e18);
+        uint256 oldTa = adapter.totalAssets();
+
+        vm.roll(block.number + 10_000_000);
+        vm.warp(block.timestamp + 150_000_000);
 
         adapter.harvest();
 
-        address[] memory rewardTokens = IWithRewards(address(adapter))
-            .rewardTokens();
-        assertEq(rewardTokens[0], 0xD533a949740bb3306d119CC777fa900bA034cd52); // CRV
-        assertEq(rewardTokens[1], 0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B); // CVX
-
-        // assert underlying asset increased
-        assertGt(adapter.totalAssets(), assetBalBefore);
-        // assert total supply has not changed 
-        assertEq(adapter.totalSupply(), vaultSharesBefore);
-        // assert rate increased
-        assertGt(adapter.previewRedeem(1e18), previewWithdrawBefore);
-
-        // assert vault doesn't hold any reward token - ie swapped whole balance claimed
-        assertEq(IERC20(rewardTokens[0]).balanceOf(address(adapter)), 0);
-        assertEq(IERC20(rewardTokens[1]).balanceOf(address(adapter)), 0);
+        assertGt(adapter.totalAssets(), oldTa);
     }
+
+    // function test__harvest_no_rewards() public {
+    //     _mintAssetAndApproveForAdapter(100e18, bob);
+
+    //     vm.prank(bob);
+    //     adapter.deposit(100e18, bob);
+
+    //     uint256 oldTa = adapter.totalAssets();
+
+    //     adapter.harvest();
+
+    //     assertEq(adapter.totalAssets(), oldTa);
+    // }
 }

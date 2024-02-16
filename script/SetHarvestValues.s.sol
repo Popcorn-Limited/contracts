@@ -3,7 +3,7 @@
 pragma solidity ^0.8.15;
 
 import {Script} from "forge-std/Script.sol";
-import {CurveGaugeSingleAssetCompounder, CurveSwap} from "../src/vault/adapter/curve/gauge/other/CurveGaugeSingleAssetCompounder.sol";
+import {CurveGaugeCompounder, CurveSwap} from "../src/vault/adapter/curve/gauge/mainnet/CurveGaugeCompounder.sol";
 
 contract SetHarvestValues is Script {
     address deployer;
@@ -14,24 +14,26 @@ contract SetHarvestValues is Script {
 
         vm.startBroadcast(deployerPrivateKey);
 
-        address arb = 0x912CE59144191C1204E64559FE8253a0e49E6548;
+        address crv = 0xD533a949740bb3306d119CC777fa900bA034cd52;
 
         address[] memory rewardTokens = new address[](1);
-        rewardTokens[0] = arb;
+        rewardTokens[0] = crv;
         uint256[] memory minTradeAmounts = new uint256[](1);
-        minTradeAmounts[0] = 0;
+        minTradeAmounts[0] = 10e18;
 
-        CurveSwap[] memory swaps = new CurveSwap[](3);
+        CurveSwap[] memory swaps = new CurveSwap[](1);
         uint256[5][5] memory swapParams; // [i, j, swap type, pool_type, n_coins]
         address[5] memory pools;
 
+        int128 indexIn = int128(1); // WETH index
+
         // arb->crvUSD->lp swap
         address[11] memory rewardRoute = [
-            arb, // arb
-            0x845C8bc94610807fCbaB5dd2bc7aC9DAbaFf3c55, // arb / crvUSD pool
-            0x498Bf2B1e120FeD3ad3D42EA2165E9b73f99C1e5, // crvUSD
-            0x2FE7AE43591E534C256A1594D326e5779E302Ff4,
-            0x17FC002b466eEc40DaE837Fc4bE5c67993ddBd6F,
+            crv, // crv
+            0x4eBdF703948ddCEA3B11f675B4D1Fba9d2414A14, // triCRV pool
+            0xf939E0A03FB07F59A73314E73794Be0E57ac1b4E, // crvUSD
+            address(0),
+            address(0),
             address(0),
             address(0),
             address(0),
@@ -40,19 +42,17 @@ contract SetHarvestValues is Script {
             address(0)
         ];
         // arb->crvUSD->lp swap params
-        swapParams[0] = [uint256(1), 0, 2, 0, 0]; // arbIndex, crvUsdIndex, exchange_underlying, irrelevant, irrelevant
-        swapParams[1] = [uint256(0), 1, 1, 1, 0]; // crvUsdIndex, irrelevant, exchange, stable, irrelevant
+        swapParams[0] = [uint256(2), 0, 1, 0, 0]; // crvIndex, wethIndex, exchange, irrelevant, irrelevant
 
         swaps[0] = CurveSwap(rewardRoute, swapParams, pools);
-        minTradeAmounts[0] = uint256(5e18);
 
-        CurveGaugeSingleAssetCompounder(
-            0x323053A0902E67791c06F65A5D2097ee79dD740F
-        ).setHarvestValues(
+        CurveGaugeCompounder(0xdce45fEab60668195D891242914864837Aa22d8d)
+            .setHarvestValues(
                 0xF0d4c12A5768D806021F80a262B4d39d26C58b8D, // curve router
                 rewardTokens,
                 minTradeAmounts,
-                swaps
+                swaps,
+                indexIn
             );
 
         vm.stopBroadcast();

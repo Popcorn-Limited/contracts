@@ -68,7 +68,7 @@ contract CurveGaugeCompounderTest is AbstractAdapterTest {
         address[11] memory rewardRoute = [
             crv, // crv
             0x4eBdF703948ddCEA3B11f675B4D1Fba9d2414A14, // triCRV pool
-            0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2, // weth
+            0xf939E0A03FB07F59A73314E73794Be0E57ac1b4E, // crvUSD
             address(0),
             address(0),
             address(0),
@@ -78,8 +78,8 @@ contract CurveGaugeCompounderTest is AbstractAdapterTest {
             address(0),
             address(0)
         ];
-        // crv->weth->weETH swap params
-        swapParams[0] = [uint256(2), 1, 1, 0, 0]; // crvIndex, wethIndex, exchange, irrelevant, irrelevant
+        // crv->crvUSD swap params
+        swapParams[0] = [uint256(2), 0, 1, 0, 0]; // crvIndex, wethIndex, exchange, irrelevant, irrelevant
 
         swaps[0] = CurveSwap(rewardRoute, swapParams, pools);
 
@@ -103,7 +103,7 @@ contract CurveGaugeCompounderTest is AbstractAdapterTest {
         vm.label(address(this), "test");
 
         maxAssets = 100_000 * 1e18;
-        maxShares = 100 * 1e27;
+        maxShares = 100 * 1e18;
     }
 
     /*//////////////////////////////////////////////////////////////

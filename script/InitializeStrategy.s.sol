@@ -18,17 +18,17 @@ contract InitializeStrategy is Script {
 
         vm.startBroadcast(deployerPrivateKey);
 
-        IAdapter(0xd11A312a7d9745C62dfc014D72E7Bb2403DABf72).initialize(
+        IAdapter(0xdce45fEab60668195D891242914864837Aa22d8d).initialize(
             abi.encode(
-                IERC20(0x0df083de449F75691fc5A36477a6f3284C269108),
+                IERC20(0x625E92624Bc2D88619ACCc1788365A69767f6200),
                 0x22f5413C075Ccd56D575A54763831C4c27A37Bdb,
                 address(0),
                 0,
                 sigs,
                 ""
             ),
-            0xf5862457AA842605f8b675Af13026d3Fd03bFfF0,
-            abi.encode(0x36691b39Ec8fa915204ba1e1A4A3596994515639, 0xa062aE8A9c5e11aaA026fc2670B0D65cCc8B2858)
+            0xd061D61a4d941c39E5453435B6345Dc261C2fcE0,
+            abi.encode(0xf69Fb60B79E463384b40dbFDFB633AB5a863C9A2)
         );
 
         vm.stopBroadcast();

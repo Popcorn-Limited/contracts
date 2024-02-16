@@ -18,9 +18,9 @@ contract InitializeVault is Script {
 
         vm.startBroadcast(deployerPrivateKey);
 
-        IVault(0x10710562d45a5356d32aD27Eea9f61F6ec44Cc19).initialize(
-            IERC20(0x0df083de449F75691fc5A36477a6f3284C269108),
-            IERC4626(0xd11A312a7d9745C62dfc014D72E7Bb2403DABf72),
+        IVault(0xE3514a5e431442D794A1aa738aC94984B593C799).initialize(
+            IERC20(0x625E92624Bc2D88619ACCc1788365A69767f6200),
+            IERC4626(0xdce45fEab60668195D891242914864837Aa22d8d),
             VaultFees({
                 deposit: 0,
                 withdrawal: 0,

@@ -17,8 +17,8 @@ contract CurveGaugeCompounderTestConfigStorage is ITestConfigStorage {
         // MAINNET - weETH / WETH
         testConfigs.push(
             CurveGaugeCompounderTestConfig(
-                0x13947303F63b363876868D070F14dc865C36463b,
-                0x1CAC1a0Ed47E2e0A313c712b2dcF85994021a365
+                0x625E92624Bc2D88619ACCc1788365A69767f6200,
+                0xf69Fb60B79E463384b40dbFDFB633AB5a863C9A2
             )
         );
     }
