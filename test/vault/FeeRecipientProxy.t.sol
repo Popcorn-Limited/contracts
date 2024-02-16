@@ -6,7 +6,7 @@ pragma solidity ^0.8.15;
 import { Test } from "forge-std/Test.sol";
 import { FeeRecipientProxy } from "../../src/vault/FeeRecipientProxy.sol";
 import { MockERC20 } from "../utils/mocks/MockERC20.sol";
-import { IERC20Upgradeable as IERC20 } from "openzeppelin-contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import { IERC20 } from "openzeppelin-contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 
 contract FeeRecipientProxyTest is Test {
   FeeRecipientProxy feeRecipient;

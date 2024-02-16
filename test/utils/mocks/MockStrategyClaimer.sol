@@ -1,7 +1,7 @@
 pragma solidity ^0.8.15;
 
 import { IWithRewards } from "../../../src/interfaces/vault/IWithRewards.sol";
-import { IERC20Upgradeable as IERC20 } from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
+import { IERC20 } from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 
 contract MockStrategyClaimer {
   event SelectorsVerified();

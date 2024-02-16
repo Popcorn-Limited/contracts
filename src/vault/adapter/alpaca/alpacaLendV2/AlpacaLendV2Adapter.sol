@@ -128,7 +128,7 @@ contract AlpacaLendV2Adapter is AdapterBase, WithRewards {
                 : shares.mulDiv(
                     ibToken.balanceOf(address(this)),
                     supply,
-                    Math.Rounding.Up
+                     Math.Rounding.Ceil
                 );
     }
 

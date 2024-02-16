@@ -1,6 +1,6 @@
 pragma solidity ^0.8.15;
 
-import {IERC20Upgradeable as IERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
+import {IERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 
 enum SwapKind {
     GIVEN_IN,

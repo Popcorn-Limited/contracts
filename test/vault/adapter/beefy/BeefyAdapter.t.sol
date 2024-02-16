@@ -96,7 +96,7 @@ contract BeefyAdapterTest is AbstractAdapterTest {
     );
     assertEq(
       adapter.totalAssets(),
-      iouBalance().mulDiv(beefyVault.balance(), beefyVault.totalSupply(), Math.Rounding.Down),
+      iouBalance().mulDiv(beefyVault.balance(), beefyVault.totalSupply(),  Math.Rounding.Floor),
       string.concat("totalAssets != beefy assets", baseTestId)
     );
   }

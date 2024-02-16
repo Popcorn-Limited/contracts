@@ -5,7 +5,7 @@ pragma solidity ^0.8.15;
 
 import { Owned } from "../utils/Owned.sol";
 import { VaultMetadata } from "../interfaces/vault/IVaultRegistry.sol";
-import { IERC4626Upgradeable as IERC4626 } from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
+import { IERC4626 } from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 
 /**
  * @title   VaultRegistry
