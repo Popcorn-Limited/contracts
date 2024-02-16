@@ -3,9 +3,9 @@
 
 pragma solidity ^0.8.15;
 
-import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
-import {ERC4626Upgradeable, ERC20Upgradeable, IERC20Upgradeable as IERC20, IERC20MetadataUpgradeable as IERC20Metadata} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
-import {MathUpgradeable as Math} from "openzeppelin-contracts/contracts/utils/math/Math.sol";
+import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
+import {ERC4626Upgradeable, ERC20Upgradeable, IERC20, IERC20Metadata} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
+import {Math} from "openzeppelin-contracts/utils/math/Math.sol";
 import {SafeCastLib} from "solmate/utils/SafeCastLib.sol";
 import {OwnedUpgradeable} from "./OwnedUpgradeable.sol";
 import {IMultiRewardEscrow} from "../interfaces/IMultiRewardEscrow.sol";
@@ -165,15 +165,14 @@ contract MultiRewardStaking is ERC4626Upgradeable, OwnedUpgradeable {
         emit Withdraw(caller, receiver, owner, assets, shares);
     }
 
-    /// @notice Internal transfer function used by `transfer()` and `transferFrom()`. Accrues rewards for `from` and `to`.
-    function _transfer(
-        address from,
-        address to,
-        uint256 amount
-    ) internal override accrueRewards(from, to) {
-        if (from == address(0) || to == address(0))
-            revert ZeroAddressTransfer(from, to);
-
+    /**
+     * @dev Transfers a `value` amount of tokens from `from` to `to`, or alternatively mints (or burns) if `from`
+     * (or `to`) is the zero address. All customizations to transfers, mints, and burns should be done by overriding
+     * this function.
+     *
+     * Emits a {Transfer} event.
+     */
+    function _update(address from, address to, uint256 amount) internal override {
         uint256 fromBalance = balanceOf(from);
         if (fromBalance < amount) revert InsufficentBalance();
 
@@ -243,7 +242,7 @@ contract MultiRewardStaking is ERC4626Upgradeable, OwnedUpgradeable {
         uint256 escrowed = rewardAmount.mulDiv(
             uint256(escrowInfo.escrowPercentage),
             1e18,
-            Math.Rounding.Down
+             Math.Rounding.Floor
         );
         uint256 payout = rewardAmount - escrowed;
 
@@ -336,7 +335,7 @@ contract MultiRewardStaking is ERC4626Upgradeable, OwnedUpgradeable {
                 escrowDuration: escrowDuration,
                 offset: offset
             });
-            rewardToken.safeApprove(address(escrow), type(uint256).max);
+            rewardToken.approve(address(escrow), type(uint256).max);
         }
 
         uint64 ONE = (10 ** IERC20Metadata(address(rewardToken)).decimals())
@@ -347,7 +346,7 @@ contract MultiRewardStaking is ERC4626Upgradeable, OwnedUpgradeable {
                     .mulDiv(
                         uint256(10 ** decimals()),
                         totalSupply(),
-                        Math.Rounding.Down
+                         Math.Rounding.Floor
                     )
                     .safeCastTo224()
             : ONE;
@@ -519,7 +518,7 @@ contract MultiRewardStaking is ERC4626Upgradeable, OwnedUpgradeable {
                 .mulDiv(
                     uint256(10 ** decimals()),
                     supplyTokens,
-                    Math.Rounding.Down
+                     Math.Rounding.Floor
                 )
                 .safeCastTo224();
         // rewardDecimals * stakeDecimals / stakeDecimals = rewardDecimals
@@ -549,7 +548,7 @@ contract MultiRewardStaking is ERC4626Upgradeable, OwnedUpgradeable {
         uint256 supplierDelta = balanceOf(_user).mulDiv(
             deltaIndex,
             uint256(10 ** decimals()),
-            Math.Rounding.Down
+             Math.Rounding.Floor
         );
         // stakeDecimals  * rewardDecimals / stakeDecimals = rewardDecimals
         // 1e18 * 1e6 / 10e18 = 0.1e18 | 1e6 * 1e18 / 10e18 = 0.1e6

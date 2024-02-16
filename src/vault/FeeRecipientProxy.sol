@@ -4,7 +4,7 @@
 pragma solidity ^0.8.15;
 
 import { Owned } from "../utils/Owned.sol";
-import { IERC20Upgradeable as IERC20 } from "openzeppelin-contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import { IERC20 } from "openzeppelin-contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 
 contract FeeRecipientProxy is Owned {
   

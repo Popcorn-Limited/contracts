@@ -57,7 +57,7 @@ contract GearboxPassivePoolAdapter is AdapterBase {
     _name = string.concat("VaultCraft GearboxPassivePool ", IERC20Metadata(asset()).name(), " Adapter");
     _symbol = string.concat("vcGPP-", IERC20Metadata(asset()).symbol());
 
-    IERC20(asset()).safeApprove(address(poolService), type(uint256).max);
+    IERC20(asset()).approve(address(poolService), type(uint256).max);
   }
 
   function name() public view override(IERC20Metadata, ERC20) returns (string memory) {

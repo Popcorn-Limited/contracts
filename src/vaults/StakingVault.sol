@@ -1,4 +1,4 @@
-pragma solidity 0.8.19;
+pragma solidity >=0.8.0;
 /// @dev 0.8.20 set's the default EVM version to shanghai and uses push0. That's not supported on L2s
 
 import {ERC20} from "solmate/tokens/ERC20.sol";

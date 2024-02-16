@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.15;
 
-import {IERC20MetadataUpgradeable as IERC20Metadata} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
+import {IERC20Metadata} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 
 interface IMetaPool {
   function swapwNEARForstNEAR(uint256 _amount) external;

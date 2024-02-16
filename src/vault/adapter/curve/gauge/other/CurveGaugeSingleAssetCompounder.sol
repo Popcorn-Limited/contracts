@@ -114,7 +114,7 @@ contract CurveGaugeSingleAssetCompounder is AdapterBase, WithRewards {
         uint256 lpWithdraw = shares.mulDiv(
             IERC20(address(gauge)).balanceOf(address(this)),
             totalSupply(),
-            Math.Rounding.Up
+             Math.Rounding.Ceil
         );
 
         gauge.withdraw(lpWithdraw);

@@ -3,11 +3,11 @@
 
 pragma solidity ^0.8.15;
 
-import {ERC4626Upgradeable, IERC20Upgradeable as IERC20, IERC20MetadataUpgradeable as IERC20Metadata, ERC20Upgradeable as ERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
-import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
-import {ReentrancyGuardUpgradeable} from "openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
-import {MathUpgradeable as Math} from "openzeppelin-contracts/contracts/utils/math/Math.sol";
-import {PausableUpgradeable} from "openzeppelin-contracts/contracts/utils/Pausable.sol";
+import {ERC4626Upgradeable, IERC20, IERC20Metadata, ERC20Upgradeable as ERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
+import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
+import {ReentrancyGuardUpgradeable} from "openzeppelin-contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {Math} from "openzeppelin-contracts/utils/math/Math.sol";
+import {PausableUpgradeable} from "openzeppelin-contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {IStrategy} from "../../../interfaces/vault/IStrategy.sol";
 import {IAdapter, IERC4626} from "../../../interfaces/vault/IAdapter.sol";
 import {EIP165} from "../../../utils/EIP165.sol";
@@ -192,7 +192,7 @@ abstract contract AdapterBase is
     function previewDeposit(
         uint256 assets
     ) public view virtual override returns (uint256) {
-        return paused() ? 0 : _convertToShares(assets, Math.Rounding.Down);
+        return paused() ? 0 : _convertToShares(assets,  Math.Rounding.Floor);
     }
 
     /**
@@ -203,7 +203,7 @@ abstract contract AdapterBase is
     function previewMint(
         uint256 shares
     ) public view virtual override returns (uint256) {
-        return paused() ? 0 : _convertToAssets(shares, Math.Rounding.Up);
+        return paused() ? 0 : _convertToAssets(shares,  Math.Rounding.Ceil);
     }
 
     function _convertToShares(
@@ -388,7 +388,7 @@ abstract contract AdapterBase is
                 ? performanceFee_.mulDiv(
                     (shareValue - highWaterMark_) * totalSupply(),
                     1e36,
-                    Math.Rounding.Down
+                     Math.Rounding.Floor
                 )
                 : 0;
     }

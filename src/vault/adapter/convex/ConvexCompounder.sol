@@ -300,7 +300,7 @@ contract ConvexCompounder is AdapterBase, WithRewards {
                     minAmountOut.mulDiv(
                         maxSlippages[i],
                         1e18,
-                        Math.Rounding.Down
+                         Math.Rounding.Floor
                     );
 
                 router.exchange_multiple(

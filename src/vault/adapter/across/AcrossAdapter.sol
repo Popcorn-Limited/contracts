@@ -194,7 +194,7 @@ contract AcrossAdapter is AdapterBase, WithRewards {
         return
             supply == 0
                 ? shares
-                : shares.mulDiv(totalLpBalance, supply, Math.Rounding.Up);
+                : shares.mulDiv(totalLpBalance, supply,  Math.Rounding.Ceil);
     }
 
     function _protocolWithdraw(

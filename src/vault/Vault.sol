@@ -3,11 +3,11 @@
 
 pragma solidity ^0.8.15;
 
-import {ERC4626Upgradeable, IERC20MetadataUpgradeable as IERC20Metadata, ERC20Upgradeable as ERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
-import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
-import {ReentrancyGuardUpgradeable} from "openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
-import {PausableUpgradeable} from "openzeppelin-contracts/contracts/utils/Pausable.sol";
-import {MathUpgradeable as Math} from "openzeppelin-contracts/contracts/utils/math/Math.sol";
+import {ERC4626Upgradeable, IERC20Metadata, ERC20Upgradeable as ERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
+import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
+import {ReentrancyGuardUpgradeable} from "openzeppelin-contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {PausableUpgradeable} from "openzeppelin-contracts-upgradeable/utils/PausableUpgradeable.sol";
+import {Math} from "openzeppelin-contracts/utils/math/Math.sol";
 import {OwnedUpgradeable} from "../utils/OwnedUpgradeable.sol";
 import {VaultFees, IERC4626, IERC20} from "../interfaces/vault/IVault.sol";
 
@@ -76,7 +76,7 @@ contract Vault is
 
         adapter = adapter_;
 
-        asset_.safeApprove(address(adapter_), type(uint256).max);
+        asset_.approve(address(adapter_), type(uint256).max);
 
         _decimals = IERC20Metadata(address(asset_)).decimals() + decimalOffset; // Asset decimals + decimal offset to combat inflation attacks
 
@@ -171,11 +171,11 @@ contract Vault is
         if (totalSupply() == 0) feesUpdatedAt = block.timestamp;
 
         uint256 feeShares = _convertToShares(
-            assets.mulDiv(uint256(fees.deposit), 1e18, Math.Rounding.Down),
-            Math.Rounding.Down
+            assets.mulDiv(uint256(fees.deposit), 1e18,  Math.Rounding.Floor),
+             Math.Rounding.Floor
         );
 
-        shares = _convertToShares(assets, Math.Rounding.Down) - feeShares;
+        shares = _convertToShares(assets,  Math.Rounding.Floor) - feeShares;
         if (shares == 0) revert ZeroAmount();
 
         if (feeShares > 0) _mint(feeRecipient, feeShares);
@@ -214,10 +214,10 @@ contract Vault is
         uint256 feeShares = shares.mulDiv(
             depositFee,
             1e18 - depositFee,
-            Math.Rounding.Down
+             Math.Rounding.Floor
         );
 
-        assets = _convertToAssets(shares + feeShares, Math.Rounding.Up);
+        assets = _convertToAssets(shares + feeShares,  Math.Rounding.Ceil);
 
         if (assets > maxMint(receiver)) revert MaxError(assets);
 
@@ -251,7 +251,7 @@ contract Vault is
         if (receiver == address(0)) revert InvalidReceiver();
         if (assets > maxWithdraw(owner)) revert MaxError(assets);
 
-        shares = _convertToShares(assets, Math.Rounding.Up);
+        shares = _convertToShares(assets,  Math.Rounding.Ceil);
         if (shares == 0) revert ZeroAmount();
 
         uint256 withdrawalFee = uint256(fees.withdrawal);
@@ -259,7 +259,7 @@ contract Vault is
         uint256 feeShares = shares.mulDiv(
             withdrawalFee,
             1e18 - withdrawalFee,
-            Math.Rounding.Down
+             Math.Rounding.Floor
         );
 
         shares += feeShares;
@@ -302,10 +302,10 @@ contract Vault is
         uint256 feeShares = shares.mulDiv(
             uint256(fees.withdrawal),
             1e18,
-            Math.Rounding.Down
+             Math.Rounding.Floor
         );
 
-        assets = _convertToAssets(shares - feeShares, Math.Rounding.Up);
+        assets = _convertToAssets(shares - feeShares,  Math.Rounding.Ceil);
 
         _burn(owner, shares);
 
@@ -336,7 +336,7 @@ contract Vault is
     ) public view override returns (uint256 shares) {
         shares = adapter.previewDeposit(
             assets -
-                assets.mulDiv(uint256(fees.deposit), 1e18, Math.Rounding.Down)
+                assets.mulDiv(uint256(fees.deposit), 1e18,  Math.Rounding.Floor)
         );
     }
 
@@ -354,7 +354,7 @@ contract Vault is
         shares += shares.mulDiv(
             depositFee,
             1e18 - depositFee,
-            Math.Rounding.Up
+             Math.Rounding.Ceil
         );
 
         assets = adapter.previewMint(shares);
@@ -374,7 +374,7 @@ contract Vault is
         assets += assets.mulDiv(
             withdrawalFee,
             1e18 - withdrawalFee,
-            Math.Rounding.Up
+             Math.Rounding.Ceil
         );
 
         shares = adapter.previewWithdraw(assets);
@@ -394,7 +394,7 @@ contract Vault is
         assets -= assets.mulDiv(
             uint256(fees.withdrawal),
             1e18,
-            Math.Rounding.Down
+             Math.Rounding.Floor
         );
     }
 
@@ -471,7 +471,7 @@ contract Vault is
                 ? managementFee.mulDiv(
                     totalAssets() * (block.timestamp - feesUpdatedAt),
                     SECONDS_PER_YEAR,
-                    Math.Rounding.Down
+                     Math.Rounding.Floor
                 ) / 1e18
                 : 0;
     }
@@ -492,7 +492,7 @@ contract Vault is
                 ? performanceFee.mulDiv(
                     (shareValue - highWaterMark_) * totalSupply(),
                     1e36,
-                    Math.Rounding.Down
+                     Math.Rounding.Floor
                 )
                 : 0;
     }
@@ -529,7 +529,7 @@ contract Vault is
                 : totalFee.mulDiv(
                     supply,
                     currentAssets - totalFee,
-                    Math.Rounding.Down
+                     Math.Rounding.Floor
                 );
             _mint(feeRecipient, feeInShare);
         }

@@ -1,4 +1,4 @@
-pragma solidity ^0.8.0 <0.8.20;
+pragma solidity ^0.8.0;
 
 import {StakingVault} from "./vaults/StakingVault.sol";
 

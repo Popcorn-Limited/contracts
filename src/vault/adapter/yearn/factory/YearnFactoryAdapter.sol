@@ -69,7 +69,7 @@ contract YearnFactoryAdapter is YearnAdapter {
             yVault.balanceOf(address(this)).mulDiv(
                 yVault.pricePerShare(),
                 1e18,
-                Math.Rounding.Down
+                 Math.Rounding.Floor
             );
     }
 }

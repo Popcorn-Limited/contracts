@@ -3,7 +3,7 @@
 
 pragma solidity ^0.8.15;
 
-import {ERC4626Upgradeable as ERC4626, ERC20Upgradeable as ERC20, IERC20Upgradeable as IERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
+import {ERC4626Upgradeable as ERC4626, ERC20Upgradeable as ERC20, IERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import {CurveCompounder, IAdapter, IWithRewards, ICurveRouter, CurveRoute} from "./CurveCompounder.sol";
 import {ISToken, IStargateRouter} from "../../../adapter/stargate/IStargate.sol";
 
