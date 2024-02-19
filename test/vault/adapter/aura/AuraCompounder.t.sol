@@ -120,7 +120,7 @@ contract AuraCompounderTest is AbstractAdapterTest {
         minTradeAmounts.push(0);
 
         // set underlyings
-        underlyings.push(0x596192bB6e41802428Ac943D2f1476C1Af25CC0E); // ezETH 
+        underlyings.push(0x596192bB6e41802428Ac943D2f1476C1Af25CC0E); // ezETH
         underlyings.push(0xbf5495Efe5DB9ce00f80364C8B423567e58d2110); // LP-Token
         underlyings.push(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2); // WETH
 
@@ -132,7 +132,8 @@ contract AuraCompounderTest is AbstractAdapterTest {
             IERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2),
             underlyings,
             2,
-            3
+            1,
+            2
         );
     }
 
