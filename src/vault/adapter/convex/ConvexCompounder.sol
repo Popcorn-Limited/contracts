@@ -26,7 +26,7 @@ contract ConvexCompounder is AdapterBase, WithRewards {
 
     /// @notice The poolId inside Convex booster for relevant Curve lpToken.
     uint256 public pid;
-    
+
     uint256 internal nCoins;
 
     /// @notice The booster address for Convex
@@ -142,10 +142,27 @@ contract ConvexCompounder is AdapterBase, WithRewards {
 
     mapping(address => CurveSwap) internal swaps; // to swap reward token to baseAsset
 
-    address internal depositAsset;
-    int128 internal indexIn;
+    address public depositAsset;
+    int128 public indexIn;
 
     error InvalidHarvestValues();
+
+    function getRoute(
+        address token
+    ) external view returns (address[11] memory) {
+        return swaps[token].route;
+    }
+
+    function getSwapParams(
+        address token,
+        uint256 i
+    ) external view returns (uint256[5] memory) {
+        return swaps[token].swapParams[i];
+    }
+
+    function getPools(address token) external view returns (address[5] memory) {
+        return swaps[token].pools;
+    }
 
     function setHarvestValues(
         address curveRouter_,
