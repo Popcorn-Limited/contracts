@@ -95,7 +95,7 @@ contract EllipsisAdapter is AdapterBase, WithRewards {
         uint256 lpBalance = ILpStaking(ellipsisLPStaking).userInfo(lpToken, address(this)).depositAmount;
 
         uint256 supply = totalSupply();
-        return supply == 0 ? shares : shares.mulDiv(lpBalance, supply, Math.Rounding.Up);
+        return supply == 0 ? shares : shares.mulDiv(lpBalance, supply,  Math.Rounding.Ceil);
         
     }
 

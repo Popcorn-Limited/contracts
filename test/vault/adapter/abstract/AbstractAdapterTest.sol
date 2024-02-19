@@ -10,7 +10,7 @@ import {IAdapter, IERC4626} from "../../../../src/interfaces/vault/IAdapter.sol"
 
 import {IMetaPool, MetaPoolAdapter} from "../../../../src/vault/adapter/metapool/MetaPoolAdapter.sol";
 import {IStrategy} from "../../../../src/interfaces/vault/IStrategy.sol";
-import {IERC20Upgradeable as IERC20, IERC20MetadataUpgradeable as IERC20Metadata} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
+import {IERC20, IERC20Metadata} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import {ITestConfigStorage} from "./ITestConfigStorage.sol";
 import {MockStrategy} from "../../../utils/mocks/MockStrategy.sol";
 import {Math} from "openzeppelin-contracts/utils/math/Math.sol";

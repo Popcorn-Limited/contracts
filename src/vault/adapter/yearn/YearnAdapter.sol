@@ -95,7 +95,7 @@ contract YearnAdapter is AdapterBase {
             yShares.mulDiv(
                 _freeFunds(),
                 yVault.totalSupply(),
-                Math.Rounding.Down
+                 Math.Rounding.Floor
             );
     }
 
@@ -139,7 +139,7 @@ contract YearnAdapter is AdapterBase {
                 : shares.mulDiv(
                     yVault.balanceOf(address(this)),
                     supply,
-                    Math.Rounding.Up
+                     Math.Rounding.Ceil
                 );
     }
 

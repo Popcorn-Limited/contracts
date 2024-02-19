@@ -58,7 +58,7 @@ contract IdleSeniorAdapter is AdapterBase {
         );
         _symbol = string.concat("vcIdlS-", IERC20Metadata(asset()).symbol());
 
-        IERC20(asset()).safeApprove(_cdo, type(uint256).max);
+        IERC20(asset()).approve(_cdo, type(uint256).max);
     }
 
     function name()
@@ -89,7 +89,7 @@ contract IdleSeniorAdapter is AdapterBase {
             IERC20(tranche).balanceOf(address(this)).mulDiv(
                 cdo.tranchePrice(tranche),
                 cdo.ONE_TRANCHE_TOKEN(),
-                Math.Rounding.Down
+                 Math.Rounding.Floor
             );
     }
 
@@ -105,7 +105,7 @@ contract IdleSeniorAdapter is AdapterBase {
         return
             supply == 0
                 ? shares
-                : shares.mulDiv(balance, supply, Math.Rounding.Up);
+                : shares.mulDiv(balance, supply,  Math.Rounding.Ceil);
     }
 
     /// @notice Applies the idle deposit limit to the adapter.

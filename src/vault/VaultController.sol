@@ -2,7 +2,7 @@
 // Docgen-SOLC: 0.8.15
 pragma solidity ^0.8.15;
 
-import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
+import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 import {Owned} from "../utils/Owned.sol";
 import {IVault, VaultInitParams, VaultFees, IERC4626, IERC20} from "../interfaces/vault/IVault.sol";
 import {IMultiRewardStaking} from "../interfaces/IMultiRewardStaking.sol";

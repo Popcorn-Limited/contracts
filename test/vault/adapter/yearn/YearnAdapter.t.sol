@@ -102,7 +102,7 @@ contract YearnAdapterTest is AbstractAdapterTest {
             iouBalance().mulDiv(
                 yearnVault.pricePerShare(),
                 10 ** IERC20Metadata(address(asset)).decimals(),
-                Math.Rounding.Up
+                 Math.Rounding.Ceil
             ),
             _delta_,
             string.concat("totalAssets != yearn assets", baseTestId)

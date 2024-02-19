@@ -86,9 +86,9 @@ contract GmdAdapter is AdapterBase, WithRewards {
         uint256 asset = gmdLpTokenBalance.mulDiv(
             poolInfo.totalStaked,
             gmdLpTokenTotalSupply,
-            Math.Rounding.Down
+             Math.Rounding.Floor
         );
-        return asset.mulDiv(1e6, 1e18, Math.Rounding.Down); //scaled down the value since
+        return asset.mulDiv(1e6, 1e18,  Math.Rounding.Floor); //scaled down the value since
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -120,7 +120,7 @@ contract GmdAdapter is AdapterBase, WithRewards {
                 : shares.mulDiv(
                 IERC20(poolInfo.GDlptoken).balanceOf(address(this)),
                 supply,
-                Math.Rounding.Up
+                 Math.Rounding.Ceil
             );
     }
 

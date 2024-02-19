@@ -5,11 +5,10 @@ pragma solidity ^0.8.15;
 
 import {AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20, Math, IStrategy, IAdapter} from "../abstracts/AdapterBase.sol";
 
-import {MathUpgradeable as Math} from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
+import {Math} from "openzeppelin-contracts/utils/math/Math.sol";
 import {IWETH} from "../../../interfaces/external/IWETH.sol";
 import {ICurveMetapool} from "../../../interfaces/external/curve/ICurveMetapool.sol";
 import {ILido, VaultAPI} from "./ILido.sol";
-import {SafeMath} from "openzeppelin-contracts/utils/math/SafeMath.sol";
 
 /// @title LidoAdapter
 /// @author RedVeil
@@ -20,7 +19,6 @@ import {SafeMath} from "openzeppelin-contracts/utils/math/SafeMath.sol";
 contract LidoAdapter is AdapterBase {
     // using FixedPointMathLib for uint256;
     using SafeERC20 for IERC20;
-    using SafeMath for uint256;
     using Math for uint256;
 
     string internal _name;
@@ -118,7 +116,7 @@ contract LidoAdapter is AdapterBase {
 
     function _totalAssets() internal view override returns (uint256) {
         uint256 assets = lido.balanceOf(address(this));
-        return assets - assets.mulDiv(slippage, 1e18, Math.Rounding.Up);
+        return assets - assets.mulDiv(slippage, 1e18,  Math.Rounding.Ceil);
     }
 
     function convertToUnderlyingShares(
@@ -132,7 +130,7 @@ contract LidoAdapter is AdapterBase {
                 : shares.mulDiv(
                     lido.balanceOf(address(this)),
                     supply,
-                    Math.Rounding.Up
+                     Math.Rounding.Ceil
                 );
     }
 

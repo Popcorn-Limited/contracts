@@ -189,7 +189,7 @@ contract IchiAdapter is AdapterBase, WithRewards {
 
         uint256 assets = assetPairAmount + oppositePairInAssetPairTerms;
 
-        return assets - assets.mulDiv(slippage, 1e18, Math.Rounding.Up);
+        return assets - assets.mulDiv(slippage, 1e18,  Math.Rounding.Ceil);
     }
 
     function calculateUnderlyingShares(
@@ -227,7 +227,7 @@ contract IchiAdapter is AdapterBase, WithRewards {
                 : shares.mulDiv(
                     vault.balanceOf(address(this)),
                     supply,
-                    Math.Rounding.Up
+                     Math.Rounding.Ceil
                 );
     }
 

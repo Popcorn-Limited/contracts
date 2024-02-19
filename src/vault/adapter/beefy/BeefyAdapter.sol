@@ -114,7 +114,7 @@ contract BeefyAdapter is AdapterBase, WithRewards {
             beefyBalanceCheck.balanceOf(address(this)).mulDiv(
                 beefyVault.balance(),
                 beefyVault.totalSupply(),
-                Math.Rounding.Down
+                 Math.Rounding.Floor
             );
     }
 
@@ -130,7 +130,7 @@ contract BeefyAdapter is AdapterBase, WithRewards {
                 : shares.mulDiv(
                     beefyBalanceCheck.balanceOf(address(this)),
                     supply,
-                    Math.Rounding.Up
+                     Math.Rounding.Ceil
                 );
     }
 
@@ -163,17 +163,17 @@ contract BeefyAdapter is AdapterBase, WithRewards {
             assets = assets.mulDiv(
                 BPS_DENOMINATOR,
                 BPS_DENOMINATOR - beefyFee,
-                Math.Rounding.Down
+                 Math.Rounding.Floor
             );
 
-        return _convertToShares(assets, Math.Rounding.Up);
+        return _convertToShares(assets,  Math.Rounding.Ceil);
     }
 
     /// @notice `previewRedeem` that takes beefy withdrawal fees into account
     function previewRedeem(
         uint256 shares
     ) public view override returns (uint256) {
-        uint256 assets = _convertToAssets(shares, Math.Rounding.Down);
+        uint256 assets = _convertToAssets(shares,  Math.Rounding.Floor);
 
         IBeefyStrat strat = IBeefyStrat(beefyVault.strategy());
 
@@ -188,7 +188,7 @@ contract BeefyAdapter is AdapterBase, WithRewards {
             assets = assets.mulDiv(
                 BPS_DENOMINATOR - beefyFee,
                 BPS_DENOMINATOR,
-                Math.Rounding.Down
+                 Math.Rounding.Floor
             );
 
         return assets;

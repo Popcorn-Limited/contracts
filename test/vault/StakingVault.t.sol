@@ -5,7 +5,7 @@ import {Clones} from "openzeppelin-contracts/proxy/Clones.sol";
 
 import {MockERC20} from "../utils/mocks/MockERC20.sol";
 import {MockERC4626} from "../utils/mocks/MockERC4626.sol";
-import {IERC20Upgradeable as IERC20} from "openzeppelin-contracts-upgradeable/interfaces/IERC4626Upgradeable.sol";
+import {IERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 
 import {StakingVault} from "../../src/vaults/StakingVault.sol";
 

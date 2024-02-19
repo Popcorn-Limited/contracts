@@ -2,10 +2,10 @@
 // Docgen-SOLC: 0.8.15
 pragma solidity ^0.8.15;
 
-import { IERC4626Upgradeable as IERC4626, IERC20Upgradeable as IERC20, IERC20MetadataUpgradeable as IERC20Metadata } from "openzeppelin-contracts-upgradeable/interfaces/IERC4626Upgradeable.sol";
+import { IERC4626, IERC20, IERC20Metadata } from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import { ERC4626Upgradeable, ERC20Upgradeable as ERC20 } from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
-import { SafeERC20Upgradeable as SafeERC20 } from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
-import { MathUpgradeable as Math } from "openzeppelin-contracts-upgradeable/utils/math/MathUpgradeable.sol";
+import { SafeERC20 } from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
+import { Math } from "openzeppelin-contracts/utils/math/Math.sol";
 
 contract MockERC4626 is ERC4626Upgradeable {
   using SafeERC20 for IERC20;

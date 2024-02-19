@@ -128,7 +128,7 @@ contract AlpacaLendV1Adapter is AdapterBase {
                 : shares.mulDiv(
                     alpacaVault.balanceOf(address(this)),
                     supply,
-                    Math.Rounding.Up
+                     Math.Rounding.Ceil
                 );
     }
 }

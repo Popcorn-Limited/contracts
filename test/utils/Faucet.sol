@@ -96,14 +96,14 @@ contract Faucet {
 
   constructor(address uniswap_) {
     uniswap = Uniswap(uniswap_);
-    IERC20(dai).safeApprove(address(cDai), type(uint256).max);
-    cDai.safeApprove(address(crvCompPool), type(uint256).max);
-    IERC20(crv).safeApprove(address(crvCvxCrvPool), type(uint256).max);
-    IERC20(dai).safeApprove(address(crvAavePool), type(uint256).max);
-    IERC20(dai).safeApprove(address(triPool), type(uint256).max);
-    IERC20(usdt).safeApprove(address(crv3CryptoPool), type(uint256).max);
-    IERC20(wbtc).safeApprove(address(crvSBtcPool), type(uint256).max);
-    IERC20(crvSBtcLP).safeApprove(address(crvIbBtcPool), type(uint256).max);
+    IERC20(dai).approve(address(cDai), type(uint256).max);
+    cDai.approve(address(crvCompPool), type(uint256).max);
+    IERC20(crv).approve(address(crvCvxCrvPool), type(uint256).max);
+    IERC20(dai).approve(address(crvAavePool), type(uint256).max);
+    IERC20(dai).approve(address(triPool), type(uint256).max);
+    IERC20(usdt).approve(address(crv3CryptoPool), type(uint256).max);
+    IERC20(wbtc).approve(address(crvSBtcPool), type(uint256).max);
+    IERC20(crvSBtcLP).approve(address(crvIbBtcPool), type(uint256).max);
   }
 
   function sendTokens(address token, uint256 amount, address recipient) public returns (uint256[] memory) {

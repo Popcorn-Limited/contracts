@@ -130,7 +130,7 @@ contract CompoundV2Adapter is AdapterBase, WithRewards {
                 : shares.mulDiv(
                     cToken.balanceOf(address(this)),
                     supply,
-                    Math.Rounding.Up
+                     Math.Rounding.Ceil
                 );
     }
 

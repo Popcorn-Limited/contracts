@@ -59,8 +59,8 @@ contract MetaPoolAdapter is AdapterBase {
         );
         _symbol = string.concat("vcM-", IERC20Metadata(asset()).symbol());
 
-        IERC20(wNear).safeApprove(registry, type(uint256).max);
-        IERC20(stNear).safeApprove(registry, type(uint256).max);
+        IERC20(wNear).approve(registry, type(uint256).max);
+        IERC20(stNear).approve(registry, type(uint256).max);
     }
 
     function name()
@@ -106,7 +106,7 @@ contract MetaPoolAdapter is AdapterBase {
                 : shares.mulDiv(
                     stNear.balanceOf(address(this)),
                     supply,
-                    Math.Rounding.Up
+                     Math.Rounding.Ceil
                 );
     }
 

@@ -3,8 +3,8 @@
 
 pragma solidity ^0.8.15;
 
-import {IERC4626Upgradeable as IERC4626, IERC20Upgradeable as IERC20} from "openzeppelin-contracts-upgradeable/interfaces/IERC4626Upgradeable.sol";
-import {SafeERC20Upgradeable as SafeERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
+import {IERC4626, IERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
+import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 import {IVaultRegistry, VaultMetadata} from "../interfaces/vault/IVaultRegistry.sol";
 import {ICurveGauge} from "../interfaces/external/curve/ICurveGauge.sol";
 
