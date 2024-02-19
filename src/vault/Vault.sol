@@ -305,7 +305,7 @@ contract Vault is
              Math.Rounding.Floor
         );
 
-        assets = _convertToAssets(shares - feeShares,  Math.Rounding.Ceil);
+        assets = _convertToAssets(shares - feeShares,  Math.Rounding.Floor);
 
         _burn(owner, shares);
 
@@ -354,7 +354,7 @@ contract Vault is
         shares += shares.mulDiv(
             depositFee,
             1e18 - depositFee,
-             Math.Rounding.Ceil
+             Math.Rounding.Floor
         );
 
         assets = adapter.previewMint(shares);
@@ -374,7 +374,7 @@ contract Vault is
         assets += assets.mulDiv(
             withdrawalFee,
             1e18 - withdrawalFee,
-             Math.Rounding.Ceil
+             Math.Rounding.Floor
         );
 
         shares = adapter.previewWithdraw(assets);
