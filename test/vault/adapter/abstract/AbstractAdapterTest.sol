@@ -371,7 +371,7 @@ abstract contract AbstractAdapterTest is PropertyTest {
 
             vm.prank(bob);
             adapter.deposit(reqAssets, bob);
-            prop_redeem(bob, bob, amount, testId);
+            prop_redeem(bob, bob, adapter.maxRedeem(bob), testId);
 
             _mintAssetAndApproveForAdapter(reqAssets, bob);
             vm.prank(bob);
@@ -381,7 +381,7 @@ abstract contract AbstractAdapterTest is PropertyTest {
 
             vm.prank(bob);
             adapter.approve(alice, type(uint256).max);
-            prop_redeem(alice, bob, amount, testId);
+            prop_redeem(alice, bob, adapter.maxRedeem(bob), testId);
         }
     }
 

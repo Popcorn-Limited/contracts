@@ -23,7 +23,7 @@ contract ConvexCompounderTest is AbstractAdapterTest {
     address depositAsset;
 
     function setUp() public {
-        vm.createSelectFork(vm.rpcUrl("mainnet"));
+        vm.createSelectFork(vm.rpcUrl("mainnet"), 19262400);
 
         testConfigStorage = ITestConfigStorage(
             address(new ConvexTestConfigStorage())
@@ -75,16 +75,17 @@ contract ConvexCompounderTest is AbstractAdapterTest {
     }
 
     function _setHarvestValues() internal {
-        address[] memory rewardTokens = new address[](1);
+        address[] memory rewardTokens = new address[](2);
         rewardTokens[0] = crv;
-        // rewardTokens[0] = cvx;
+        rewardTokens[1] = cvx;
 
-        uint256[] memory minTradeAmounts = new uint256[](1);
-        //minTradeAmounts[0] = uint256(1e16);
-        minTradeAmounts[0] = uint256(1e16);
+        uint256[] memory minTradeAmounts = new uint256[](2);
+        minTradeAmounts[0] = uint256(1e18);
+        minTradeAmounts[1] = uint256(1e18);
 
-        CurveSwap[] memory swaps = new CurveSwap[](1);
-        uint256[5][5] memory swapParams; // [i, j, swap type, pool_type, n_coins]
+        CurveSwap[] memory swaps = new CurveSwap[](2);
+        uint256[5][5] memory swapParams0; // [i, j, swap type, pool_type, n_coins]
+        uint256[5][5] memory swapParams1; // [i, j, swap type, pool_type, n_coins]
         address[5] memory pools;
 
         int128 indexIn = int128(1); // WETH index
@@ -104,31 +105,29 @@ contract ConvexCompounderTest is AbstractAdapterTest {
             address(0)
         ];
         // crv->crvUSD swap params
-        swapParams[0] = [uint256(2), 0, 2, 0, 0]; // crvIndex, crvUSDIndex, exchange_underlying, irrelevant, irrelevant
+        swapParams0[0] = [uint256(2), 0, 2, 0, 0]; // crvIndex, crvUSDIndex, exchange_underlying, irrelevant, irrelevant
 
-        swaps[0] = CurveSwap(rewardRoute, swapParams, pools);
+        swaps[0] = CurveSwap(rewardRoute, swapParams0, pools);
 
         // crv->weth->weETH swap
-        // address[11] memory rewardRoute = [
-        //     cvx, // crv
-        //     0xB576491F1E6e5E62f1d8F26062Ee822B40B0E0d4, // triCRV pool
-        //     0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE, // weth
-        //     0x4eBdF703948ddCEA3B11f675B4D1Fba9d2414A14,
-        //     0xf939E0A03FB07F59A73314E73794Be0E57ac1b4E,
-        //     address(0),
-        //     address(0),
-        //     address(0),
-        //     address(0),
-        //     address(0),
-        //     address(0)
-        // ];
-        // // crv->crvUSD swap params
-        // swapParams[0] = [uint256(1), 0, 1, 2, 2]; // crvIndex, wethIndex, exchange, irrelevant, irrelevant
-        // swapParams[1] = [uint256(1), 0, 1, 3, 3]; // crvIndex, wethIndex, exchange, irrelevant, irrelevant
+        rewardRoute = [
+            cvx, // crv
+            0xB576491F1E6e5E62f1d8F26062Ee822B40B0E0d4, // triCRV pool
+            0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE, // weth
+            0x4eBdF703948ddCEA3B11f675B4D1Fba9d2414A14,
+            0xf939E0A03FB07F59A73314E73794Be0E57ac1b4E,
+            address(0),
+            address(0),
+            address(0),
+            address(0),
+            address(0),
+            address(0)
+        ];
+        // crv->crvUSD swap params
+        swapParams1[0] = [uint256(1), 0, 1, 2, 2]; // crvIndex, wethIndex, exchange, irrelevant, irrelevant
+        swapParams1[1] = [uint256(1), 0, 1, 3, 3]; // crvIndex, wethIndex, exchange, irrelevant, irrelevant
 
-        // //pools[0] = 0x4eBdF703948ddCEA3B11f675B4D1Fba9d2414A14;
-
-        // swaps[0] = CurveSwap(rewardRoute, swapParams, pools);
+        swaps[1] = CurveSwap(rewardRoute, swapParams1, pools);
 
         ConvexCompounder(address(adapter)).setHarvestValues(
             0xF0d4c12A5768D806021F80a262B4d39d26C58b8D, // curve router
@@ -183,54 +182,6 @@ contract ConvexCompounderTest is AbstractAdapterTest {
             type(uint256).max,
             "allowance"
         );
-
-        address[11] memory route = ConvexCompounder(address(adapter)).getRoute(
-            address(crv)
-        );
-        emit log_address(route[0]);
-        emit log_address(route[1]);
-        emit log_address(route[2]);
-        emit log_address(route[3]);
-        emit log_address(route[4]);
-
-        emit log_string("------");
-
-        route = ConvexCompounder(address(adapter)).getRoute(address(cvx));
-        emit log_address(route[0]);
-        emit log_address(route[1]);
-        emit log_address(route[2]);
-        emit log_address(route[3]);
-        emit log_address(route[4]);
-
-        uint256[5] memory swapParams = ConvexCompounder(address(adapter))
-            .getSwapParams(address(crv), uint256(0));
-        emit log_uint(swapParams[0]);
-        emit log_uint(swapParams[1]);
-        emit log_uint(swapParams[2]);
-        emit log_uint(swapParams[3]);
-        emit log_uint(swapParams[4]);
-
-        emit log_string("------");
-
-        swapParams = ConvexCompounder(address(adapter)).getSwapParams(
-            address(cvx),
-            uint256(0)
-        );
-        emit log_uint(swapParams[0]);
-        emit log_uint(swapParams[1]);
-        emit log_uint(swapParams[2]);
-        emit log_uint(swapParams[3]);
-        emit log_uint(swapParams[4]);
-
-        swapParams = ConvexCompounder(address(adapter)).getSwapParams(
-            address(cvx),
-            uint256(1)
-        );
-        emit log_uint(swapParams[0]);
-        emit log_uint(swapParams[1]);
-        emit log_uint(swapParams[2]);
-        emit log_uint(swapParams[3]);
-        emit log_uint(swapParams[4]);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -245,8 +196,8 @@ contract ConvexCompounderTest is AbstractAdapterTest {
 
         uint256 oldTa = adapter.totalAssets();
 
-        vm.roll(block.number + 10_000_000);
-        vm.warp(block.timestamp + 150_000_000);
+        vm.roll(block.number + 1_000_000);
+        vm.warp(block.timestamp + 15_000_000);
 
         adapter.harvest();
 

@@ -147,23 +147,6 @@ contract ConvexCompounder is AdapterBase, WithRewards {
 
     error InvalidHarvestValues();
 
-    function getRoute(
-        address token
-    ) external view returns (address[11] memory) {
-        return swaps[token].route;
-    }
-
-    function getSwapParams(
-        address token,
-        uint256 i
-    ) external view returns (uint256[5] memory) {
-        return swaps[token].swapParams[i];
-    }
-
-    function getPools(address token) external view returns (address[5] memory) {
-        return swaps[token].pools;
-    }
-
     function setHarvestValues(
         address curveRouter_,
         address[] memory rewardTokens_,
