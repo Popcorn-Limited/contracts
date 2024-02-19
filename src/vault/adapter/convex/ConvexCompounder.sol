@@ -26,7 +26,7 @@ contract ConvexCompounder is AdapterBase, WithRewards {
 
     /// @notice The poolId inside Convex booster for relevant Curve lpToken.
     uint256 public pid;
-    
+
     uint256 internal nCoins;
 
     /// @notice The booster address for Convex
@@ -142,8 +142,8 @@ contract ConvexCompounder is AdapterBase, WithRewards {
 
     mapping(address => CurveSwap) internal swaps; // to swap reward token to baseAsset
 
-    address internal depositAsset;
-    int128 internal indexIn;
+    address public depositAsset;
+    int128 public indexIn;
 
     error InvalidHarvestValues();
 
