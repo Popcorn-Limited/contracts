@@ -200,7 +200,7 @@ contract AuraCompounder is AdapterBase, WithRewards {
                 bytes memory userData;
                 if (underlyings.length != amountsInLen) {
                     uint256[] memory amountsIn = new uint256[](amountsInLen);
-                    amountsIn[indexIn] = poolAmount;
+                    amountsIn[indexInUserData] = poolAmount;
                     userData = abi.encode(1, amountsIn, 0); // Exact In Enum, inAmounts, minOut
                 } else {
                     userData = abi.encode(1, amounts, 0); // Exact In Enum, inAmounts, minOut
@@ -231,6 +231,7 @@ contract AuraCompounder is AdapterBase, WithRewards {
     IERC20 internal baseAsset;
     address[] internal underlyings;
     uint256 internal indexIn;
+    uint256 internal indexInUserData;
     uint256 internal amountsInLen;
 
     function setHarvestValues(
@@ -241,6 +242,7 @@ contract AuraCompounder is AdapterBase, WithRewards {
         IERC20 baseAsset_,
         address[] memory underlyings_,
         uint256 indexIn_,
+        uint256 indexInUserData_,
         uint256 amountsInLen_
     ) external onlyOwner {
         _setTradeData(crv, swaps_[0], assets_[0], limits_[0]);
@@ -250,6 +252,7 @@ contract AuraCompounder is AdapterBase, WithRewards {
         baseAsset = baseAsset_;
         underlyings = underlyings_;
         indexIn = indexIn_;
+        indexInUserData = indexInUserData_;
         amountsInLen = amountsInLen_;
     }
 
@@ -269,7 +272,7 @@ contract AuraCompounder is AdapterBase, WithRewards {
         limits[key] = limits_;
         assets[key] = assets_;
     }
-    
+
     /*//////////////////////////////////////////////////////////////
                       EIP-165 LOGIC
   //////////////////////////////////////////////////////////////*/

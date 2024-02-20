@@ -15,9 +15,9 @@ contract AuraCompounderTestConfigStorage is ITestConfigStorage {
     constructor() {
         testConfigs.push(
             AuraCompounderTestConfig(
-                152,
+                189,
                 0xBA12222222228d8Ba445958a75a0704d566BF2C8,
-                0xe7e2c68d3b13d905bbb636709cf4dfd21076b9d20000000000000000000005ca,
+                0x596192bb6e41802428ac943d2f1476c1af25cc0e000000000000000000000659,
                 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2
             )
         );
