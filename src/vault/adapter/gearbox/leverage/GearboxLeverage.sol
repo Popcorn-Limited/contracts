@@ -3,7 +3,7 @@
 
 pragma solidity ^0.8.15;
 
-import {AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20} from "../abstracts/AdapterBase.sol";
+import {AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20} from "../../abstracts/AdapterBase.sol";
 import {
     ICreditFacadeV3, ICreditManagerV3, MultiCall, ICreditFacadeV3Multicall, CollateralDebtData, CollateralCalcTask
 } from "./IGearboxV3.sol";
