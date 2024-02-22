@@ -230,20 +230,20 @@ contract WeirollAdapterTest is AbstractAdapterTest {
 
     }
 
-    function test_execute() public {
+    function test_reader() public {
         WeirollReader r = new WeirollReader();
         // 0x70a082310200ffffffffff0179579633029a61963eDfbA1C0BE22498b6e0D33D
         Command memory c = r.translate(hex"70a082310200ffffffffff0179579633029a61963eDfbA1C0BE22498b6e0D33D");
-        console.logBytes4(c.sig);
-        console.log(c.callType);
 
-        console.log(c.inputIndexes[0]);
-        console.log(c.inputIndexes[1]);
-        console.log(c.inputIndexes[2]);
-        console.log(c.inputIndexes[3]);
-        console.log(c.inputIndexes[4]);
-        console.log(c.outputIndex);
-        console.log(c.target);
+        uint8[6] memory inputsInd;
+        inputsInd[0] = 0;
+        inputsInd[1] = 255;
+        inputsInd[2] = 255;
+        inputsInd[3] = 255;
+        inputsInd[4] = 255;
+        inputsInd[5] = 255;
 
+        bytes32 comm = r.toByteCommand("balanceOf(address)", 2, inputsInd, 1, address(0x79579633029a61963eDfbA1C0BE22498b6e0D33D));
+        assertEq(comm, hex"70a082310200ffffffffff0179579633029a61963eDfbA1C0BE22498b6e0D33D");
     }
 }

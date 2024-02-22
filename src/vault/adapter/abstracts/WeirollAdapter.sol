@@ -6,6 +6,7 @@ pragma solidity ^0.8.15;
 import {AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20, Math} from "../abstracts/AdapterBase.sol";
 import {IPermissionRegistry} from "../../../interfaces/vault/IPermissionRegistry.sol";
 import {VM} from "./VM.sol";
+import "forge-std/console.sol";
 
 /**
  * @title   ERC4626 Universal Adapter
@@ -178,5 +179,26 @@ contract WeirollReader {
         c.inputIndexes[5] = uint8(bytes1(command[10:11]));
         c.outputIndex = uint8(bytes1(command[11:12]));
         c.target = address(bytes20(command[12:32]));
+    }
+
+    function toByteCommand(
+        string memory functionSig, uint8 callType, uint8[6] memory inputIndexes, uint8 outputIndex, address target
+    ) public view returns (bytes32 command) {
+       bytes memory inputIn;
+       
+       for(uint i=0; i<6; i++){
+        inputIn = abi.encodePacked(
+            inputIn, 
+            bytes1(bytes32(abi.encode(inputIndexes[i])) << 31*8)
+        );
+       }
+
+       command = bytes32(abi.encodePacked(
+            bytes4(keccak256(abi.encodePacked(functionSig))),
+            bytes1(callType),
+            inputIn,
+            bytes1(outputIndex),
+            bytes20(target))
+        );
     }
 }
