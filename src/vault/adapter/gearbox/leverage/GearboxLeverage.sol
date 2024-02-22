@@ -142,6 +142,20 @@ contract GearboxLeverage is AdapterBase {
         creditFacade.multicall(creditAccount, calls);
     }
 
+    function setHarvestValues(
+        uint256 _leverageRatio
+    ) public onlyOwner {
+        leverageRatio = _leverageRatio;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                          HELPERS
+    //////////////////////////////////////////////////////////////*/
+
+    function _calculateLeverageRatio() internal view returns (uint256){
+        CollateralDebtData memory collateralDebtData = _getCreditAccountData();
+        return (collateralDebtData.totalValue + collateralDebtData.debt)/collateralDebtData.totalValue;
+    }
 
     function _reduceDebtLevel(uint256 amount) internal {
         MultiCall[] memory calls = new MultiCall[](1);
@@ -161,12 +175,6 @@ contract GearboxLeverage is AdapterBase {
         });
 
         creditFacade.multicall(creditAccount, calls);
-    }
-
-    function setHarvestValues(
-        uint256 _leverageRatio
-    ) public onlyOwner {
-        leverageRatio = _leverageRatio;
     }
 
     function _getCreditAccountData() internal view returns (CollateralDebtData memory){
