@@ -95,20 +95,12 @@ contract WeirollUniversalAdapter is AdapterBase, VM {
     /*//////////////////////////////////////////////////////////////
                           INTERNAL HOOKS LOGIC
     //////////////////////////////////////////////////////////////*/
-    function executeDep(uint256 amount) public {
-        _protocolDeposit(amount,0);
-    }
-
-    function executeWith(uint256 amount) public {
-        _protocolWithdraw(amount,0);
-    }
-
     function _protocolDeposit(
         uint256 amount,
         uint256 
     ) internal override {
         depositCommands.states[0] = abi.encode(amount); // push amount to state 0
-        depositCommands.states[1] = (abi.encode(msg.sender));
+        depositCommands.states[1] = abi.encode(msg.sender); // push sender to state 1 
 
         _execute(depositCommands.commands, depositCommands.states);
     }
@@ -119,8 +111,6 @@ contract WeirollUniversalAdapter is AdapterBase, VM {
     ) internal override {
         withdrawCommands.states[0] = abi.encode(amount); // push amount to state 0
         withdrawCommands.states[1] = abi.encode(msg.sender); // push sender to state 1 
-
-        // withdrawCommands.states.push(abi.encode(0)); // initialise slot in order to write output after TODO move in init
 
         _execute(withdrawCommands.commands, withdrawCommands.states);
     }
@@ -168,3 +158,25 @@ contract WeirollUniversalAdapter is AdapterBase, VM {
     }
 }
 
+struct Command {
+    bytes4 sig; // function signature
+    uint8 callType; // 0: delegate call, 1: call, 2: static call
+    uint8[6] inputIndexes; // indexes in the state array where input variables are taken from 
+    uint8 outputIndex; // index in the state array where output is written
+    address target; // target contract 
+}
+
+contract WeirollReader {
+    function translate(bytes calldata command) public pure returns (Command memory c) {
+        c.sig = bytes4(command[0:4]);
+        c.callType = uint8(bytes1(command[4:5]));
+        c.inputIndexes[0] = uint8(bytes1(command[5:6]));
+        c.inputIndexes[1] = uint8(bytes1(command[6:7]));
+        c.inputIndexes[2] = uint8(bytes1(command[7:8]));
+        c.inputIndexes[3] = uint8(bytes1(command[8:9]));
+        c.inputIndexes[4] = uint8(bytes1(command[9:10]));
+        c.inputIndexes[5] = uint8(bytes1(command[10:11]));
+        c.outputIndex = uint8(bytes1(command[11:12]));
+        c.target = address(bytes20(command[12:32]));
+    }
+}
