@@ -3,14 +3,20 @@
 
 pragma solidity ^0.8.15;
 
+
+enum AllowanceAction {
+    FORBID,
+    ALLOW
+}
+
 struct MultiCall {
     address target;
     bytes callData;
 }
 
-enum AllowanceAction {
-    FORBID,
-    ALLOW
+struct BalanceDelta {
+    address token;
+    int256 amount;
 }
 
 /// @notice Debt limits packed into a single slot
@@ -387,6 +393,13 @@ interface ICreditManagerV3 {
     function calcTotalValue(
         address creditAccount
     ) external view returns (uint256 total, uint256 twv);
+
+    function calcDebtAndCollateral(
+        address creditAccount, CollateralCalcTask task
+    )
+    external
+    view
+    returns (CollateralDebtData memory cdd);
 
     function calcCreditAccountHealthFactor(
         address creditAccount

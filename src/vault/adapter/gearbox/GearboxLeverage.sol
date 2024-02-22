@@ -3,8 +3,10 @@
 
 pragma solidity ^0.8.15;
 
-import {AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20} from "../../abstracts/AdapterBase.sol";
-import {ICreditFacadeV3, MultiCall, ICreditFacadeV3Multicall} from "./IGearboxV3.sol";
+import {AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20} from "../abstracts/AdapterBase.sol";
+import {
+    ICreditFacadeV3, ICreditManagerV3, MultiCall, ICreditFacadeV3Multicall, CollateralDebtData, CollateralCalcTask
+} from "./IGearboxV3.sol";
 
 /**
  * @title   Gearbox Passive Pool Adapter
@@ -20,6 +22,8 @@ contract GearboxLeverage is AdapterBase {
     string internal _name;
     string internal _symbol;
 
+    uint256 public leverageRatio;
+    address public creditAccount;
     ICreditFacadeV3 public creditFacade;
 
     /*//////////////////////////////////////////////////////////////
@@ -27,11 +31,11 @@ contract GearboxLeverage is AdapterBase {
    //////////////////////////////////////////////////////////////*/
 
     error WrongPool();
+    error CreditAccountLiquidatable();
 
     /**
      * @notice Initialize a new Gearbox Passive Pool Adapter.
      * @param adapterInitData Encoded data for the base adapter initialization.
-     * @param addressProvider GearboxAddressProvider
      * @param gearboxInitData Encoded data for the Lido adapter initialization.
      * @dev `_pid` - The poolId for lpToken.
      * @dev This function is called by the factory contract when deploying a new vault.
@@ -50,8 +54,7 @@ contract GearboxLeverage is AdapterBase {
 
         creditFacade = ICreditFacadeV3(_creditFacade);
         //creditManager = _creditManager;
-
-        ICreditFacadeV3(_creditFacade).openCreditAccount(address(this), [], 0);
+        creditAccount = ICreditFacadeV3(_creditFacade).openCreditAccount(address(this), new MultiCall[](0), 0);
 
         _name = string.concat(
             "VaultCraft GearboxLeverage ",
@@ -86,7 +89,9 @@ contract GearboxLeverage is AdapterBase {
   //////////////////////////////////////////////////////////////*/
 
     /// @dev Calculate totalAssets by converting the total diesel tokens to underlying amount
-    function _totalAssets() internal view override returns (uint256) {}
+    function _totalAssets() internal view override returns (uint256) {
+        return _getCreditAccountData().totalValue;
+    }
 
     /*//////////////////////////////////////////////////////////////
                     DEPOSIT/WITHDRAWAL LIMIT LOGIC
@@ -94,7 +99,6 @@ contract GearboxLeverage is AdapterBase {
 
     function maxDeposit(address) public view override returns (uint256) {}
 
-    function maxMint(address) public view override returns (uint256) {}
 
     /// @dev When poolService is paused and we didnt withdraw before (paused()) return 0
     function maxWithdraw(
@@ -118,11 +122,13 @@ contract GearboxLeverage is AdapterBase {
             )
         });
 
-        creditFacade.multicall(calls);
+        creditFacade.multicall(creditAccount, calls);
     }
 
     function _protocolWithdraw(uint256 assets, uint256) internal override {
-        // TODO make a liquidation check
+        if(_creditAccountIsLiquidatable()){
+            revert CreditAccountLiquidatable();
+        }
 
         MultiCall[] memory calls = new MultiCall[](1);
         calls[0] = MultiCall({
@@ -133,17 +139,57 @@ contract GearboxLeverage is AdapterBase {
             )
         });
 
-        creditFacade.multicall(calls);
+        creditFacade.multicall(creditAccount, calls);
     }
 
 
-    function _reduceDebtLevel() internal {
-      // Withdraw assets
-      // Decrease Debt
+    function _reduceDebtLevel(uint256 amount) internal {
+        MultiCall[] memory calls = new MultiCall[](1);
+        calls[0] = MultiCall({
+            target: address(creditFacade),
+            callData: abi.encodeCall(ICreditFacadeV3Multicall.decreaseDebt, (amount))
+        });
+
+        creditFacade.multicall(creditAccount, calls);
     }
 
-    function _increaseDebtLevel() internal {
-      // increase Debt
-      // Deposit Assets
+    function _increaseDebtLevel(uint256 amount) internal {
+        MultiCall[] memory calls = new MultiCall[](1);
+        calls[0] = MultiCall({
+            target: address(creditFacade),
+            callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (amount))
+        });
+
+        creditFacade.multicall(creditAccount, calls);
+    }
+
+    function setHarvestValues(
+        uint256 _leverageRatio
+    ) public onlyOwner {
+        leverageRatio = _leverageRatio;
+    }
+
+    function _getCreditAccountData() internal view returns (CollateralDebtData memory){
+        return ICreditManagerV3(creditFacade.creditManager()).calcDebtAndCollateral(
+            address(this), CollateralCalcTask.GENERIC_PARAMS
+        );
+    }
+
+    function _creditAccountIsLiquidatable() internal view returns(bool) {
+        bool _creditFacadeIsExpired;
+        uint40 _expirationDate = creditFacade.expirationDate();
+        if(!creditFacade.expirable()){
+            _creditFacadeIsExpired = false;
+        }else {
+            _creditFacadeIsExpired = (_expirationDate != 0 && block.timestamp >= _expirationDate);
+        }
+
+        CollateralDebtData memory collateralDebtData = _getCreditAccountData();
+        bool isUnhealthy = collateralDebtData.twvUSD < collateralDebtData.totalDebtUSD;
+        if (collateralDebtData.debt == 0 || !isUnhealthy && !_creditFacadeIsExpired) {
+            return false;
+        }
+
+        return true;
     }
 }
