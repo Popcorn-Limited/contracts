@@ -204,16 +204,16 @@ contract ConvexCompounderTest is AbstractAdapterTest {
         assertGt(adapter.totalAssets(), oldTa);
     }
 
-    // function test__harvest_no_rewards() public {
-    //     _mintAssetAndApproveForAdapter(100e18, bob);
+    function test__harvest_no_rewards() public {
+        _mintAssetAndApproveForAdapter(100e18, bob);
 
-    //     vm.prank(bob);
-    //     adapter.deposit(100e18, bob);
+        vm.prank(bob);
+        adapter.deposit(100e18, bob);
 
-    //     uint256 oldTa = adapter.totalAssets();
+        uint256 oldTa = adapter.totalAssets();
 
-    //     adapter.harvest();
+        adapter.harvest();
 
-    //     assertEq(adapter.totalAssets(), oldTa);
-    // }
+        assertEq(adapter.totalAssets(), oldTa);
+    }
 }
