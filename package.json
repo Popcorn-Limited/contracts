@@ -23,7 +23,8 @@
     "vault:setHarvestValues": "forge script ./script/SetHarvestValues.s.sol --rpc-url https://eth-mainnet.g.alchemy.com/v2/KsuP431uPWKR3KFb-K_0MT1jcwpUnjAg --broadcast",
     "fees:move": "forge script ./script/MoveFees.s.sol --rpc-url https://eth-mainnet.g.alchemy.com/v2/KsuP431uPWKR3KFb-K_0MT1jcwpUnjAg --broadcast",
     "verify": "./script/verifyContract.sh",
-    "verifyContractValues":"./script/verifyContractValues.sh"
+    "verifyContractValues":"./script/verifyContractValues.sh",
+    "allocateFunds": "forge script ./script/AllocateFunds.s.sol --rpc-url https://arb-mainnet.g.alchemy.com/v2/KsuP431uPWKR3KFb-K_0MT1jcwpUnjAg --broadcast"
   },
   "dependencies": {}
 }
