@@ -6,7 +6,6 @@ pragma solidity ^0.8.15;
 import {AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20, Math} from "../abstracts/AdapterBase.sol";
 import {IPermissionRegistry} from "../../../interfaces/vault/IPermissionRegistry.sol";
 import {VM} from "./VM.sol";
-import "forge-std/console.sol";
 
 /**
  * @title   ERC4626 Universal Adapter

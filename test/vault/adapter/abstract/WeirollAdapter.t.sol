@@ -7,7 +7,7 @@ import {ConvexAdapter, SafeERC20, IERC20, IERC20Metadata, Math, IConvexBooster, 
 import {ConvexTestConfigStorage, ConvexTestConfig} from "../convex/ConvexTestConfigStorage.sol";
 import {AbstractAdapterTest, ITestConfigStorage, IAdapter} from "../abstract/AbstractAdapterTest.sol";
 import {MockStrategyClaimer} from "../../../utils/mocks/MockStrategyClaimer.sol";
-import {WeirollUniversalAdapter, VmCommand, WeirollReader, Command} from "../../../../src/vault/adapter/abstracts/WeirollAdapter.sol";
+import {WeirollUniversalAdapter, VmCommand, WeirollReader, Command} from "../../../../src/vault/adapter/weiroll/WeirollAdapter.sol";
 import "forge-std/console.sol";
 
 // bytes4 sig = "0x43a0d066"; bytes4(keccak256(abi.encodePacked("deposit(address,address,uint256)")))
@@ -25,6 +25,7 @@ contract WeirollAdapterTest is AbstractAdapterTest {
     IConvexRewards convexRewards;
     uint256 pid;
     WeirollUniversalAdapter adapterContract;
+    WeirollReader r;
 
     function setUp() public {
         vm.createSelectFork(vm.rpcUrl("mainnet"));
@@ -63,35 +64,55 @@ contract WeirollAdapterTest is AbstractAdapterTest {
         vm.label(address(asset), "asset");
         vm.label(address(this), "test");
 
-        // ENCODE TOTAL ASSET 
-        // bytes32 totalAssetCommand = hex"70 a0 82 31 02 00 ff ff ff ff ff 0179579633029a61963eDfbA1C0BE22498b6e0D33D";
-        bytes32 totalAssetCommand = hex"70a082310200ffffffffff0179579633029a61963eDfbA1C0BE22498b6e0D33D";
+        r = new WeirollReader();
 
+        // ENCODE TOTAL ASSET 
+        uint8[6] memory inputsInd;
+        inputsInd[0] = 0;
+        inputsInd[1] = 255;
+        inputsInd[2] = 255;
+        inputsInd[3] = 255;
+        inputsInd[4] = 255;
+        inputsInd[5] = 255;
+        bytes32 totalAssetCommand = r.toByteCommand("balanceOf(address)", 2, inputsInd, 1, address(0x79579633029a61963eDfbA1C0BE22498b6e0D33D));
         bytes32[] memory tComm = new bytes32[](1);
         tComm[0] = totalAssetCommand;
-       
         bytes[] memory tStates = new bytes[](1);
         tStates[0] = abi.encode(address(adapter));
 
+        // ---------------------------------------------- 
         // ENCODE DEPOSIT 
-        bytes32 depositBoosterCommand = hex"43a0d06601020004ffffffffF403C135812408BFbE8713b5A23a04b3D48AAE31";
-        // bytes32 safeTransferAssetCommand = hex"23b872dd01010400ffffffff625E92624Bc2D88619ACCc1788365A69767f6200";
+        inputsInd[0] = 2;
+        inputsInd[1] = 0;
+        inputsInd[2] = 4;
+        inputsInd[3] = 255;
+        inputsInd[4] = 255;
+        inputsInd[5] = 255;
+
+        bytes32 depositBoosterCommand = r.toByteCommand("deposit(uint256,uint256,bool)", 1, inputsInd, 255, address(0xF403C135812408BFbE8713b5A23a04b3D48AAE31));
         bytes32[] memory depCommands = new bytes32[](1);
-        // depCommands[0] = safeTransferAssetCommand;
         depCommands[0] = depositBoosterCommand;
-  
         bytes[] memory states = new bytes[](3);
         states[0] = abi.encode(289);
         states[1] = abi.encode(true);
         states[2] = abi.encode(address(adapter));
 
+        // ---------------------------------------------- 
         // ENCODE WITHDRAW 
-        bytes32 withdrawBoosterCommand = hex"c32e7202010001ffffffffff79579633029a61963eDfbA1C0BE22498b6e0D33D";
+        inputsInd[0] = 0;
+        inputsInd[1] = 1;
+        inputsInd[2] = 255;
+        inputsInd[3] = 255;
+        inputsInd[4] = 255;
+        inputsInd[5] = 255;
+
+        bytes32 withdrawBoosterCommand = r.toByteCommand("withdrawAndUnwrap(uint256,bool)", 1, inputsInd, 255, address(0x79579633029a61963eDfbA1C0BE22498b6e0D33D));
         bytes32[] memory wCommands = new bytes32[](1);
         wCommands[0] = withdrawBoosterCommand;
         bytes[] memory wStates = new bytes[](1);
         wStates[0] = abi.encode(false);
 
+        // ---------------------------------------------- 
         // ENCODE ALL COMMANDS 
         bytes memory commands = abi.encode(depCommands,states,wCommands,wStates,tComm,tStates);
 
@@ -231,7 +252,6 @@ contract WeirollAdapterTest is AbstractAdapterTest {
     }
 
     function test_reader() public {
-        WeirollReader r = new WeirollReader();
         // 0x70a082310200ffffffffff0179579633029a61963eDfbA1C0BE22498b6e0D33D
         Command memory c = r.translate(hex"70a082310200ffffffffff0179579633029a61963eDfbA1C0BE22498b6e0D33D");
 
