@@ -3,7 +3,6 @@
 pragma solidity ^0.8.11;
 
 import "./CommandBuilder.sol";
-import "forge-std/console.sol";
 
 abstract contract VM {
     using CommandBuilder for bytes[];
@@ -101,7 +100,6 @@ abstract contract VM {
 
             if (!success) {
                 if (outdata.length > 0) {
-                                            console.log("HEREYPO");
                     assembly {
                         outdata := add(outdata, 68)
                     }
