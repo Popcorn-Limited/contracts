@@ -248,12 +248,18 @@ contract AuraCompounder is AdapterBase, WithRewards {
         _setTradeData(crv, swaps_[0], assets_[0], limits_[0]);
         _setTradeData(cvx, swaps_[1], assets_[1], limits_[1]);
 
+        if (address(baseAsset) != address(0)) {
+            baseAsset.approve(balVault, 0);
+        }
+
         minTradeAmounts = minTradeAmounts_;
         baseAsset = baseAsset_;
         underlyings = underlyings_;
         indexIn = indexIn_;
         indexInUserData = indexInUserData_;
         amountsInLen = amountsInLen_;
+
+        baseAsset_.approve(balVault, type(uint).max);
     }
 
     function _setTradeData(
