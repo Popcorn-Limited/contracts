@@ -35,6 +35,7 @@ contract WeirollUniversalAdapter is AdapterBase, VM {
     VmCommand depositCommands;
     VmCommand withdrawCommands;
     VmCommand totalAssetsCommands;
+    VmCommand harvestCommands;
 
     /**
      * @notice Initialize a new generic Vault Adapter.
@@ -87,9 +88,11 @@ contract WeirollUniversalAdapter is AdapterBase, VM {
     /// @notice Calculates the total amount of underlying tokens the Vault holds.
     /// @return The total amount of underlying tokens the Vault holds.
     function _totalAssets() internal view override returns (uint256) {
+        // output is last element of states arrays   
         uint256 indexOut = totalAssetsCommands.states.length - 1;
-        bytes[] memory outState = _executeView(totalAssetsCommands.commands, totalAssetsCommands.states); 
-        return abi.decode(outState[indexOut], (uint256));
+    
+        bytes[] memory outputState = _executeCommandsView(totalAssetsCommands);
+        return abi.decode(outputState[indexOut], (uint256));
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -101,8 +104,8 @@ contract WeirollUniversalAdapter is AdapterBase, VM {
     ) internal override {
         depositCommands.states[0] = abi.encode(amount); // push amount to state 0
         depositCommands.states[1] = abi.encode(msg.sender); // push sender to state 1 
-
-        _execute(depositCommands.commands, depositCommands.states);
+        
+        _executeCommands(depositCommands);
     }
 
     function _protocolWithdraw(
@@ -112,7 +115,39 @@ contract WeirollUniversalAdapter is AdapterBase, VM {
         withdrawCommands.states[0] = abi.encode(amount); // push amount to state 0
         withdrawCommands.states[1] = abi.encode(msg.sender); // push sender to state 1 
 
-        _execute(withdrawCommands.commands, withdrawCommands.states);
+        _executeCommands(withdrawCommands);  
+    }
+
+    function harvest() public override takeFees {
+       _executeCommands(harvestCommands);
+    }
+
+    function _executeCommandsView(VmCommand memory commands) internal view returns (bytes[] memory outputState) {
+        bytes32[] memory c = new bytes32[](1);
+        for(uint i=0; i<commands.commands.length; i++) {
+            c[0] = commands.commands[i];
+            if(i==0) {
+                // execute first command with original state 
+                outputState = _executeView(c, commands.states);
+            } else {
+                // execute other commands using output state from prev op
+                outputState = _executeView(c, outputState);
+            }
+        }
+    }
+
+    function _executeCommands(VmCommand memory commands) internal returns (bytes[] memory outputState) {
+        bytes32[] memory c = new bytes32[](1);
+        for(uint i=0; i<commands.commands.length; i++) {
+            c[0] = commands.commands[i];
+            if(i==0) {
+                // execute first command with original state 
+                outputState = _execute(c, commands.states);
+            } else {
+                // execute other commands using output state from prev op
+                outputState = _execute(c, outputState);
+            }
+        }
     }
 
     function _initCommands(bytes memory commands) internal {
@@ -122,8 +157,10 @@ contract WeirollUniversalAdapter is AdapterBase, VM {
             bytes32[] memory cW, 
             bytes[] memory sW,
             bytes32[] memory cT, 
-            bytes[] memory sT
-        ) = abi.decode(commands, (bytes32[],bytes[],bytes32[],bytes[],bytes32[],bytes[]));
+            bytes[] memory sT,
+            bytes32[] memory cH, 
+            bytes[] memory sH
+        ) = abi.decode(commands, (bytes32[],bytes[],bytes32[],bytes[],bytes32[],bytes[],bytes32[],bytes[]));
         
         // DEPOSIT 
         for(uint i=0; i<c.length; i++) {
@@ -155,6 +192,14 @@ contract WeirollUniversalAdapter is AdapterBase, VM {
             totalAssetsCommands.states.push(sT[i]);
         }
         totalAssetsCommands.states.push(abi.encode(0)); // push empty slot to get output value written
+
+        // HARVEST
+        for(uint i=0; i<cH.length; i++) {
+            harvestCommands.commands.push(cH[i]);
+        }
+        for(uint i=0; i<sH.length; i++) {
+            harvestCommands.states.push(sH[i]);
+        }
     }
 }
 
@@ -165,6 +210,11 @@ struct Command {
     uint8 outputIndex; // index in the state array where output is written
     address target; // target contract 
 }
+
+// struct InputIndex {
+//     bool isDynamic;
+//     uint8 index;
+// }
 
 contract WeirollReader {
     function translate(bytes calldata command) public pure returns (Command memory c) {
@@ -179,17 +229,34 @@ contract WeirollReader {
         c.outputIndex = uint8(bytes1(command[11:12]));
         c.target = address(bytes20(command[12:32]));
     }
-
+    
+    // TODO in the same array we can have both static and dynamic
     function toByteCommand(
-        string memory functionSig, uint8 callType, uint8[6] memory inputIndexes, uint8 outputIndex, address target
+        string memory functionSig, uint8 callType, bool isDynamic, uint8[6] memory inputIndexes, uint8 outputIndex, address target
     ) public view returns (bytes32 command) {
        bytes memory inputIn;
-       
-       for(uint i=0; i<6; i++){
-        inputIn = abi.encodePacked(
-            inputIn, 
-            bytes1(bytes32(abi.encode(inputIndexes[i])) << 31*8)
-        );
+
+       if(!isDynamic) {
+        for(uint i=0; i<6; i++){
+            inputIn = abi.encodePacked(
+                inputIn, 
+                bytes1(bytes32(abi.encode(inputIndexes[i])) << 31*8)
+            );
+        }
+       } else {
+            for(uint i=0; i<6; i++){
+                uint256 actualNumb;
+                if(inputIndexes[i] == 255) {
+                    actualNumb = inputIndexes[i];
+                } else {
+                    // append 1 and 1 to the MSB cause it's dynamic input
+                    actualNumb = 2**7 + 2**6 + inputIndexes[i];
+                }
+                inputIn = abi.encodePacked(
+                    inputIn, 
+                    bytes1(bytes32(abi.encode(actualNumb)) << 31*8)
+                );
+            }
        }
 
        command = bytes32(abi.encodePacked(
