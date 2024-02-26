@@ -113,8 +113,8 @@ contract AuraCompounderTest is AbstractAdapterTest {
         assets[0].push(IAsset(0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0)); // wstETH
 
         limits[0].push(type(int256).max); // BAL limit
-        limits[0].push(0); // WETH limit
-        limits[0].push(-type(int256).max); // wstETH limit
+        limits[0].push(type(int256).max); // WETH limit
+        limits[0].push(type(int256).max); // wstETH limit
         
         // --------- AURA -> wstETH ---------
         // add AURA -> WETH swap swap
@@ -143,8 +143,8 @@ contract AuraCompounderTest is AbstractAdapterTest {
         assets[1].push(IAsset(0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0)); // wstETH
 
         limits[1].push(type(int256).max); // AURA limit
-        limits[1].push(0); // WETH limit
-        limits[1].push(-type(int256).max); // wstETH limit
+        limits[1].push(type(int256).max); // WETH limit
+        limits[1].push(type(int256).max); // wstETH limit
 
         // --------- Rest of Configuration ---------
 
@@ -238,16 +238,16 @@ contract AuraCompounderTest is AbstractAdapterTest {
         assertGt(adapter.totalAssets(), oldTa);
     }
 
-    // function test__harvest_no_rewards() public {
-    //     _mintAssetAndApproveForAdapter(100e18, bob);
+    function test__harvest_no_rewards() public {
+        _mintAssetAndApproveForAdapter(100e18, bob);
 
-    //     vm.prank(bob);
-    //     adapter.deposit(100e18, bob);
+        vm.prank(bob);
+        adapter.deposit(100e18, bob);
 
-    //     uint256 oldTa = adapter.totalAssets();
+        uint256 oldTa = adapter.totalAssets();
 
-    //     adapter.harvest();
+        adapter.harvest();
 
-    //     assertEq(adapter.totalAssets(), oldTa);
-    // }
+        assertEq(adapter.totalAssets(), oldTa);
+    }
 }
