@@ -217,8 +217,8 @@ contract LeveragedWstETHAdapter is AdapterBase {
 
     // returns current loan to value, debt and collateral (token) amounts
     function _getCurrentLTV() internal view returns (uint256 loanToValue, uint256 debt, uint256 collateral) {
-        debt = debtToken.balanceOf(address(this));
-        collateral = interestToken.balanceOf(address(this));
+        debt = debtToken.balanceOf(address(this)); // ETH DEBT 
+        collateral = IwstETH(asset()).getStETHByWstETH(interestToken.balanceOf(address(this))); // converted into ETH (stETH) amount;
         loanToValue = debt.mulDiv(1e18, collateral, Math.Rounding.Ceil);
     }
 
