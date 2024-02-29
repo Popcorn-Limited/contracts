@@ -19,9 +19,9 @@ contract AuraCompounderTest is AbstractAdapterTest {
     address public auraLpToken;
     uint256 public pid;
 
-    BatchSwapStep[][2] swaps;
-    IAsset[][2] assets;
-    int256[][2] limits;
+    BatchSwapStep[][] swaps;
+    IAsset[][] assets;
+    int256[][] limits;
     uint256[] minTradeAmounts;
     address[] underlyings;
 
@@ -42,11 +42,8 @@ contract AuraCompounderTest is AbstractAdapterTest {
 
     function _setUpTest(bytes memory testConfig) internal {
         (
-            uint256 _pid,
-            address _balVault,
-            bytes32 _balPoolId,
-            address _weth
-        ) = abi.decode(testConfig, (uint256, address, bytes32, address));
+            uint256 _pid,,,
+        ) = abi.decode(testConfig, (uint256, address, bytes32, address[]));
 
         pid = _pid;
 
@@ -86,22 +83,24 @@ contract AuraCompounderTest is AbstractAdapterTest {
         );
 
         // add BAL swap
+        swaps.push();
         swaps[0].push(
-            BatchSwapStep(
+           // trade BAL for WETH 
+           BatchSwapStep(
                 0x5c6ee304399dbdb9c8ef030ab642b10820db8f56000200000000000000000014,
                 0,
                 1,
                 0,
                 ""
             )
-        ); // trade BAL for WETH
-        assets[0].push(IAsset(0xba100000625a3754423978a60c9317c58a424e3D)); // BAL
-        assets[0].push(IAsset(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2)); // WETH
-        limits[0].push(type(int256).max); // BAL limit
-        limits[0].push(-1); // WETH limit
+        );
+        assets.push([IAsset(0xba100000625a3754423978a60c9317c58a424e3D), IAsset(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2)]); // BAL
+        limits.push([type(int).max, type(int).max]);
 
-        // add BAL swap
+        // add AURA swap
+        swaps.push();
         swaps[1].push(
+            // trade AURA for WETH
             BatchSwapStep(
                 0xcfca23ca9ca720b6e98e3eb9b6aa0ffc4a5c08b9000200000000000000000274,
                 0,
@@ -109,20 +108,13 @@ contract AuraCompounderTest is AbstractAdapterTest {
                 0,
                 ""
             )
-        ); // trade AURA for WETH
-        assets[1].push(IAsset(0xC0c293ce456fF0ED870ADd98a0828Dd4d2903DBF)); // AURA
-        assets[1].push(IAsset(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2)); // WETH
-        limits[1].push(type(int256).max); // AURA limit
-        limits[1].push(-1); // WETH limit
+        ); 
+        assets.push([IAsset(0xC0c293ce456fF0ED870ADd98a0828Dd4d2903DBF), IAsset(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2)]); // AURA
+        limits.push([type(int).max, type(int).max]);
 
         // set minTradeAmounts
         minTradeAmounts.push(0);
         minTradeAmounts.push(0);
-
-        // set underlyings
-        underlyings.push(0x596192bB6e41802428Ac943D2f1476C1Af25CC0E); // ezETH
-        underlyings.push(0xbf5495Efe5DB9ce00f80364C8B423567e58d2110); // LP-Token
-        underlyings.push(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2); // WETH
 
         AuraCompounder(address(adapter)).setHarvestValues(
             swaps,
@@ -130,7 +122,6 @@ contract AuraCompounderTest is AbstractAdapterTest {
             limits,
             minTradeAmounts,
             IERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2),
-            underlyings,
             2,
             1,
             2

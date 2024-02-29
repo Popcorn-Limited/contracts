@@ -35,9 +35,6 @@ contract AuraCompounder is AdapterBase, WithRewards {
     address internal balVault;
     bytes32 internal balPoolId;
 
-    address public crv;
-    address public cvx;
-    address public weth;
     address[] internal _rewardToken;
 
     /*//////////////////////////////////////////////////////////////
@@ -65,20 +62,14 @@ contract AuraCompounder is AdapterBase, WithRewards {
             uint256 _pid,
             address _balVault,
             bytes32 _balPoolId,
-            address _weth
-        ) = abi.decode(auraInitData, (uint256, address, bytes32, address));
+            address[] memory _underlyings
+        ) = abi.decode(auraInitData, (uint256, address, bytes32, address[]));
 
         auraBooster = IAuraBooster(registry);
         pid = _pid;
         balVault = _balVault;
         balPoolId = _balPoolId;
-        weth = _weth;
-
-        IAuraStaking auraStaking = IAuraStaking(auraBooster.stakerRewards());
-        crv = auraStaking.crv();
-        _rewardToken.push(crv);
-        cvx = auraStaking.cvx();
-        _rewardToken.push(cvx);
+        underlyings = _underlyings;
 
         (address balancerLpToken, , , address _auraRewards, , ) = auraBooster
             .poolInfo(pid);
@@ -98,9 +89,6 @@ contract AuraCompounder is AdapterBase, WithRewards {
             address(auraBooster),
             type(uint256).max
         );
-        IERC20(crv).approve(_balVault, type(uint256).max);
-        IERC20(cvx).approve(_balVault, type(uint256).max);
-        IERC20(_weth).approve(_balVault, type(uint256).max);
     }
 
     function name()
@@ -235,33 +223,43 @@ contract AuraCompounder is AdapterBase, WithRewards {
     uint256 internal amountsInLen;
 
     function setHarvestValues(
-        BatchSwapStep[][2] memory swaps_,
-        IAsset[][2] memory assets_,
-        int256[][2] memory limits_,
-        uint256[] memory minTradeAmounts_,
+        BatchSwapStep[][] calldata swaps_,
+        IAsset[][] calldata assets_,
+        int256[][] calldata limits_,
+        uint256[] calldata minTradeAmounts_,
         IERC20 baseAsset_,
-        address[] memory underlyings_,
         uint256 indexIn_,
         uint256 indexInUserData_,
         uint256 amountsInLen_
     ) external onlyOwner {
-        _setTradeData(crv, swaps_[0], assets_[0], limits_[0]);
-        _setTradeData(cvx, swaps_[1], assets_[1], limits_[1]);
-
+        delete _rewardToken;
+        for (uint i; i < assets_.length;) {
+            _rewardToken.push(address(assets_[i][0]));
+            _setTradeData(swaps_[i], assets_[i], limits_[i]);
+            IERC20(address(assets_[i][0])).approve(balVault, type(uint).max);
+            unchecked {
+                ++i;
+            }
+        }
+        
+        if (address(baseAsset) != address(0)) {
+            baseAsset.approve(balVault, 0);
+        }
+        baseAsset_.approve(balVault, type(uint).max);
+        
         minTradeAmounts = minTradeAmounts_;
         baseAsset = baseAsset_;
-        underlyings = underlyings_;
         indexIn = indexIn_;
         indexInUserData = indexInUserData_;
         amountsInLen = amountsInLen_;
     }
 
     function _setTradeData(
-        address key,
         BatchSwapStep[] memory swaps_,
         IAsset[] memory assets_,
         int256[] memory limits_
     ) internal {
+        address key = address(assets_[0]);
         delete swaps[key];
 
         uint256 len = swaps_.length;
