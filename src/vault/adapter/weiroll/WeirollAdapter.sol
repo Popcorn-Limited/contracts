@@ -91,7 +91,7 @@ contract WeirollUniversalAdapter is AdapterBase, VM {
         // output is last element of states arrays   
         uint256 indexOut = totalAssetsCommands.states.length - 1;
     
-        bytes[] memory outputState = _executeCommandsView(totalAssetsCommands);
+        bytes[] memory outputState = _executeView(totalAssetsCommands.commands, totalAssetsCommands.states);
         return abi.decode(outputState[indexOut], (uint256));
     }
 
@@ -105,7 +105,7 @@ contract WeirollUniversalAdapter is AdapterBase, VM {
         depositCommands.states[0] = abi.encode(amount); // push amount to state 0
         depositCommands.states[1] = abi.encode(msg.sender); // push sender to state 1 
         
-        _executeCommands(depositCommands);
+        _execute(depositCommands.commands, depositCommands.states);
     }
 
     function _protocolWithdraw(
@@ -115,40 +115,41 @@ contract WeirollUniversalAdapter is AdapterBase, VM {
         withdrawCommands.states[0] = abi.encode(amount); // push amount to state 0
         withdrawCommands.states[1] = abi.encode(msg.sender); // push sender to state 1 
 
-        _executeCommands(withdrawCommands);  
+        _execute(withdrawCommands.commands, withdrawCommands.states);
     }
 
     function harvest() public override takeFees {
-       _executeCommands(harvestCommands);
+        bytes[] memory state = _execute(harvestCommands.commands, harvestCommands.states);
+
     }
 
-    function _executeCommandsView(VmCommand memory commands) internal view returns (bytes[] memory outputState) {
-        bytes32[] memory c = new bytes32[](1);
-        for(uint i=0; i<commands.commands.length; i++) {
-            c[0] = commands.commands[i];
-            if(i==0) {
-                // execute first command with original state 
-                outputState = _executeView(c, commands.states);
-            } else {
-                // execute other commands using output state from prev op
-                outputState = _executeView(c, outputState);
-            }
-        }
-    }
+    // function _executeCommandsView(VmCommand memory commands) internal view returns (bytes[] memory outputState) {
+    //     bytes32[] memory c = new bytes32[](1);
+    //     for(uint i=0; i<commands.commands.length; i++) {
+    //         c[0] = commands.commands[i];
+    //         if(i==0) {
+    //             // execute first command with original state 
+    //             outputState = _executeView(c, commands.states);
+    //         } else {
+    //             // execute other commands using output state from prev op
+    //             outputState = _executeView(c, outputState);
+    //         }
+    //     }
+    // }
 
-    function _executeCommands(VmCommand memory commands) internal returns (bytes[] memory outputState) {
-        bytes32[] memory c = new bytes32[](1);
-        for(uint i=0; i<commands.commands.length; i++) {
-            c[0] = commands.commands[i];
-            if(i==0) {
-                // execute first command with original state 
-                outputState = _execute(c, commands.states);
-            } else {
-                // execute other commands using output state from prev op
-                outputState = _execute(c, outputState);
-            }
-        }
-    }
+    // function _executeCommands(VmCommand memory commands) internal returns (bytes[] memory outputState) {
+    //     bytes32[] memory c = new bytes32[](1);
+    //     for(uint i=0; i<commands.commands.length; i++) {
+    //         c[0] = commands.commands[i];
+    //         if(i==0) {
+    //             // execute first command with original state 
+    //             outputState = _execute(c, commands.states);
+    //         } else {
+    //             // execute other commands using output state from prev op
+    //             outputState = _execute(c, outputState);
+    //         }
+    //     }
+    // }
 
     function _initCommands(bytes memory commands) internal {
          (
@@ -211,10 +212,10 @@ struct Command {
     address target; // target contract 
 }
 
-// struct InputIndex {
-//     bool isDynamic;
-//     uint8 index;
-// }
+struct InputIndex {
+    bool isDynamicArray;
+    uint8 index;
+}
 
 contract WeirollReader {
     function translate(bytes calldata command) public pure returns (Command memory c) {
@@ -232,33 +233,36 @@ contract WeirollReader {
     
     // TODO in the same array we can have both static and dynamic
     function toByteCommand(
-        string memory functionSig, uint8 callType, bool isDynamic, uint8[6] memory inputIndexes, uint8 outputIndex, address target
+        string memory functionSig, uint8 callType, InputIndex[6] memory inputIndexes, uint8 outputIndex, address target
     ) public view returns (bytes32 command) {
        bytes memory inputIn;
 
-       if(!isDynamic) {
         for(uint i=0; i<6; i++){
-            inputIn = abi.encodePacked(
-                inputIn, 
-                bytes1(bytes32(abi.encode(inputIndexes[i])) << 31*8)
-            );
-        }
-       } else {
-            for(uint i=0; i<6; i++){
+            InputIndex memory index = inputIndexes[i];
+            uint256 ind = index.index;
+
+            if(!index.isDynamicArray){
+                inputIn = abi.encodePacked(
+                    inputIn, 
+                    bytes1(bytes32(abi.encode(ind)) << 31*8)
+                );
+            } else {
+                // TODO encode arrays
                 uint256 actualNumb;
-                if(inputIndexes[i] == 255) {
-                    actualNumb = inputIndexes[i];
+                if(ind == 255) {
+                    actualNumb = ind;
                 } else {
                     // append 1 and 1 to the MSB cause it's dynamic input
-                    actualNumb = 2**7 + 2**6 + inputIndexes[i];
+                    actualNumb = 2**6 + ind;
                 }
                 inputIn = abi.encodePacked(
                     inputIn, 
                     bytes1(bytes32(abi.encode(actualNumb)) << 31*8)
                 );
             }
-       }
+        }
 
+       // TODO output index with dynamic output variable 
        command = bytes32(abi.encodePacked(
             bytes4(keccak256(abi.encodePacked(functionSig))),
             bytes1(callType),
@@ -268,3 +272,18 @@ contract WeirollReader {
         );
     }
 }
+
+// contract MockTarget {
+//     function tryOut(uint256[] memory test, uint256 val) public {
+//         console.log(test[0]);
+//                 console.log(test[1]);
+//         console.log(test[2]);
+//         console.log(test[3]);
+//         console.log(test[4]);
+//         console.log(val);
+//     }
+
+//     fallback() external{
+//         console.log("FALL");
+//     }
+// }
