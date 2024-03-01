@@ -31,6 +31,9 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
     // ILendingPool lendingPool = ILendingPool(0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2); // aave 
     ILendingPool lendingPool = ILendingPool(0xC13e21B648A5Ee794902342038FF3aDAB66BE987); // spark 
 
+    // address aaveDataProvider = address(0x7B4EB56E7CD4b454BA8ff71E4518426369a138a3); //aave
+    address aaveDataProvider = address(0xFc21d6d146E6086B8359705C8b28512a983db0cb); //spark
+
     LeveragedWstETHAdapter adapterContract;
 
     function setUp() public {
@@ -74,7 +77,7 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
 
         adapter.initialize(
             abi.encode(asset, address(this), address(0), 0, sigs, ""),
-            address(lendingPool),
+            aaveDataProvider,
             testConfig
         );
 
@@ -116,7 +119,7 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
     function test_depositAndLeverage() public {
         uint256 amountMint = 10e18;
         uint256 amountDeposit = 1e18;
-        uint256 amountDebt = 1e17;
+        uint256 amountDebt = 6e17;
 
         deal(address(asset), bob, amountMint);
 
@@ -165,7 +168,7 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
         assertEq(
             IERC20Metadata(address(adapter)).name(),
             string.concat(
-                "VaultCraft Leveraged wstETH ",
+                "VaultCraft Leveraged ",
                 IERC20Metadata(address(asset)).name(),
                 " Adapter"
             ),
@@ -173,7 +176,7 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
         );
         assertEq(
             IERC20Metadata(address(adapter)).symbol(),
-            string.concat("vcwstETH-", IERC20Metadata(address(asset)).symbol()),
+            string.concat("vc-", IERC20Metadata(address(asset)).symbol()),
             "symbol"
         );
 
