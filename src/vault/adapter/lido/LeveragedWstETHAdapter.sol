@@ -13,7 +13,7 @@ import {ILendingPool, IAaveIncentives, IAToken, IProtocolDataProvider, DataTypes
 /// @title Leveraged wstETH yield adapter
 /// @author Andrea Di Nenno
 /// @notice ERC4626 wrapper for leveraging stETH yield 
-/// @dev The strategy takes ETH and deposits it into a lending protocol. 
+/// @dev The strategy takes ETH and deposits it into a lending protocol (aave). 
 /// Then it borrows ETH, swap for wstETH and redeposits it
 contract LeveragedWstETHAdapter is AdapterBase {
     // using FixedPointMathLib for uint256;
@@ -24,7 +24,7 @@ contract LeveragedWstETHAdapter is AdapterBase {
     string internal _symbol;
 
     // address of the aave/spark router
-    ILendingPool public aaveRouter;
+    ILendingPool public lendingPoolRouter;
 
     IERC20 public debtToken; // aave eth debt token
     IERC20 public interestToken; // aave awstETH
@@ -37,7 +37,8 @@ contract LeveragedWstETHAdapter is AdapterBase {
     uint256 public slippage; // 1e18 = 100% slippage, 1e14 = 1 BPS slippage
     IWETH public weth;
 
-    uint256 public targetLTV;
+    uint256 public targetLTV; // in 18 decimals - 1e17 being 0.1%
+    bool firsDeposit; 
 
     /*//////////////////////////////////////////////////////////////
                                 INITIALIZATION
@@ -54,27 +55,27 @@ contract LeveragedWstETHAdapter is AdapterBase {
      */
     function initialize(
         bytes memory adapterInitData,
-        address _aaveRouter,
+        address _lendingPoolRouter,
         bytes memory _initData
     ) public initializer {
         __AdapterBase_init(adapterInitData);
 
-        (address _wETH, uint256 _slippage, uint256 _targetLTV) = abi.decode(
+        (address _wETH, address _vdWETH, uint256 _slippage, uint256 _targetLTV) = abi.decode(
             _initData,
-            (address, uint256, uint256)
+            (address, address, uint256, uint256)
         );
 
         targetLTV = _targetLTV;
         slippage = _slippage;
-        aaveRouter = ILendingPool(_aaveRouter);
+        lendingPoolRouter = ILendingPool(_lendingPoolRouter);
         weth = IWETH(_wETH);
+        firsDeposit = true;
 
         // retrieve asset relative debt token and interest token
         address baseAsset = asset();
-        DataTypes.ReserveData memory poolData = aaveRouter.getReserveData(baseAsset);
-        debtToken = IERC20(poolData.variableDebtTokenAddress);
+        DataTypes.ReserveData2 memory poolData = lendingPoolRouter.getReserveData(baseAsset);
         interestToken = IERC20(poolData.aTokenAddress);
-        
+        debtToken = IERC20(_vdWETH); // variable debt WETH token
 
         _name = string.concat(
             "VaultCraft Leveraged wstETH ",
@@ -87,7 +88,7 @@ contract LeveragedWstETHAdapter is AdapterBase {
         );
 
         // approve aave router to pull wstETH
-        IERC20(baseAsset).approve(address(aaveRouter), type(uint256).max);
+        IERC20(baseAsset).approve(address(lendingPoolRouter), type(uint256).max);
     }
 
     receive() external payable {}
@@ -108,6 +109,10 @@ contract LeveragedWstETHAdapter is AdapterBase {
         returns (string memory)
     {
         return _symbol;
+    }
+
+    function getLTV() public view returns (uint256 ltv) {
+        (ltv,,) = _getCurrentLTV();
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -135,6 +140,7 @@ contract LeveragedWstETHAdapter is AdapterBase {
         //         );
     }
 
+    // amount of WETH to borrow OR amount of WETH to repay (converted into wstETH amount internally)
     function adjustLeverage(uint256 amount) external onlyOwner {
         // get vault current leverage : debt/collateral
         (uint256 currentLTV, uint256 currentDebt, uint256 currentCollateral) = _getCurrentLTV();
@@ -159,7 +165,7 @@ contract LeveragedWstETHAdapter is AdapterBase {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Deposit wstETH into lending protocol
-    function _protocolDeposit(uint256 assets, uint256) internal override {        
+    function _protocolDeposit(uint256 assets, uint256) internal override {    
         // deposit wstETH into aave - receive aToken here        
         _depositwstETH(asset(), assets);
     }
@@ -198,18 +204,23 @@ contract LeveragedWstETHAdapter is AdapterBase {
     }
 
     // reduce leverage by withdrawing wstETH, swapping to ETH repaying ETH debt
-    // check if can be paid with collateral direclty
+    // repayAmount is a ETH (wETH) amount
     function _reduceLeverage(uint256 repayAmount) internal {
         address asset = asset();
 
+        // get amount of wstETH
+        uint256 amountWstETH = IwstETH(asset).getWstETHByStETH(repayAmount);
+
         // withdraw wstETH from aave
-        aaveRouter.withdraw(asset, repayAmount, address(this));
+        lendingPoolRouter.withdraw(asset, amountWstETH, address(this));
 
         // unwrap wstETH into stETH
-        uint256 stETHAmount = IwstETH(asset).unwrap(repayAmount);
+        uint256 stETHAmount = IwstETH(asset).unwrap(amountWstETH);
         
         // swap stETH for ETH and deposit into WETH
         uint256 WETHAmount = _swapToWETH(stETHAmount);
+
+        // assert.equal(WETHAmount, repayAmount) ? TODO
 
         // repay WETH debt 
         _repayDebt(WETHAmount);
@@ -219,22 +230,29 @@ contract LeveragedWstETHAdapter is AdapterBase {
     function _getCurrentLTV() internal view returns (uint256 loanToValue, uint256 debt, uint256 collateral) {
         debt = debtToken.balanceOf(address(this)); // ETH DEBT 
         collateral = IwstETH(asset()).getStETHByWstETH(interestToken.balanceOf(address(this))); // converted into ETH (stETH) amount;
-        loanToValue = debt.mulDiv(1e18, collateral, Math.Rounding.Ceil);
+
+        (debt == 0 || collateral == 0) ? loanToValue = 0 : loanToValue = debt.mulDiv(1e18, collateral, Math.Rounding.Ceil);
     }
 
     // deposit wstETH into lending protocol
     function _depositwstETH(address asset, uint256 amount) internal {
-        aaveRouter.supply(asset, amount, address(this), 0);
+        lendingPoolRouter.supply(asset, amount, address(this), 0);
+
+        if(firsDeposit) {
+            // enable wstETH as collateral 
+            lendingPoolRouter.setUserUseReserveAsCollateral(asset, true);
+            firsDeposit = false;
+        }
     }
 
     // borrow WETH from lending protocol
     function _borrowETH(uint256 amount) internal {
-        aaveRouter.borrow(address(weth), amount, 0, 0, address(this));
+        lendingPoolRouter.borrow(address(weth), amount, 2, 0, address(this));
     }
              
     // repay WETH debt 
     function _repayDebt(uint256 amount) internal {
-        aaveRouter.repay(address(weth), amount, 0, address(this));
+        lendingPoolRouter.repay(address(weth), amount, 2, address(this));
     }
 
     // swaps stETH to WETH 
