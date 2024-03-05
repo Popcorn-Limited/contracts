@@ -3,7 +3,7 @@ pragma solidity ^0.8.15;
 
 import {Test} from "forge-std/Test.sol";
 
-import {AuraCompounder, SafeERC20, IERC20, IERC20Metadata, Math, IAuraBooster, IAuraRewards, IAuraStaking, IStrategy, IAdapter, IWithRewards, IAsset, BatchSwapStep} from "../../../../src/vault/adapter/aura/AuraCompounder.sol";
+import {AuraCompounder, SafeERC20, IERC20, IERC20Metadata, Math, IAuraBooster, IAuraRewards, IAuraStaking, IStrategy, IAdapter, IWithRewards, IAsset, BatchSwapStep} from "../../../../src/vault/adapter/aura/AuraCompounderVEC.sol";
 import {AuraCompounderTestConfigStorage, AuraCompounderTestConfig} from "./AuraCompounderTestConfigStorage.sol";
 import {AbstractAdapterTest, ITestConfigStorage} from "../abstract/AbstractAdapterTest.sol";
 import {MockStrategyClaimer} from "../../../utils/mocks/MockStrategyClaimer.sol";
@@ -196,16 +196,39 @@ contract AuraCompounderTest is AbstractAdapterTest {
         assertGt(adapter.totalAssets(), oldTa);
     }
 
-    // function test__harvest_no_rewards() public {
-    //     _mintAssetAndApproveForAdapter(100e18, bob);
+    function test__harvest_no_rewards() public {
+        _mintAssetAndApproveForAdapter(100e18, bob);
 
-    //     vm.prank(bob);
-    //     adapter.deposit(100e18, bob);
+        vm.prank(bob);
+        adapter.deposit(100e18, bob);
 
-    //     uint256 oldTa = adapter.totalAssets();
+        uint256 oldTa = adapter.totalAssets();
 
-    //     adapter.harvest();
+        adapter.harvest();
 
-    //     assertEq(adapter.totalAssets(), oldTa);
-    // }
+        assertEq(adapter.totalAssets(), oldTa);
+    }
+
+    function test__recover() public {
+        _mintAssetAndApproveForAdapter(10000e18, bob);
+
+        vm.prank(bob);
+        adapter.deposit(10000e18, bob);
+
+        uint256 oldTa = adapter.totalAssets();
+
+        vm.roll(block.number + 100);
+        vm.warp(block.timestamp + 1500);
+
+        AuraCompounder(address(adapter)).claim();
+
+        emit log_uint(IERC20(0xba100000625a3754423978a60c9317c58a424e3D).balanceOf(address(adapter)));
+        emit log_uint(IERC20(0xC0c293ce456fF0ED870ADd98a0828Dd4d2903DBF).balanceOf(address(adapter)));
+        emit log_uint(IERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2).balanceOf(address(adapter)));
+        emit log_uint(IERC20(0x1BB9b64927e0C5e207C9DB4093b3738Eef5D8447).balanceOf(address(adapter)));
+
+        AuraCompounder(address(adapter)).recoverToken(0x1BB9b64927e0C5e207C9DB4093b3738Eef5D8447,address(this));
+
+        assertGt(IERC20(0x1BB9b64927e0C5e207C9DB4093b3738Eef5D8447).balanceOf(address(this)), 0);
+    }
 }
