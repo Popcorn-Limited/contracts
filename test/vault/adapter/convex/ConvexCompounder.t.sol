@@ -37,7 +37,7 @@ contract ConvexCompounderTest is AbstractAdapterTest {
     }
 
     function _setUpTest(bytes memory testConfig) internal {
-        uint256 _pid = abi.decode(testConfig, (uint256));
+        (uint256 _pid,,) = abi.decode(testConfig, (uint256, address, address));
         pid = _pid;
 
         (address _asset, , , address _convexRewards, , ) = convexBooster
