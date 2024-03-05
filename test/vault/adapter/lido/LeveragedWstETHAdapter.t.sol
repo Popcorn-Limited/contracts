@@ -119,7 +119,8 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
     function test_depositAndLeverage() public {
         uint256 amountMint = 10e18;
         uint256 amountDeposit = 1e18;
-        uint256 amountDebt = 6e17;
+        uint256 amountDebt = 1e18;
+        uint256 amountWithdraw = 1e17;
 
         deal(address(asset), bob, amountMint);
 
@@ -156,6 +157,15 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
         assertGt(adapterContract.getLTV(), 0);
 
         // LTV is not greater than target LTV
+        assertGt(adapterContract.targetLTV(), adapterContract.getLTV());
+
+        // repay 
+        vm.prank(bob);
+        adapter.withdraw(amountWithdraw,bob,bob);
+
+        // console.log(adapterContract.targetLTV(), adapterContract.getLTV());
+        // console.log(wstETH.balanceOf(address(adapter)));
+
         assertGt(adapterContract.targetLTV(), adapterContract.getLTV());
     }
 
