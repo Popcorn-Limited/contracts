@@ -160,23 +160,24 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
     }
 
     // amount of WETH to borrow OR amount of WETH to repay (converted into wstETH amount internally)
-    function adjustLeverage(uint256 amount) external onlyOwner {
+    function adjustLeverage() external {
         // get vault current leverage : debt/collateral
         (uint256 currentLTV, uint256 currentDebt, uint256 currentCollateral) = _getCurrentLTV();
+        uint256 amountETH = (targetLTV * currentCollateral - currentDebt) / (1e18 - targetLTV);
 
         // de-leverage if vault LTV is higher than target
         if (currentLTV > targetLTV) {
             // require that the update gets the vault LTV back below target leverage
-            require((currentDebt - amount).mulDiv(1e18, (currentCollateral - amount), Math.Rounding.Ceil) < targetLTV, 'Too little');
+            require((currentDebt - amountETH).mulDiv(1e18, (currentCollateral - amountETH), Math.Rounding.Ceil) <= targetLTV, 'Too little');
 
             // flash loan eth to repay part of the debt
-            _flashLoanETH(amount, 0, 0);
+            _flashLoanETH(amountETH, 0, 0);
         } else {
             // require that the update doesn't get the vault above target leverage
-            require((currentDebt + amount).mulDiv(1e18, (currentCollateral + amount), Math.Rounding.Ceil) < targetLTV, 'Too much');
+            require((currentDebt + amountETH).mulDiv(1e18, (currentCollateral + amountETH), Math.Rounding.Ceil) <= targetLTV, 'Too much');
 
             // flash loan WETH from lending protocol and add to cdp
-            _flashLoanETH(amount, 0, 2);
+            _flashLoanETH(amountETH, 0, 2);
         }
     }
 
