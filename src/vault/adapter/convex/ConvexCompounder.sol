@@ -54,29 +54,29 @@ contract ConvexCompounder is AdapterBase, WithRewards {
         address registry,
         bytes memory convexInitData
     ) external initializer {
-        uint256 _pid = abi.decode(convexInitData, (uint256));
+        (uint256 _pid, address _curvePool, address _curveLpToken) = abi.decode(convexInitData, (uint256, address, address));
 
-        (address _asset, , , address _convexRewards, , ) = IConvexBooster(
+        (, , , address _convexRewards, , ) = IConvexBooster(
             registry
         ).poolInfo(_pid);
 
         convexBooster = IConvexBooster(registry);
         convexRewards = IConvexRewards(_convexRewards);
         pid = _pid;
-        nCoins = ICurveLp(_asset).N_COINS();
+        nCoins = ICurveLp(_curvePool).N_COINS();
 
         __AdapterBase_init(adapterInitData);
 
-        if (_asset != asset()) revert AssetMismatch();
+        if (_curveLpToken != asset()) revert AssetMismatch();
 
         _name = string.concat(
             "VaultCraft Convex ",
-            IERC20Metadata(_asset).name(),
+            IERC20Metadata(_curveLpToken).name(),
             " Adapter"
         );
-        _symbol = string.concat("vcCvx-", IERC20Metadata(_asset).symbol());
+        _symbol = string.concat("vcCvx-", IERC20Metadata(_curveLpToken).symbol());
 
-        IERC20(_asset).approve(registry, type(uint256).max);
+        IERC20(_curveLpToken).approve(registry, type(uint256).max);
     }
 
     function name()

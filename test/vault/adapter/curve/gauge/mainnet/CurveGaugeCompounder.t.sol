@@ -31,9 +31,9 @@ contract CurveGaugeCompounderTest is AbstractAdapterTest {
     }
 
     function _setUpTest(bytes memory testConfig) internal {
-        (address _asset, address _gauge) = abi.decode(
+        (address _asset, address _gauge, address _pool) = abi.decode(
             testConfigStorage.getTestConfig(0),
-            (address, address)
+            (address, address, address)
         );
 
         gauge = _gauge;
@@ -50,7 +50,7 @@ contract CurveGaugeCompounderTest is AbstractAdapterTest {
         adapter.initialize(
             abi.encode(asset, address(this), strategy, 0, sigs, ""),
             externalRegistry,
-            abi.encode(_gauge)
+            abi.encode(_gauge, _pool)
         );
 
         address[] memory rewardTokens = new address[](1);
@@ -140,11 +140,10 @@ contract CurveGaugeCompounderTest is AbstractAdapterTest {
 
     function test__initialization() public override {
         createAdapter();
-        uint256 callTime = block.timestamp;
 
-        (address _asset, address _gauge) = abi.decode(
+        (address _asset, address _gauge, address _pool) = abi.decode(
             testConfigStorage.getTestConfig(0),
-            (address, address)
+            (address, address, address)
         );
 
         vm.expectEmit(false, false, false, true, address(adapter));
@@ -152,7 +151,7 @@ contract CurveGaugeCompounderTest is AbstractAdapterTest {
         adapter.initialize(
             abi.encode(_asset, address(this), strategy, 0, sigs, ""),
             externalRegistry,
-            abi.encode(_gauge)
+            abi.encode(_gauge, _pool)
         );
 
         assertEq(adapter.owner(), address(this), "owner");

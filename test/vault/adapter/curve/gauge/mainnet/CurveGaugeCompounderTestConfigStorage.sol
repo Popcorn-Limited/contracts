@@ -8,6 +8,7 @@ import {ITestConfigStorage} from "../../../abstract/ITestConfigStorage.sol";
 struct CurveGaugeCompounderTestConfig {
     address asset;
     address gauge;
+    address pool;
 }
 
 contract CurveGaugeCompounderTestConfigStorage is ITestConfigStorage {
@@ -18,13 +19,14 @@ contract CurveGaugeCompounderTestConfigStorage is ITestConfigStorage {
         testConfigs.push(
             CurveGaugeCompounderTestConfig(
                 0x625E92624Bc2D88619ACCc1788365A69767f6200,
-                0xf69Fb60B79E463384b40dbFDFB633AB5a863C9A2
+                0xf69Fb60B79E463384b40dbFDFB633AB5a863C9A2,
+                0x625E92624Bc2D88619ACCc1788365A69767f6200
             )
         );
     }
 
     function getTestConfig(uint256 i) public view returns (bytes memory) {
-        return abi.encode(testConfigs[i].asset, testConfigs[i].gauge);
+        return abi.encode(testConfigs[i].asset, testConfigs[i].gauge, testConfigs[i].pool);
     }
 
     function getTestConfigLength() public view returns (uint256) {
