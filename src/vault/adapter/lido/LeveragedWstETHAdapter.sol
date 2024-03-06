@@ -163,18 +163,21 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
     function adjustLeverage() external {
         // get vault current leverage : debt/collateral
         (uint256 currentLTV, uint256 currentDebt, uint256 currentCollateral) = _getCurrentLTV();
-        uint256 amountETH = (targetLTV * currentCollateral - currentDebt) / (1e18 - targetLTV);
 
         // de-leverage if vault LTV is higher than target
         if (currentLTV > targetLTV) {
+            uint256 amountETH = (currentDebt - (targetLTV.mulDiv((currentCollateral), 1e18, Math.Rounding.Ceil))).mulDiv(1e18, (1e18 - targetLTV), Math.Rounding.Ceil);
+
             // require that the update gets the vault LTV back below target leverage
-            require((currentDebt - amountETH).mulDiv(1e18, (currentCollateral - amountETH), Math.Rounding.Ceil) <= targetLTV, 'Too little');
+            require((currentDebt - amountETH).mulDiv(1e18, (currentCollateral - amountETH), Math.Rounding.Floor) <= targetLTV, 'Too little');
 
             // flash loan eth to repay part of the debt
             _flashLoanETH(amountETH, 0, 0);
         } else {
+            uint256 amountETH = (targetLTV * currentCollateral - currentDebt) / (1e18 - targetLTV);
+
             // require that the update doesn't get the vault above target leverage
-            require((currentDebt + amountETH).mulDiv(1e18, (currentCollateral + amountETH), Math.Rounding.Ceil) <= targetLTV, 'Too much');
+            require((currentDebt + amountETH).mulDiv(1e18, (currentCollateral + amountETH), Math.Rounding.Floor) <= targetLTV, 'Too much');
 
             // flash loan WETH from lending protocol and add to cdp
             _flashLoanETH(amountETH, 0, 2);
@@ -239,9 +242,10 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
     ) internal override {
         (, uint256 currentDebt, uint256 currentCollateral) = _getCurrentLTV();
        
-        // repay a portion of debt proportional to collateral to withdraw
-        uint256 debtToRepay = assets.mulDiv(currentDebt, currentCollateral, Math.Rounding.Ceil);
-        
+        // repay a portion of debt to bring vault LTV to target
+        uint256 ethAssetsValue = IwstETH(asset()).getStETHByWstETH(assets);
+        uint256 debtToRepay = currentDebt - (targetLTV.mulDiv((currentCollateral - ethAssetsValue), 1e18, Math.Rounding.Ceil));
+
         // flash loan debtToRepay - mode 0 - flash loan is repaid at the end
         _flashLoanETH(debtToRepay, assets, 0);
     }
@@ -272,7 +276,7 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
         // get flash loan amount of wstETH 
         uint256 flashLoanWstETHAmount = IwstETH(asset).getWstETHByStETH(flashLoanDebt);
 
-        // apply slippage 
+        // add slippage buffer for swapping with flashLoanDebt min amount out
         uint256 wstETHBuffer = flashLoanWstETHAmount.mulDiv(slippage, 1e18, Math.Rounding.Ceil);
 
         // withdraw wstETH from aave

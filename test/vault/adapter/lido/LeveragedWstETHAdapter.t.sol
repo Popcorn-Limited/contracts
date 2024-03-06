@@ -37,8 +37,7 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
     LeveragedWstETHAdapter adapterContract;
 
     function setUp() public {
-        uint256 forkId = vm.createSelectFork(vm.rpcUrl("mainnet"));
-        //        vm.rollFork(16812240);
+        uint256 forkId = vm.createSelectFork(vm.rpcUrl("mainnet"), 19333540);
         vm.selectFork(forkId);
 
         testConfigStorage = ITestConfigStorage(
@@ -119,7 +118,6 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
     function test_depositAndLeverage() public {
         uint256 amountMint = 10e18;
         uint256 amountDeposit = 1e18;
-        uint256 amountDebt = 1e18;
         uint256 amountWithdraw = 1e17;
 
         deal(address(asset), bob, amountMint);
@@ -142,7 +140,7 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
         assertEq(adapterContract.getLTV(), 0);
 
         // HARVEST - trigger leverage loop
-        adapterContract.adjustLeverage(amountDebt);
+        adapterContract.adjustLeverage();
 
         // wstETH should be in lending market 
         assertEq(wstETH.balanceOf(address(adapter)), 0);  
@@ -150,23 +148,30 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
         // adapter should now have more wstETH aToken than before
         assertGt(awstETH.balanceOf(address(adapter)), amountDeposit);
 
-        // adapter should hold amountDebt debt tokens
-        assertEq(vdWETH.balanceOf(address(adapter)), amountDebt);
+        // adapter should hold debt tokens
+        assertGt(vdWETH.balanceOf(address(adapter)), 0);
         
         // LTV is non zero now
         assertGt(adapterContract.getLTV(), 0);
 
-        // LTV is not greater than target LTV
-        assertGt(adapterContract.targetLTV(), adapterContract.getLTV());
+        // LTV is at target
+        assertEq(adapterContract.targetLTV(), adapterContract.getLTV());
 
         // repay 
         vm.prank(bob);
         adapter.withdraw(amountWithdraw,bob,bob);
 
-        // console.log(adapterContract.targetLTV(), adapterContract.getLTV());
-        // console.log(wstETH.balanceOf(address(adapter)));
+        // after withdraw, vault ltv is a bit higher than target, considering the anti slipage amount witdrawn
+        assertGt(adapterContract.getLTV(), adapterContract.targetLTV());
 
-        assertGt(adapterContract.targetLTV(), adapterContract.getLTV());
+        // HARVEST - should reduce leverage back to target
+        adapterContract.adjustLeverage();
+
+        assertEq(adapterContract.targetLTV(), adapterContract.getLTV());
+
+        adapterContract.adjustLeverage();
+
+        assertEq(adapterContract.targetLTV(), adapterContract.getLTV());
     }
 
     /*//////////////////////////////////////////////////////////////
