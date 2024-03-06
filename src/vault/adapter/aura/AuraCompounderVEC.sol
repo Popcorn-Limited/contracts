@@ -281,7 +281,7 @@ contract AuraCompounder is AdapterBase, WithRewards {
         for (uint256 i=0; i < _rewardToken.length; i++) {
             if(_rewardToken[i] == token) revert NoAssets();
         }
-        IERC20(token).transfer(recipient,IERC20(token).balanceOf(address(this)));
+        IERC20(token).safeTransfer(recipient, IERC20(token).balanceOf(address(this)));
     }
 
     /*//////////////////////////////////////////////////////////////

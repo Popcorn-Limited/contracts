@@ -14,14 +14,14 @@ contract AuraCompounderTestConfigStorage is ITestConfigStorage {
 
     constructor() {
         address[] memory underlyings = new address[](3);
-        underlyings[0] = 0x596192bB6e41802428Ac943D2f1476C1Af25CC0E;
-        underlyings[1] = 0xbf5495Efe5DB9ce00f80364C8B423567e58d2110;
-        underlyings[2] = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
+        underlyings[0] = 0x6733F0283711F225A447e759D859a70b0c0Fd2bC;
+        underlyings[1] = 0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0;
+        underlyings[2] = 0xdEdb11A6a23263469567C2881A9b9F8629eE0041;
         testConfigs.push(
             AuraCompounderTestConfig(
-                189,
+                196,
                 0xBA12222222228d8Ba445958a75a0704d566BF2C8,
-                0x596192bb6e41802428ac943d2f1476c1af25cc0e000000000000000000000659,
+                0xdedb11a6a23263469567c2881a9b9f8629ee0041000000000000000000000669,
                 underlyings
             )
         );
