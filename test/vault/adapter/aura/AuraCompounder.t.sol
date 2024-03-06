@@ -260,5 +260,16 @@ contract AuraCompounderTest is AbstractAdapterTest {
         AuraCompounder(address(adapter)).recoverToken(0x1BB9b64927e0C5e207C9DB4093b3738Eef5D8447,address(this));
 
         assertGt(IERC20(0x1BB9b64927e0C5e207C9DB4093b3738Eef5D8447).balanceOf(address(this)), 0);
+
+        // simulate manual compound
+        deal(0xdEdb11A6a23263469567C2881A9b9F8629eE0041, address(this), 100e18);
+        
+        IERC20(0xdEdb11A6a23263469567C2881A9b9F8629eE0041).approve(address(auraBooster),100e18);
+        auraBooster.deposit(196, 100e18, false);
+
+        IERC20(auraLpToken).approve(address(auraRewards),100e18);
+        auraRewards.stakeFor(address(adapter),100e18);
+
+        assertGt(adapter.totalAssets(), oldTa);
     }
 }
