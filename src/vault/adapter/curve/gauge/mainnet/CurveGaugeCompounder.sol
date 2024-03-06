@@ -22,6 +22,7 @@ contract CurveGaugeCompounder is AdapterBase, WithRewards {
     string internal _symbol;
 
     IMinter internal minter;
+    ICurveLp public pool;
     IGauge public gauge;
     uint256 internal nCoins;
 
@@ -38,12 +39,13 @@ contract CurveGaugeCompounder is AdapterBase, WithRewards {
     ) external initializer {
         __AdapterBase_init(adapterInitData);
 
-        address _gauge = abi.decode(curveInitData, (address));
+        (address _gauge, address _pool) = abi.decode(curveInitData, (address, address));
 
         minter = IMinter(registry);
         gauge = IGauge(_gauge);
+        pool = ICurveLp(_pool);
 
-        nCoins = ICurveLp(asset()).N_COINS();
+        nCoins = pool.N_COINS();
 
         _name = string.concat(
             "VaultCraft CurveGaugeCompounder ",
@@ -131,12 +133,13 @@ contract CurveGaugeCompounder is AdapterBase, WithRewards {
             swaps[rewardTokens_[i]] = swaps_[i];
         }
 
-        address asset_ = asset();
-        address depositAsset_ = ICurveLp(asset_).coins(
+        ICurveLp _pool = pool;
+        address depositAsset_ = _pool.coins(
             uint256(uint128(indexIn_))
         );
-        if (depositAsset != address(0)) IERC20(depositAsset).approve(asset_, 0);
-        IERC20(depositAsset_).approve(asset_, type(uint256).max);
+
+        if (depositAsset != address(0)) IERC20(depositAsset).approve(address(_pool), 0);
+        IERC20(depositAsset_).approve(address(_pool), type(uint256).max);
 
         depositAsset = depositAsset_;
         indexIn = indexIn_;
@@ -185,10 +188,9 @@ contract CurveGaugeCompounder is AdapterBase, WithRewards {
                 uint256[] memory amounts = new uint256[](nCoins);
                 amounts[uint256(uint128(indexIn))] = amount;
 
+                ICurveLp(pool).add_liquidity(amounts, 0);
+
                 address asset_ = asset();
-
-                ICurveLp(asset_).add_liquidity(amounts, 0);
-
                 _protocolDeposit(IERC20(asset_).balanceOf(address(this)), 0);
             }
 
