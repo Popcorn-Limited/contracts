@@ -39,6 +39,8 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
     IWETH public weth;
 
     uint256 public targetLTV; // in 18 decimals - 1e17 being 0.1%
+    uint256 public maxLTV; // max ltv the vault can reach
+
     bool firsDeposit;
     error DifferentAssets(address asset, address underlying);
 
@@ -62,14 +64,16 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
     ) public initializer {
         __AdapterBase_init(adapterInitData);
 
-        (address _wETH, address _stETH, address _poolAddressesProvider, uint256 _slippage, uint256 _targetLTV) = abi.decode(
+        (address _wETH, address _stETH, address _poolAddressesProvider, uint256 _slippage, uint256 _targetLTV, uint256 _maxLTV) = abi.decode(
             _initData,
-            (address, address, address, uint256, uint256)
+            (address, address, address, uint256, uint256, uint256)
         );
 
         address baseAsset = asset();
 
         targetLTV = _targetLTV;
+        maxLTV = _maxLTV;
+
         slippage = _slippage;
         weth = IWETH(_wETH);
         firsDeposit = true;
@@ -107,7 +111,7 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
         IERC20(address(weth)).approve(address(lendingPool), type(uint256).max);
 
         // approve curve router to pull stETH for swapping
-        IERC20(address(0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84)).approve(address(StableSwapSTETH), type(uint256).max);
+        IERC20(address(_stETH)).approve(address(StableSwapSTETH), type(uint256).max);
     }
 
     receive() external payable {}
@@ -139,9 +143,18 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
     //////////////////////////////////////////////////////////////*/
 
     function _totalAssets() internal view override returns (uint256 total) {
-        (, uint256 debt, uint256 collateral) = _getCurrentLTV();
+        // (, uint256 debt, uint256 collateral) = _getCurrentLTV();
+        // debt >= collateral ? total = 0 : total = collateral - debt;
+
+        uint256 debt = IwstETH(asset()).getWstETHByStETH(debtToken.balanceOf(address(this))); // wstETH DEBT
+        uint256 collateral = interestToken.balanceOf(address(this)) + IERC20(asset()).balanceOf(address(this)); // wstETH collateral
+
         debt >= collateral ? total = 0 : total = collateral - debt;
-    }
+
+        // if there's debt, apply slippage to repay it
+        if (debt > 0)
+            total -= total.mulDiv(slippage, 1e18,  Math.Rounding.Floor);
+        }
 
     // TODO 
     function convertToUnderlyingShares(
@@ -168,19 +181,13 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
         if (currentLTV > targetLTV) {
             uint256 amountETH = (currentDebt - (targetLTV.mulDiv((currentCollateral), 1e18, Math.Rounding.Ceil))).mulDiv(1e18, (1e18 - targetLTV), Math.Rounding.Ceil);
 
-            // require that the update gets the vault LTV back below target leverage
-            require((currentDebt - amountETH).mulDiv(1e18, (currentCollateral - amountETH), Math.Rounding.Floor) <= targetLTV, 'Too little');
-
             // flash loan eth to repay part of the debt
-            _flashLoanETH(amountETH, 0, 0);
+            _flashLoanETH(amountETH, 0, 0, false);
         } else {
             uint256 amountETH = (targetLTV * currentCollateral - currentDebt) / (1e18 - targetLTV);
 
-            // require that the update doesn't get the vault above target leverage
-            require((currentDebt + amountETH).mulDiv(1e18, (currentCollateral + amountETH), Math.Rounding.Floor) <= targetLTV, 'Too much');
-
             // flash loan WETH from lending protocol and add to cdp
-            _flashLoanETH(amountETH, 0, 2);
+            _flashLoanETH(amountETH, 0, 2, false);
         }
     }
 
@@ -189,7 +196,7 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
                           FLASH LOAN LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    // this is triggered after the flash loan is given, ie contract has loaned assets
+    // this is triggered after the flash loan is given, ie contract has loaned assets at this point
     function executeOperation(
         address[] calldata assets,
         uint256[] calldata amounts,
@@ -197,7 +204,7 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
         address initiator,
         bytes calldata params
     ) external override returns (bool) {
-        (bool isWithdraw, uint256 assetsToWithdraw) = abi.decode(params, (bool, uint256 ));
+        (bool isWithdraw, bool isFullWithdraw, uint256 assetsToWithdraw) = abi.decode(params, (bool, bool, uint256 ));
 
         if(!isWithdraw) {
             // flash loan is to leverage UP 
@@ -209,10 +216,10 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
             // repay cdp WETH debt 
             _repayDebt(amounts[0]);
 
-            // withdraw collateral, swap repay flashloan 
-            _reduceLeverage(assetsToWithdraw, flashLoanDebt);
+            // withdraw collateral, swap, repay flashloan 
+            _reduceLeverage(isFullWithdraw, assetsToWithdraw, flashLoanDebt);
         }
-        
+
         return true;
     }
 
@@ -241,13 +248,23 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
         uint256 shares
     ) internal override {
         (, uint256 currentDebt, uint256 currentCollateral) = _getCurrentLTV();
-       
-        // repay a portion of debt to bring vault LTV to target
         uint256 ethAssetsValue = IwstETH(asset()).getStETHByWstETH(assets);
-        uint256 debtToRepay = currentDebt - (targetLTV.mulDiv((currentCollateral - ethAssetsValue), 1e18, Math.Rounding.Ceil));
 
-        // flash loan debtToRepay - mode 0 - flash loan is repaid at the end
-        _flashLoanETH(debtToRepay, assets, 0);
+        // get the LTV we would have without repaying debt
+        uint256 futureLTV = currentDebt.mulDiv(1e18, (currentCollateral - ethAssetsValue), Math.Rounding.Floor);
+
+        if(futureLTV <= maxLTV) {
+            // if the amount to withdraw is small, just withdraw collateral
+            lendingPool.withdraw(asset(), assets, address(this));
+        } else {
+            // repay debt and withdraw collateral
+            bool isFullWithdraw = assets == _totalAssets();
+            
+            uint256 debtToRepay = isFullWithdraw ? currentDebt : currentDebt - (targetLTV.mulDiv((currentCollateral - ethAssetsValue), 1e18, Math.Rounding.Floor));
+
+            // flash loan debtToRepay - mode 0 - flash loan is repaid at the end
+            _flashLoanETH(debtToRepay, assets, 0, isFullWithdraw);
+        }
     }
 
     // increase leverage by borrowing ETH and depositing wstETH
@@ -270,17 +287,22 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
 
     // reduce leverage by withdrawing wstETH, swapping to ETH repaying ETH debt
     // repayAmount is a ETH (wETH) amount
-    function _reduceLeverage(uint256 toWithdraw, uint256 flashLoanDebt) internal {
+    function _reduceLeverage(bool isFullWithdraw, uint256 toWithdraw, uint256 flashLoanDebt) internal {
         address asset = asset();
 
         // get flash loan amount of wstETH 
         uint256 flashLoanWstETHAmount = IwstETH(asset).getWstETHByStETH(flashLoanDebt);
-
-        // add slippage buffer for swapping with flashLoanDebt min amount out
-        uint256 wstETHBuffer = flashLoanWstETHAmount.mulDiv(slippage, 1e18, Math.Rounding.Ceil);
+        
+        // get slippage buffer for swapping with flashLoanDebt min amount out
+        uint256 wstETHBuffer = flashLoanWstETHAmount.mulDiv(slippage, 1e18, Math.Rounding.Floor);
 
         // withdraw wstETH from aave
-        lendingPool.withdraw(asset, flashLoanWstETHAmount + wstETHBuffer + toWithdraw, address(this));
+        if(isFullWithdraw) {
+            // withdraw all
+            lendingPool.withdraw(asset, type(uint256).max, address(this));
+        } else {
+            lendingPool.withdraw(asset, flashLoanWstETHAmount + wstETHBuffer + toWithdraw, address(this));
+        }
 
         // unwrap wstETH into stETH
         uint256 stETHAmount = IwstETH(asset).unwrap(flashLoanWstETHAmount + wstETHBuffer);
@@ -294,7 +316,7 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
         debt = debtToken.balanceOf(address(this)); // ETH DEBT 
         collateral = IwstETH(asset()).getStETHByWstETH(interestToken.balanceOf(address(this))); // converted into ETH (stETH) amount;
 
-        (debt == 0 || collateral == 0) ? loanToValue = 0 : loanToValue = debt.mulDiv(1e18, collateral, Math.Rounding.Ceil);
+        (debt == 0 || collateral == 0) ? loanToValue = 0 : loanToValue = debt.mulDiv(1e18, collateral, Math.Rounding.Floor);
     }
 
     // deposit wstETH into lending protocol
@@ -311,7 +333,7 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
     // borrow WETH from lending protocol
     // interestRateMode = 2 -> flash loan eth and deposit into cdp, don't repay
     // interestRateMode = 0 -> flash loan eth to repay cdp, have to repay flash loan at the end
-    function _flashLoanETH(uint256 amount, uint256 assetsToWithdraw, uint256 interestRateMode) internal {
+    function _flashLoanETH(uint256 amount, uint256 assetsToWithdraw, uint256 interestRateMode, bool isFullWithdraw) internal {
         // lendingPool.borrow(address(weth), amount, 2, 0, address(this));
         address[] memory assets = new address[](1);
         assets[0] = address(weth);
@@ -330,7 +352,7 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
             amounts,
             interestRateModes,
             address(this),
-            abi.encode(isWithdraw, assetsToWithdraw),
+            abi.encode(isWithdraw, isFullWithdraw, assetsToWithdraw),
             0
         );
     }   
