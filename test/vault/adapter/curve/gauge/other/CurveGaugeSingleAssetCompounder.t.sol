@@ -209,6 +209,8 @@ contract CurveGaugeSingleAssetCompounderTest is AbstractAdapterTest {
     //////////////////////////////////////////////////////////////*/
 
     function test__unpause() public override {
+        uint defaultAmount = 1e18;
+        uint _delta_ = 1e16;
         _mintAssetAndApproveForAdapter(defaultAmount * 3, bob);
 
         vm.prank(bob);
@@ -249,6 +251,54 @@ contract CurveGaugeSingleAssetCompounderTest is AbstractAdapterTest {
         adapter.mint(defaultAmount, bob);
     }
 
+    function test__pause() public override {
+        uint _delta_ = 1e16;
+        uint defaultAmount = 1e18;
+        _mintAssetAndApproveForAdapter(defaultAmount, bob);
+
+        vm.prank(bob);
+        adapter.deposit(defaultAmount, bob);
+
+        uint256 oldTotalAssets = adapter.totalAssets();
+        uint256 oldTotalSupply = adapter.totalSupply();
+
+        adapter.pause();
+
+        // We simply withdraw into the adapter
+        // TotalSupply and Assets dont change
+        assertApproxEqAbs(
+            oldTotalAssets,
+            adapter.totalAssets(),
+            _delta_,
+            "totalAssets"
+        );
+        assertApproxEqAbs(
+            oldTotalSupply,
+            adapter.totalSupply(),
+            _delta_,
+            "totalSupply"
+        );
+        assertApproxEqAbs(
+            asset.balanceOf(address(adapter)),
+            oldTotalAssets,
+            _delta_,
+            "asset balance"
+        );
+        assertApproxEqAbs(iouBalance(), 0, _delta_, "iou balance");
+
+        vm.startPrank(bob);
+        // Deposit and mint are paused (maxDeposit/maxMint are set to 0 on pause)
+        vm.expectRevert();
+        adapter.deposit(defaultAmount, bob);
+
+        vm.expectRevert();
+        adapter.mint(defaultAmount, bob);
+
+        // Withdraw and Redeem dont revert
+        adapter.withdraw(defaultAmount / 10, bob, bob);
+        adapter.redeem(defaultAmount / 10, bob, bob);
+    }
+
     /*//////////////////////////////////////////////////////////////
                                 CLAIM
     //////////////////////////////////////////////////////////////*/
@@ -281,5 +331,33 @@ contract CurveGaugeSingleAssetCompounderTest is AbstractAdapterTest {
         adapter.harvest();
 
         assertEq(adapter.totalAssets(), oldTa);
+    }
+
+    function test__withdraw(uint8 fuzzAmount) public override {
+        uint8 len = uint8(testConfigStorage.getTestConfigLength());
+        for (uint8 i; i < len; i++) {
+            if (i > 0) overrideSetup(testConfigStorage.getTestConfig(i));
+            uint256 amount = bound(uint256(fuzzAmount), minFuzz, maxAssets);
+
+            uint256 reqAssets = adapter.previewMint(
+                adapter.previewWithdraw(amount)
+            );
+            _mintAssetAndApproveForAdapter(reqAssets, bob);
+            vm.prank(bob);
+            adapter.deposit(reqAssets, bob);
+
+            prop_withdraw(bob, bob, amount * 9950 / 10000, testId);
+
+            _mintAssetAndApproveForAdapter(reqAssets, bob);
+            vm.prank(bob);
+            adapter.deposit(reqAssets, bob);
+
+            increasePricePerShare(raise);
+
+            vm.prank(bob);
+            adapter.approve(alice, type(uint256).max);
+
+            prop_withdraw(alice, bob, amount * 9950 / 10000, testId);
+        }
     }
 }

@@ -89,7 +89,7 @@ contract CurveGaugeSingleAssetCompounder is AdapterBase, WithRewards {
         uint256 lpBal = IERC20(address(gauge)).balanceOf(address(this));
         return
             lpBal > 0
-                ? ICurveLp(lpToken).calc_withdraw_one_coin(lpBal, indexIn)
+                ? ICurveLp(lpToken).get_virtual_price() * lpBal / 1e18 * 9_950 / 10_000
                 : 0;
     }
 

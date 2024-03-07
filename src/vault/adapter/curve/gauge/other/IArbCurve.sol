@@ -23,6 +23,8 @@ interface ICurveLp {
     ) external;
 
     function N_COINS() external view returns (uint256);
+
+    function get_virtual_price() external view returns (uint256);
 }
 
 interface IGauge {
