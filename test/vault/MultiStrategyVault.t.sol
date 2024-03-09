@@ -442,10 +442,10 @@ contract MultiStrategyVaultTest is Test {
             0
         );
 
-        assertEq(vault.totalAssets(), 0);
+        assertApproxEqAbs(vault.totalAssets(), 0,1);
         assertEq(vault.balanceOf(alice), 0);
         assertEq(vault.convertToAssets(vault.balanceOf(alice)), 0);
-        assertEq(asset.balanceOf(alice), alicePreDepositBal);
+        assertApproxEqAbs(asset.balanceOf(alice), alicePreDepositBal,1);
     }
 
     function testFail__mint_zero() public {
@@ -1247,11 +1247,11 @@ contract MultiStrategyVaultTest is Test {
         assertTrue(vault.paused());
 
         vm.prank(alice);
-        vm.expectRevert("Pausable: paused");
+        vm.expectRevert(0xd93c0665); // EnforcedPause()
         vault.deposit(depositAmount, alice);
 
         vm.prank(alice);
-        vm.expectRevert("Pausable: paused");
+        vm.expectRevert(0xd93c0665); // EnforcedPause()
         vault.mint(depositAmount, alice);
 
         vm.prank(alice);

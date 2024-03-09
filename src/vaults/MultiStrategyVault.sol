@@ -326,8 +326,10 @@ contract MultiStrategyVault is
         // Get the Vault's floating balance.
         uint256 float = asset_.balanceOf(address(this));
 
-        // If the amount is greater than the float, withdraw from strategies.
-        if (amount > float) {
+        if (amount < float){
+            asset_.safeTransfer(receiver, amount);
+        } else {
+            // If the amount is greater than the float, withdraw from strategies.
             if (float > 0) {
                 asset_.safeTransfer(receiver, float);
             }
@@ -357,7 +359,7 @@ contract MultiStrategyVault is
                     float += withdrawableAssets;
                 }
             }
-        }
+        } 
     }
 
     /*//////////////////////////////////////////////////////////////
