@@ -11,14 +11,14 @@ import {
     IERC20,
     IERC20Metadata,
     Math,
-    ILendingPool
+    ILendingPool,
+    IwstETH
 } from "../../../../src/vault/adapter/lido/LeveragedWstETHAdapter.sol";
 import {IERC4626, IERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import {LevWstETHTestConfigStorage, LevWstETHTestConfig} from "./wstETHTestConfigStorage.sol";
 import {AbstractAdapterTest, ITestConfigStorage, IAdapter} from "../abstract/AbstractAdapterTest.sol";
 import {ICurveMetapool} from "../../../../src/interfaces/external/curve/ICurveMetapool.sol";
 import {Clones} from "openzeppelin-contracts/proxy/Clones.sol";
-import "forge-std/console.sol";
 
 contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
     using Math for uint256;
@@ -40,6 +40,8 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
 
     // address aaveDataProvider = address(0x7B4EB56E7CD4b454BA8ff71E4518426369a138a3); //aave
     address aaveDataProvider = address(0xFc21d6d146E6086B8359705C8b28512a983db0cb); //spark
+    
+    uint256 slippage = 1e15;
 
     LeveragedWstETHAdapter adapterContract;
 
@@ -70,7 +72,7 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
         setUpBaseTest(
             wstETH,
             address(new LeveragedWstETHAdapter()),
-            0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2,
+            aaveDataProvider,
             10,
             "Leveraged wstETH  ",
             false
@@ -89,7 +91,7 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
     //////////////////////////////////////////////////////////////*/
 
     // Verify that totalAssets returns the expected amount
-    function verify_totalAssets() public override {
+    function test_verify_totalAssets() public {
         // Make sure totalAssets isnt 0
         deal(address(asset), bob, defaultAmount);
         vm.startPrank(bob);
@@ -105,7 +107,7 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
         );
     }
 
-    function test_depositAndLeverage() public {
+    function test_deposit() public {
         uint256 amountMint = 10e18;
         uint256 amountDeposit = 1e18;
         uint256 amountWithdraw = 5e17;
@@ -115,7 +117,7 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
         vm.startPrank(bob);
         asset.approve(address(adapter), amountMint);
         adapter.deposit(amountDeposit, bob);
-        vm.stopPrank();
+        vm.stopPrank(); 
 
         // check total assets
         assertEq(adapter.totalAssets(), amountDeposit);
@@ -131,12 +133,35 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
 
         // LTV should still be 0
         assertEq(adapterContract.getLTV(), 0);
+    }
+
+    function test_leverageUp() public {
+        uint256 amountMint = 10e18;
+        uint256 amountDeposit = 1e18;
+        uint256 amountWithdraw = 5e17;
+
+        deal(address(asset), bob, amountMint);
+
+        vm.startPrank(bob);
+        asset.approve(address(adapter), amountMint);
+        adapter.deposit(amountDeposit, bob);
+        vm.stopPrank(); 
 
         // HARVEST - trigger leverage loop
         adapterContract.adjustLeverage();
 
-        // check total assets
-        // assertEq(adapter.totalAssets(), amountDeposit); // 1 wei error TODO
+        // check total assets - should be lt than totalDeposits
+        assertLt(adapter.totalAssets(), amountDeposit);
+
+        uint256 slippageDebt = IwstETH(address(wstETH)).getWstETHByStETH(vdWETH.balanceOf(address(adapter)));
+        slippageDebt = slippageDebt.mulDiv(slippage, 1e18, Math.Rounding.Ceil);
+
+        assertApproxEqAbs(
+            adapter.totalAssets(),
+            amountDeposit - slippageDebt,
+            _delta_,
+            string.concat("totalAssets != expected", baseTestId)
+        );
 
         // wstETH should be in lending market
         assertEq(wstETH.balanceOf(address(adapter)), 0);
@@ -152,14 +177,25 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
 
         // LTV is at target
         assertEq(adapterContract.targetLTV(), adapterContract.getLTV());
+    }
 
-        // withdraw partial amount
+    function test_leverageDown() public {
+        uint256 amountMint = 10e18;
+        uint256 amountDeposit = 1e18;
+        uint256 amountWithdraw = 5e17;
+
+        deal(address(asset), bob, amountMint);
+
+        vm.startPrank(bob);
+        asset.approve(address(adapter), amountMint);
+        adapter.deposit(amountDeposit, bob);
+        vm.stopPrank(); 
+
+        // HARVEST - trigger leverage loop
+        adapterContract.adjustLeverage();
+
         vm.prank(bob);
         adapter.withdraw(amountWithdraw, bob, bob);
-        // console.log(adapter.totalAssets(), amountWithdraw);
-        // console.log(wstETH.balanceOf(address(adapter)));
-        // console.log(IERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2).balanceOf(address(adapter)));
-        // console.log(address(adapter).balance);
 
         // after withdraw, vault ltv is a bit higher than target, considering the anti slipage amount witdrawn
         uint256 currentLTV = adapterContract.getLTV();
@@ -170,19 +206,50 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
 
         // ltv before should be higher than now
         assertGt(currentLTV, adapterContract.getLTV());
+    }
+
+    function test_withdraw() public {
+        uint256 amountMint = 10e18;
+        uint256 amountDeposit = 1e18;
+        uint256 amountWithdraw = 5e17;
+
+        deal(address(asset), bob, amountMint);
+
+        vm.startPrank(bob);
+        asset.approve(address(adapter), amountMint);
+        adapter.deposit(amountDeposit, bob);
+        vm.stopPrank(); 
+
+        // HARVEST - trigger leverage loop - get debt
+        adapterContract.adjustLeverage();
 
         // withdraw full amount - repay full debt
         uint256 amountWithd = adapter.totalAssets();
         vm.prank(bob);
         adapter.withdraw(amountWithd, bob, bob);
 
-        // console.log(adapter.totalAssets());
-        // console.log(wstETH.balanceOf(address(adapter)));
-        // console.log(IERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2).balanceOf(address(adapter)));
-        // console.log(address(adapter).balance);
+        // check total assets
+        assertEq(adapter.totalAssets(), 0);
+
+        // should not hold any wstETH
+        assertApproxEqAbs(
+            wstETH.balanceOf(address(adapter)),
+            0,
+            _delta_,
+            string.concat("more wstETH dust than expected", baseTestId)
+        );
+
+        // should not hold any wstETH aToken
+        assertEq(awstETH.balanceOf(address(adapter)), 0);
+
+        // adapter should not hold debt any debt
+        assertEq(vdWETH.balanceOf(address(adapter)), 0);
+
+        // adapter might have some dust ETH 
+        uint256 dust = address(adapter).balance;
+        assertGt(dust, 0);
 
         // withdraw dust from owner
-        uint256 dust = address(adapter).balance;
         uint256 aliceBalBefore = alice.balance;
 
         adapterContract.withdrawDust(alice);
