@@ -245,16 +245,17 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
         (, uint256 currentDebt, uint256 currentCollateral) = _getCurrentLTV();
         uint256 ethAssetsValue = IwstETH(asset()).getStETHByWstETH(assets);
 
-        // get the LTV we would have without repaying debt
-        uint256 futureLTV = currentDebt.mulDiv(1e18, (currentCollateral - ethAssetsValue), Math.Rounding.Floor);
+        bool isFullWithdraw = assets == _totalAssets();
 
-        if (futureLTV <= maxLTV) {
-            // if the amount to withdraw is small, just withdraw collateral
+        // get the LTV we would have without repaying debt
+        uint256 futureLTV = isFullWithdraw ? type(uint256).max : currentDebt.mulDiv(1e18, (currentCollateral - ethAssetsValue), Math.Rounding.Floor);
+
+        if (futureLTV <= maxLTV || currentDebt == 0) {
+            // 1 - withdraw any asset amount with no debt
+            // 2 - withdraw assets with debt but the change doesn't take LTV above max
             lendingPool.withdraw(asset(), assets, address(this));
         } else {
-            // repay debt and withdraw collateral
-            bool isFullWithdraw = assets == _totalAssets();
-
+            // 1 - withdraw assets but repay debt
             uint256 debtToRepay = isFullWithdraw
                 ? currentDebt
                 : currentDebt - (targetLTV.mulDiv((currentCollateral - ethAssetsValue), 1e18, Math.Rounding.Floor));
