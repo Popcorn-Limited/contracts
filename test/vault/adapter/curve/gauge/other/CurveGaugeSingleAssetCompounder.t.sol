@@ -16,6 +16,7 @@ contract CurveGaugeSingleAssetCompounderTest is AbstractAdapterTest {
     address arb = 0x912CE59144191C1204E64559FE8253a0e49E6548;
     uint256 forkId;
 
+    uint constant DISCOUNT_BPS = 50;
     function setUp() public {
         forkId = vm.createSelectFork(vm.rpcUrl("arbitrum"), 176205000);
         vm.selectFork(forkId);
@@ -346,7 +347,7 @@ contract CurveGaugeSingleAssetCompounderTest is AbstractAdapterTest {
             vm.prank(bob);
             adapter.deposit(reqAssets, bob);
 
-            prop_withdraw(bob, bob, amount * 9950 / 10000, testId);
+            prop_withdraw(bob, bob, amount * (10_000 - DISCOUNT_BPS) / 10_000, testId);
 
             _mintAssetAndApproveForAdapter(reqAssets, bob);
             vm.prank(bob);
@@ -357,7 +358,33 @@ contract CurveGaugeSingleAssetCompounderTest is AbstractAdapterTest {
             vm.prank(bob);
             adapter.approve(alice, type(uint256).max);
 
-            prop_withdraw(alice, bob, amount * 9950 / 10000, testId);
+            prop_withdraw(alice, bob, amount * (10_000 - DISCOUNT_BPS ) / 10_000, testId);
+        }
+    }
+
+    function test__withdrawal_complex(uint128 depositAmount, uint128 withdrawAmount) public {
+        uint8 len = uint8(testConfigStorage.getTestConfigLength());
+        for (uint8 i; i < len; i++) {
+            if (i > 0) overrideSetup(testConfigStorage.getTestConfig(i));
+            depositAmount = uint128(bound(depositAmount, 1e10, 1e24));
+            withdrawAmount = uint128(bound(withdrawAmount, 1e9, depositAmount * (10_000 - DISCOUNT_BPS) / 10_000));
+
+            _mintAssetAndApproveForAdapter(depositAmount, bob);
+            vm.prank(bob);
+            adapter.deposit(depositAmount, bob);
+
+            prop_withdraw(bob, bob, withdrawAmount, testId);
+
+            _mintAssetAndApproveForAdapter(depositAmount, bob);
+            vm.prank(bob);
+            adapter.deposit(depositAmount, bob);
+
+            increasePricePerShare(raise);
+
+            vm.prank(bob);
+            adapter.approve(alice, type(uint256).max);
+
+            prop_withdraw(alice, bob, withdrawAmount, testId);
         }
     }
 }

@@ -26,6 +26,8 @@ contract CurveGaugeSingleAssetCompounder is AdapterBase, WithRewards {
     int128 internal indexIn;
     uint256 internal nCoins;
 
+    uint internal constant DISCOUNT_BPS = 50;
+
     /*//////////////////////////////////////////////////////////////
                             INITIALIZATION
     //////////////////////////////////////////////////////////////*/
@@ -89,7 +91,7 @@ contract CurveGaugeSingleAssetCompounder is AdapterBase, WithRewards {
         uint256 lpBal = IERC20(address(gauge)).balanceOf(address(this));
         return
             lpBal > 0
-                ? ICurveLp(lpToken).get_virtual_price() * lpBal / 1e18 * 9_950 / 10_000
+                ? ICurveLp(lpToken).get_virtual_price() * lpBal / 1e18 * (10_000 - DISCOUNT_BPS) / 10_000
                 : 0;
     }
 
