@@ -27,6 +27,7 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
     ILendingPool public lendingPool;
     IPoolAddressesProvider public poolAddressesProvider;
 
+    IWETH public weth;
     IERC20 public debtToken; // aave eth debt token
     IERC20 public interestToken; // aave awstETH
 
@@ -36,10 +37,9 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
         ICurveMetapool(0xDC24316b9AE028F1497c275EB9192a3Ea0f67022);
 
     uint256 public slippage; // 1e18 = 100% slippage, 1e14 = 1 BPS slippage
-    IWETH public weth;
 
     uint256 public targetLTV; // in 18 decimals - 1e17 being 0.1%
-    uint256 public minLTV; // min ltv the vault can reach
+    uint256 public maxLTV; // max ltv the vault can reach
 
     error DifferentAssets(address asset, address underlying);
 
@@ -56,7 +56,7 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
      * @dev `_stEth` - stETH address.
      * @dev `_poolAddressesProvider` - aave Pool Addresses Provider contract address.
      * @dev `_targetLTV` - The desired loan to value of the vault CDP.
-     * @dev `_minLTV` - The min loan to value allowed before a automatic de-leverage
+     * @dev `_maxLTV` - The max loan to value allowed before a automatic de-leverage
      * @dev This function is called by the factory contract when deploying a new vault.
      */
     function initialize(
@@ -72,7 +72,7 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
             address _poolAddressesProvider,
             uint256 _slippage,
             uint256 _targetLTV,
-            uint256 _minLTV
+            uint256 _maxLTV
         ) = abi.decode(
                 _initData,
                 (address, address, address, uint256, uint256, uint256)
@@ -81,7 +81,7 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
         address baseAsset = asset();
 
         targetLTV = _targetLTV;
-        minLTV = _minLTV;
+        maxLTV = _maxLTV;
 
         slippage = _slippage;
         weth = IWETH(_wETH);
@@ -118,9 +118,6 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
             address(StableSwapSTETH),
             type(uint256).max
         );
-
-        // TODO -- move this into its own function? Require deposit on init?
-        lendingPool.setUserUseReserveAsCollateral(baseAsset, true);
     }
 
     receive() external payable {}
@@ -141,10 +138,6 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
         returns (string memory)
     {
         return _symbol;
-    }
-
-    function getLTV() public view returns (uint256 ltv) {
-        (ltv, , ) = _getCurrentLTV();
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -174,50 +167,25 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
         }
     }
 
-    // amount of WETH to borrow OR amount of WETH to repay (converted into wstETH amount internally)
-    function adjustLeverage() external {
-        // get vault current leverage : debt/collateral
-        (
-            uint256 currentLTV,
-            uint256 currentDebt,
-            uint256 currentCollateral
-        ) = _getCurrentLTV();
-
-        // de-leverage if vault LTV is higher than target
-        if (currentLTV > targetLTV) {
-            uint256 amountETH = (currentDebt -
-                (
-                    targetLTV.mulDiv(
-                        (currentCollateral),
-                        1e18,
-                        Math.Rounding.Floor
-                    )
-                )).mulDiv(1e18, (1e18 - targetLTV), Math.Rounding.Floor);
-
-            // flash loan eth to repay part of the debt
-            _flashLoanETH(amountETH, 0, 0, false);
-        } else {
-            uint256 amountETH = (targetLTV.mulDiv(
-                currentCollateral,
-                1e18,
-                Math.Rounding.Floor
-            ) - currentDebt).mulDiv(
-                    1e18,
-                    (1e18 - targetLTV),
-                    Math.Rounding.Floor
-                );
-
-            // use eventual ETH dust remained in the contract
-            amountETH -= address(this).balance;
-
-            // flash loan WETH from lending protocol and add to cdp
-            _flashLoanETH(amountETH, 0, 2, false);
-        }
+    function getLTV() public view returns (uint256 ltv) {
+        (ltv, , ) = _getCurrentLTV();
     }
 
     /*//////////////////////////////////////////////////////////////
                           FLASH LOAN LOGIC
     //////////////////////////////////////////////////////////////*/
+
+    function ADDRESSES_PROVIDER()
+        external
+        view
+        returns (IPoolAddressesProvider)
+    {
+        return poolAddressesProvider;
+    }
+
+    function POOL() external view returns (ILendingPool) {
+        return lendingPool;
+    }
 
     // this is triggered after the flash loan is given, ie contract has loaned assets at this point
     function executeOperation(
@@ -245,26 +213,6 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
         }
 
         return true;
-    }
-
-    function ADDRESSES_PROVIDER()
-        external
-        view
-        returns (IPoolAddressesProvider)
-    {
-        return poolAddressesProvider;
-    }
-
-    function POOL() external view returns (ILendingPool) {
-        return lendingPool;
-    }
-
-    function withdrawDust(address recipient) public onlyOwner {
-        // send eth dust to recipient
-        (bool sent, ) = address(recipient).call{value: address(this).balance}(
-            ""
-        );
-        require(sent, "Failed to send ETH");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -296,7 +244,7 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
                 Math.Rounding.Floor
             );
 
-        if (futureLTV <= minLTV || currentDebt == 0) {
+        if (futureLTV <= maxLTV || currentDebt == 0) {
             // 1 - withdraw any asset amount with no debt
             // 2 - withdraw assets with debt but the change doesn't take LTV above max
             lendingPool.withdraw(asset(), assets, address(this));
@@ -439,5 +387,79 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
             minAmount
         );
         weth.deposit{value: minAmount}(); // wrap precise amount of eth for flash loan repayment
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                          MANAGEMENT LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    // amount of WETH to borrow OR amount of WETH to repay (converted into wstETH amount internally)
+    function adjustLeverage() external {
+        // get vault current leverage : debt/collateral
+        (
+            uint256 currentLTV,
+            uint256 currentDebt,
+            uint256 currentCollateral
+        ) = _getCurrentLTV();
+
+        // de-leverage if vault LTV is higher than target
+        if (currentLTV > targetLTV) {
+            uint256 amountETH = (currentDebt -
+                (
+                    targetLTV.mulDiv(
+                        (currentCollateral),
+                        1e18,
+                        Math.Rounding.Floor
+                    )
+                )).mulDiv(1e18, (1e18 - targetLTV), Math.Rounding.Floor);
+
+            // flash loan eth to repay part of the debt
+            _flashLoanETH(amountETH, 0, 0, false);
+        } else {
+            uint256 amountETH = (targetLTV.mulDiv(
+                currentCollateral,
+                1e18,
+                Math.Rounding.Floor
+            ) - currentDebt).mulDiv(
+                    1e18,
+                    (1e18 - targetLTV),
+                    Math.Rounding.Floor
+                );
+
+            // use eventual ETH dust remained in the contract
+            amountETH -= address(this).balance;
+
+            // flash loan WETH from lending protocol and add to cdp
+            _flashLoanETH(amountETH, 0, 2, false);
+        }
+    }
+
+    function withdrawDust(address recipient) public onlyOwner {
+        // send eth dust to recipient
+        (bool sent, ) = address(recipient).call{value: address(this).balance}(
+            ""
+        );
+        require(sent, "Failed to send ETH");
+    }
+
+    function setLeverageValues(
+        uint256 targetLTV_,
+        uint256 maxLTV_,
+        uint256 slippage_
+    ) external onlyOwner {
+        // TODO adjust leverage if target / maxLTV was lowered and new targets are to slow
+        targetLTV = targetLTV_;
+        maxLTV = maxLTV_;
+
+        // TODO validate slippage
+        slippage = slippage_;
+    }
+
+    function setUserUseReserveAsCollateral(uint256 amount) onlyOwner {
+        // TODO block if function was called
+        IERC20(baseAsset).safeTransferFrom(msg.sender, address(this), amount);
+        lendingPool.supply(asset(), assets, address(this), 0);
+
+        lendingPool.setUserUseReserveAsCollateral(baseAsset, true);
     }
 }
