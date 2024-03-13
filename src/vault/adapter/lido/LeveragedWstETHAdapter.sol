@@ -118,7 +118,7 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
             address(StableSwapSTETH),
             type(uint256).max
         );
-        
+
         // TODO -- move this into its own function? Require deposit on init?
         lendingPool.setUserUseReserveAsCollateral(baseAsset, true);
     }
@@ -230,10 +230,7 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
         (bool isWithdraw, bool isFullWithdraw, uint256 assetsToWithdraw) = abi
             .decode(params, (bool, bool, uint256));
 
-        if (!isWithdraw) {
-            // flash loan is to leverage UP
-            _redepositAsset(amounts[0]);
-        } else {
+        if (isWithdraw) {
             // flash loan is to repay ETH debt as part of a withdrawal
             uint256 flashLoanDebt = amounts[0] + premiums[0];
 
@@ -242,6 +239,9 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
 
             // withdraw collateral, swap, repay flashloan
             _reduceLeverage(isFullWithdraw, assetsToWithdraw, flashLoanDebt);
+        } else {
+            // flash loan is to leverage UP
+            _redepositAsset(amounts[0]);
         }
 
         return true;
@@ -403,7 +403,6 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
         uint256 interestRateMode,
         bool isFullWithdraw
     ) internal {
-        // lendingPool.borrow(address(weth), amount, 2, 0, address(this));
         address[] memory assets = new address[](1);
         assets[0] = address(weth);
 
