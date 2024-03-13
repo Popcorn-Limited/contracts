@@ -339,12 +339,12 @@ contract MultiStrategyVault is
             if (float > 0) {
                 asset_.safeTransfer(receiver, float);
             }
-            // We'll start at the tip of the stack and traverse backwards.
-            uint256 currentIndex = strategies.length - 1;
+            uint256 currentIndex;
 
-            // Iterate in reverse so we pull from the stack in a "last in, first out" manner.
+            // Iterate the withdrawal queue and get indexes 
             // Will revert due to underflow if we empty the stack before pulling the desired amount.
-            for (; ; currentIndex--) {
+            for (uint256 i=0; i<withdrawalQueue.length; i++) {
+                currentIndex = withdrawalQueue[i];
                 uint256 missing = amount - float;
 
                 IERC4626 strategy = strategies[currentIndex];
@@ -692,6 +692,8 @@ contract MultiStrategyVault is
         if(indexes.length != strategies.length)
             revert InvalidWithdrawalQueue();
         
+        withdrawalQueue = new uint256[](indexes.length);
+
         for(uint256 i=0; i<indexes.length; i++) {
             uint256 index = indexes[i];
 

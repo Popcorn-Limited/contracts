@@ -74,6 +74,12 @@ contract MultiStrategyVaultTest is Test {
             type(uint256).max,
             address(this)
         );
+
+        uint256[] memory withdrawalQueue = new uint256[](2);
+        withdrawalQueue[0] = 0;
+        withdrawalQueue[1] = 1;
+
+        vault.setWithdrawalQueue(withdrawalQueue);
     }
 
     /*//////////////////////////////////////////////////////////////
