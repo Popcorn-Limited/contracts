@@ -187,7 +187,10 @@ contract MultiStrategyVault is
 
         IERC20(asset()).safeTransferFrom(msg.sender, address(this), assets);
 
-        strategies[0].deposit(assets, address(this));
+        // deposit into default index strategy or leave funds idle 
+        if(defaultDepositIndex != type(uint256).max) {
+            strategies[defaultDepositIndex].deposit(assets, address(this));
+        }
 
         emit Deposit(msg.sender, receiver, assets, shares);
     }
@@ -230,7 +233,10 @@ contract MultiStrategyVault is
 
         IERC20(asset()).safeTransferFrom(msg.sender, address(this), assets);
 
-        strategies[0].deposit(assets, address(this));
+        // deposit into default index strategy or leave funds idle 
+        if(defaultDepositIndex != type(uint256).max) {
+            strategies[defaultDepositIndex].deposit(assets, address(this));
+        }
 
         emit Deposit(msg.sender, receiver, assets, shares);
     }
@@ -657,11 +663,15 @@ contract MultiStrategyVault is
     IERC4626[] public strategies;
     IERC4626[] public proposedStrategies;
     uint256 public proposedStrategyTime;
+    uint256 public defaultDepositIndex; // index of the strategy to deposit funds by default - if uint.max, leave funds idle 
+    uint256[] public withdrawalQueue; // indexes of the strategy order in the withdrawal queue 
 
     event NewStrategiesProposed();
     event ChangedStrategies();
 
     error VaultAssetMismatchNewAdapterAsset();
+    error InvalidIndex();
+    error InvalidWithdrawalQueue();
 
     function getStrategies() external view returns (IERC4626[] memory) {
         return strategies;
@@ -669,6 +679,27 @@ contract MultiStrategyVault is
 
     function getProposedStrategies() external view returns (IERC4626[] memory) {
         return proposedStrategies;
+    }
+
+    function setDefaultDepositIndex(uint256 index) external onlyOwner {
+        if(index > strategies.length - 1 && index != type(uint256).max)
+            revert InvalidIndex();
+
+        defaultDepositIndex = index;
+    }
+
+    function setWithdrawalQueue(uint256[] memory indexes) external onlyOwner {
+        if(indexes.length != strategies.length)
+            revert InvalidWithdrawalQueue();
+        
+        for(uint256 i=0; i<indexes.length; i++) {
+            uint256 index = indexes[i];
+
+            if(index > strategies.length - 1 && index != type(uint256).max)
+                revert InvalidIndex();
+
+            withdrawalQueue[i] = index;
+        }
     }
 
     /**
