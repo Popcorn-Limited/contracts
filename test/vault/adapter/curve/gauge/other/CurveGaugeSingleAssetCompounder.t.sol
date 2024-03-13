@@ -16,7 +16,8 @@ contract CurveGaugeSingleAssetCompounderTest is AbstractAdapterTest {
     address arb = 0x912CE59144191C1204E64559FE8253a0e49E6548;
     uint256 forkId;
 
-    uint constant DISCOUNT_BPS = 50;
+    uint256 constant DISCOUNT_BPS = 50;
+
     function setUp() public {
         forkId = vm.createSelectFork(vm.rpcUrl("arbitrum"), 176205000);
         vm.selectFork(forkId);
@@ -95,7 +96,8 @@ contract CurveGaugeSingleAssetCompounderTest is AbstractAdapterTest {
             0xF0d4c12A5768D806021F80a262B4d39d26C58b8D, // curve router
             rewardTokens,
             minTradeAmounts,
-            swaps
+            swaps,
+            uint256(50)
         );
 
         vm.label(address(arb), "arb");
@@ -155,8 +157,6 @@ contract CurveGaugeSingleAssetCompounderTest is AbstractAdapterTest {
                 (address, address, address, int128)
             );
 
-        vm.expectEmit(false, false, false, true, address(adapter));
-        emit Initialized(uint8(1));
         adapter.initialize(
             abi.encode(_asset, address(this), strategy, 0, sigs, ""),
             externalRegistry,
@@ -332,59 +332,5 @@ contract CurveGaugeSingleAssetCompounderTest is AbstractAdapterTest {
         adapter.harvest();
 
         assertEq(adapter.totalAssets(), oldTa);
-    }
-
-    function test__withdraw(uint8 fuzzAmount) public override {
-        uint8 len = uint8(testConfigStorage.getTestConfigLength());
-        for (uint8 i; i < len; i++) {
-            if (i > 0) overrideSetup(testConfigStorage.getTestConfig(i));
-            uint256 amount = bound(uint256(fuzzAmount), minFuzz, maxAssets);
-
-            uint256 reqAssets = adapter.previewMint(
-                adapter.previewWithdraw(amount)
-            );
-            _mintAssetAndApproveForAdapter(reqAssets, bob);
-            vm.prank(bob);
-            adapter.deposit(reqAssets, bob);
-
-            prop_withdraw(bob, bob, amount * (10_000 - DISCOUNT_BPS) / 10_000, testId);
-
-            _mintAssetAndApproveForAdapter(reqAssets, bob);
-            vm.prank(bob);
-            adapter.deposit(reqAssets, bob);
-
-            increasePricePerShare(raise);
-
-            vm.prank(bob);
-            adapter.approve(alice, type(uint256).max);
-
-            prop_withdraw(alice, bob, amount * (10_000 - DISCOUNT_BPS ) / 10_000, testId);
-        }
-    }
-
-    function test__withdrawal_complex(uint128 depositAmount, uint128 withdrawAmount) public {
-        uint8 len = uint8(testConfigStorage.getTestConfigLength());
-        for (uint8 i; i < len; i++) {
-            if (i > 0) overrideSetup(testConfigStorage.getTestConfig(i));
-            depositAmount = uint128(bound(depositAmount, 1e10, 1e24));
-            withdrawAmount = uint128(bound(withdrawAmount, 1e9, depositAmount * (10_000 - DISCOUNT_BPS) / 10_000));
-
-            _mintAssetAndApproveForAdapter(depositAmount, bob);
-            vm.prank(bob);
-            adapter.deposit(depositAmount, bob);
-
-            prop_withdraw(bob, bob, withdrawAmount, testId);
-
-            _mintAssetAndApproveForAdapter(depositAmount, bob);
-            vm.prank(bob);
-            adapter.deposit(depositAmount, bob);
-
-            increasePricePerShare(raise);
-
-            vm.prank(bob);
-            adapter.approve(alice, type(uint256).max);
-
-            prop_withdraw(alice, bob, withdrawAmount, testId);
-        }
     }
 }

@@ -26,7 +26,7 @@ contract CurveGaugeSingleAssetCompounder is AdapterBase, WithRewards {
     int128 internal indexIn;
     uint256 internal nCoins;
 
-    uint internal constant DISCOUNT_BPS = 50;
+    uint256 internal discountBps;
 
     /*//////////////////////////////////////////////////////////////
                             INITIALIZATION
@@ -50,7 +50,7 @@ contract CurveGaugeSingleAssetCompounder is AdapterBase, WithRewards {
         gauge = IGauge(_gauge);
         indexIn = _indexIn;
         nCoins = ICurveLp(_lpToken).N_COINS();
-
+        
         _name = string.concat(
             "VaultCraft CurveGaugeSingleAssetCompounder ",
             IERC20Metadata(asset()).name(),
@@ -91,7 +91,8 @@ contract CurveGaugeSingleAssetCompounder is AdapterBase, WithRewards {
         uint256 lpBal = IERC20(address(gauge)).balanceOf(address(this));
         return
             lpBal > 0
-                ? ICurveLp(lpToken).get_virtual_price() * lpBal / 1e18 * (10_000 - DISCOUNT_BPS) / 10_000
+                ? (((ICurveLp(lpToken).get_virtual_price() * lpBal) / 1e18) *
+                    (10_000 - discountBps)) / 10_000
                 : 0;
     }
 
@@ -116,7 +117,7 @@ contract CurveGaugeSingleAssetCompounder is AdapterBase, WithRewards {
         uint256 lpWithdraw = shares.mulDiv(
             IERC20(address(gauge)).balanceOf(address(this)),
             totalSupply(),
-             Math.Rounding.Ceil
+            Math.Rounding.Ceil
         );
 
         gauge.withdraw(lpWithdraw);
@@ -141,7 +142,8 @@ contract CurveGaugeSingleAssetCompounder is AdapterBase, WithRewards {
         address curveRouter_,
         address[] memory rewardTokens_,
         uint256[] memory minTradeAmounts_, // must be ordered like rewardTokens_
-        CurveSwap[] memory swaps_ // must be ordered like rewardTokens_
+        CurveSwap[] memory swaps_, // must be ordered like rewardTokens_
+        uint256 discountBps_
     ) public onlyOwner {
         curveRouter = ICurveRouter(curveRouter_);
 
@@ -160,6 +162,7 @@ contract CurveGaugeSingleAssetCompounder is AdapterBase, WithRewards {
 
         _rewardTokens = rewardTokens_;
         minTradeAmounts = minTradeAmounts_;
+        discountBps = discountBps_;
     }
 
     /**
