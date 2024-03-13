@@ -13,6 +13,7 @@ import {AbstractAdapterTest, ITestConfigStorage, IAdapter} from "../../abstract/
 contract GearboxLeverageTest is AbstractAdapterTest {
     //IERC20 _asset;
     address USDC = address(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
+    address DAI = address(0x6B175474E89094C44Da98b954EedeAC495271d0F);
     address addressProvider = 0xcF64698AFF7E5f27A11dff868AF228653ba53be0;
 
     function setUp() public {
@@ -34,7 +35,7 @@ contract GearboxLeverageTest is AbstractAdapterTest {
         (address _creditFacade, address _creditManager) = abi.decode(testConfig, (address, address));
 
         setUpBaseTest(
-            IERC20(USDC),
+            IERC20(DAI),
             address(new GearboxLeverage()),
             addressProvider,
             10,
@@ -69,7 +70,6 @@ contract GearboxLeverageTest is AbstractAdapterTest {
     //////////////////////////////////////////////////////////////*/
 
     function verify_adapterInit() public override {
-//        assertEq(adapter.asset(), poolService.underlyingToken(), "asset");
         assertEq(
             IERC20Metadata(address(adapter)).name(),
             string.concat(
@@ -84,12 +84,6 @@ contract GearboxLeverageTest is AbstractAdapterTest {
             string.concat("vc-gl-", IERC20Metadata(address(asset)).symbol()),
             "symbol"
         );
-
-//        assertEq(
-//            asset.allowance(address(adapter), address(poolService)),
-//            type(uint256).max,
-//            "allowance"
-//        );
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -98,7 +92,6 @@ contract GearboxLeverageTest is AbstractAdapterTest {
 
     // Verify that totalAssets returns the expected amount
     function verify_totalAssets() public override {
-        // Make sure totalAssets isnt 0
         _mintAsset(defaultAmount, bob);
 
         vm.startPrank(bob);
@@ -112,12 +105,27 @@ contract GearboxLeverageTest is AbstractAdapterTest {
             _delta_,
             string.concat("totalSupply converted != totalAssets", baseTestId)
         );
-
-//        assertApproxEqAbs(
-//            adapter.totalAssets(),
-//            poolService.fromDiesel(iouBalance()),
-//            _delta_,
-//            string.concat("totalAssets != pool assets", baseTestId)
-//        );
     }
+
+    /*//////////////////////////////////////////////////////////////
+                    DEPOSIT/MINT/WITHDRAW/REDEEM
+    //////////////////////////////////////////////////////////////*/
+    function test__maxDeposit() public override {
+        prop_maxDeposit(bob);
+
+        // Deposit smth so withdraw on pause is not 0
+        _mintAsset(defaultAmount, address(this));
+        asset.approve(address(adapter), defaultAmount);
+        adapter.deposit(defaultAmount, address(this));
+
+        adapter.pause();
+        assertEq(adapter.maxDeposit(bob), type(uint256).max);
+    }
+
+    function test__harvest() public override {}
+
+    function test__redeem(uint8 fuzzAmount) public override {}
+    function test__RT_mint_redeem() public override {}
+    function test__RT_deposit_redeem() public override {}
+    function test__previewRedeem(uint8 fuzzAmount) public override {}
 }

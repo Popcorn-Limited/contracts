@@ -25,6 +25,7 @@ contract GearboxLeverage is AdapterBase {
     uint256 public leverageRatio;
     address public creditAccount;
     ICreditFacadeV3 public creditFacade;
+    ICreditManagerV3 public creditManager;
 
     /*//////////////////////////////////////////////////////////////
                                 INITIALIZATION
@@ -53,8 +54,18 @@ contract GearboxLeverage is AdapterBase {
         );
 
         creditFacade = ICreditFacadeV3(_creditFacade);
-        //creditManager = _creditManager;
+        creditManager = ICreditManagerV3(_creditManager);
         creditAccount = ICreditFacadeV3(_creditFacade).openCreditAccount(address(this), new MultiCall[](0), 0);
+
+        (   uint256 debt,
+            uint256 cumulativeIndexLastUpdate,
+            uint128 cumulativeQuotaInterest,
+            uint128 quotaFees,
+            uint256 enabledTokensMask,
+            uint16 flags,
+            uint64 lastDebtUpdate,
+            address borrower
+        ) = creditManager.creditAccountInfo(creditAccount);
 
         _name = string.concat(
             "VaultCraft GearboxLeverage ",
@@ -86,27 +97,27 @@ contract GearboxLeverage is AdapterBase {
 
     /*//////////////////////////////////////////////////////////////
                           ACCOUNTING LOGIC
-  //////////////////////////////////////////////////////////////*/
-
-    /// @dev Calculate totalAssets by converting the total diesel tokens to underlying amount
+    //////////////////////////////////////////////////////////////*/
     function _totalAssets() internal view override returns (uint256) {
-        return _getCreditAccountData().totalValue;
+        return IERC20(asset()).balanceOf(creditAccount); //_getCreditAccountData().totalValue;
     }
 
     /*//////////////////////////////////////////////////////////////
                     DEPOSIT/WITHDRAWAL LIMIT LOGIC
-  //////////////////////////////////////////////////////////////*/
+    //////////////////////////////////////////////////////////////*/
+    function maxDeposit(address) public view override returns (uint256) {
+        return type(uint256).max;
+    }
 
-    function maxDeposit(address) public view override returns (uint256) {}
-
-
-    /// @dev When poolService is paused and we didnt withdraw before (paused()) return 0
     function maxWithdraw(
         address owner
-    ) public view override returns (uint256) {}
+    ) public view override returns (uint256) {
+        return convertToAssets(balanceOf(owner));
+    }
 
-    /// @dev When poolService is paused and we didnt withdraw before (paused()) return 0
-    function maxRedeem(address owner) public view override returns (uint256) {}
+    function maxRedeem(address owner) public view override returns (uint256) {
+        return balanceOf(owner);
+    }
 
     /*//////////////////////////////////////////////////////////////
                           INTERNAL HOOKS LOGIC
@@ -179,7 +190,7 @@ contract GearboxLeverage is AdapterBase {
 
     function _getCreditAccountData() internal view returns (CollateralDebtData memory){
         return ICreditManagerV3(creditFacade.creditManager()).calcDebtAndCollateral(
-            address(this), CollateralCalcTask.GENERIC_PARAMS
+            creditAccount, CollateralCalcTask.GENERIC_PARAMS
         );
     }
 

@@ -2,7 +2,6 @@
 // Docgen-SOLC: 0.8.15
 
 pragma solidity ^0.8.15;
-
 import { ITestConfigStorage } from "../../abstract/ITestConfigStorage.sol";
 
 struct GearboxLeverageTestConfig {
@@ -10,7 +9,7 @@ struct GearboxLeverageTestConfig {
   address _creditManager;
 }
 
-contract GearboxLeverageTestConfigStorage {
+contract GearboxLeverageTestConfigStorage is ITestConfigStorage {
   GearboxLeverageTestConfig[] internal testConfigs;
 
   constructor() {
