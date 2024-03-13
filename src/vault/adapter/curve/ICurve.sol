@@ -68,6 +68,8 @@ interface ICurveLp {
     function N_COINS() external view returns (uint256);
 
     function coins(uint256 i) external view returns (address);
+
+    function get_virtual_price() external view returns (uint256);
 }
 
 interface ICurveRouter {

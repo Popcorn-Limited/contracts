@@ -16,6 +16,8 @@ contract CurveGaugeSingleAssetCompounderTest is AbstractAdapterTest {
     address arb = 0x912CE59144191C1204E64559FE8253a0e49E6548;
     uint256 forkId;
 
+    uint256 constant DISCOUNT_BPS = 50;
+
     function setUp() public {
         forkId = vm.createSelectFork(vm.rpcUrl("arbitrum"), 176205000);
         vm.selectFork(forkId);
@@ -94,7 +96,8 @@ contract CurveGaugeSingleAssetCompounderTest is AbstractAdapterTest {
             0xF0d4c12A5768D806021F80a262B4d39d26C58b8D, // curve router
             rewardTokens,
             minTradeAmounts,
-            swaps
+            swaps,
+            uint256(50)
         );
 
         vm.label(address(arb), "arb");
@@ -154,8 +157,6 @@ contract CurveGaugeSingleAssetCompounderTest is AbstractAdapterTest {
                 (address, address, address, int128)
             );
 
-        vm.expectEmit(false, false, false, true, address(adapter));
-        emit Initialized(uint8(1));
         adapter.initialize(
             abi.encode(_asset, address(this), strategy, 0, sigs, ""),
             externalRegistry,
@@ -209,6 +210,8 @@ contract CurveGaugeSingleAssetCompounderTest is AbstractAdapterTest {
     //////////////////////////////////////////////////////////////*/
 
     function test__unpause() public override {
+        uint defaultAmount = 1e18;
+        uint _delta_ = 1e16;
         _mintAssetAndApproveForAdapter(defaultAmount * 3, bob);
 
         vm.prank(bob);
@@ -247,6 +250,54 @@ contract CurveGaugeSingleAssetCompounderTest is AbstractAdapterTest {
         vm.startPrank(bob);
         adapter.deposit(defaultAmount, bob);
         adapter.mint(defaultAmount, bob);
+    }
+
+    function test__pause() public override {
+        uint _delta_ = 1e16;
+        uint defaultAmount = 1e18;
+        _mintAssetAndApproveForAdapter(defaultAmount, bob);
+
+        vm.prank(bob);
+        adapter.deposit(defaultAmount, bob);
+
+        uint256 oldTotalAssets = adapter.totalAssets();
+        uint256 oldTotalSupply = adapter.totalSupply();
+
+        adapter.pause();
+
+        // We simply withdraw into the adapter
+        // TotalSupply and Assets dont change
+        assertApproxEqAbs(
+            oldTotalAssets,
+            adapter.totalAssets(),
+            _delta_,
+            "totalAssets"
+        );
+        assertApproxEqAbs(
+            oldTotalSupply,
+            adapter.totalSupply(),
+            _delta_,
+            "totalSupply"
+        );
+        assertApproxEqAbs(
+            asset.balanceOf(address(adapter)),
+            oldTotalAssets,
+            _delta_,
+            "asset balance"
+        );
+        assertApproxEqAbs(iouBalance(), 0, _delta_, "iou balance");
+
+        vm.startPrank(bob);
+        // Deposit and mint are paused (maxDeposit/maxMint are set to 0 on pause)
+        vm.expectRevert();
+        adapter.deposit(defaultAmount, bob);
+
+        vm.expectRevert();
+        adapter.mint(defaultAmount, bob);
+
+        // Withdraw and Redeem dont revert
+        adapter.withdraw(defaultAmount / 10, bob, bob);
+        adapter.redeem(defaultAmount / 10, bob, bob);
     }
 
     /*//////////////////////////////////////////////////////////////
