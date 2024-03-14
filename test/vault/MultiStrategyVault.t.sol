@@ -1020,9 +1020,95 @@ contract MultiStrategyVaultTest is Test {
         vault.changeStrategies();
     }
 
+    function testFail_changeWithdrawalQueue_invalidLength() public {
+        uint256[] memory withdrawalQueue = new uint256[](1);
+        withdrawalQueue[0] = 0;
+
+        vault.setWithdrawalQueue(withdrawalQueue);
+    }
+
+    function testFail_changeWithdrawalQueue_invalidIndex() public {
+        uint256[] memory withdrawalQueue = new uint256[](2);
+        withdrawalQueue[0] = 5;
+        withdrawalQueue[1] = 0;
+
+        vault.setWithdrawalQueue(withdrawalQueue);
+    }
+
     /*//////////////////////////////////////////////////////////////
                           PULL AND PUSH FUNDS
     //////////////////////////////////////////////////////////////*/
+
+    function test_deposit_fundsIdle() public {
+        // set default index to be type max 
+        vault.setDefaultDepositIndex(type(uint256).max);
+
+        uint256 amount = 1e18;
+        _depositIntoVault(bob, amount);
+
+        assertEq(asset.balanceOf(address(strategies[0])), 0);
+        assertEq(asset.balanceOf(address(strategies[1])), 0);
+        assertEq(asset.balanceOf(address(vault)), amount);
+    }
+
+    function test_withdrawIdleFunds() public {
+         // set default index to be type max 
+        vault.setDefaultDepositIndex(type(uint256).max);
+
+        uint256 amount = 1e18;
+        _depositIntoVault(bob, amount);
+
+        assertEq(asset.balanceOf(address(strategies[0])), 0);
+        assertEq(asset.balanceOf(address(strategies[1])), 0);
+        assertEq(asset.balanceOf(address(vault)), amount);
+
+        uint256 balBobBefore = asset.balanceOf(bob);
+
+        vm.prank(bob);
+        vault.withdraw(amount);
+
+        assertEq(asset.balanceOf(address(strategies[0])), 0);
+        assertEq(asset.balanceOf(address(strategies[1])), 0);
+        assertEq(asset.balanceOf(address(vault)), 0);
+
+        assertEq(asset.balanceOf(bob), balBobBefore + amount);
+    }
+
+    function test_withdraw_queueOrder() public {
+        _depositIntoVault(bob, 10e18);
+
+        assertEq(asset.balanceOf(address(strategies[0])), 10e18);
+        assertEq(asset.balanceOf(address(strategies[1])), 0);
+
+        Allocation[] memory allocations = new Allocation[](2);
+        allocations[0] = Allocation({index: 0, amount: 10e18});
+
+        vault.pullFunds(allocations);
+
+        allocations[0] = Allocation({index: 0, amount: 1e18});
+        allocations[1] = Allocation({index: 1, amount: 9e18});
+
+        vault.pushFunds(allocations);
+
+        assertEq(asset.balanceOf(address(strategies[1])), 9e18);
+        assertEq(asset.balanceOf(address(strategies[0])), 1e18);
+
+        uint256[] memory withdrawalQueue = new uint256[](2);
+        withdrawalQueue[0] = 1;
+        withdrawalQueue[1] = 0;
+
+        vault.setWithdrawalQueue(withdrawalQueue);
+
+        vm.prank(bob);
+        vault.withdraw(95e17);
+
+        assertEq(asset.balanceOf(address(strategies[1])), 0);
+        assertEq(asset.balanceOf(address(strategies[0])), 5e17);
+    }
+
+    function testFail_setDefaultIndex_invalidIndex() public {
+        vault.setDefaultDepositIndex(5);
+    }
 
     function _depositIntoVault(address user, uint256 amount) internal {
         asset.mint(user, amount);
