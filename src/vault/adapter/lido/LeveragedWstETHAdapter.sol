@@ -147,17 +147,20 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
                             ACCOUNTING LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function _totalAssets() internal view override returns (uint256 total) {
+    function _totalAssets() internal view override returns (uint256) {
         uint256 debt = IwstETH(asset()).getWstETHByStETH(debtToken.balanceOf(address(this))); // wstETH DEBT
         uint256 collateral = interestToken.balanceOf(address(this)); // wstETH collateral
 
-        debt >= collateral ? total = 0 : total = collateral - debt;
+        if(debt >= collateral)
+            return 0;
 
-        // if there's debt, apply slippage to repay it
+        uint256 total = collateral - debt;
         if (debt > 0) {
+            // if there's debt, apply slippage to repay it
             uint256 slippageDebt = debt.mulDiv(slippage, 1e18, Math.Rounding.Ceil);
             total -= slippageDebt;
         }
+        return total;
     }
 
     // amount of WETH to borrow OR amount of WETH to repay (converted into wstETH amount internally)
