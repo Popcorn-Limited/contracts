@@ -2,7 +2,7 @@
 // Docgen-SOLC: 0.8.15
 
 pragma solidity ^0.8.15;
-
+import {Math} from "openzeppelin-contracts/utils/math/Math.sol";
 import {AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20} from "../../abstracts/AdapterBase.sol";
 import {
     ICreditFacadeV3, ICreditManagerV3, MultiCall, ICreditFacadeV3Multicall, CollateralDebtData, CollateralCalcTask
@@ -22,7 +22,7 @@ contract GearboxLeverage is AdapterBase {
     string internal _name;
     string internal _symbol;
 
-    uint256 public leverageRatio;
+    uint256 public targetLeverageRatio;
     address public creditAccount;
     ICreditFacadeV3 public creditFacade;
     ICreditManagerV3 public creditManager;
@@ -153,22 +153,41 @@ contract GearboxLeverage is AdapterBase {
         creditFacade.multicall(creditAccount, calls);
     }
 
-    function setHarvestValues(
+    function setTargetLeverageRatio(
         uint256 _leverageRatio
     ) public onlyOwner {
-        leverageRatio = _leverageRatio;
+        targetLeverageRatio = _leverageRatio;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                          HARVEST LOGIC
+    //////////////////////////////////////////////////////////////*/
+    function adjustLeverage(uint256 amount) public onlyOwner {
+        (uint256 currentLeverageRatio, CollateralDebtData memory collateralDebtData) = _calculateLeverageRatio();
+        uint256 currentCollateral = collateralDebtData.totalValue;
+        uint256 currentDebt = collateralDebtData.debt;
+
+        if(currentLeverageRatio > targetLeverageRatio) {
+            if(Math.ceilDiv((currentDebt - amount), (currentCollateral - amount)) < targetLeverageRatio) {
+                _reduceLeverage(amount);
+            }
+        } else {
+            if(Math.ceilDiv((currentDebt + amount), (currentCollateral + amount)) < targetLeverageRatio) {
+                _increaseLeverage(amount);
+            }
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
                           HELPERS
     //////////////////////////////////////////////////////////////*/
 
-    function _calculateLeverageRatio() internal view returns (uint256){
+    function _calculateLeverageRatio() internal view returns (uint256, CollateralDebtData memory){
         CollateralDebtData memory collateralDebtData = _getCreditAccountData();
-        return (collateralDebtData.totalValue + collateralDebtData.debt)/collateralDebtData.totalValue;
+        return (Math.ceilDiv(collateralDebtData.debt, collateralDebtData.totalValue), collateralDebtData);
     }
 
-    function _reduceDebtLevel(uint256 amount) internal {
+    function _reduceLeverage(uint256 amount) internal {
         MultiCall[] memory calls = new MultiCall[](1);
         calls[0] = MultiCall({
             target: address(creditFacade),
@@ -178,7 +197,7 @@ contract GearboxLeverage is AdapterBase {
         creditFacade.multicall(creditAccount, calls);
     }
 
-    function _increaseDebtLevel(uint256 amount) internal {
+    function _increaseLeverage(uint256 amount) internal {
         MultiCall[] memory calls = new MultiCall[](1);
         calls[0] = MultiCall({
             target: address(creditFacade),
