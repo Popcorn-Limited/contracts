@@ -394,7 +394,7 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
     //////////////////////////////////////////////////////////////*/
 
     // amount of WETH to borrow OR amount of WETH to repay (converted into wstETH amount internally)
-    function adjustLeverage() external {
+    function adjustLeverage() public {
         // get vault current leverage : debt/collateral
         (
             uint256 currentLTV,
@@ -447,19 +447,25 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
         uint256 maxLTV_,
         uint256 slippage_
     ) external onlyOwner {
-        // TODO adjust leverage if target / maxLTV was lowered and new targets are to slow
         targetLTV = targetLTV_;
         maxLTV = maxLTV_;
 
-        // TODO validate slippage
+        adjustLeverage();
+
         slippage = slippage_;
     }
 
-    function setUserUseReserveAsCollateral(uint256 amount) onlyOwner {
-        // TODO block if function was called
-        IERC20(baseAsset).safeTransferFrom(msg.sender, address(this), amount);
-        lendingPool.supply(asset(), assets, address(this), 0);
+    bool internal initCollateral;
 
-        lendingPool.setUserUseReserveAsCollateral(baseAsset, true);
+    function setUserUseReserveAsCollateral(uint256 amount) external onlyOwner {
+        if (initCollateral) revert InvalidInitialization();
+        address asset_ = asset();
+
+        IERC20(asset_).safeTransferFrom(msg.sender, address(this), amount);
+        lendingPool.supply(asset_, amount, address(this), 0);
+
+        lendingPool.setUserUseReserveAsCollateral(asset_, true);
+        
+        initCollateral = true;
     }
 }
