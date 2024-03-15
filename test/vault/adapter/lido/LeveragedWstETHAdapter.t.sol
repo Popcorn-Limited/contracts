@@ -264,6 +264,54 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
         assertEq(alice.balance, aliceBalBefore + dust);
     }
 
+    function test_setLeverageValues_lever_up() public {
+        uint256 amountMint = 10e18;
+        uint256 amountDeposit = 1e18;
+        uint256 amountWithdraw = 5e17;
+
+        deal(address(asset), bob, amountMint);
+
+        vm.startPrank(bob);
+        asset.approve(address(adapter), amountMint);
+        adapter.deposit(amountDeposit, bob);
+        vm.stopPrank();
+
+        // HARVEST - trigger leverage loop
+        adapterContract.adjustLeverage();
+
+        uint256 oldABalance = awstETH.balanceOf(address(adapter));
+        uint256 oldLTV = adapterContract.getLTV();
+
+        adapterContract.setLeverageValues(6.5e17, 7e17, 1e15);
+
+        assertGt(awstETH.balanceOf(address(adapter)), oldABalance);
+        assertGt(adapterContract.getLTV(), oldLTV);
+    }
+
+    function test_setLeverageValues_lever_down() public {
+        uint256 amountMint = 10e18;
+        uint256 amountDeposit = 1e18;
+        uint256 amountWithdraw = 5e17;
+
+        deal(address(asset), bob, amountMint);
+
+        vm.startPrank(bob);
+        asset.approve(address(adapter), amountMint);
+        adapter.deposit(amountDeposit, bob);
+        vm.stopPrank();
+
+        // HARVEST - trigger leverage loop
+        adapterContract.adjustLeverage();
+
+        uint256 oldABalance = awstETH.balanceOf(address(adapter));
+        uint256 oldLTV = adapterContract.getLTV();
+
+        adapterContract.setLeverageValues(3e17, 4e17, 1e15);
+
+        assertLt(awstETH.balanceOf(address(adapter)), oldABalance);
+        assertLt(adapterContract.getLTV(), oldLTV);
+    }
+
     /*//////////////////////////////////////////////////////////////
                           INITIALIZATION
     //////////////////////////////////////////////////////////////*/
