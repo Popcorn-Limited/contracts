@@ -150,21 +150,19 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
         ); // wstETH DEBT
         uint256 collateral = interestToken.balanceOf(address(this)); // wstETH collateral
 
-        if (debt >= collateral) {
-            return 0;
-        } else {
-            uint256 total = collateral - debt;
+        if (debt >= collateral) return 0;
+
+        uint256 total = collateral - debt;
+        if (debt > 0) {
             // if there's debt, apply slippage to repay it
-            if (debt > 0) {
-                uint256 slippageDebt = debt.mulDiv(
-                    slippage,
-                    1e18,
-                    Math.Rounding.Ceil
-                );
-                total -= slippageDebt;
-            }
-            return total;
+            uint256 slippageDebt = debt.mulDiv(
+                slippage,
+                1e18,
+                Math.Rounding.Ceil
+            );
+            total -= slippageDebt;
         }
+        return total;
     }
 
     function getLTV() public view returns (uint256 ltv) {
@@ -465,7 +463,7 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
         lendingPool.supply(asset_, amount, address(this), 0);
 
         lendingPool.setUserUseReserveAsCollateral(asset_, true);
-        
+
         initCollateral = true;
     }
 }
