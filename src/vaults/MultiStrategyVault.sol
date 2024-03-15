@@ -174,11 +174,11 @@ contract MultiStrategyVault is
         if (totalSupply() == 0) feesUpdatedAt = block.timestamp;
 
         uint256 feeShares = _convertToShares(
-            assets.mulDiv(uint256(fees.deposit), 1e18,  Math.Rounding.Floor),
-             Math.Rounding.Floor
+            assets.mulDiv(uint256(fees.deposit), 1e18, Math.Rounding.Floor),
+            Math.Rounding.Floor
         );
 
-        shares = _convertToShares(assets,  Math.Rounding.Floor) - feeShares;
+        shares = _convertToShares(assets, Math.Rounding.Floor) - feeShares;
         if (shares == 0) revert ZeroAmount();
 
         if (feeShares > 0) _mint(feeRecipient, feeShares);
@@ -187,8 +187,8 @@ contract MultiStrategyVault is
 
         IERC20(asset()).safeTransferFrom(msg.sender, address(this), assets);
 
-        // deposit into default index strategy or leave funds idle 
-        if(defaultDepositIndex != type(uint256).max) {
+        // deposit into default index strategy or leave funds idle
+        if (defaultDepositIndex != type(uint256).max) {
             strategies[defaultDepositIndex].deposit(assets, address(this));
         }
 
@@ -220,10 +220,10 @@ contract MultiStrategyVault is
         uint256 feeShares = shares.mulDiv(
             depositFee,
             1e18 - depositFee,
-             Math.Rounding.Floor
+            Math.Rounding.Floor
         );
 
-        assets = _convertToAssets(shares + feeShares,  Math.Rounding.Ceil);
+        assets = _convertToAssets(shares + feeShares, Math.Rounding.Ceil);
 
         if (assets > maxMint(receiver)) revert MaxError(assets);
 
@@ -233,8 +233,8 @@ contract MultiStrategyVault is
 
         IERC20(asset()).safeTransferFrom(msg.sender, address(this), assets);
 
-        // deposit into default index strategy or leave funds idle 
-        if(defaultDepositIndex != type(uint256).max) {
+        // deposit into default index strategy or leave funds idle
+        if (defaultDepositIndex != type(uint256).max) {
             strategies[defaultDepositIndex].deposit(assets, address(this));
         }
 
@@ -260,7 +260,7 @@ contract MultiStrategyVault is
         if (receiver == address(0)) revert InvalidReceiver();
         if (assets > maxWithdraw(owner)) revert MaxError(assets);
 
-        shares = _convertToShares(assets,  Math.Rounding.Ceil);
+        shares = _convertToShares(assets, Math.Rounding.Ceil);
         if (shares == 0) revert ZeroAmount();
 
         uint256 withdrawalFee = uint256(fees.withdrawal);
@@ -268,7 +268,7 @@ contract MultiStrategyVault is
         uint256 feeShares = shares.mulDiv(
             withdrawalFee,
             1e18 - withdrawalFee,
-             Math.Rounding.Floor
+            Math.Rounding.Floor
         );
 
         shares += feeShares;
@@ -311,10 +311,10 @@ contract MultiStrategyVault is
         uint256 feeShares = shares.mulDiv(
             uint256(fees.withdrawal),
             1e18,
-             Math.Rounding.Floor
+            Math.Rounding.Floor
         );
 
-        assets = _convertToAssets(shares - feeShares,  Math.Rounding.Floor);
+        assets = _convertToAssets(shares - feeShares, Math.Rounding.Floor);
 
         _burn(owner, shares);
 
@@ -328,26 +328,26 @@ contract MultiStrategyVault is
     function _withdrawStrategyFunds(uint256 amount, address receiver) internal {
         // caching
         IERC20 asset_ = IERC20(asset());
+        uint256[] memory withdrawalQueue_ = withdrawalQueue;
 
         // Get the Vault's floating balance.
         uint256 float = asset_.balanceOf(address(this));
 
-        if (amount < float){
+        if (amount < float) {
             asset_.safeTransfer(receiver, amount);
         } else {
             // If the amount is greater than the float, withdraw from strategies.
             if (float > 0) {
                 asset_.safeTransfer(receiver, float);
             }
-            uint256 currentIndex;
 
-            // Iterate the withdrawal queue and get indexes 
+            // Iterate the withdrawal queue and get indexes
             // Will revert due to underflow if we empty the stack before pulling the desired amount.
-            for (uint256 i=0; i<withdrawalQueue.length; i++) {
-                currentIndex = withdrawalQueue[i];
+            uint256 len = withdrawalQueue_.length;
+            for (uint256 i = 0; i < len; i++) {
                 uint256 missing = amount - float;
 
-                IERC4626 strategy = strategies[currentIndex];
+                IERC4626 strategy = strategies[withdrawalQueue_[i]];
 
                 uint256 withdrawableAssets = strategy.previewRedeem(
                     strategy.balanceOf(address(this))
@@ -365,7 +365,7 @@ contract MultiStrategyVault is
                     float += withdrawableAssets;
                 }
             }
-        } 
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -397,9 +397,9 @@ contract MultiStrategyVault is
         assets -= assets.mulDiv(
             uint256(fees.deposit),
             1e18,
-             Math.Rounding.Floor
+            Math.Rounding.Floor
         );
-        shares = _convertToShares(assets,  Math.Rounding.Floor);
+        shares = _convertToShares(assets, Math.Rounding.Floor);
     }
 
     /**
@@ -415,9 +415,9 @@ contract MultiStrategyVault is
         shares += shares.mulDiv(
             depositFee,
             1e18 - depositFee,
-             Math.Rounding.Floor
+            Math.Rounding.Floor
         );
-        assets = _convertToAssets(shares,  Math.Rounding.Ceil);
+        assets = _convertToAssets(shares, Math.Rounding.Ceil);
     }
 
     /**
@@ -429,13 +429,13 @@ contract MultiStrategyVault is
     function previewWithdraw(
         uint256 assets
     ) public view override returns (uint256 shares) {
-        shares = _convertToShares(assets,  Math.Rounding.Ceil);
+        shares = _convertToShares(assets, Math.Rounding.Ceil);
 
         uint256 withdrawalFee = uint256(fees.withdrawal);
         shares += shares.mulDiv(
             withdrawalFee,
             1e18 - withdrawalFee,
-             Math.Rounding.Floor
+            Math.Rounding.Floor
         );
     }
 
@@ -451,10 +451,10 @@ contract MultiStrategyVault is
         uint256 feeShares = shares.mulDiv(
             uint256(fees.withdrawal),
             1e18,
-             Math.Rounding.Floor
+            Math.Rounding.Floor
         );
 
-        assets = _convertToAssets(shares - feeShares,  Math.Rounding.Floor);
+        assets = _convertToAssets(shares - feeShares, Math.Rounding.Floor);
     }
 
     // TODO - is this now inherited anyways?
@@ -521,7 +521,7 @@ contract MultiStrategyVault is
                 ? managementFee.mulDiv(
                     totalAssets() * (block.timestamp - feesUpdatedAt),
                     SECONDS_PER_YEAR,
-                     Math.Rounding.Floor
+                    Math.Rounding.Floor
                 ) / 1e18
                 : 0;
     }
@@ -542,7 +542,7 @@ contract MultiStrategyVault is
                 ? performanceFee.mulDiv(
                     (shareValue - highWaterMark_) * totalSupply(),
                     1e36,
-                     Math.Rounding.Floor
+                    Math.Rounding.Floor
                 )
                 : 0;
     }
@@ -579,7 +579,7 @@ contract MultiStrategyVault is
                 : totalFee.mulDiv(
                     supply,
                     currentAssets - totalFee,
-                     Math.Rounding.Floor
+                    Math.Rounding.Floor
                 );
             _mint(feeRecipient, feeInShare);
         }
@@ -663,8 +663,8 @@ contract MultiStrategyVault is
     IERC4626[] public strategies;
     IERC4626[] public proposedStrategies;
     uint256 public proposedStrategyTime;
-    uint256 public defaultDepositIndex; // index of the strategy to deposit funds by default - if uint.max, leave funds idle 
-    uint256[] public withdrawalQueue; // indexes of the strategy order in the withdrawal queue 
+    uint256 public defaultDepositIndex; // index of the strategy to deposit funds by default - if uint.max, leave funds idle
+    uint256[] public withdrawalQueue; // indexes of the strategy order in the withdrawal queue
 
     event NewStrategiesProposed();
     event ChangedStrategies();
@@ -682,22 +682,22 @@ contract MultiStrategyVault is
     }
 
     function setDefaultDepositIndex(uint256 index) external onlyOwner {
-        if(index > strategies.length - 1 && index != type(uint256).max)
+        if (index > strategies.length - 1 && index != type(uint256).max)
             revert InvalidIndex();
 
         defaultDepositIndex = index;
     }
 
     function setWithdrawalQueue(uint256[] memory indexes) external onlyOwner {
-        if(indexes.length != strategies.length)
+        if (indexes.length != strategies.length)
             revert InvalidWithdrawalQueue();
-        
+
         withdrawalQueue = new uint256[](indexes.length);
 
-        for(uint256 i=0; i<indexes.length; i++) {
+        for (uint256 i = 0; i < indexes.length; i++) {
             uint256 index = indexes[i];
 
-            if(index > strategies.length - 1 && index != type(uint256).max)
+            if (index > strategies.length - 1 && index != type(uint256).max)
                 revert InvalidIndex();
 
             withdrawalQueue[i] = index;
