@@ -5,15 +5,7 @@ pragma solidity ^0.8.15;
 
 import {Test} from "forge-std/Test.sol";
 
-import {
-    LeveragedWstETHAdapter,
-    SafeERC20,
-    IERC20,
-    IERC20Metadata,
-    Math,
-    ILendingPool,
-    IwstETH
-} from "../../../../src/vault/adapter/lido/LeveragedWstETHAdapter.sol";
+import {LeveragedWstETHAdapter, SafeERC20, IERC20, IERC20Metadata, Math, ILendingPool, IwstETH} from "../../../../src/vault/adapter/lido/LeveragedWstETHAdapter.sol";
 import {IERC4626, IERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import {LevWstETHTestConfigStorage, LevWstETHTestConfig} from "./wstETHTestConfigStorage.sol";
 import {AbstractAdapterTest, ITestConfigStorage, IAdapter} from "../abstract/AbstractAdapterTest.sol";
@@ -25,7 +17,8 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
 
     int128 private constant WETHID = 0;
     int128 private constant STETHID = 1;
-    ICurveMetapool public constant StableSwapSTETH = ICurveMetapool(0xDC24316b9AE028F1497c275EB9192a3Ea0f67022);
+    ICurveMetapool public constant StableSwapSTETH =
+        ICurveMetapool(0xDC24316b9AE028F1497c275EB9192a3Ea0f67022);
 
     IERC20 wstETH = IERC20(0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0);
 
@@ -36,11 +29,13 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
     IERC20 vdWETH = IERC20(0x2e7576042566f8D6990e07A1B61Ad1efd86Ae70d); // variable debt token spark
 
     // ILendingPool lendingPool = ILendingPool(0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2); // aave
-    ILendingPool lendingPool = ILendingPool(0xC13e21B648A5Ee794902342038FF3aDAB66BE987); // spark
+    ILendingPool lendingPool =
+        ILendingPool(0xC13e21B648A5Ee794902342038FF3aDAB66BE987); // spark
 
     // address aaveDataProvider = address(0x7B4EB56E7CD4b454BA8ff71E4518426369a138a3); //aave
-    address aaveDataProvider = address(0xFc21d6d146E6086B8359705C8b28512a983db0cb); //spark
-    
+    address aaveDataProvider =
+        address(0xFc21d6d146E6086B8359705C8b28512a983db0cb); //spark
+
     uint256 slippage = 1e15;
 
     LeveragedWstETHAdapter adapterContract;
@@ -49,7 +44,9 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
         uint256 forkId = vm.createSelectFork(vm.rpcUrl("mainnet"), 19333530);
         vm.selectFork(forkId);
 
-        testConfigStorage = ITestConfigStorage(address(new LevWstETHTestConfigStorage()));
+        testConfigStorage = ITestConfigStorage(
+            address(new LevWstETHTestConfigStorage())
+        );
 
         _setUpTest(testConfigStorage.getTestConfig(0));
 
@@ -81,9 +78,17 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
         vm.label(address(asset), "asset");
         vm.label(address(this), "test");
 
-        adapter.initialize(abi.encode(asset, address(this), address(0), 0, sigs, ""), aaveDataProvider, testConfig);
+        adapter.initialize(
+            abi.encode(asset, address(this), address(0), 0, sigs, ""),
+            aaveDataProvider,
+            testConfig
+        );
 
         adapterContract = LeveragedWstETHAdapter(payable(address(adapter)));
+
+        deal(address(asset), address(this), 1);
+        IERC20(asset).approve(address(adapter), 1);
+        adapterContract.setUserUseReserveAsCollateral(1);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -117,16 +122,16 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
         vm.startPrank(bob);
         asset.approve(address(adapter), amountMint);
         adapter.deposit(amountDeposit, bob);
-        vm.stopPrank(); 
+        vm.stopPrank();
 
         // check total assets
-        assertEq(adapter.totalAssets(), amountDeposit);
+        assertEq(adapter.totalAssets(), amountDeposit + 1);
 
         // wstETH should be in lending market
         assertEq(wstETH.balanceOf(address(adapter)), 0);
 
         // adapter should hold wstETH aToken in equal amount
-        assertEq(awstETH.balanceOf(address(adapter)), amountDeposit);
+        assertEq(awstETH.balanceOf(address(adapter)), amountDeposit + 1);
 
         // adapter should not hold debt at this poin
         assertEq(vdWETH.balanceOf(address(adapter)), 0);
@@ -145,7 +150,7 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
         vm.startPrank(bob);
         asset.approve(address(adapter), amountMint);
         adapter.deposit(amountDeposit, bob);
-        vm.stopPrank(); 
+        vm.stopPrank();
 
         // HARVEST - trigger leverage loop
         adapterContract.adjustLeverage();
@@ -153,7 +158,9 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
         // check total assets - should be lt than totalDeposits
         assertLt(adapter.totalAssets(), amountDeposit);
 
-        uint256 slippageDebt = IwstETH(address(wstETH)).getWstETHByStETH(vdWETH.balanceOf(address(adapter)));
+        uint256 slippageDebt = IwstETH(address(wstETH)).getWstETHByStETH(
+            vdWETH.balanceOf(address(adapter))
+        );
         slippageDebt = slippageDebt.mulDiv(slippage, 1e18, Math.Rounding.Ceil);
 
         assertApproxEqAbs(
@@ -189,7 +196,7 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
         vm.startPrank(bob);
         asset.approve(address(adapter), amountMint);
         adapter.deposit(amountDeposit, bob);
-        vm.stopPrank(); 
+        vm.stopPrank();
 
         // HARVEST - trigger leverage loop
         adapterContract.adjustLeverage();
@@ -218,7 +225,7 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
         vm.startPrank(bob);
         asset.approve(address(adapter), amountMint);
         adapter.deposit(amountDeposit, bob);
-        vm.stopPrank(); 
+        vm.stopPrank();
 
         // HARVEST - trigger leverage loop - get debt
         adapterContract.adjustLeverage();
@@ -245,7 +252,7 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
         // adapter should not hold debt any debt
         assertEq(vdWETH.balanceOf(address(adapter)), 0);
 
-        // adapter might have some dust ETH 
+        // adapter might have some dust ETH
         uint256 dust = address(adapter).balance;
         assertGt(dust, 0);
 
@@ -257,6 +264,54 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
         assertEq(alice.balance, aliceBalBefore + dust);
     }
 
+    function test_setLeverageValues_lever_up() public {
+        uint256 amountMint = 10e18;
+        uint256 amountDeposit = 1e18;
+        uint256 amountWithdraw = 5e17;
+
+        deal(address(asset), bob, amountMint);
+
+        vm.startPrank(bob);
+        asset.approve(address(adapter), amountMint);
+        adapter.deposit(amountDeposit, bob);
+        vm.stopPrank();
+
+        // HARVEST - trigger leverage loop
+        adapterContract.adjustLeverage();
+
+        uint256 oldABalance = awstETH.balanceOf(address(adapter));
+        uint256 oldLTV = adapterContract.getLTV();
+
+        adapterContract.setLeverageValues(6.5e17, 7e17, 1e15);
+
+        assertGt(awstETH.balanceOf(address(adapter)), oldABalance);
+        assertGt(adapterContract.getLTV(), oldLTV);
+    }
+
+    function test_setLeverageValues_lever_down() public {
+        uint256 amountMint = 10e18;
+        uint256 amountDeposit = 1e18;
+        uint256 amountWithdraw = 5e17;
+
+        deal(address(asset), bob, amountMint);
+
+        vm.startPrank(bob);
+        asset.approve(address(adapter), amountMint);
+        adapter.deposit(amountDeposit, bob);
+        vm.stopPrank();
+
+        // HARVEST - trigger leverage loop
+        adapterContract.adjustLeverage();
+
+        uint256 oldABalance = awstETH.balanceOf(address(adapter));
+        uint256 oldLTV = adapterContract.getLTV();
+
+        adapterContract.setLeverageValues(3e17, 4e17, 1e15);
+
+        assertLt(awstETH.balanceOf(address(adapter)), oldABalance);
+        assertLt(adapterContract.getLTV(), oldLTV);
+    }
+
     /*//////////////////////////////////////////////////////////////
                           INITIALIZATION
     //////////////////////////////////////////////////////////////*/
@@ -265,7 +320,11 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
         assertEq(adapter.asset(), address(wstETH), "asset");
         assertEq(
             IERC20Metadata(address(adapter)).name(),
-            string.concat("VaultCraft Leveraged ", IERC20Metadata(address(asset)).name(), " Adapter"),
+            string.concat(
+                "VaultCraft Leveraged ",
+                IERC20Metadata(address(asset)).name(),
+                " Adapter"
+            ),
             "name"
         );
         assertEq(
@@ -274,6 +333,10 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
             "symbol"
         );
 
-        assertEq(asset.allowance(address(adapter), address(lendingPool)), type(uint256).max, "allowance");
+        assertEq(
+            asset.allowance(address(adapter), address(lendingPool)),
+            type(uint256).max,
+            "allowance"
+        );
     }
 }
