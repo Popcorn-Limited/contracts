@@ -8,7 +8,7 @@ import {IwstETH} from "./IwstETH.sol";
 import {Math} from "openzeppelin-contracts/utils/math/Math.sol";
 import {IWETH} from "../../../interfaces/external/IWETH.sol";
 import {ICurveMetapool} from "../../../interfaces/external/curve/ICurveMetapool.sol";
-import {ILendingPool, IAaveIncentives, IAToken, IFlashLoanReceiver, IProtocolDataProvider, DataTypes, IPoolAddressesProvider} from "../aave/aaveV3/IAaveV3.sol";
+import {ILendingPool, IAToken, IFlashLoanReceiver, IProtocolDataProvider, IPoolAddressesProvider} from "../aave/aaveV3/IAaveV3.sol";
 
 /// @title Leveraged wstETH yield adapter
 /// @author Andrea Di Nenno
@@ -54,8 +54,6 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
      * @param adapterInitData Encoded data for the base adapter initialization.
      * @param _initData Encoded data for the adapter initialization.
      * @dev `_slippage` - allowed slippage in 1e18
-     * @dev `_weth` - Weth address.
-     * @dev `_stEth` - stETH address.
      * @dev `_poolAddressesProvider` - aave Pool Addresses Provider contract address.
      * @dev `_targetLTV` - The desired loan to value of the vault CDP.
      * @dev `_maxLTV` - The max loan to value allowed before a automatic de-leverage
