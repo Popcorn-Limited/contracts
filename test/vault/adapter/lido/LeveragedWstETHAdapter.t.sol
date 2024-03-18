@@ -21,18 +21,10 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
         ICurveMetapool(0xDC24316b9AE028F1497c275EB9192a3Ea0f67022);
 
     IERC20 wstETH = IERC20(0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0);
-
-    // IERC20 awstETH = IERC20(0x0B925eD163218f6662a35e0f0371Ac234f9E9371); // interest token aave
     IERC20 awstETH = IERC20(0x12B54025C112Aa61fAce2CDB7118740875A566E9); // interest token spark
-
-    // IERC20 vdWETH = IERC20(0xeA51d7853EEFb32b6ee06b1C12E6dcCA88Be0fFE); // variable debt token aave
     IERC20 vdWETH = IERC20(0x2e7576042566f8D6990e07A1B61Ad1efd86Ae70d); // variable debt token spark
-
-    // ILendingPool lendingPool = ILendingPool(0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2); // aave
     ILendingPool lendingPool =
         ILendingPool(0xC13e21B648A5Ee794902342038FF3aDAB66BE987); // spark
-
-    // address aaveDataProvider = address(0x7B4EB56E7CD4b454BA8ff71E4518426369a138a3); //aave
     address aaveDataProvider =
         address(0xFc21d6d146E6086B8359705C8b28512a983db0cb); //spark
 
