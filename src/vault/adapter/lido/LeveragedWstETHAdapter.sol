@@ -272,16 +272,16 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
         address wstETH = asset();
 
         // account for eventual eth dust
-        borrowAmount += address(this).balance;
+        uint256 ethDust = address(this).balance;
 
         // unwrap into ETH
         weth.withdraw(borrowAmount);
-
+       
         // get amount of wstETH the vault receives
-        uint256 wstETHAmount = IwstETH(wstETH).getWstETHByStETH(borrowAmount);
+        uint256 wstETHAmount = IwstETH(wstETH).getWstETHByStETH(borrowAmount + ethDust);
 
         // stake borrowed eth and receive wstETH
-        (bool sent, ) = wstETH.call{value: borrowAmount}("");
+        (bool sent, ) = wstETH.call{value: borrowAmount + ethDust}("");
         require(sent, "Fail to send eth to wstETH");
 
         // deposit wstETH into lending protocol
