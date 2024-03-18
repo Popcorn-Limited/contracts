@@ -312,6 +312,18 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
         assertLt(adapterContract.getLTV(), oldLTV);
     }
 
+    function testFail_invalid_flashLoan() public {
+        address[] memory assets = new address[](1);
+        uint256[] memory amounts = new uint256[](1);
+        uint256[] memory premiums = new uint256[](1);
+
+        vm.prank(bob);
+        adapterContract.executeOperation(assets,amounts,premiums,bob, "");
+
+        vm.prank(address(adapter));
+        adapterContract.executeOperation(assets,amounts,premiums,bob, "");
+    }
+
     /*//////////////////////////////////////////////////////////////
                           INITIALIZATION
     //////////////////////////////////////////////////////////////*/

@@ -172,6 +172,8 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
     /*//////////////////////////////////////////////////////////////
                           FLASH LOAN LOGIC
     //////////////////////////////////////////////////////////////*/
+    
+    error NotFlashLoan();
 
     function ADDRESSES_PROVIDER()
         external
@@ -193,6 +195,9 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
         address initiator,
         bytes calldata params
     ) external override returns (bool) {
+        if(initiator != address(this) && msg.sender != address(lendingPool))
+            revert NotFlashLoan();
+            
         (bool isWithdraw, bool isFullWithdraw, uint256 assetsToWithdraw) = abi
             .decode(params, (bool, bool, uint256));
 
