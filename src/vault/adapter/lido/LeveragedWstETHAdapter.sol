@@ -27,7 +27,9 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
     ILendingPool public lendingPool;
     IPoolAddressesProvider public poolAddressesProvider;
 
-    IWETH public weth;
+    IWETH public constant weth = IWETH(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
+    address public constant stETH = address(0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84);
+
     IERC20 public debtToken; // aave eth debt token
     IERC20 public interestToken; // aave awstETH
 
@@ -67,15 +69,13 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
         __AdapterBase_init(adapterInitData);
 
         (
-            address _wETH,
-            address _stETH,
             address _poolAddressesProvider,
             uint256 _slippage,
             uint256 _targetLTV,
             uint256 _maxLTV
         ) = abi.decode(
                 _initData,
-                (address, address, address, uint256, uint256, uint256)
+                (address, uint256, uint256, uint256)
             );
 
         address baseAsset = asset();
@@ -84,7 +84,6 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
         maxLTV = _maxLTV;
 
         slippage = _slippage;
-        weth = IWETH(_wETH);
 
         // retrieve and set wstETH aToken, lending pool
         (address _aToken, , ) = IProtocolDataProvider(aaveDataProvider)
@@ -97,7 +96,8 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
         // retrieve and set WETH variable debt token
         (, , address _variableDebtToken) = IProtocolDataProvider(
             aaveDataProvider
-        ).getReserveTokensAddresses(_wETH);
+        ).getReserveTokensAddresses(address(weth));
+
         debtToken = IERC20(_variableDebtToken); // variable debt WETH token
 
         _name = string.concat(
@@ -114,7 +114,7 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
         IERC20(address(weth)).approve(address(lendingPool), type(uint256).max);
 
         // approve curve router to pull stETH for swapping
-        IERC20(address(_stETH)).approve(
+        IERC20(stETH).approve(
             address(StableSwapSTETH),
             type(uint256).max
         );
