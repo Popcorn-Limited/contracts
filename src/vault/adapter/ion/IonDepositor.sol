@@ -86,6 +86,7 @@ contract IonDepositor is AdapterBase {
     function _totalAssets() internal view override returns (uint256) {
         return ionPool.balanceOf(address(this));
     }
+
     /*//////////////////////////////////////////////////////////////
                           INTERNAL HOOKS LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -104,5 +105,13 @@ contract IonDepositor is AdapterBase {
         uint256
     ) internal virtual override {
         ionPool.withdraw(address(this), assets);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                          MANAGEMENT LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    function setProof(bytes32[] calldata newProof) external onlyOwner {
+        _proof = newProof;
     }
 }
