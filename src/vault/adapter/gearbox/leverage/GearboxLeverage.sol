@@ -48,7 +48,7 @@ contract GearboxLeverage is AdapterBase {
     ) external initializer {
         __AdapterBase_init(adapterInitData);
 
-        (address _creditFacade, address _creditManager) = abi.decode(
+        (address _creditFacade, address _creditManager, address _underlyingProtocol) = abi.decode(
             gearboxInitData,
             (address, address)
         );
@@ -180,7 +180,9 @@ contract GearboxLeverage is AdapterBase {
 
     /*//////////////////////////////////////////////////////////////
                           HELPERS
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////
+
+    //////////////*/
 
     function _calculateLeverageRatio() internal view returns (uint256, CollateralDebtData memory){
         CollateralDebtData memory collateralDebtData = _getCreditAccountData();

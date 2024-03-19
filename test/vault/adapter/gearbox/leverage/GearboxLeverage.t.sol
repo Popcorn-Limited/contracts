@@ -9,8 +9,13 @@ import {GearboxLeverage, IERC20, IERC20Metadata} from "../../../../../src/vault/
 import {GearboxLeverageTestConfigStorage, GearboxLeverageTestConfig} from "./GearboxLeverageTestConfigStorage.sol";
 import {AbstractAdapterTest, ITestConfigStorage, IAdapter} from "../../abstract/AbstractAdapterTest.sol";
 
+interface ILeverageAdapter is IAdapter {
+    function adjustLeverage(uint256 amount) external;
+}
+
 
 contract GearboxLeverageTest is AbstractAdapterTest {
+
     //IERC20 _asset;
     address USDC = address(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
     address DAI = address(0x6B175474E89094C44Da98b954EedeAC495271d0F);
@@ -121,6 +126,25 @@ contract GearboxLeverageTest is AbstractAdapterTest {
         adapter.pause();
         assertEq(adapter.maxDeposit(bob), type(uint256).max);
     }
+
+    /*//////////////////////////////////////////////////////////////
+                            ADJUST LEVERAGE
+    //////////////////////////////////////////////////////////////*/
+    function test__adjustLeverage() public {
+//        _mintAssetAndApproveForAdapter(reqAssets, bob);
+//        vm.prank(bob);
+//        adapter.deposit(reqAssets, bob);
+
+        _mintAsset(defaultAmount, bob);
+        vm.prank(bob);
+        asset.approve(address(adapter), defaultAmount);
+
+//        _mintAsset(defaultAmount, address(this));
+        vm.prank(bob);
+        adapter.deposit(defaultAmount, bob);
+        ILeverageAdapter(address(adapter)).adjustLeverage(1);
+    }
+
 
     function test__harvest() public override {}
 
