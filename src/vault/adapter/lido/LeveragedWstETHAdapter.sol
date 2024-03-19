@@ -5,6 +5,7 @@ pragma solidity ^0.8.15;
 
 import {AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20, Math, IStrategy, IAdapter} from "../abstracts/AdapterBase.sol";
 import {IwstETH} from "./IwstETH.sol";
+import {ILido} from "./ILido.sol";
 import {Math} from "openzeppelin-contracts/utils/math/Math.sol";
 import {IWETH} from "../../../interfaces/external/IWETH.sol";
 import {ICurveMetapool} from "../../../interfaces/external/curve/ICurveMetapool.sol";
@@ -27,8 +28,10 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
     ILendingPool public lendingPool;
     IPoolAddressesProvider public poolAddressesProvider;
 
-    IWETH public constant weth = IWETH(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
-    address public constant stETH = address(0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84);
+    IWETH public constant weth =
+        IWETH(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
+    address public constant stETH =
+        address(0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84);
 
     IERC20 public debtToken; // aave eth debt token
     IERC20 public interestToken; // aave awstETH
@@ -71,10 +74,7 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
             uint256 _slippage,
             uint256 _targetLTV,
             uint256 _maxLTV
-        ) = abi.decode(
-                _initData,
-                (address, uint256, uint256, uint256)
-            );
+        ) = abi.decode(_initData, (address, uint256, uint256, uint256));
 
         address baseAsset = asset();
 
@@ -112,10 +112,7 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
         IERC20(address(weth)).approve(address(lendingPool), type(uint256).max);
 
         // approve curve router to pull stETH for swapping
-        IERC20(stETH).approve(
-            address(StableSwapSTETH),
-            type(uint256).max
-        );
+        IERC20(stETH).approve(address(StableSwapSTETH), type(uint256).max);
     }
 
     receive() external payable {}
@@ -144,7 +141,7 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
 
     function _totalAssets() internal view override returns (uint256) {
         uint256 debt = IwstETH(asset()).getWstETHByStETH(
-            debtToken.balanceOf(address(this))
+            getstETHAmount(debtToken.balanceOf(address(this)))
         ); // wstETH DEBT
         uint256 collateral = interestToken.balanceOf(address(this)); // wstETH collateral
 
@@ -170,7 +167,7 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
     /*//////////////////////////////////////////////////////////////
                           FLASH LOAN LOGIC
     //////////////////////////////////////////////////////////////*/
-    
+
     error NotFlashLoan();
 
     function ADDRESSES_PROVIDER()
@@ -193,9 +190,9 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
         address initiator,
         bytes calldata params
     ) external override returns (bool) {
-        if(initiator != address(this) && msg.sender != address(lendingPool))
+        if (initiator != address(this) && msg.sender != address(lendingPool))
             revert NotFlashLoan();
-            
+
         (bool isWithdraw, bool isFullWithdraw, uint256 assetsToWithdraw) = abi
             .decode(params, (bool, bool, uint256));
 
@@ -276,9 +273,11 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
 
         // unwrap into ETH
         weth.withdraw(borrowAmount);
-       
+
         // get amount of wstETH the vault receives
-        uint256 wstETHAmount = IwstETH(wstETH).getWstETHByStETH(borrowAmount + ethDust);
+        uint256 wstETHAmount = IwstETH(wstETH).getWstETHByStETH(
+            getstETHAmount(borrowAmount + ethDust)
+        );
 
         // stake borrowed eth and receive wstETH
         (bool sent, ) = wstETH.call{value: borrowAmount + ethDust}("");
@@ -299,12 +298,14 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
 
         // get flash loan amount of wstETH
         uint256 flashLoanWstETHAmount = IwstETH(asset).getWstETHByStETH(
-            flashLoanDebt
+            getstETHAmount(flashLoanDebt)
         );
 
         // get slippage buffer for swapping with flashLoanDebt as minAmountOut
-        uint256 wstETHBuffer = IwstETH(asset).getWstETHByStETH(
-            flashLoanDebt.mulDiv(slippage, 1e18, Math.Rounding.Floor)
+        uint256 wstETHBuffer = flashLoanWstETHAmount.mulDiv(
+            slippage,
+            1e18,
+            Math.Rounding.Floor
         );
 
         // withdraw wstETH from aave
@@ -388,6 +389,21 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
             minAmount
         );
         weth.deposit{value: minAmount}(); // wrap precise amount of eth for flash loan repayment
+    }
+
+    // returns steth/eth ratio
+    function getstETHAmount(
+        uint256 ethAmount
+    ) internal view returns (uint256 stETHAmount) {
+        // ratio = stETh totSupply / total protocol owned ETH
+        ILido stETHImpl = ILido(stETH);
+        uint256 ratio = stETHImpl.totalSupply().mulDiv(
+            1e18,
+            stETHImpl.getTotalPooledEther(),
+            Math.Rounding.Floor
+        );
+
+        stETHAmount = ratio.mulDiv(ethAmount, 1e18, Math.Rounding.Floor);
     }
 
     /*//////////////////////////////////////////////////////////////
