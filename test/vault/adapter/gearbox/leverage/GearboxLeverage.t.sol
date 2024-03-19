@@ -37,7 +37,7 @@ contract GearboxLeverageTest is AbstractAdapterTest {
     }
 
     function _setUpTest(bytes memory testConfig) internal {
-        (address _creditFacade, address _creditManager) = abi.decode(testConfig, (address, address));
+        (address _creditFacade, address _creditManager, address _strategyAdapter) = abi.decode(testConfig, (address, address, address ));
 
         setUpBaseTest(
             IERC20(DAI),
@@ -131,15 +131,10 @@ contract GearboxLeverageTest is AbstractAdapterTest {
                             ADJUST LEVERAGE
     //////////////////////////////////////////////////////////////*/
     function test__adjustLeverage() public {
-//        _mintAssetAndApproveForAdapter(reqAssets, bob);
-//        vm.prank(bob);
-//        adapter.deposit(reqAssets, bob);
-
         _mintAsset(defaultAmount, bob);
         vm.prank(bob);
         asset.approve(address(adapter), defaultAmount);
 
-//        _mintAsset(defaultAmount, address(this));
         vm.prank(bob);
         adapter.deposit(defaultAmount, bob);
         ILeverageAdapter(address(adapter)).adjustLeverage(1);

@@ -1,33 +1,32 @@
 // SPDX-License-Identifier: MIT
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023
-pragma solidity ^0.8.17;
-
-import {IConvexV1BaseRewardPoolAdapter} from "../../../interfaces/convex/IConvexV1BaseRewardPoolAdapter.sol";
-
+pragma solidity ^0.8.15;
+import { MultiCall } from "../../IGearboxV3.sol";
+import { IConvexV1BaseRewardPoolAdapter } from "../IAdapter.sol";
 
 library ConvexV1BaseRewardPool {
-    function stake(address protocolAdapter, uint256 amount) internal pure returns (MultiCall memory) {
+    function stake(address strategyAdapter, uint256 amount) internal pure returns (MultiCall memory) {
         return MultiCall({
-            target: protocolAdapter,
+            target: strategyAdapter,
             callData: abi.encodeCall(IConvexV1BaseRewardPoolAdapter.stake, (amount))
         });
     }
 
-    function withdraw(address protocolAdapter, uint256 amount, bool claim)
+    function withdraw(address strategyAdapter, uint256 amount, bool claim)
         internal
         pure
         returns (MultiCall memory)
     {
         return MultiCall({
-            target: protocolAdapter,
+            target: strategyAdapter,
             callData: abi.encodeCall(IConvexV1BaseRewardPoolAdapter.withdraw, (amount, claim))
         });
     }
 
-    function getReward(address protocolAdapter) internal pure returns (MultiCall memory) {
+    function getReward(address strategyAdapter) internal pure returns (MultiCall memory) {
         return MultiCall({
-            target: protocolAdapter,
+            target: strategyAdapter,
             callData: abi.encodeCall(IConvexV1BaseRewardPoolAdapter.getReward, ())
         });
     }

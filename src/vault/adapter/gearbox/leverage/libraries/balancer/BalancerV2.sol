@@ -1,46 +1,35 @@
 // SPDX-License-Identifier: MIT
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.15;
 
-import {
-    IAsset,
-    SingleSwap,
-    SingleSwapDiff,
-    FundManagement,
-    SwapKind,
-    BatchSwapStep,
-    JoinPoolRequest,
-    ExitPoolRequest,
-    IBalancerV2VaultAdapter
-} from "../../../interfaces/balancer/IBalancerV2VaultAdapter.sol";
-
-interface BalancerV2_Multicaller {}
+import { MultiCall } from "../../IGearboxV3.sol";
+import { IAsset, IBalancerV2VaultAdapter } from "../IAdapter.sol";
 
 library BalancerV2 {
 
     function joinPoolSingleAsset(
-        address protocolAdapter,
+        address strategyAdapter,
         bytes32 poolId,
         IAsset assetIn,
         uint256 amountIn,
         uint256 minAmountOut
     ) internal pure returns (MultiCall memory) {
         return MultiCall({
-            target: protocolAdapter,
+            target: strategyAdapter,
             callData: abi.encodeCall(IBalancerV2VaultAdapter.joinPoolSingleAsset, (poolId, assetIn, amountIn, minAmountOut))
         });
     }
 
     function exitPoolSingleAsset(
-        address protocolAdapter,
+        address strategyAdapter,
         bytes32 poolId,
         IAsset assetOut,
         uint256 amountIn,
         uint256 minAmountOut
     ) internal pure returns (MultiCall memory) {
         return MultiCall({
-            target: protocolAdapter,
+            target: strategyAdapter,
             callData: abi.encodeCall(
                 IBalancerV2VaultAdapter.exitPoolSingleAsset, (poolId, assetOut, amountIn, minAmountOut)
                 )

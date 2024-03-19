@@ -7,6 +7,7 @@ import {AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20} from "../../abstr
 import {
     ICreditFacadeV3, ICreditManagerV3, MultiCall, ICreditFacadeV3Multicall, CollateralDebtData, CollateralCalcTask
 } from "./IGearboxV3.sol";
+import {YearnV2} from "./libraries/yearn/YearnV2.sol";
 
 /**
  * @title   Gearbox Passive Pool Adapter
@@ -24,8 +25,11 @@ contract GearboxLeverage is AdapterBase {
 
     uint256 public targetLeverageRatio;
     address public creditAccount;
+    address public strategyAdapter;
     ICreditFacadeV3 public creditFacade;
     ICreditManagerV3 public creditManager;
+
+    address public constant YEARN_USDC_ADAPTER = 0x2fA039b014FF3167472a1DA127212634E7a57564;
 
     /*//////////////////////////////////////////////////////////////
                                 INITIALIZATION
@@ -48,11 +52,11 @@ contract GearboxLeverage is AdapterBase {
     ) external initializer {
         __AdapterBase_init(adapterInitData);
 
-        (address _creditFacade, address _creditManager, address _underlyingProtocol) = abi.decode(
-            gearboxInitData,
-            (address, address)
+        (address _creditFacade, address _creditManager, address _protocolAdapter) = abi.decode(
+            gearboxInitData, (address, address, address)
         );
 
+        strategyAdapter = _protocolAdapter;
         creditFacade = ICreditFacadeV3(_creditFacade);
         creditManager = ICreditManagerV3(_creditManager);
         creditAccount = ICreditFacadeV3(_creditFacade).openCreditAccount(address(this), new MultiCall[](0), 0);
@@ -162,7 +166,7 @@ contract GearboxLeverage is AdapterBase {
     /*//////////////////////////////////////////////////////////////
                           HARVEST LOGIC
     //////////////////////////////////////////////////////////////*/
-    function adjustLeverage(uint256 amount) public onlyOwner {
+    function adjustLeverage(uint256 amount, bytes memory data) public onlyOwner {
         (uint256 currentLeverageRatio, CollateralDebtData memory collateralDebtData) = _calculateLeverageRatio();
         uint256 currentCollateral = collateralDebtData.totalValue;
         uint256 currentDebt = collateralDebtData.debt;
@@ -174,6 +178,7 @@ contract GearboxLeverage is AdapterBase {
         } else {
             if(Math.ceilDiv((currentDebt + amount), (currentCollateral + amount)) < targetLeverageRatio) {
                 _increaseLeverage(amount);
+                _depositToGearboxStrategy(amount, data);
             }
         }
     }
@@ -231,5 +236,11 @@ contract GearboxLeverage is AdapterBase {
         }
 
         return true;
+    }
+
+    function _depositToGearboxStrategy(uint256 amount, bytes memory data) internal {
+        if(strategyAdapter == YEARN_USDC_ADAPTER){
+            YearnV2.deposit(strategyAdapter, amount);
+        }
     }
 }
