@@ -104,6 +104,13 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
         );
     }
 
+    function increasePricePerShare(uint256 amount) public override {
+        deal(address(wstETH), address(adapter), 10 ether);
+        vm.startPrank(address(adapter));
+        lendingPool.supply(address(wstETH), 10 ether, address(adapter), 0);
+        vm.stopPrank();
+    }
+
     function test_deposit() public {
         uint256 amountMint = 10e18;
         uint256 amountDeposit = 1e18;
