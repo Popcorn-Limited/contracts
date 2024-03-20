@@ -113,6 +113,9 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
 
         // approve curve router to pull stETH for swapping
         IERC20(stETH).approve(address(StableSwapSTETH), type(uint256).max);
+
+        // set efficiency mode 
+        lendingPool.setUserEMode(uint8(1));
     }
 
     receive() external payable {}
@@ -428,7 +431,7 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
                         1e18,
                         Math.Rounding.Floor
                     )
-                )).mulDiv(1e18, (1e18 - targetLTV), Math.Rounding.Floor);
+                )).mulDiv(1e18, (1e18 - targetLTV), Math.Rounding.Ceil);
 
             // flash loan eth to repay part of the debt
             _flashLoanETH(amountETH, 0, 0, false);
@@ -436,11 +439,11 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
             uint256 amountETH = (targetLTV.mulDiv(
                 currentCollateral,
                 1e18,
-                Math.Rounding.Floor
+                Math.Rounding.Ceil
             ) - currentDebt).mulDiv(
                     1e18,
                     (1e18 - targetLTV),
-                    Math.Rounding.Floor
+                    Math.Rounding.Ceil
                 );
 
             // use eventual ETH dust remained in the contract
@@ -461,14 +464,15 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
 
     function setLeverageValues(
         uint256 targetLTV_,
-        uint256 maxLTV_,
-        uint256 slippage_
+        uint256 maxLTV_
     ) external onlyOwner {
         targetLTV = targetLTV_;
         maxLTV = maxLTV_;
 
         adjustLeverage();
+    }
 
+    function setSlippage(uint256 slippage_) external onlyOwner {
         slippage = slippage_;
     }
 

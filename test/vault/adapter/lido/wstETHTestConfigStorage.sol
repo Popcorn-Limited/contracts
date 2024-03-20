@@ -20,9 +20,9 @@ contract LevWstETHTestConfigStorage is ITestConfigStorage {
             LevWstETHTestConfig(
                 address(0x02C3eA4e34C0cBd694D2adFa2c690EECbC1793eE),
                 1e15, 
-                5e17,
-                6e17
-            ) // 10 BPS / 50% targetLTV - 60% maxLTV
+                80e16,
+                85e16
+            ) // 10 BPS / 80% targetLTV - 85% maxLTV
         );
     }
 

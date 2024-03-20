@@ -99,6 +99,8 @@ interface ILendingPool {
 
   function setUserUseReserveAsCollateral(address asset, bool useAsCollateral) external;
 
+  function setUserEMode(uint8 category) external;
+
   /**
    * @dev Returns the state and configuration of the reserve
    * @param asset The address of the underlying asset of the reserve

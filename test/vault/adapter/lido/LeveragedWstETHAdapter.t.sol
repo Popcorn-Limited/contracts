@@ -281,7 +281,7 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
         uint256 oldABalance = awstETH.balanceOf(address(adapter));
         uint256 oldLTV = adapterContract.getLTV();
 
-        adapterContract.setLeverageValues(6.5e17, 7e17, 1e15);
+        adapterContract.setLeverageValues(8.5e17, 8.8e17);
 
         assertGt(awstETH.balanceOf(address(adapter)), oldABalance);
         assertGt(adapterContract.getLTV(), oldLTV);
@@ -305,10 +305,19 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
         uint256 oldABalance = awstETH.balanceOf(address(adapter));
         uint256 oldLTV = adapterContract.getLTV();
 
-        adapterContract.setLeverageValues(3e17, 4e17, 1e15);
+        adapterContract.setLeverageValues(3e17, 4e17);
 
         assertLt(awstETH.balanceOf(address(adapter)), oldABalance);
         assertLt(adapterContract.getLTV(), oldLTV);
+    }
+
+    function test_setSlippage() public {
+        uint256 oldSlippage = adapterContract.slippage();
+        uint256 newSlippage = oldSlippage + 1;
+        adapterContract.setSlippage(newSlippage);
+
+        assertNotEq(oldSlippage, adapterContract.slippage());
+        assertEq(adapterContract.slippage(), newSlippage);
     }
 
     function testFail_invalid_flashLoan() public {
