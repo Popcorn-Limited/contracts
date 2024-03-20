@@ -5,10 +5,12 @@ pragma solidity ^0.8.15;
 
 import {AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20, Math, IStrategy, IAdapter} from "../abstracts/AdapterBase.sol";
 import {IwstETH} from "../lido/IwstETH.sol";
+import {ILido} from "../lido/ILido.sol";
 import {Math} from "openzeppelin-contracts/utils/math/Math.sol";
 import {IWETH} from "../../../interfaces/external/IWETH.sol";
 import {ICurveMetapool} from "../../../interfaces/external/curve/ICurveMetapool.sol";
 import {IMorpho, IMorphoFlashLoanCallback, MarketParams} from "./IMorpho.sol";
+import "forge-std/console.sol";
 
 /// @title Leveraged wstETH yield adapter
 /// @author Andrea Di Nenno
@@ -80,8 +82,13 @@ contract MorphoLeveragedWstETHAdapter is AdapterBase, IMorphoFlashLoanCallback {
         maxLTV = _maxLTV;
         slippage = _slippage;
 
-        (address loanToken, address collateralToken, address oracle, address irm, uint256 lltv) = 
-        morpho.idToMarketParams(_marketId);
+        (
+            address loanToken, 
+            address collateralToken, 
+            address oracle, 
+            address irm, 
+            uint256 lltv
+        ) = morpho.idToMarketParams(_marketId);
 
         if(collateralToken != baseAsset)
             revert DifferentAssets(collateralToken, baseAsset);
@@ -138,10 +145,11 @@ contract MorphoLeveragedWstETHAdapter is AdapterBase, IMorphoFlashLoanCallback {
                             ACCOUNTING LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function _totalAssets() internal view override returns (uint256) {
+    function _totalAssets() internal view override(AdapterBase) returns (uint256) {
         uint256 debt = IwstETH(asset()).getWstETHByStETH(
-            debtToken.balanceOf(address(this))
+            getstETHAmount(debtToken.balanceOf(address(this)))
         ); // wstETH DEBT
+
         uint256 collateral = interestToken.balanceOf(address(this)); // wstETH collateral
 
         if (debt >= collateral) return 0;
@@ -179,8 +187,6 @@ contract MorphoLeveragedWstETHAdapter is AdapterBase, IMorphoFlashLoanCallback {
 
         if (isWithdraw) {
             // flash loan is to repay ETH debt as part of a withdrawal
-
-            // repay cdp WETH debt
             morpho.repay(marketParams, assets, 0, address(this), hex"");
 
             // withdraw collateral, swap, repay flashloan
@@ -197,7 +203,7 @@ contract MorphoLeveragedWstETHAdapter is AdapterBase, IMorphoFlashLoanCallback {
 
     /// @notice Deposit wstETH into lending protocol
     function _protocolDeposit(uint256 assets, uint256) internal override(AdapterBase) {
-        // deposit wstETH into aave - receive aToken here
+        console.log("LOL");
         morpho.supply(marketParams, assets, 0, address(this), hex"");
     }
 
@@ -238,7 +244,7 @@ contract MorphoLeveragedWstETHAdapter is AdapterBase, IMorphoFlashLoanCallback {
                     );
 
             // flash loan debtToRepay - mode 0 - flash loan is repaid at the end
-            _flashLoanETH(debtToRepay, assets, 0, isFullWithdraw);
+            _flashLoanETH(debtToRepay, assets, true, isFullWithdraw);
         }
     }
 
@@ -253,7 +259,9 @@ contract MorphoLeveragedWstETHAdapter is AdapterBase, IMorphoFlashLoanCallback {
         weth.withdraw(borrowAmount);
        
         // get amount of wstETH the vault receives
-        uint256 wstETHAmount = IwstETH(wstETH).getWstETHByStETH(borrowAmount + ethDust);
+        uint256 wstETHAmount = IwstETH(wstETH).getWstETHByStETH(
+            getstETHAmount(borrowAmount + ethDust)
+        );
 
         // stake borrowed eth and receive wstETH
         (bool sent, ) = wstETH.call{value: borrowAmount + ethDust}("");
@@ -274,7 +282,7 @@ contract MorphoLeveragedWstETHAdapter is AdapterBase, IMorphoFlashLoanCallback {
 
         // get flash loan amount of wstETH
         uint256 flashLoanWstETHAmount = IwstETH(asset).getWstETHByStETH(
-            flashLoanDebt
+            getstETHAmount(flashLoanDebt)
         );
 
         // get slippage buffer for swapping with flashLoanDebt as minAmountOut
@@ -321,16 +329,12 @@ contract MorphoLeveragedWstETHAdapter is AdapterBase, IMorphoFlashLoanCallback {
     }
 
     // borrow WETH from lending protocol
-    // interestRateMode = 2 -> flash loan eth and deposit into cdp, don't repay
-    // interestRateMode = 0 -> flash loan eth to repay cdp, have to repay flash loan at the end
     function _flashLoanETH(
         uint256 amount,
         uint256 assetsToWithdraw,
-        uint256 interestRateMode,
+        bool isWithdraw,
         bool isFullWithdraw
     ) internal {
-        bool isWithdraw = interestRateMode == 0 ? true : false;
-
         morpho.flashLoan(
             address(weth),
             amount,
@@ -352,6 +356,21 @@ contract MorphoLeveragedWstETHAdapter is AdapterBase, IMorphoFlashLoanCallback {
             minAmount
         );
         weth.deposit{value: minAmount}(); // wrap precise amount of eth for flash loan repayment
+    }
+
+    // returns steth/eth ratio
+    function getstETHAmount(
+        uint256 ethAmount
+    ) internal view returns (uint256 stETHAmount) {
+        // ratio = stETh totSupply / total protocol owned ETH
+        ILido stETHImpl = ILido(stETH);
+        uint256 ratio = stETHImpl.totalSupply().mulDiv(
+            1e18,
+            stETHImpl.getTotalPooledEther(),
+            Math.Rounding.Floor
+        );
+
+        stETHAmount = ratio.mulDiv(ethAmount, 1e18, Math.Rounding.Floor);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -379,7 +398,7 @@ contract MorphoLeveragedWstETHAdapter is AdapterBase, IMorphoFlashLoanCallback {
                 )).mulDiv(1e18, (1e18 - targetLTV), Math.Rounding.Floor);
 
             // flash loan eth to repay part of the debt
-            _flashLoanETH(amountETH, 0, 0, false);
+            _flashLoanETH(amountETH, 0, false, false);
         } else {
             uint256 amountETH = (targetLTV.mulDiv(
                 currentCollateral,
@@ -395,7 +414,7 @@ contract MorphoLeveragedWstETHAdapter is AdapterBase, IMorphoFlashLoanCallback {
             amountETH -= address(this).balance;
 
             // flash loan WETH from lending protocol and add to cdp
-            _flashLoanETH(amountETH, 0, 2, false);
+            _flashLoanETH(amountETH, 0, false, false);
         }
     }
 
