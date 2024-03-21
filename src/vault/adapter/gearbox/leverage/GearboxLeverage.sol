@@ -7,7 +7,6 @@ import {AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20} from "../../abstr
 import {
     ICreditFacadeV3, ICreditManagerV3, MultiCall, ICreditFacadeV3Multicall, CollateralDebtData, CollateralCalcTask
 } from "./IGearboxV3.sol";
-import {YearnV2} from "./libraries/yearn/YearnV2.sol";
 
 /**
  * @title   Gearbox Passive Pool Adapter
@@ -17,7 +16,7 @@ import {YearnV2} from "./libraries/yearn/YearnV2.sol";
  * An ERC4626 compliant Wrapper for https://github.com/Gearbox-protocol/core-v2/blob/main/contracts/pool/PoolService.sol.
  * Allows wrapping Passive pools.
  */
-contract GearboxLeverage is AdapterBase {
+abstract contract GearboxLeverage is AdapterBase {
     using SafeERC20 for IERC20;
 
     string internal _name;
@@ -173,12 +172,13 @@ contract GearboxLeverage is AdapterBase {
 
         if(currentLeverageRatio > targetLeverageRatio) {
             if(Math.ceilDiv((currentDebt - amount), (currentCollateral - amount)) < targetLeverageRatio) {
+                _gearboxStrategyWithdraw(data);
                 _reduceLeverage(amount);
             }
         } else {
             if(Math.ceilDiv((currentDebt + amount), (currentCollateral + amount)) < targetLeverageRatio) {
                 _increaseLeverage(amount);
-                _depositToGearboxStrategy(amount, data);
+                _gearboxStrategyDeposit(data);
             }
         }
     }
@@ -238,9 +238,6 @@ contract GearboxLeverage is AdapterBase {
         return true;
     }
 
-    function _depositToGearboxStrategy(uint256 amount, bytes memory data) internal {
-        if(strategyAdapter == YEARN_USDC_ADAPTER){
-            YearnV2.deposit(strategyAdapter, amount);
-        }
-    }
+    function _gearboxStrategyDeposit(bytes memory data) internal virtual {}
+    function _gearboxStrategyWithdraw(bytes memory data) internal virtual {}
 }

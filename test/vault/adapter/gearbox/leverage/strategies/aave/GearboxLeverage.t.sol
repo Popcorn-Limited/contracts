@@ -5,9 +5,10 @@ pragma solidity ^0.8.15;
 
 import {Test} from "forge-std/Test.sol";
 
-import {GearboxLeverage, IERC20, IERC20Metadata} from "../../../../../src/vault/adapter/gearbox/leverage/GearboxLeverage.sol";
-import {GearboxLeverageTestConfigStorage, GearboxLeverageTestConfig} from "./GearboxLeverageTestConfigStorage.sol";
-import {AbstractAdapterTest, ITestConfigStorage, IAdapter} from "../../abstract/AbstractAdapterTest.sol";
+import {GearboxLeverage, IERC20, IERC20Metadata} from "../../../../../../../src/vault/adapter/gearbox/leverage/GearboxLeverage.sol";
+import {GearboxLeverageTestConfigStorage, GearboxLeverageTestConfig} from "../../GearboxLeverageTestConfigStorage.sol";
+import {AbstractAdapterTest, ITestConfigStorage, IAdapter} from "../../../../abstract/AbstractAdapterTest.sol";
+import {GearboxLeverage_AaveV2LendingPool} from "../../../../../../../src/vault/adapter/gearbox/leverage/strategies/aave/GearboxLeverage_AaveV2LendingPool.sol";
 
 interface ILeverageAdapter is IAdapter {
     function adjustLeverage(uint256 amount) external;
@@ -41,7 +42,7 @@ contract GearboxLeverageTest is AbstractAdapterTest {
 
         setUpBaseTest(
             IERC20(DAI),
-            address(new GearboxLeverage()),
+            address(new GearboxLeverage_AaveV2LendingPool()),
             addressProvider,
             10,
             "Gearbox Leverage ",
