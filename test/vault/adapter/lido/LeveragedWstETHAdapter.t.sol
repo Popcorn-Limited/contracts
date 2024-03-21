@@ -332,6 +332,36 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
         adapterContract.executeOperation(assets,amounts,premiums,bob, "");
     }
 
+    function test__harvest() public override {
+        _mintAssetAndApproveForAdapter(100e18, bob);
+
+        vm.prank(bob);
+        adapter.deposit(100e18, bob);
+
+        vm.warp(block.timestamp + 12);
+
+        // LTV should be 0
+        assertEq(adapterContract.getLTV(), 0);
+
+        adapter.harvest();
+
+        // LTV should be at target now
+        assertEq(adapterContract.targetLTV(), adapterContract.getLTV());
+    }
+
+    function test__disable_auto_harvest() public override {
+        adapter.toggleAutoHarvest();
+        assertTrue(adapter.autoHarvest());
+
+        _mintAssetAndApproveForAdapter(defaultAmount, bob);
+        vm.prank(bob);
+        adapter.deposit(defaultAmount, bob);
+
+        uint256 lastHarvest = adapter.lastHarvest();
+
+        assertEq(lastHarvest, block.timestamp, "should auto harvest");
+    }
+
     /*//////////////////////////////////////////////////////////////
                           INITIALIZATION
     //////////////////////////////////////////////////////////////*/

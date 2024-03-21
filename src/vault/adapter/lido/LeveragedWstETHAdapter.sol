@@ -116,6 +116,9 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
 
         // set efficiency mode 
         lendingPool.setUserEMode(uint8(1));
+
+        // turn off auto harvest
+        autoHarvest = false;
     }
 
     receive() external payable {}
@@ -413,8 +416,17 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
                           MANAGEMENT LOGIC
     //////////////////////////////////////////////////////////////*/
 
+    function harvest() public override {
+        if ((lastHarvest + harvestCooldown) < block.timestamp) {
+                adjustLeverage();
+
+                lastHarvest = block.timestamp;
+                emit Harvested();
+        }
+    }
+
     // amount of WETH to borrow OR amount of WETH to repay (converted into wstETH amount internally)
-    function adjustLeverage() public {
+    function adjustLeverage() public takeFees {
         // get vault current leverage : debt/collateral
         (
             uint256 currentLTV,
