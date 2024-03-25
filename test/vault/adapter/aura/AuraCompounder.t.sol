@@ -3,7 +3,7 @@ pragma solidity ^0.8.15;
 
 import {Test} from "forge-std/Test.sol";
 
-import {AuraCompounder, SafeERC20, IERC20, IERC20Metadata, Math, IAuraBooster, IAuraRewards, IAuraStaking, IStrategy, IAdapter, IWithRewards, IAsset, BatchSwapStep} from "../../../../src/vault/adapter/aura/AuraCompounder.sol";
+import {AuraCompounder, SafeERC20, IERC20, IERC20Metadata, Math, IAuraBooster, IAuraRewards, IAuraStaking, IStrategy, IAdapter, IWithRewards, IAsset, BatchSwapStep} from "../../../../src/vault/adapter/aura/AuraCompounderVEC.sol";
 import {AuraCompounderTestConfigStorage, AuraCompounderTestConfig} from "./AuraCompounderTestConfigStorage.sol";
 import {AbstractAdapterTest, ITestConfigStorage} from "../abstract/AbstractAdapterTest.sol";
 import {MockStrategyClaimer} from "../../../utils/mocks/MockStrategyClaimer.sol";
@@ -26,7 +26,7 @@ contract AuraCompounderTest is AbstractAdapterTest {
     address[] underlyings;
 
     function setUp() public {
-        uint256 forkId = vm.createSelectFork(vm.rpcUrl("mainnet"));
+        uint256 forkId = vm.createSelectFork(vm.rpcUrl("mainnet"),19279000);
         vm.selectFork(forkId);
 
         testConfigStorage = ITestConfigStorage(
@@ -92,10 +92,18 @@ contract AuraCompounderTest is AbstractAdapterTest {
                 1,
                 0,
                 ""
+            ));
+         swaps[0].push(
+            BatchSwapStep(
+                0x93d199263632a4ef4bb438f1feb99e57b4b5f0bd0000000000000000000005c2, // wstETH - WETH
+                1, // WETH index 
+                2, // wstETH index
+                0, // will use the previous output
+                ""
             )
         );
-        assets.push([IAsset(0xba100000625a3754423978a60c9317c58a424e3D), IAsset(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2)]); // BAL
-        limits.push([type(int).max, type(int).max]);
+        assets.push([IAsset(0xba100000625a3754423978a60c9317c58a424e3D), IAsset(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2),IAsset(0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0)]); // BAL
+        limits.push([type(int).max, type(int).max,type(int256).max]);
 
         // add AURA swap
         swaps.push();
@@ -107,12 +115,37 @@ contract AuraCompounderTest is AbstractAdapterTest {
                 1,
                 0,
                 ""
+            ));
+        swaps[1].push(
+             // add WETH -> wsETH swap
+            BatchSwapStep(
+                0x93d199263632a4ef4bb438f1feb99e57b4b5f0bd0000000000000000000005c2,
+                1,
+                2,
+                0, // will use the previous output
+                ""
             )
         ); 
-        assets.push([IAsset(0xC0c293ce456fF0ED870ADd98a0828Dd4d2903DBF), IAsset(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2)]); // AURA
+        assets.push([IAsset(0xC0c293ce456fF0ED870ADd98a0828Dd4d2903DBF), IAsset(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2),IAsset(0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0)]); // AURA
+        limits.push([type(int).max, type(int).max, type(int).max]);
+
+        // add WETH swap
+        swaps.push();
+        swaps[2].push(
+             // add WETH -> wsETH swap
+            BatchSwapStep(
+                0x93d199263632a4ef4bb438f1feb99e57b4b5f0bd0000000000000000000005c2,
+                0,
+                1,
+                0, // will use the previous output
+                ""
+            )
+        ); 
+        assets.push([IAsset(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2),IAsset(0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0)]); // WETH
         limits.push([type(int).max, type(int).max]);
 
         // set minTradeAmounts
+        minTradeAmounts.push(0);
         minTradeAmounts.push(0);
         minTradeAmounts.push(0);
 
@@ -121,8 +154,8 @@ contract AuraCompounderTest is AbstractAdapterTest {
             assets,
             limits,
             minTradeAmounts,
-            IERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2),
-            2,
+            IERC20(0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0),
+            1,
             1,
             2
         );
@@ -188,24 +221,55 @@ contract AuraCompounderTest is AbstractAdapterTest {
 
         uint256 oldTa = adapter.totalAssets();
 
-        vm.roll(block.number + 100);
-        vm.warp(block.timestamp + 1500);
+        vm.roll(block.number + 5000);
+        vm.warp(block.timestamp + 75000);
 
         adapter.harvest();
+
+        assertGt(IERC20(0x1BB9b64927e0C5e207C9DB4093b3738Eef5D8447).balanceOf(address(adapter)), 0);
 
         assertGt(adapter.totalAssets(), oldTa);
     }
 
-    // function test__harvest_no_rewards() public {
-    //     _mintAssetAndApproveForAdapter(100e18, bob);
+    function test__harvest_no_rewards() public {
+        _mintAssetAndApproveForAdapter(100e18, bob);
 
-    //     vm.prank(bob);
-    //     adapter.deposit(100e18, bob);
+        vm.prank(bob);
+        adapter.deposit(100e18, bob);
 
-    //     uint256 oldTa = adapter.totalAssets();
+        uint256 oldTa = adapter.totalAssets();
 
-    //     adapter.harvest();
+        adapter.harvest();
 
-    //     assertEq(adapter.totalAssets(), oldTa);
-    // }
+        assertEq(adapter.totalAssets(), oldTa);
+    }
+
+    function test__recover() public {
+        _mintAssetAndApproveForAdapter(10001e18, bob);
+
+        vm.prank(bob);
+        adapter.deposit(10000e18, bob);
+
+        uint256 oldTa = adapter.totalAssets();
+
+        vm.roll(block.number + 5000);
+        vm.warp(block.timestamp + 75000);
+
+        AuraCompounder(address(adapter)).claim();
+
+        AuraCompounder(address(adapter)).recoverToken(0x1BB9b64927e0C5e207C9DB4093b3738Eef5D8447,address(this));
+
+        assertGt(IERC20(0x1BB9b64927e0C5e207C9DB4093b3738Eef5D8447).balanceOf(address(this)), 0);
+
+        // simulate manual compound
+        deal(0xdEdb11A6a23263469567C2881A9b9F8629eE0041, address(this), 100e18);
+        
+        IERC20(0xdEdb11A6a23263469567C2881A9b9F8629eE0041).approve(address(auraBooster),100e18);
+        auraBooster.deposit(196, 100e18, false);
+
+        IERC20(auraLpToken).approve(address(auraRewards),100e18);
+        auraRewards.stakeFor(address(adapter),100e18);
+
+        assertGt(adapter.totalAssets(), oldTa);
+    }
 }

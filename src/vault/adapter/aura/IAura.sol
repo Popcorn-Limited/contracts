@@ -22,6 +22,8 @@ interface IAuraRewards {
   function withdrawAndUnwrap(uint256 _amount, bool _claim) external;
 
   function balanceOf(address _user) external view returns (uint256);
+
+  function stakeFor(address _user, uint256 amount) external;
 }
 
 interface IAuraStaking {
