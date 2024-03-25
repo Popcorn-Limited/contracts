@@ -11,11 +11,11 @@ import {AbstractAdapterTest, ITestConfigStorage, IAdapter} from "../../../../abs
 import {GearboxLeverage_AaveV2LendingPool} from "../../../../../../../src/vault/adapter/gearbox/leverage/strategies/aave/GearboxLeverage_AaveV2LendingPool.sol";
 
 interface ILeverageAdapter is IAdapter {
-    function adjustLeverage(uint256 amount) external;
+    function adjustLeverage(uint256 amount, bytes memory data) external;
 }
 
 
-contract GearboxLeverageTest is AbstractAdapterTest {
+contract GearboxLeverage_AaveV2LendingPool_Test is AbstractAdapterTest {
 
     //IERC20 _asset;
     address USDC = address(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
@@ -38,7 +38,7 @@ contract GearboxLeverageTest is AbstractAdapterTest {
     }
 
     function _setUpTest(bytes memory testConfig) internal {
-        (address _creditFacade, address _creditManager, address _strategyAdapter) = abi.decode(testConfig, (address, address, address ));
+        (address _creditFacade, address _creditManager, address _strategyAdapter) = abi.decode(testConfig, (address, address, address));
 
         setUpBaseTest(
             IERC20(DAI),
@@ -138,7 +138,9 @@ contract GearboxLeverageTest is AbstractAdapterTest {
 
         vm.prank(bob);
         adapter.deposit(defaultAmount, bob);
-        ILeverageAdapter(address(adapter)).adjustLeverage(1);
+
+        bytes memory data = abi.encode(address(asset), defaultAmount);
+        ILeverageAdapter(address(adapter)).adjustLeverage(1, data);
     }
 
 
