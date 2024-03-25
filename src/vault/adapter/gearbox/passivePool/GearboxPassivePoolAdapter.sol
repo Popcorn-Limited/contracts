@@ -4,7 +4,7 @@
 pragma solidity ^0.8.15;
 
 import { AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20 } from "../../abstracts/AdapterBase.sol";
-import { IPoolService, IContractRegistry, IAddressProvider } from "../IGearbox.sol";
+import { IPoolService, IContractRegistry, IAddressProvider } from "./IGearbox.sol";
 
 /**
  * @title   Gearbox Passive Pool Adapter
