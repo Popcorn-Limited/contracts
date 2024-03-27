@@ -41,11 +41,22 @@ library CommandBuilder {
                     count += arglen + 32;
                 }
             } else {
-                require(
-                    state[idx & IDX_VALUE_MASK].length == 32,
-                    "Static state variables must be 32 bytes"
-                );
-                count += 32;
+                uint256 arglen = state[idx & IDX_VALUE_MASK].length;
+
+                if(arglen > 32) {
+                    // fixed size arrays
+                    require(
+                        arglen % 32 == 0,
+                        "Fixed size arrays must be a multiple of 32 bytes"
+                    );
+                    count += arglen;
+                } else {
+                    require(
+                        state[idx & IDX_VALUE_MASK].length == 32,
+                        "Static state variables must be 32 bytes"
+                    );
+                    count += 32;
+                }   
             }
             unchecked{free += 32;}
             unchecked{++i;}
@@ -85,10 +96,19 @@ library CommandBuilder {
                     free += arglen;
                 }
             } else {
-                // Fixed length data; write it directly
+                uint256 len = state[idx & IDX_VALUE_MASK].length;
                 bytes memory statevar = state[idx & IDX_VALUE_MASK];
-                assembly {
-                    mstore(add(add(ret, 36), count), mload(add(statevar, 32)))
+
+                if (len == 32) {
+                    // Fixed length data; write it directly
+                    assembly {
+                        mstore(add(add(ret, 36), count), mload(add(statevar, 32)))
+                    }
+                }  else {
+                    // fixed length array
+                    memcpy(statevar, 0, ret, count + 4, len);
+                    count += len - 32;
+                    free += len - 32;
                 }
             }
             unchecked{count += 32;}
