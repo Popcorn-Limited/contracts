@@ -134,7 +134,7 @@ contract AaveV3AdapterTest is AbstractAdapterTest {
     }
 
     function getApy() public view returns (uint256) {
-        DataTypes.ReserveData memory data = lendingPool.getReserveData(
+        DataTypes.ReserveData2 memory data = lendingPool.getReserveData(
             address(asset)
         );
         uint128 supplyRate = data.currentLiquidityRate;
