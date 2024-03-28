@@ -86,11 +86,6 @@ contract MultiStrategyVault is
             asset_.approve(address(strategies_[i]), type(uint256).max);
         }
 
-        _decimals = IERC20Metadata(address(asset_)).decimals() + decimalOffset; // Asset decimals + decimal offset to combat inflation attacks
-
-        INITIAL_CHAIN_ID = block.chainid;
-        INITIAL_DOMAIN_SEPARATOR = computeDomainSeparator();
-
         if (
             fees_.deposit >= 1e18 ||
             fees_.withdrawal >= 1e18 ||
@@ -102,17 +97,11 @@ contract MultiStrategyVault is
         if (feeRecipient_ == address(0)) revert InvalidFeeRecipient();
         feeRecipient = feeRecipient_;
 
-        contractName = keccak256(
-            abi.encodePacked("VaultCraft ", name(), block.timestamp, "Vault")
-        );
-
         highWaterMark = 1e9;
         quitPeriod = 3 days;
         depositLimit = depositLimit_;
 
-        emit VaultInitialized(contractName, address(asset_));
-
-        _name = string.concat(
+        name = string.concat(
             "VaultCraft ",
             IERC20Metadata(address(asset_)).name(),
             " Vault"
@@ -121,6 +110,15 @@ contract MultiStrategyVault is
             "vc-",
             IERC20Metadata(address(asset_)).symbol()
         );
+
+        contractName = keccak256(
+            abi.encodePacked("VaultCraft ", name(), block.timestamp, "Vault")
+        );
+
+        INITIAL_CHAIN_ID = block.chainid;
+        INITIAL_DOMAIN_SEPARATOR = computeDomainSeparator();
+
+        emit VaultInitialized(contractName, address(asset_));
     }
 
     function name()
@@ -455,32 +453,6 @@ contract MultiStrategyVault is
         );
 
         assets = _convertToAssets(shares - feeShares, Math.Rounding.Floor);
-    }
-
-    // TODO - is this now inherited anyways?
-    function _convertToShares(
-        uint256 assets,
-        Math.Rounding rounding
-    ) internal view virtual override returns (uint256 shares) {
-        return
-            assets.mulDiv(
-                totalSupply() + 10 ** decimalOffset,
-                totalAssets() + 1,
-                rounding
-            );
-    }
-
-    // TODO - is this now inherited anyways?
-    function _convertToAssets(
-        uint256 shares,
-        Math.Rounding rounding
-    ) internal view virtual override returns (uint256) {
-        return
-            shares.mulDiv(
-                totalAssets() + 1,
-                totalSupply() + 10 ** decimalOffset,
-                rounding
-            );
     }
 
     /*//////////////////////////////////////////////////////////////
