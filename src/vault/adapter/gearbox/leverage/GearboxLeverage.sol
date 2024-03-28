@@ -51,11 +51,11 @@ abstract contract GearboxLeverage is AdapterBase {
     ) external initializer {
         __AdapterBase_init(adapterInitData);
 
-        (address _creditFacade, address _creditManager, address _protocolAdapter) = abi.decode(
+        (address _creditFacade, address _creditManager, address _strategyAdapter) = abi.decode(
             gearboxInitData, (address, address, address)
         );
 
-        strategyAdapter = _protocolAdapter;
+        strategyAdapter = _strategyAdapter;
         creditFacade = ICreditFacadeV3(_creditFacade);
         creditManager = ICreditManagerV3(_creditManager);
         creditAccount = ICreditFacadeV3(_creditFacade).openCreditAccount(address(this), new MultiCall[](0), 0);
