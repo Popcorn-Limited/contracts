@@ -101,7 +101,7 @@ contract MultiStrategyVault is
         quitPeriod = 3 days;
         depositLimit = depositLimit_;
 
-        name = string.concat(
+        _name = string.concat(
             "VaultCraft ",
             IERC20Metadata(address(asset_)).name(),
             " Vault"

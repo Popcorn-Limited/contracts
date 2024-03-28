@@ -40,9 +40,9 @@ abstract contract AdapterBase is
 
     error StrategySetupFailed();
 
-    constructor() {
-        _disableInitializers();
-    }
+    // constructor() {
+    //     _disableInitializers();
+    // }
 
     /**
      * @notice Initialize a new Adapter.

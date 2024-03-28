@@ -45,9 +45,9 @@ contract Vault is
     error InvalidAsset();
     error InvalidAdapter();
 
-    constructor() {
-        _disableInitializers();
-    }
+    // constructor() {
+    //     _disableInitializers();
+    // }
 
     /**
      * @notice Initialize a new Vault.
