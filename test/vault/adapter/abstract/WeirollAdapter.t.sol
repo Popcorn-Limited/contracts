@@ -7,15 +7,10 @@ import {ConvexAdapter, SafeERC20, IERC20, IERC20Metadata, Math, IConvexBooster, 
 import {ConvexTestConfigStorage, ConvexTestConfig} from "../convex/ConvexTestConfigStorage.sol";
 import {AbstractAdapterTest, ITestConfigStorage, IAdapter} from "../abstract/AbstractAdapterTest.sol";
 import {MockStrategyClaimer} from "../../../utils/mocks/MockStrategyClaimer.sol";
-import {WeirollUniversalAdapter, VmCommand, WeirollReader, Command, InputIndex, MockTarget} from "../../../../src/vault/adapter/weiroll/WeirollAdapter.sol";
-import "forge-std/console.sol";
+import {WeirollUniversalAdapter, VmCommand} from "../../../../src/vault/adapter/weiroll/WeirollAdapter.sol";
+import {WeirollUtils, InputIndex, OutputIndex} from "../../../../src/vault/adapter/weiroll/WeirollUtils.sol";
 
-// bytes4 sig = "0x43a0d066"; bytes4(keccak256(abi.encodePacked("deposit(address,address,uint256)")))
-// bytes1 f = "0x01"; ->  call 
-// bytes6 in = 01 00 02 ff ff ff -> (first arg (pid) at slot 1 in state, second arg(amount) at slot 0, 3 arg(stake) at slot 2); ff to ignore rest of inputs
-// bytes1 o = ff -> ignore output 
-// bytes20 target = F403C135812408BFbE8713b5A23a04b3D48AAE31; convex booster 
-// bytes32 depositBoosterCommand = hex"43a0d06601010002ffffffffF403C135812408BFbE8713b5A23a04b3D48AAE31";
+import "forge-std/console.sol";
 
 contract WeirollAdapterTest is AbstractAdapterTest {
     using Math for uint256;
@@ -23,15 +18,16 @@ contract WeirollAdapterTest is AbstractAdapterTest {
     IConvexBooster convexBooster =
         IConvexBooster(0xF403C135812408BFbE8713b5A23a04b3D48AAE31);
     IConvexRewards convexRewards;
+    address rewardPool = address(0x79579633029a61963eDfbA1C0BE22498b6e0D33D);
+
     uint256 pid;
     WeirollUniversalAdapter adapterContract;
-    WeirollReader r;
+    WeirollUtils encoder;
 
     address crv = address(0xD533a949740bb3306d119CC777fa900bA034cd52);
     address cvx = address(0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B);
     address baseAsset = address(0xf939E0A03FB07F59A73314E73794Be0E57ac1b4E); //crvUSD
     address router = address(0xF0d4c12A5768D806021F80a262B4d39d26C58b8D);
-    MockTarget mockTarget; 
 
     bytes[] claimStates = new bytes[](9);
 
@@ -55,7 +51,6 @@ contract WeirollAdapterTest is AbstractAdapterTest {
         pid = _pid;
         (address _asset, , , , , ) = convexBooster
             .poolInfo(pid);
-        console.log(_asset);
         // convexRewards = IConvexRewards(_convexRewards);
 
         setUpBaseTest(
@@ -66,70 +61,34 @@ contract WeirollAdapterTest is AbstractAdapterTest {
             "Convex",
             true
         );
+        
+        vm.prank(address(this));
 
         vm.label(address(convexBooster), "convexBooster");
         // vm.label(address(convexRewards), "convexRewards");
         vm.label(address(asset), "asset");
         vm.label(address(this), "test");
 
-        r = new WeirollReader();
-        mockTarget = new MockTarget();
-        console.log(address(mockTarget));
-        // ENCODE TOTAL ASSET 
-        InputIndex[6] memory inputs;
-        inputs[0] = InputIndex(false, 0); 
-        inputs[1] = InputIndex(false, 255); 
-        inputs[2] = InputIndex(false, 255);
-        inputs[3] = InputIndex(false, 255);
-        inputs[4] = InputIndex(false, 255);
-        inputs[5] = InputIndex(false, 255);
+        encoder = new WeirollUtils();
 
+        // ENCODE TOTAL ASSET 
         bytes32[] memory tComm = new bytes32[](1);
-        tComm[0] = r.toByteCommand("balanceOf(address)", 2, inputs, 1, address(0x79579633029a61963eDfbA1C0BE22498b6e0D33D)); // BALANCE OF
         bytes[] memory tStates = new bytes[](1);
-        tStates[0] = abi.encode(address(adapter));
+
+        (tComm, tStates) = _totalAssetsCommand();
 
         // ---------------------------------------------- 
-        // ENCODE DEPOSIT 
-        inputs[0] = InputIndex(false, 2); 
-        inputs[1] = InputIndex(false, 0); 
-        inputs[2] = InputIndex(false, 4);
-        inputs[3] = InputIndex(false, 255);
-        inputs[4] = InputIndex(false, 255);
-        inputs[5] = InputIndex(false, 255);
-       
+        // ENCODE DEPOSIT         
         bytes32[] memory depCommands = new bytes32[](1);
-        // console.logBytes4(bytes4(keccak256(abi.encodePacked("tryOut(uint256[],uint256)"))));
-        depCommands[0] = r.toByteCommand("deposit(uint256,uint256,bool)", 1, inputs, 255, address(0xF403C135812408BFbE8713b5A23a04b3D48AAE31)); // DEPOSIT BOOSTER
-        // depCommands[0] = hex"dda18e90018203ffffffffffa0Cb889707d426A7A386870A03bc70d1b0697598";
-        // 5c9c18e2018586020788fffff0d4c12a5768d806021f80a262b4d39d26c58b8d
-        bytes[] memory states = new bytes[](3); 
-        // uint256[5] memory test = [uint256(5),0,0,0,uint256(2)];
-        // uint256[] memory test2 = new uint256[](5);
-        // test2[0] = 5;
-        // test2[4] = 2;
-        // console.logBytes(abi.encode(test));
-        // console.logBytes(abi.encode(test2));
+        bytes[] memory depStates = new bytes[](2);
 
-        // states[1] = abi.encode(10);
-        states[0] = abi.encode(289);
-        states[1] = abi.encode(true);
-        states[2] = abi.encode(address(adapter));
+        (depCommands, depStates) = _depositCommand();
 
         // ---------------------------------------------- 
         // ENCODE WITHDRAW 
-        inputs[0] = InputIndex(false, 0); 
-        inputs[1] = InputIndex(false, 1); 
-        inputs[2] = InputIndex(false, 255);
-        inputs[3] = InputIndex(false, 255);
-        inputs[4] = InputIndex(false, 255);
-        inputs[5] = InputIndex(false, 255);
-
-        bytes32 withdrawBoosterCommand = r.toByteCommand("withdrawAndUnwrap(uint256,bool)", 1, inputs, 255, address(0x79579633029a61963eDfbA1C0BE22498b6e0D33D));
         bytes32[] memory wCommands = new bytes32[](1);
-        wCommands[0] = withdrawBoosterCommand;
         bytes[] memory wStates = new bytes[](1);
-        wStates[0] = abi.encode(false);
+        (wCommands, wStates) = _withdrawCommand();
 
         // ---------------------------------------------- 
         // ENCODE HARVEST
@@ -151,7 +110,7 @@ contract WeirollAdapterTest is AbstractAdapterTest {
 
         // ---------------------------------------------- 
         // ENCODE ALL COMMANDS 
-        bytes memory commands = abi.encode(depCommands,states,wCommands,wStates,tComm,tStates,claimComms,claimStates);
+        bytes memory commands = abi.encode(depCommands,depStates,wCommands,wStates,tComm,tStates,claimComms,claimStates);
 
         adapter.initialize(
             abi.encode(asset, address(this), strategy, 0, sigs, ""),
@@ -160,6 +119,8 @@ contract WeirollAdapterTest is AbstractAdapterTest {
         );
 
         adapterContract = WeirollUniversalAdapter(address(adapter));
+
+        adapter.toggleAutoHarvest();
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -294,7 +255,6 @@ contract WeirollAdapterTest is AbstractAdapterTest {
         // EXECUTE DEPOSIT        
         vm.startPrank(bob);
         asset.approve(address(adapter), amountDep);
-                console.log("TO", adapter.totalAssets());
 
         adapter.deposit(amountDep, bob);
 
@@ -305,7 +265,6 @@ contract WeirollAdapterTest is AbstractAdapterTest {
 
         // get data before
         uint256 totAssetsBefore = adapter.totalAssets();
-        console.log("TOT", totAssetsBefore);
 
         // HARVEST
         console.log("BS", IERC20(crv).balanceOf(address(adapter)));
@@ -321,20 +280,65 @@ contract WeirollAdapterTest is AbstractAdapterTest {
         // assertEq(bobBalAfter, bobBalBefore + amountWith);
     }
 
-    function test_reader() public {
-        // 0x70a082310200ffffffffff0179579633029a61963eDfbA1C0BE22498b6e0D33D
-        Command memory c = r.translate(hex"70a082310200ffffffffff0179579633029a61963eDfbA1C0BE22498b6e0D33D");
-
+    function _totalAssetsCommand() internal returns (bytes32[] memory comm, bytes[] memory states) {
         InputIndex[6] memory inputs;
-        inputs[0] = InputIndex(false, 0);
-        inputs[1] = InputIndex(false, 255);
+        inputs[0] = InputIndex(false, 0); 
+        inputs[1] = InputIndex(false, 255); 
         inputs[2] = InputIndex(false, 255);
         inputs[3] = InputIndex(false, 255);
         inputs[4] = InputIndex(false, 255);
         inputs[5] = InputIndex(false, 255);
 
-        bytes32 comm = r.toByteCommand("balanceOf(address)", 2, inputs, 1, address(0x79579633029a61963eDfbA1C0BE22498b6e0D33D));
-        assertEq(comm, hex"70a082310200ffffffffff0179579633029a61963eDfbA1C0BE22498b6e0D33D");
+        OutputIndex memory output = OutputIndex(false,1);
+       
+        address target = rewardPool;
+
+        comm = new bytes32[](1);
+        comm[0] = encoder.encodeCommand("balanceOf(address)", 2, inputs, output, target); // BALANCE OF
+        states = new bytes[](1);
+        states[0] = abi.encode(address(adapter));
+    }
+
+    function _depositCommand() internal returns (bytes32[] memory comm, bytes[] memory states) {
+        InputIndex[6] memory inputs;
+        inputs[0] = InputIndex(false, 2); 
+        inputs[1] = InputIndex(false, 0); 
+        inputs[2] = InputIndex(false, 3);
+        inputs[3] = InputIndex(false, 255);
+        inputs[4] = InputIndex(false, 255);
+        inputs[5] = InputIndex(false, 255);
+       
+        OutputIndex memory output = OutputIndex(false,255);
+
+        address target = address(convexBooster);
+        
+        comm = new bytes32[](1);
+        comm[0] = encoder.encodeCommand("deposit(uint256,uint256,bool)", 1, inputs, output, target); // DEPOSIT BOOSTER
+        
+        states = new bytes[](2); 
+        states[0] = abi.encode(pid);
+        states[1] = abi.encode(true);
+    }
+
+    function _withdrawCommand() internal returns (bytes32[] memory comm, bytes[] memory states) {
+        InputIndex[6] memory inputs;
+        inputs[0] = InputIndex(false, 0); 
+        inputs[1] = InputIndex(false, 1); 
+        inputs[2] = InputIndex(false, 255);
+        inputs[3] = InputIndex(false, 255);
+        inputs[4] = InputIndex(false, 255);
+        inputs[5] = InputIndex(false, 255);
+
+        OutputIndex memory output = OutputIndex(false,0);
+        output = OutputIndex(false, 255);
+
+        address target = rewardPool;
+
+        comm = new bytes32[](1);
+        comm[0] =  encoder.encodeCommand("withdrawAndUnwrap(uint256,bool)", 1, inputs, output, target);
+        
+        states = new bytes[](1);
+        states[0] = abi.encode(false);
     }
 
     function _claimCommand() internal returns (bytes32 comm) {
@@ -345,9 +349,11 @@ contract WeirollAdapterTest is AbstractAdapterTest {
         inputs[3] = InputIndex(false, 255);
         inputs[4] = InputIndex(false, 255);
         inputs[5] = InputIndex(false, 255);
+
+        OutputIndex memory output = OutputIndex(false,255);
         
         // 0x7050ccd9 01 00 01 ff ff ff ff ff 79579633029a61963edfba1c0be22498b6e0d33d
-        comm = r.toByteCommand("getReward(address,bool)", 1, inputs, 255, address(0x79579633029a61963eDfbA1C0BE22498b6e0D33D));
+        comm = encoder.encodeCommand("getReward(address,bool)", 1, inputs, output, address(0x79579633029a61963eDfbA1C0BE22498b6e0D33D));
     }
 
     function _getCRVBalanceCommand() internal returns (bytes32 comm) {
@@ -359,7 +365,9 @@ contract WeirollAdapterTest is AbstractAdapterTest {
         inputs[4] = InputIndex(false, 255);
         inputs[5] = InputIndex(false, 255);
 
-        comm = r.toByteCommand("balanceOf(address)", 2, inputs, 2, crv);
+        OutputIndex memory output = OutputIndex(false,2);
+
+        comm = encoder.encodeCommand("balanceOf(address)", 2, inputs, output, crv);
     }
 
     function _getCVXBalanceCommand() internal returns (bytes32 comm) {
@@ -370,8 +378,10 @@ contract WeirollAdapterTest is AbstractAdapterTest {
         inputs[3] = InputIndex(false, 255);
         inputs[4] = InputIndex(false, 255);
         inputs[5] = InputIndex(false, 255);
+
+        OutputIndex memory output = OutputIndex(false,3);
         
-        comm = r.toByteCommand("balanceOf(address)", 2, inputs, 3, cvx);
+        comm = encoder.encodeCommand("balanceOf(address)", 2, inputs, output, cvx);
     }
 
     function _approveCRVCommand() internal returns (bytes32 comm) {
@@ -383,7 +393,9 @@ contract WeirollAdapterTest is AbstractAdapterTest {
         inputs[4] = InputIndex(false, 255);
         inputs[5] = InputIndex(false, 255);
 
-        comm = r.toByteCommand("approve(address,uint256)", 1, inputs, 255, crv);
+        OutputIndex memory output = OutputIndex(false,255);
+
+        comm = encoder.encodeCommand("approve(address,uint256)", 1, inputs, output, crv);
     }
 
     function _approveCVXCommand() internal returns (bytes32 comm) {
@@ -394,8 +406,10 @@ contract WeirollAdapterTest is AbstractAdapterTest {
         inputs[3] = InputIndex(false, 255);
         inputs[4] = InputIndex(false, 255);
         inputs[5] = InputIndex(false, 255);
+
+        OutputIndex memory output = OutputIndex(false,255);
         
-        comm = r.toByteCommand("approve(address,uint256)", 1, inputs, 255, cvx);
+        comm = encoder.encodeCommand("approve(address,uint256)", 1, inputs, output, cvx);
     }
 
     // // Lenght of the array + its elements as state slot of a dynamic var 
@@ -443,10 +457,10 @@ contract WeirollAdapterTest is AbstractAdapterTest {
         inputsInd[4] = 8;
         inputsInd[5] = 255;
         
-        console.log("HE");
-        console.logBytes4(bytes4(keccak256(abi.encodePacked("exchange(address[11],uint256[5][5],uint256,uint256,address[5])"))));
+        // console.log("HE");
+        // console.logBytes4(bytes4(keccak256(abi.encodePacked("exchange(address[11],uint256[5][5],uint256,uint256,address[5])"))));
 
-        // comm = r.toByteCommand("exchange(address[11],uint256[5][5],uint256,uint256,address[5])", 1, true, inputsInd, 255, address(0xF0d4c12A5768D806021F80a262B4d39d26C58b8D));
+        // comm = encoder.encodeCommand("exchange(address[11],uint256[5][5],uint256,uint256,address[5])", 1, true, inputsInd, 255, address(0xF0d4c12A5768D806021F80a262B4d39d26C58b8D));
         comm = hex"5c9c18e2018586020788fffff0d4c12a5768d806021f80a262b4d39d26c58b8d";
     }
 }
