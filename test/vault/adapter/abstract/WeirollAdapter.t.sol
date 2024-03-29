@@ -10,8 +10,6 @@ import {MockStrategyClaimer} from "../../../utils/mocks/MockStrategyClaimer.sol"
 import {WeirollUniversalAdapter, VmCommand} from "../../../../src/vault/adapter/weiroll/WeirollAdapter.sol";
 import {WeirollUtils, InputIndex, OutputIndex} from "../../../../src/vault/adapter/weiroll/WeirollUtils.sol";
 
-import "forge-std/console.sol";
-
 contract WeirollAdapterTest is AbstractAdapterTest {
     using Math for uint256;
 
@@ -107,6 +105,7 @@ contract WeirollAdapterTest is AbstractAdapterTest {
         claimComms[3] = _approveCRVCommand();  // APPROVE CVX TO BE TRADED BY CURVE ROUTER 
         claimComms[4] = _approveCVXCommand(); // APPROVE CRV TO BE TRADED BY CURVE ROUTER
         claimComms[5] = _swapCRVCommand(); // swap crv
+        // TODO swap CVX and add liquidity to complete harvest command
 
         // ---------------------------------------------- 
         // ENCODE ALL COMMANDS 
@@ -352,7 +351,6 @@ contract WeirollAdapterTest is AbstractAdapterTest {
 
         OutputIndex memory output = OutputIndex(false,255);
         
-        // 0x7050ccd9 01 00 01 ff ff ff ff ff 79579633029a61963edfba1c0be22498b6e0d33d
         comm = encoder.encodeCommand("getReward(address,bool)", 1, inputs, output, address(0x79579633029a61963eDfbA1C0BE22498b6e0D33D));
     }
 
@@ -436,16 +434,14 @@ contract WeirollAdapterTest is AbstractAdapterTest {
             address(0)
         ];
 
-
         uint256[5][5] memory swapParams0;
         swapParams0[0] = [uint256(2), 0, 1, 1, 2];
 
         // add states
-        claimStates[5] = abi.encodePacked(rewardRoute.length, rewardRoute);
-        // console.logBytes(claimStates[5]);
-        claimStates[6] = abi.encode(swapParams0.length, swapParams0);
+        claimStates[5] = abi.encode(rewardRoute);
+        claimStates[6] = abi.encode(swapParams0);
         claimStates[7] = abi.encode(0);
-        claimStates[8] = abi.encode(pools.length, pools);
+        claimStates[8] = abi.encode(pools);
     }
 
     function _swapCRVCommand() internal returns (bytes32 comm) {
@@ -456,11 +452,25 @@ contract WeirollAdapterTest is AbstractAdapterTest {
         inputsInd[3] = 7;
         inputsInd[4] = 8;
         inputsInd[5] = 255;
-        
-        // console.log("HE");
-        // console.logBytes4(bytes4(keccak256(abi.encodePacked("exchange(address[11],uint256[5][5],uint256,uint256,address[5])"))));
 
-        // comm = encoder.encodeCommand("exchange(address[11],uint256[5][5],uint256,uint256,address[5])", 1, true, inputsInd, 255, address(0xF0d4c12A5768D806021F80a262B4d39d26C58b8D));
-        comm = hex"5c9c18e2018586020788fffff0d4c12a5768d806021f80a262b4d39d26c58b8d";
+        InputIndex[6] memory inputs;
+        inputs[0] = InputIndex(false, 5);
+        inputs[1] = InputIndex(false, 6); 
+        inputs[2] = InputIndex(false, 2);
+        inputs[3] = InputIndex(false, 7);
+        inputs[4] = InputIndex(false, 8);
+        inputs[5] = InputIndex(false, 255);
+        
+        OutputIndex memory output = OutputIndex(false,255);
+
+        address target = address(0xF0d4c12A5768D806021F80a262B4d39d26C58b8D);
+
+        comm = encoder.encodeCommand(
+            "exchange(address[11],uint256[5][5],uint256,uint256,address[5])", 
+            1, 
+            inputs, 
+            output, 
+            target
+        );
     }
 }
