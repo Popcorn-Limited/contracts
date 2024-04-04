@@ -177,6 +177,35 @@ library CommandBuilder {
         }
     }
 
+    // encode params from different state slots in array format in a single state slot
+    function elementsToArray(bytes[] memory state) internal pure returns (bytes[] memory) {        
+        (
+            uint8[] memory indexes, 
+            bool isDynamic, 
+            uint8 outputIndex
+        ) = abi.decode(state[(state.length - 1) & IDX_VALUE_MASK], (uint8[], bool, uint8));
+
+        bytes memory arrayElement;
+        bytes32[] memory elements = new bytes32[](indexes.length);
+
+        for(uint i=0; i<indexes.length; i++) {
+            elements[i] = bytes32(state[uint256(indexes[i])]);
+        }
+
+        if(isDynamic) {
+            // dynamic array
+            arrayElement = abi.encodePacked(elements.length, elements);
+        } else {
+            // fixed size array
+            arrayElement = abi.encodePacked(elements);
+        }
+
+        // write to state
+        state[uint256(outputIndex)] = arrayElement;
+        
+        return state;
+    }
+
     function memcpy(
         bytes memory src,
         uint256 srcidx,

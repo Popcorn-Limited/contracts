@@ -24,6 +24,8 @@ struct OutputIndex {
 }
 
 contract WeirollUtils {
+    bytes32 public constant UPDATE_STATE_COMMAND = hex"00000000200000000000000000000000000000000000000000000000000000";
+    
     function decodeCommand(bytes calldata command) public pure returns (Command memory c) {
         c.sig = bytes4(command[0:4]);
         c.callType = uint8(bytes1(command[4:5]));
@@ -45,6 +47,11 @@ contract WeirollUtils {
         address target
     ) public pure returns (bytes32 command) {
        bytes memory inputIn;
+
+       if(callType == 14) {
+        // command is to update state
+        return UPDATE_STATE_COMMAND;
+       }
 
         for(uint i=0; i<6; i++){
             InputIndex memory index = inputIndexes[i];

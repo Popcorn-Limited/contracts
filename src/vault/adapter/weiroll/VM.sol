@@ -12,6 +12,7 @@ abstract contract VM {
     uint256 constant FLAG_CT_STATICCALL = 0x02;
     uint256 constant FLAG_CT_VALUECALL = 0x03;
     uint256 constant FLAG_CT_MASK = 0x03;
+    uint256 constant FLAG_CT_SET_ARRAY_STATE = 0x20;
     uint256 constant FLAG_EXTENDED_COMMAND = 0x80;
     uint256 constant FLAG_TUPLE_RETURN = 0x40;
 
@@ -50,7 +51,12 @@ abstract contract VM {
                 indices = bytes32(uint256(command << 40) | SHORT_COMMAND_FILL);
             }
 
-            if (flags & FLAG_CT_MASK == FLAG_CT_DELEGATECALL) {
+            if (flags & FLAG_CT_SET_ARRAY_STATE != 0) {
+                // commmand is to edit state array
+                state = state.elementsToArray();
+                unchecked{++i;}
+                continue;
+            } else if (flags & FLAG_CT_MASK == FLAG_CT_DELEGATECALL) {
                 (success, outdata) = address(uint160(uint256(command))).delegatecall( // target
                     // inputs
                     state.buildInputs(
