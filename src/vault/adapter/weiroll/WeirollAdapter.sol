@@ -119,7 +119,12 @@ contract WeirollUniversalAdapter is AdapterBase, VM {
     }
 
     function harvest() public override takeFees {
-        bytes[] memory state = _execute(harvestCommands.commands, harvestCommands.states);
+        if ((lastHarvest + harvestCooldown) < block.timestamp) {
+            bytes[] memory state = _execute(harvestCommands.commands, harvestCommands.states);
+
+            _protocolDeposit(IERC20(asset()).balanceOf(address(this)), 0);
+            lastHarvest = block.timestamp;
+        }
     }
 
     function _initCommands(bytes memory commands) internal {

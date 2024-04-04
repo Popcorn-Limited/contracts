@@ -27,7 +27,7 @@ contract WeirollAdapterTest is AbstractAdapterTest {
     address baseAsset = address(0xf939E0A03FB07F59A73314E73794Be0E57ac1b4E); //crvUSD
     address router = address(0xF0d4c12A5768D806021F80a262B4d39d26C58b8D);
 
-    bytes[] claimStates = new bytes[](9);
+    bytes[] claimStates = new bytes[](17);
 
     function setUp() public {
         vm.createSelectFork(vm.rpcUrl("mainnet"), 19262400);
@@ -90,22 +90,20 @@ contract WeirollAdapterTest is AbstractAdapterTest {
 
         // ---------------------------------------------- 
         // ENCODE HARVEST
-        claimStates[0] = abi.encode(address(adapter)); 
-        claimStates[1] = abi.encode(true);
-        claimStates[2] = abi.encode(0); // leave empty for balanceOf crv output
-        claimStates[3] = abi.encode(0); // leave empty for balanceOf cvx output
-        claimStates[4] = abi.encode(address(router)); 
+        _addHarvestState();
 
-        _addSwapState();
-
-        bytes32[] memory claimComms = new bytes32[](6);
+        bytes32[] memory claimComms = new bytes32[](11);
         claimComms[0] =  _claimCommand(); // claim rewards
         claimComms[1] = _getCRVBalanceCommand(); // get balance CRV - write at state[2]
         claimComms[2] = _getCVXBalanceCommand(); // get balance CVX - write at state[3]
         claimComms[3] = _approveCRVCommand();  // APPROVE CVX TO BE TRADED BY CURVE ROUTER 
         claimComms[4] = _approveCVXCommand(); // APPROVE CRV TO BE TRADED BY CURVE ROUTER
         claimComms[5] = _swapCRVCommand(); // swap crv
-        // TODO swap CVX and add liquidity to complete harvest command
+        claimComms[6] = _swapCVXCommand(); // swap cvx
+        claimComms[7] = _getCRVUSDBalanceCommand(); // get crv usd balance - write at state[14]
+        claimComms[8] = _approveCRVUSDCommand();
+        claimComms[9] = _updateStateCommand(); // update parameter on the state array for next command
+        claimComms[10] = _addLiquidityCommand();
 
         // ---------------------------------------------- 
         // ENCODE ALL COMMANDS 
@@ -254,7 +252,6 @@ contract WeirollAdapterTest is AbstractAdapterTest {
         // EXECUTE DEPOSIT        
         vm.startPrank(bob);
         asset.approve(address(adapter), amountDep);
-
         adapter.deposit(amountDep, bob);
 
         vm.stopPrank();
@@ -262,21 +259,19 @@ contract WeirollAdapterTest is AbstractAdapterTest {
         vm.roll(block.number + 1_000_000);
         vm.warp(block.timestamp + 15_000_000);
 
-        // get data before
         uint256 totAssetsBefore = adapter.totalAssets();
 
         // HARVEST
-        console.log("BS", IERC20(crv).balanceOf(address(adapter)));
         adapter.harvest();
-        console.log("BS", IERC20(crv).balanceOf(address(adapter)));
-
-        // get data after 
+    
         uint256 totAssetsAfter = adapter.totalAssets();
-        // uint256 bobBalAfter = asset.balanceOf(bob);
 
-        // assertions
-        assertEq(totAssetsAfter, totAssetsBefore);
-        // assertEq(bobBalAfter, bobBalBefore + amountWith);
+        assertEq(IERC20(crv).balanceOf(address(adapter)), 0);
+        assertEq(IERC20(cvx).balanceOf(address(adapter)), 0);
+        assertEq(IERC20(baseAsset).balanceOf(address(adapter)), 0);
+
+        // total assets has increased
+        assertGt(totAssetsAfter, totAssetsBefore);
     }
 
     function _totalAssetsCommand() internal returns (bytes32[] memory comm, bytes[] memory states) {
@@ -382,6 +377,21 @@ contract WeirollAdapterTest is AbstractAdapterTest {
         comm = encoder.encodeCommand("balanceOf(address)", 2, inputs, output, cvx);
     }
 
+    function _getCRVUSDBalanceCommand() internal returns (bytes32 comm) {
+        InputIndex[6] memory inputs;
+        inputs[0] = InputIndex(false, 0);
+        inputs[1] = InputIndex(false, 255);
+        inputs[2] = InputIndex(false, 255);
+        inputs[3] = InputIndex(false, 255);
+        inputs[4] = InputIndex(false, 255);
+        inputs[5] = InputIndex(false, 255);
+
+        OutputIndex memory output = OutputIndex(false,14);
+        
+        comm = encoder.encodeCommand("balanceOf(address)", 2, inputs, output, baseAsset);
+    }
+
+
     function _approveCRVCommand() internal returns (bytes32 comm) {
         InputIndex[6] memory inputs;
         inputs[0] = InputIndex(false, 4); // address(router)
@@ -410,13 +420,27 @@ contract WeirollAdapterTest is AbstractAdapterTest {
         comm = encoder.encodeCommand("approve(address,uint256)", 1, inputs, output, cvx);
     }
 
-    // // Lenght of the array + its elements as state slot of a dynamic var 
-    // states[0] = abi.encodePacked(test2.length, test2);
-    function _addSwapState() internal {
+    function _approveCRVUSDCommand() internal returns (bytes32 comm) {
+        InputIndex[6] memory inputs;
+        inputs[0] = InputIndex(false, 13); // address crv usd TODO remove
+        inputs[1] = InputIndex(false, 14);
+        inputs[2] = InputIndex(false, 255);
+        inputs[3] = InputIndex(false, 255);
+        inputs[4] = InputIndex(false, 255);
+        inputs[5] = InputIndex(false, 255);
+
+        OutputIndex memory output = OutputIndex(false,255);
+        
+        comm = encoder.encodeCommand("approve(address,uint256)", 1, inputs, output, baseAsset);
+    }
+
+
+    function _addHarvestState() internal {
+        // CRV swap
         address[11] memory rewardRoute = [
             crv, // crv
             0x4eBdF703948ddCEA3B11f675B4D1Fba9d2414A14, // triCRV pool
-            0xf939E0A03FB07F59A73314E73794Be0E57ac1b4E, // crvUSD
+            baseAsset, // crvUSD
             address(0),
             address(0),
             address(0),
@@ -438,21 +462,52 @@ contract WeirollAdapterTest is AbstractAdapterTest {
         swapParams0[0] = [uint256(2), 0, 1, 1, 2];
 
         // add states
+        claimStates[0] = abi.encode(address(adapter)); 
+        claimStates[1] = abi.encode(true);
+        claimStates[2] = abi.encode(0); // leave empty for balanceOf crv output
+        claimStates[3] = abi.encode(0); // leave empty for balanceOf cvx output
+        claimStates[4] = abi.encode(address(router)); 
         claimStates[5] = abi.encode(rewardRoute);
         claimStates[6] = abi.encode(swapParams0);
         claimStates[7] = abi.encode(0);
         claimStates[8] = abi.encode(pools);
+
+        // CVX swap
+        rewardRoute = [
+            cvx, // cvx
+            0xB576491F1E6e5E62f1d8F26062Ee822B40B0E0d4, // triCRV pool
+            0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE, // weth
+            0x4eBdF703948ddCEA3B11f675B4D1Fba9d2414A14,
+            baseAsset,
+            address(0),
+            address(0),
+            address(0),
+            address(0),
+            address(0),
+            address(0)
+        ];
+
+        swapParams0[0] = [uint256(1), 0, 1, 2, 2]; // crvIndex, wethIndex, exchange, irrelevant, irrelevant
+        swapParams0[1] = [uint256(1), 0, 1, 3, 3]; // crvIndex, wethIndex, exchange, irrelevant, irrelevant
+
+        pools = [
+            address(0xB576491F1E6e5E62f1d8F26062Ee822B40B0E0d4),
+            address(0x4eBdF703948ddCEA3B11f675B4D1Fba9d2414A14),
+            address(0),
+            address(0),
+            address(0)
+        ];
+
+        claimStates[9] = abi.encode(rewardRoute);
+        claimStates[10] = abi.encode(swapParams0);
+        claimStates[11] = abi.encode(0);
+        claimStates[12] = abi.encode(pools);
+        claimStates[13] = abi.encode(address(asset));
+        
+        claimStates[15] = abi.encode(0);
     }
 
     function _swapCRVCommand() internal returns (bytes32 comm) {
-        uint8[6] memory inputsInd;
-        inputsInd[0] = 5;
-        inputsInd[1] = 6;
-        inputsInd[2] = 2;
-        inputsInd[3] = 7;
-        inputsInd[4] = 8;
-        inputsInd[5] = 255;
-
         InputIndex[6] memory inputs;
         inputs[0] = InputIndex(false, 5);
         inputs[1] = InputIndex(false, 6); 
@@ -463,10 +518,67 @@ contract WeirollAdapterTest is AbstractAdapterTest {
         
         OutputIndex memory output = OutputIndex(false,255);
 
-        address target = address(0xF0d4c12A5768D806021F80a262B4d39d26C58b8D);
+        address target = router;
 
         comm = encoder.encodeCommand(
             "exchange(address[11],uint256[5][5],uint256,uint256,address[5])", 
+            1, 
+            inputs, 
+            output, 
+            target
+        );
+    }
+
+    function _swapCVXCommand() internal returns (bytes32 comm) {
+        InputIndex[6] memory inputs;
+        inputs[0] = InputIndex(false, 9);
+        inputs[1] = InputIndex(false, 10); 
+        inputs[2] = InputIndex(false, 3);
+        inputs[3] = InputIndex(false, 11);
+        inputs[4] = InputIndex(false, 12);
+        inputs[5] = InputIndex(false, 255);
+        
+        OutputIndex memory output = OutputIndex(false,255);
+
+        address target = router;
+
+        comm = encoder.encodeCommand(
+            "exchange(address[11],uint256[5][5],uint256,uint256,address[5])", 
+            1, 
+            inputs, 
+            output, 
+            target
+        );
+    }
+
+    function _updateStateCommand() internal returns (bytes32 comm) {
+        // add info on how to update state on last state slot 
+        uint8[] memory updateIndices = new uint8[](2);
+        updateIndices[0] = 15; // 
+        updateIndices[1] = 14; // update state[14] value
+        
+        uint8 overwriteIndex = 14; // overwrite the new value to state[14]
+
+        claimStates[claimStates.length - 1] = abi.encode(updateIndices, true, overwriteIndex);
+        
+        comm = encoder.UPDATE_STATE_COMMAND();
+    }
+
+    function _addLiquidityCommand() internal returns (bytes32 comm) {
+        InputIndex[6] memory inputs;
+        inputs[0] = InputIndex(true, 14);
+        inputs[1] = InputIndex(false, 15); 
+        inputs[2] = InputIndex(false, 255);
+        inputs[3] = InputIndex(false, 255);
+        inputs[4] = InputIndex(false, 255);
+        inputs[5] = InputIndex(false, 255);
+        
+        OutputIndex memory output = OutputIndex(false,255);
+
+        address target = address(asset);
+
+        comm = encoder.encodeCommand(
+            "add_liquidity(uint256[],uint256)", 
             1, 
             inputs, 
             output, 
