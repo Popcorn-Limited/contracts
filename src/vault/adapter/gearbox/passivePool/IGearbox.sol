@@ -3,7 +3,7 @@
 
 pragma solidity ^0.8.15;
 
-import { IPausable } from "../../../interfaces/IPausable.sol";
+import { IPausable } from "../../../../interfaces/IPausable.sol";
 
 interface IAddressProvider {
   function getContractsRegister() external view returns (address);
