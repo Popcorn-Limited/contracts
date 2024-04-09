@@ -35,8 +35,6 @@ contract MultiStrategyVault is
     using SafeERC20 for IERC20;
     using Math for uint256;
 
-    uint8 internal _decimals;
-
     string internal _name;
     string internal _symbol;
 
@@ -120,10 +118,6 @@ contract MultiStrategyVault is
         return _symbol;
     }
 
-    function decimals() public view override returns (uint8) {
-        return _decimals;
-    }
-
     /*//////////////////////////////////////////////////////////////
                         DEPOSIT/WITHDRAWAL LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -136,97 +130,12 @@ contract MultiStrategyVault is
         return deposit(assets, msg.sender);
     }
 
-    /**
-     * @notice Deposit exactly `assets` amount of tokens, issuing vault shares to `receiver`.
-     * @param assets Quantity of tokens to deposit.
-     * @param receiver Receiver of issued vault shares.
-     * @return shares Quantity of vault shares issued to `receiver`.
-     */
-    function deposit(
-        uint256 assets,
-        address receiver
-    ) public override nonReentrant whenNotPaused returns (uint256 shares) {
-        if (receiver == address(0)) revert InvalidReceiver();
-        if (assets > maxDeposit(receiver)) revert MaxError(assets);
-
-        shares = previewDeposit(assets);
-        if (shares == 0 || assets == 0) revert ZeroAmount();
-
-        IERC20(asset()).safeTransferFrom(msg.sender, address(this), assets);
-
-        _mint(receiver, shares);
-
-        // deposit into default index strategy or leave funds idle
-        if (defaultDepositIndex != type(uint256).max) {
-            strategies[defaultDepositIndex].deposit(assets, address(this));
-        }
-
-        emit Deposit(msg.sender, receiver, assets, shares);
-    }
-
     function mint(uint256 shares) external returns (uint256) {
         return mint(shares, msg.sender);
     }
 
-    /**
-     * @notice Mint exactly `shares` vault shares to `receiver`, taking the necessary amount of `asset` from the caller.
-     * @param shares Quantity of shares to mint.
-     * @param receiver Receiver of issued vault shares.
-     * @return assets Quantity of assets deposited by caller.
-     */
-    function mint(
-        uint256 shares,
-        address receiver
-    ) public override nonReentrant whenNotPaused returns (uint256 assets) {
-        if (receiver == address(0)) revert InvalidReceiver();
-        if (shares > maxMint(receiver)) revert MaxError(assets);
-
-        assets = previewMint(shares);
-        if (shares == 0 || assets == 0) revert ZeroAmount();
-
-        IERC20(asset()).safeTransferFrom(msg.sender, address(this), assets);
-
-        _mint(receiver, shares);
-
-        // deposit into default index strategy or leave funds idle
-        if (defaultDepositIndex != type(uint256).max) {
-            strategies[defaultDepositIndex].deposit(assets, address(this));
-        }
-
-        emit Deposit(msg.sender, receiver, assets, shares);
-    }
-
     function withdraw(uint256 assets) public returns (uint256) {
         return withdraw(assets, msg.sender, msg.sender);
-    }
-
-    /**
-     * @notice Burn shares from `owner` in exchange for `assets` amount of underlying token.
-     * @param assets Quantity of underlying `asset` token to withdraw.
-     * @param receiver Receiver of underlying token.
-     * @param owner Owner of burned vault shares.
-     * @return shares Quantity of vault shares burned in exchange for `assets`.
-     */
-    function withdraw(
-        uint256 assets,
-        address receiver,
-        address owner
-    ) public override nonReentrant returns (uint256 shares) {
-        if (receiver == address(0)) revert InvalidReceiver();
-        if (assets > maxWithdraw(owner)) revert MaxError(assets);
-
-        shares = previewWithdraw(assets);
-
-        if (shares == 0 || assets == 0) revert ZeroAmount();
-
-        if (msg.sender != owner)
-            _approve(owner, msg.sender, allowance(owner, msg.sender) - shares);
-
-        _burn(owner, shares);
-
-        _withdrawStrategyFunds(assets, receiver);
-
-        emit Withdraw(msg.sender, receiver, owner, assets, shares);
     }
 
     function redeem(uint256 shares) external returns (uint256) {
@@ -234,32 +143,63 @@ contract MultiStrategyVault is
     }
 
     /**
-     * @notice Burn exactly `shares` vault shares from `owner` and send underlying `asset` tokens to `receiver`.
-     * @param shares Quantity of vault shares to exchange for underlying tokens.
-     * @param receiver Receiver of underlying tokens.
-     * @param owner Owner of burned vault shares.
-     * @return assets Quantity of `asset` sent to `receiver`.
+     * @dev Deposit/mint common workflow.
      */
-    function redeem(
-        uint256 shares,
+    function _deposit(
+        address caller,
         address receiver,
-        address owner
-    ) public override nonReentrant returns (uint256 assets) {
-        if (receiver == address(0)) revert InvalidReceiver();
-        if (shares > maxRedeem(owner)) revert MaxError(shares);
+        uint256 assets,
+        uint256 shares
+    ) internal override {
+        // If _asset is ERC-777, `transferFrom` can trigger a reentrancy BEFORE the transfer happens through the
+        // `tokensToSend` hook. On the other hand, the `tokenReceived` hook, that is triggered after the transfer,
+        // calls the vault, which is assumed not malicious.
+        //
+        // Conclusion: we need to do the transfer before we mint so that any reentrancy would happen before the
+        // assets are transferred and before the shares are minted, which is a valid state.
+        // slither-disable-next-line reentrancy-no-eth
+        SafeERC20.safeTransferFrom(
+            IERC20(asset()),
+            caller,
+            address(this),
+            assets
+        );
 
-        assets = previewRedeem(shares);
+        // deposit into default index strategy or leave funds idle
+        if (defaultDepositIndex != type(uint256).max) {
+            strategies[defaultDepositIndex].deposit(assets, address(this));
+        }
 
-        if (shares == 0 || assets == 0) revert ZeroAmount();
+        _mint(receiver, shares);
 
-        if (msg.sender != owner)
-            _approve(owner, msg.sender, allowance(owner, msg.sender) - shares);
+        emit Deposit(caller, receiver, assets, shares);
+    }
 
+    /**
+     * @dev Withdraw/redeem common workflow.
+     */
+    function _withdraw(
+        address caller,
+        address receiver,
+        address owner,
+        uint256 assets,
+        uint256 shares
+    ) internal override {
+        if (caller != owner) {
+            _spendAllowance(owner, caller, shares);
+        }
+
+        // If _asset is ERC-777, `transfer` can trigger a reentrancy AFTER the transfer happens through the
+        // `tokensReceived` hook. On the other hand, the `tokensToSend` hook, that is triggered before the transfer,
+        // calls the vault, which is assumed not malicious.
+        //
+        // Conclusion: we need to do the transfer after the burn so that any reentrancy would happen after the
+        // shares are burned and after the assets are transferred, which is a valid state.
         _burn(owner, shares);
 
         _withdrawStrategyFunds(assets, receiver);
 
-        emit Withdraw(msg.sender, receiver, owner, assets, shares);
+        emit Withdraw(caller, receiver, owner, assets, shares);
     }
 
     function _withdrawStrategyFunds(uint256 amount, address receiver) internal {

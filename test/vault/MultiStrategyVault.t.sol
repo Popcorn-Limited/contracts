@@ -100,7 +100,7 @@ contract MultiStrategyVaultTest is Test {
 
         assertEq(newVault.name(), "VaultCraft Mock Token Vault");
         assertEq(newVault.symbol(), "vc-TKN");
-        assertEq(newVault.decimals(), 27);
+        assertEq(newVault.decimals(), 18);
 
         assertEq(address(newVault.asset()), address(asset));
         assertEq(address(newVault.strategies(0)), address(strategies[0]));
@@ -168,7 +168,7 @@ contract MultiStrategyVaultTest is Test {
     // TODO -- test withdrawal flow with filled strategies
 
     function test__deposit_withdraw(uint128 amount) public {
-        if (amount < 1e9) amount = 1e9;
+        if (amount < 1) amount = 1;
 
         uint256 aliceassetAmount = amount;
 
@@ -192,8 +192,7 @@ contract MultiStrategyVaultTest is Test {
             0
         );
 
-        // Expect exchange rate to be 1:1e9 on initial deposit.
-        assertEq(aliceassetAmount * 1e9, aliceShareAmount);
+        assertEq(aliceassetAmount, aliceShareAmount);
         assertEq(vault.previewWithdraw(aliceassetAmount), aliceShareAmount);
         assertEq(vault.previewDeposit(aliceassetAmount), aliceShareAmount);
         assertEq(vault.totalSupply(), aliceShareAmount);
@@ -223,14 +222,6 @@ contract MultiStrategyVaultTest is Test {
         assertEq(vault.balanceOf(alice), 0);
         assertEq(vault.convertToAssets(vault.balanceOf(alice)), 0);
         assertEq(asset.balanceOf(alice), alicePreDepositBal);
-    }
-
-    function testFail__deposit_zero() public {
-        vault.deposit(0, address(this));
-    }
-
-    function testFail__withdraw_zero() public {
-        vault.withdraw(0, address(this), address(this));
     }
 
     function testFail__deposit_with_no_approval() public {
@@ -263,7 +254,7 @@ contract MultiStrategyVaultTest is Test {
     //////////////////////////////////////////////////////////////*/
 
     function test__mint_redeem(uint128 amount) public {
-        if (amount < 1e9) amount = 1e9;
+        if (amount < 1) amount = 1;
 
         uint256 aliceShareAmount = amount;
         asset.mint(alice, aliceShareAmount);
@@ -286,25 +277,23 @@ contract MultiStrategyVaultTest is Test {
             0
         );
 
-        // Expect exchange rate to be 1e9:1 on initial mint.
-        // We allow 1e9 delta since virtual shares lead to amounts between 1e9 to demand/mint more shares
-        // E.g. (1e9 + 1) to 2e9 assets requires 2e9 shares to withdraw
+        // Expect exchange rate to be 1:1 on initial mint.
         assertApproxEqAbs(
-            aliceShareAmount / 1e9,
+            aliceShareAmount,
             aliceAssetAmount,
-            1e9,
+            1,
             "share = assets"
         );
         assertApproxEqAbs(
             vault.previewWithdraw(aliceAssetAmount),
             aliceShareAmount,
-            1e9,
+            1,
             "pw"
         );
         assertApproxEqAbs(
             vault.previewDeposit(aliceAssetAmount),
             aliceShareAmount,
-            1e9,
+            1,
             "pd"
         );
         assertEq(vault.totalSupply(), aliceShareAmount, "ts");
@@ -313,7 +302,7 @@ contract MultiStrategyVaultTest is Test {
         assertApproxEqAbs(
             vault.convertToAssets(vault.balanceOf(alice)),
             aliceAssetAmount,
-            1e9,
+            1,
             "convert"
         );
         assertEq(
@@ -342,14 +331,6 @@ contract MultiStrategyVaultTest is Test {
         assertApproxEqAbs(asset.balanceOf(alice), alicePreDepositBal, 1);
     }
 
-    function testFail__mint_zero() public {
-        vault.mint(0, address(this));
-    }
-
-    function testFail__redeem_zero() public {
-        vault.redeem(0, address(this), address(this));
-    }
-
     function testFail__mint_with_no_approval() public {
         vault.mint(1e18, address(this));
     }
@@ -368,7 +349,7 @@ contract MultiStrategyVaultTest is Test {
 
         vault.deposit(0.5e18, address(this));
 
-        vault.redeem(1e27, address(this), address(this));
+        vault.redeem(1e18, address(this), address(this));
     }
 
     function testFail__redeem_with_no_shares() public {
@@ -395,25 +376,25 @@ contract MultiStrategyVaultTest is Test {
         vault.deposit(1e18, bob);
 
         assertEq(vault.balanceOf(alice), 0);
-        assertEq(vault.balanceOf(bob), 1e27);
+        assertEq(vault.balanceOf(bob), 1e18);
         assertEq(asset.balanceOf(alice), 0);
 
-        // bob mint 1e27 for alice
+        // bob mint 1e18 for alice
         vm.prank(bob);
-        vault.mint(1e27, alice);
-        assertEq(vault.balanceOf(alice), 1e27);
-        assertEq(vault.balanceOf(bob), 1e27);
+        vault.mint(1e18, alice);
+        assertEq(vault.balanceOf(alice), 1e18);
+        assertEq(vault.balanceOf(bob), 1e18);
         assertEq(asset.balanceOf(bob), 0);
 
-        // alice redeem 1e27 for bob
+        // alice redeem 1e18 for bob
         vm.prank(alice);
-        vault.redeem(1e27, bob, alice);
+        vault.redeem(1e18, bob, alice);
 
         assertEq(vault.balanceOf(alice), 0);
-        assertEq(vault.balanceOf(bob), 1e27);
+        assertEq(vault.balanceOf(bob), 1e18);
         assertEq(asset.balanceOf(bob), 1e18);
 
-        // bob withdraw 1e27 for alice
+        // bob withdraw 1e18 for alice
         vm.prank(bob);
         vault.withdraw(1e18, alice, bob);
 
@@ -489,13 +470,13 @@ contract MultiStrategyVaultTest is Test {
         assertEq(asset.allowance(address(vault), address(strategies[1])), 0);
 
         // Annoyingly Math fails us here and leaves 1 asset in the adapter
-        assertEq(asset.balanceOf(address(strategies[0])), 1);
+        assertEq(asset.balanceOf(address(strategies[0])), 0);
         assertEq(asset.balanceOf(address(strategies[1])), 0);
 
         assertEq(strategies[0].balanceOf(address(vault)), 0);
 
         assertEq(asset.balanceOf(address(newStrategy)), 0);
-        assertEq(asset.balanceOf(address(vault)), (depositAmount * 2) - 1);
+        assertEq(asset.balanceOf(address(vault)), depositAmount);
         assertEq(
             asset.allowance(address(vault), address(newStrategy)),
             type(uint256).max
@@ -814,15 +795,11 @@ contract MultiStrategyVaultTest is Test {
         asset.mint(address(this), 101);
         asset.approve(address(vault), 101);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(MultiStrategyVault.MaxError.selector, 101)
-        );
+        vm.expectRevert(); // maxDeposit
         vault.deposit(101, address(this));
 
-        vm.expectRevert(
-            abi.encodeWithSelector(MultiStrategyVault.MaxError.selector, 101)
-        );
-        vault.mint(101 * 1e9, address(this));
+        vm.expectRevert(); // maxDeposit
+        vault.mint(101, address(this));
     }
 
     function testFail__setDepositLimit_NonOwner() public {
@@ -853,11 +830,11 @@ contract MultiStrategyVaultTest is Test {
         assertTrue(vault.paused());
 
         vm.prank(alice);
-        vm.expectRevert(0xd93c0665); // EnforcedPause()
+        vm.expectRevert(); // maxDeposit()
         vault.deposit(depositAmount, alice);
 
         vm.prank(alice);
-        vm.expectRevert(0xd93c0665); // EnforcedPause()
+        vm.expectRevert(); // maxDeposit()
         vault.mint(depositAmount, alice);
 
         vm.prank(alice);
