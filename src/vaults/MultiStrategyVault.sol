@@ -9,7 +9,7 @@ import {ReentrancyGuardUpgradeable} from "openzeppelin-contracts-upgradeable/uti
 import {PausableUpgradeable} from "openzeppelin-contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {Math} from "openzeppelin-contracts/utils/math/Math.sol";
 import {OwnedUpgradeable} from "../utils/OwnedUpgradeable.sol";
-import {VaultFees, IERC4626, IERC20} from "../interfaces/vault/IVault.sol";
+import {IERC4626, IERC20} from "../interfaces/vault/IVault.sol";
 
 struct Allocation {
     uint256 index;
@@ -415,7 +415,7 @@ contract MultiStrategyVault is
      * @dev Additionally it will zero old allowances and set new ones
      * @dev Last we update HWM and assetsCheckpoint for fees to make sure they adjust to the new adapter
      */
-    function changeStrategies() external takeFees {
+    function changeStrategies() external {
         if (
             proposedStrategyTime == 0 ||
             block.timestamp < proposedStrategyTime + quitPeriod
@@ -481,16 +481,15 @@ contract MultiStrategyVault is
     event QuitPeriodSet(uint256 quitPeriod);
 
     error InvalidQuitPeriod();
+    error NotPassedQuitPeriod(uint256 quitPeriod);
 
     /**
      * @notice Set a quitPeriod for rage quitting after new adapter or fees are proposed. Caller must be Owner.
      * @param _quitPeriod Time to rage quit after proposal.
      */
     function setQuitPeriod(uint256 _quitPeriod) external onlyOwner {
-        if (
-            block.timestamp < proposedStrategyTime + quitPeriod ||
-            block.timestamp < proposedFeeTime + quitPeriod
-        ) revert NotPassedQuitPeriod(quitPeriod);
+        if (block.timestamp < proposedStrategyTime + quitPeriod)
+            revert NotPassedQuitPeriod(quitPeriod);
         if (_quitPeriod < 1 days || _quitPeriod > 7 days)
             revert InvalidQuitPeriod();
 

@@ -8,7 +8,6 @@ import {MockERC20} from "../utils/mocks/MockERC20.sol";
 import {MockERC4626} from "../utils/mocks/MockERC4626.sol";
 import {MultiStrategyVault, Allocation} from "../../src/vaults/MultiStrategyVault.sol";
 import {IERC4626, IERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
-import {VaultFees} from "../../src/interfaces/vault/IVault.sol";
 import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
 import {Clones} from "openzeppelin-contracts/proxy/Clones.sol";
 
@@ -40,7 +39,6 @@ contract MultiStrategyVaultTest is Test {
     event DepositLimitSet(uint256 depositLimit);
 
     function setUp() public {
-        vm.label(feeRecipient, "feeRecipient");
         vm.label(alice, "alice");
         vm.label(bob, "bob");
 
@@ -73,7 +71,6 @@ contract MultiStrategyVaultTest is Test {
     /*//////////////////////////////////////////////////////////////
                               HELPER
     //////////////////////////////////////////////////////////////*/
-
 
     function _createStrategy(IERC20 _asset) internal returns (IERC4626) {
         address strategyAddress = Clones.clone(strategyImplementation);
@@ -339,10 +336,10 @@ contract MultiStrategyVaultTest is Test {
             0
         );
 
-        assertApproxEqAbs(vault.totalAssets(), 0,1);
+        assertApproxEqAbs(vault.totalAssets(), 0, 1);
         assertEq(vault.balanceOf(alice), 0);
         assertEq(vault.convertToAssets(vault.balanceOf(alice)), 0);
-        assertApproxEqAbs(asset.balanceOf(alice), alicePreDepositBal,1);
+        assertApproxEqAbs(asset.balanceOf(alice), alicePreDepositBal, 1);
     }
 
     function testFail__mint_zero() public {
@@ -481,11 +478,6 @@ contract MultiStrategyVaultTest is Test {
         vault.deposit(depositAmount, alice);
         vm.stopPrank();
 
-        // Increase assets in asset strategy to check hwm and assetCheckpoint later
-        asset.mint(address(strategies[0]), depositAmount);
-        vault.takeManagementAndPerformanceFees();
-        uint256 oldHWM = vault.highWaterMark();
-
         // Preparation to change the strategies
         vault.proposeStrategies(newStrategies);
 
@@ -508,9 +500,6 @@ contract MultiStrategyVaultTest is Test {
             asset.allowance(address(vault), address(newStrategy)),
             type(uint256).max
         );
-
-        assertEq(vault.highWaterMark(), oldHWM);
-
         IERC4626[] memory changedStrategies = vault.getStrategies();
 
         assertEq(changedStrategies.length, 1);
@@ -549,11 +538,6 @@ contract MultiStrategyVaultTest is Test {
         vault.deposit(depositAmount, alice);
         vm.stopPrank();
 
-        // Increase assets in asset Adapter to check hwm and assetCheckpoint later
-        asset.mint(address(strategies[0]), depositAmount);
-        vault.takeManagementAndPerformanceFees();
-        uint256 oldHWM = vault.highWaterMark();
-
         // Preparation to change the adapter
         vault.proposeStrategies(newStrategies);
 
@@ -586,7 +570,7 @@ contract MultiStrategyVaultTest is Test {
     //////////////////////////////////////////////////////////////*/
 
     function test_deposit_fundsIdle() public {
-        // set default index to be type max 
+        // set default index to be type max
         vault.setDefaultDepositIndex(type(uint256).max);
 
         uint256 amount = 1e18;
@@ -598,7 +582,7 @@ contract MultiStrategyVaultTest is Test {
     }
 
     function test_withdrawIdleFunds() public {
-         // set default index to be type max 
+        // set default index to be type max
         vault.setDefaultDepositIndex(type(uint256).max);
 
         uint256 amount = 1e18;
@@ -810,22 +794,6 @@ contract MultiStrategyVaultTest is Test {
         vm.warp(block.timestamp + 3 days);
 
         vault.proposeStrategies(strategies);
-
-        vault.setQuitPeriod(1 days);
-    }
-
-    function testFail__setQuitPeriod_during_fee_quitPeriod() public {
-        // Pass the inital quit period
-        vm.warp(block.timestamp + 3 days);
-
-        vault.proposeFees(
-            VaultFees({
-                deposit: 1,
-                withdrawal: 1,
-                management: 1,
-                performance: 1
-            })
-        );
 
         vault.setQuitPeriod(1 days);
     }

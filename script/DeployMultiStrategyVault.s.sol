@@ -3,9 +3,9 @@
 pragma solidity ^0.8.15;
 
 import {Script} from "forge-std/Script.sol";
-import {MultiStrategyVault, IERC4626, IERC20, VaultFees} from "../src/vaults/MultiStrategyVault.sol";
+import {MultiStrategyVault, IERC4626, IERC20} from "../src/vaults/MultiStrategyVault.sol";
 import {IPermissionRegistry, Permission} from "../src/interfaces/vault/IPermissionRegistry.sol";
-import {VaultController, IAdapter, VaultInitParams, VaultMetadata, IERC4626, IERC20, VaultFees} from "../src/vault/VaultController.sol";
+import {VaultController, IAdapter, VaultInitParams, VaultMetadata} from "../src/vault/VaultController.sol";
 
 contract DeployMultiStrategyVault is Script {
     address deployer;
@@ -34,13 +34,6 @@ contract DeployMultiStrategyVault is Script {
             .initialize(
                 IERC20(0x17FC002b466eEc40DaE837Fc4bE5c67993ddBd6F),
                 strategies,
-                VaultFees({
-                    deposit: 0,
-                    withdrawal: 0,
-                    management: 0,
-                    performance: 1e17
-                }),
-                feeRecipient,
                 type(uint256).max,
                 deployer
             );
