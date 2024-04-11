@@ -5,6 +5,7 @@ pragma solidity ^0.8.15;
 
 import {AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20, Math, IStrategy, IAdapter, IERC4626} from "../abstracts/AdapterBase.sol";
 import {IPendleRouter, IPendleMarket, IPendleSYToken, IPendleOracle, ApproxParams, LimitOrderData, TokenInput, TokenOutput, SwapData} from "./IPendle.sol";
+import {WithRewards, IWithRewards} from "../abstracts/WithRewards.sol";
 
 /**
  * @title   ERC4626 Pendle Protocol Vault Adapter
@@ -13,7 +14,7 @@ import {IPendleRouter, IPendleMarket, IPendleSYToken, IPendleOracle, ApproxParam
  *
  * An ERC4626 compliant Wrapper for Pendle Protocol.
  */
-contract PendleAdapter is AdapterBase {
+contract PendleAdapter is AdapterBase, WithRewards {
     using SafeERC20 for IERC20;
     using Math for uint256;
 
@@ -35,6 +36,8 @@ contract PendleAdapter is AdapterBase {
     error NotEndorsed();
     error InvalidAsset();
 
+    receive() external payable {}
+
     /**
      * @notice Initialize a new generic Vault Adapter.
      * @param adapterInitData Encoded data for the base adapter initialization.
@@ -50,7 +53,7 @@ contract PendleAdapter is AdapterBase {
         address baseAsset = asset();
 
         _name = string.concat(
-            "VaultCraft Pendle",
+            "VaultCraft Pendle ",
             IERC20Metadata(baseAsset).name(),
             " Adapter"
         );
@@ -101,6 +104,9 @@ contract PendleAdapter is AdapterBase {
 
         // initialize rate 
         refreshRate();
+
+        // get reward tokens 
+        _rewardTokens = IPendleMarket(pendleMarket).getRewardTokens();
     }
 
     function name()
@@ -137,6 +143,23 @@ contract PendleAdapter is AdapterBase {
         // for some reason the call reverts if called multiple times within the same tx
         try pendleOracle.getLpToAssetRate(address(pendleMarket), twapDuration) returns (uint256 r) {
             lastRate = r;
+        } catch {}
+    }
+    
+    /*//////////////////////////////////////////////////////////////
+                            REWARDS LOGIC
+    //////////////////////////////////////////////////////////////*/
+    address[] _rewardTokens;
+
+    /// @notice The token rewarded from the convex reward contract
+    function rewardTokens() external view override returns (address[] memory) {
+        return _rewardTokens;
+    }
+
+    /// @notice Claim liquidity mining rewards given that it's active
+    function claim() public override returns (bool success) {
+        try IPendleMarket(pendleMarket).redeemRewards(address(this)) {
+            success = true;
         } catch {}
     }
 
@@ -216,7 +239,7 @@ contract PendleAdapter is AdapterBase {
         return amount.mulDiv(1e18, lastRate, Math.Rounding.Floor);
     }
 
-    function _validateAsset(address syToken, address baseAsset) internal {
+    function _validateAsset(address syToken, address baseAsset) internal view {
         // check that vault asset is among the tokens available to mint the SY token
         address[] memory validTokens = IPendleSYToken(syToken).getTokensIn();
         bool isValidMarket;
@@ -243,5 +266,17 @@ contract PendleAdapter is AdapterBase {
 
         if(!isValidMarket)
             revert InvalidAsset();  
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                      EIP-165 LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    function supportsInterface(
+        bytes4 interfaceId
+    ) public pure override(WithRewards, AdapterBase) returns (bool) {
+        return
+            interfaceId == type(IWithRewards).interfaceId ||
+            interfaceId == type(IAdapter).interfaceId;
     }
 }

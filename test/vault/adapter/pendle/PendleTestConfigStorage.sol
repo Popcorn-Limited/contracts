@@ -8,6 +8,8 @@ import {ITestConfigStorage} from "../abstract/ITestConfigStorage.sol";
 struct PendleTestConfig {
     address asset;
     address pendleMarket;
+    uint256 slippage;
+    uint32 twapDuration;
 }
 
 contract PendleTestConfigStorage is ITestConfigStorage {
@@ -18,13 +20,20 @@ contract PendleTestConfigStorage is ITestConfigStorage {
         testConfigs.push(
             PendleTestConfig(
                 0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0, // wstETH
-                0xD0354D4e7bCf345fB117cabe41aCaDb724eccCa2 // stETH 26DIC24
+                0xD0354D4e7bCf345fB117cabe41aCaDb724eccCa2, // stETH 26DIC24
+                0.01e16, 
+                900
             )
         );
     }
 
     function getTestConfig(uint256 i) public view returns (bytes memory) {
-        return abi.encode(testConfigs[i].asset, testConfigs[i].pendleMarket);
+        return abi.encode(
+            testConfigs[i].asset, 
+            testConfigs[i].pendleMarket, 
+            testConfigs[i].slippage, 
+            testConfigs[i].twapDuration
+        );
     }
 
     function getTestConfigLength() public view returns (uint256) {
