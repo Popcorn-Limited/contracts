@@ -69,33 +69,6 @@ contract PendleAdapter is AdapterBase, WithRewards {
         // make sure base asset and market are compatible
         _validateAsset(pendleSYToken, baseAsset);
 
-        // check that vault asset is among the tokens available to mint the SY token
-        address[] memory validTokens = IPendleSYToken(pendleSYToken).getTokensIn();
-        bool isValidMarket;
-        
-        for(uint256 i=0; i<validTokens.length; i++) {
-            if (validTokens[i] == baseAsset){
-                isValidMarket = true;
-                break;
-            }
-        }
-
-        if(!isValidMarket)
-            revert InvalidAsset();  
-
-        // and among the tokens to be redeemable from the SY token
-        validTokens = IPendleSYToken(pendleSYToken).getTokensOut();
-        isValidMarket = false;
-        for(uint256 i=0; i<validTokens.length; i++) {
-            if (validTokens[i] == baseAsset){
-                isValidMarket = true;
-                break;
-            }
-        }
-
-        if(!isValidMarket)
-            revert InvalidAsset();  
-
         // approve pendle router 
         IERC20(baseAsset).approve(_pendleRouter, type(uint256).max);
 
