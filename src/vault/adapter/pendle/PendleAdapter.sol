@@ -24,10 +24,10 @@ contract PendleAdapter is AdapterBase, WithRewards {
     IPendleRouter public pendleRouter;
     IPendleOracle public pendleOracle;
     address public pendleMarket;
-    
+
     uint256 public lastRate;
     uint256 public slippage;
-    uint32 public twapDuration; 
+    uint32 public twapDuration;
 
     /*//////////////////////////////////////////////////////////////
                             INITIALIZATION
@@ -60,25 +60,30 @@ contract PendleAdapter is AdapterBase, WithRewards {
         _symbol = string.concat("vc-", IERC20Metadata(baseAsset).symbol());
 
         pendleRouter = IPendleRouter(_pendleRouter);
-        pendleOracle = IPendleOracle(address(0x66a1096C6366b2529274dF4f5D8247827fe4CEA8));
+        pendleOracle = IPendleOracle(
+            address(0x66a1096C6366b2529274dF4f5D8247827fe4CEA8)
+        );
 
-        (pendleMarket, slippage, twapDuration) = abi.decode(pendleInitData, (address, uint256, uint32));
-        
-        (address pendleSYToken, ,) = IPendleMarket(pendleMarket).readTokens();
+        (pendleMarket, slippage, twapDuration) = abi.decode(
+            pendleInitData,
+            (address, uint256, uint32)
+        );
+
+        (address pendleSYToken, , ) = IPendleMarket(pendleMarket).readTokens();
 
         // make sure base asset and market are compatible
         _validateAsset(pendleSYToken, baseAsset);
 
-        // approve pendle router 
+        // approve pendle router
         IERC20(baseAsset).approve(_pendleRouter, type(uint256).max);
 
         // approve LP token for withdrawal
         IERC20(pendleMarket).approve(_pendleRouter, type(uint256).max);
 
-        // initialize rate 
+        // initialize rate
         refreshRate();
 
-        // get reward tokens 
+        // get reward tokens
         _rewardTokens = IPendleMarket(pendleMarket).getRewardTokens();
     }
 
@@ -106,7 +111,9 @@ contract PendleAdapter is AdapterBase, WithRewards {
 
     // uses last stored rate to approximate total underlying
     function _totalAssets() internal view override returns (uint256 t) {
-        uint256 totAssets = IERC20(pendleMarket).balanceOf(address(this)).mulDiv(lastRate, 1e18, Math.Rounding.Floor);
+        uint256 totAssets = IERC20(pendleMarket)
+            .balanceOf(address(this))
+            .mulDiv(lastRate, 1e18, Math.Rounding.Floor);
 
         // apply slippage
         t = totAssets - totAssets.mulDiv(slippage, 1e18, Math.Rounding.Floor);
@@ -114,11 +121,13 @@ contract PendleAdapter is AdapterBase, WithRewards {
 
     function refreshRate() public virtual {
         // for some reason the call reverts if called multiple times within the same tx
-        try pendleOracle.getLpToAssetRate(address(pendleMarket), twapDuration) returns (uint256 r) {
+        try
+            pendleOracle.getLpToAssetRate(address(pendleMarket), twapDuration)
+        returns (uint256 r) {
             lastRate = r;
         } catch {}
     }
-    
+
     /*//////////////////////////////////////////////////////////////
                             REWARDS LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -144,11 +153,11 @@ contract PendleAdapter is AdapterBase, WithRewards {
         uint256 amount,
         uint256
     ) internal virtual override {
-        // params suggested by docs 
+        // params suggested by docs
         ApproxParams memory approxParams = ApproxParams(
             0,
             type(uint256).max,
-            0, 
+            0,
             256,
             1e14
         );
@@ -167,11 +176,11 @@ contract PendleAdapter is AdapterBase, WithRewards {
         );
 
         pendleRouter.addLiquiditySingleToken(
-            address(this), 
-            pendleMarket, 
-            0, 
-            approxParams, 
-            tokenInput, 
+            address(this),
+            pendleMarket,
+            0,
+            approxParams,
+            tokenInput,
             limitOrderData
         );
     }
@@ -186,7 +195,7 @@ contract PendleAdapter is AdapterBase, WithRewards {
         // Empty structs
         LimitOrderData memory limitOrderData;
         SwapData memory swapData;
-        
+
         TokenOutput memory tokenOutput = TokenOutput(
             asset,
             amount,
@@ -195,18 +204,20 @@ contract PendleAdapter is AdapterBase, WithRewards {
             swapData
         );
 
-        uint256 lpAmount = amount == totalAssets() 
-            ? IERC20(pendleMarket).balanceOf(address(this)) 
-            : amountToLp(amount + amount.mulDiv(slippage, 1e18, Math.Rounding.Floor));
+        uint256 lpAmount = amount == totalAssets()
+            ? IERC20(pendleMarket).balanceOf(address(this))
+            : amountToLp(
+                amount + amount.mulDiv(slippage, 1e18, Math.Rounding.Floor)
+            );
 
         pendleRouter.removeLiquiditySingleToken(
-            address(this), 
-            pendleMarket, 
-            lpAmount, 
-            tokenOutput, 
+            address(this),
+            pendleMarket,
+            lpAmount,
+            tokenOutput,
             limitOrderData
         );
-    }  
+    }
 
     function amountToLp(uint256 amount) internal returns (uint256) {
         return amount.mulDiv(1e18, lastRate, Math.Rounding.Floor);
@@ -216,29 +227,27 @@ contract PendleAdapter is AdapterBase, WithRewards {
         // check that vault asset is among the tokens available to mint the SY token
         address[] memory validTokens = IPendleSYToken(syToken).getTokensIn();
         bool isValidMarket;
-        
-        for(uint256 i=0; i<validTokens.length; i++) {
-            if (validTokens[i] == baseAsset){
+
+        for (uint256 i = 0; i < validTokens.length; i++) {
+            if (validTokens[i] == baseAsset) {
                 isValidMarket = true;
                 break;
             }
         }
 
-        if(!isValidMarket)
-            revert InvalidAsset();  
+        if (!isValidMarket) revert InvalidAsset();
 
         // and among the tokens to be redeemable from the SY token
         validTokens = IPendleSYToken(syToken).getTokensOut();
         isValidMarket = false;
-        for(uint256 i=0; i<validTokens.length; i++) {
-            if (validTokens[i] == baseAsset){
+        for (uint256 i = 0; i < validTokens.length; i++) {
+            if (validTokens[i] == baseAsset) {
                 isValidMarket = true;
                 break;
             }
         }
 
-        if(!isValidMarket)
-            revert InvalidAsset();  
+        if (!isValidMarket) revert InvalidAsset();
     }
 
     /*//////////////////////////////////////////////////////////////

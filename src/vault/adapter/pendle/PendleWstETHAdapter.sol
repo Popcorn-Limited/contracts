@@ -29,7 +29,8 @@ contract PendleWstETHAdapter is PendleAdapter {
 
     BalancerRewardTokenData[] rewardTokensData; // ordered as in _rewardTokens
 
-    IBalancerRouter public constant balancerRouter = IBalancerRouter(address(0xBA12222222228d8Ba445958a75a0704d566BF2C8)); 
+    IBalancerRouter public constant balancerRouter =
+        IBalancerRouter(address(0xBA12222222228d8Ba445958a75a0704d566BF2C8));
 
     /*//////////////////////////////////////////////////////////////
                             INITIALIZATION
@@ -44,11 +45,14 @@ contract PendleWstETHAdapter is PendleAdapter {
         bytes memory adapterInitData,
         address _pendleRouter,
         bytes memory pendleInitData
-    ) external initializer override (PendleAdapter) {
+    ) external override(PendleAdapter) initializer {
         __AdapterBase_init(adapterInitData);
 
         address baseAsset = asset();
-        require(baseAsset == 0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0, 'Only wstETH');
+        require(
+            baseAsset == 0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0,
+            "Only wstETH"
+        );
 
         _name = string.concat(
             "VaultCraft Pendle ",
@@ -58,31 +62,38 @@ contract PendleWstETHAdapter is PendleAdapter {
         _symbol = string.concat("vc-", IERC20Metadata(baseAsset).symbol());
 
         pendleRouter = IPendleRouter(_pendleRouter);
-        pendleOracle = IPendleOracle(address(0x66a1096C6366b2529274dF4f5D8247827fe4CEA8));
+        pendleOracle = IPendleOracle(
+            address(0x66a1096C6366b2529274dF4f5D8247827fe4CEA8)
+        );
 
-        (pendleMarket, slippage, twapDuration) = abi.decode(pendleInitData, (address, uint256, uint32));
-        
-        (address pendleSYToken, ,) = IPendleMarket(pendleMarket).readTokens();
+        (pendleMarket, slippage, twapDuration) = abi.decode(
+            pendleInitData,
+            (address, uint256, uint32)
+        );
+
+        (address pendleSYToken, , ) = IPendleMarket(pendleMarket).readTokens();
 
         // make sure base asset and market are compatible
         _validateAsset(pendleSYToken, baseAsset);
 
-        // approve base asset for deposit 
+        // approve base asset for deposit
         IERC20(baseAsset).approve(_pendleRouter, type(uint256).max);
 
         // approve LP token for withdrawal
         IERC20(pendleMarket).approve(_pendleRouter, type(uint256).max);
 
-        // initialize lp to asset rate 
+        // initialize lp to asset rate
         refreshRate();
 
-        // get reward tokens 
+        // get reward tokens
         _rewardTokens = IPendleMarket(pendleMarket).getRewardTokens();
     }
 
-    function refreshRate() public override (PendleAdapter) {
+    function refreshRate() public override(PendleAdapter) {
         // for some reason the call reverts if called multiple times within the same tx
-        try pendleOracle.getLpToAssetRate(address(pendleMarket), twapDuration) returns (uint256 r) {
+        try
+            pendleOracle.getLpToAssetRate(address(pendleMarket), twapDuration)
+        returns (uint256 r) {
             // if using wsteth, the rate returned by pendle is against eth
             // need to apply eth/wsteth rate as well
             uint256 ethRate = IwstETH(asset()).getWstETHByStETH(1 ether);
@@ -94,14 +105,16 @@ contract PendleWstETHAdapter is PendleAdapter {
                             HARVESGT LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function setHarvestData(BalancerRewardTokenData[] memory rewData) external onlyOwner {
+    function setHarvestData(
+        BalancerRewardTokenData[] memory rewData
+    ) external onlyOwner {
         uint256 len = rewData.length;
         require(len == _rewardTokens.length, "Invalid length");
 
-        for(uint256 i=0; i<len; i++) {
+        for (uint256 i = 0; i < len; i++) {
             rewardTokensData.push(rewData[i]);
             _approveSwapTokens(rewData[i].pathAddresses);
-        }        
+        }
     }
 
     /**
@@ -113,18 +126,22 @@ contract PendleWstETHAdapter is PendleAdapter {
 
             uint256 amount;
             uint256 rewLen = _rewardTokens.length;
-            
+
             // swap each reward token to the vault asset
             for (uint256 i = 0; i < rewLen; i++) {
                 address rewardToken = _rewardTokens[i];
                 amount = IERC20(rewardToken).balanceOf(address(this));
-                
+
                 BalancerRewardTokenData memory rewData = rewardTokensData[i];
                 if (amount > rewData.minTradeAmount) {
                     // perform all the balancer single swaps for this reward token
-                    for(uint256 j=0; j < rewData.poolIds.length; j++) {
+                    for (uint256 j = 0; j < rewData.poolIds.length; j++) {
                         amount = _singleBalancerSwap(
-                            rewData.pathAddresses[j], rewData.pathAddresses[j + 1], amount, rewData.poolIds[j]);
+                            rewData.pathAddresses[j],
+                            rewData.pathAddresses[j + 1],
+                            amount,
+                            rewData.poolIds[j]
+                        );
                     }
                 }
             }
@@ -141,9 +158,7 @@ contract PendleWstETHAdapter is PendleAdapter {
         emit Harvested();
     }
 
-    function _approveSwapTokens(
-        address[] memory assets
-    ) internal {
+    function _approveSwapTokens(address[] memory assets) internal {
         uint256 len = assets.length;
         if (len > 0) {
             // void approvals
@@ -153,14 +168,17 @@ contract PendleWstETHAdapter is PendleAdapter {
         }
 
         for (uint256 i = 0; i < len - 1; i++) {
-            IERC20(assets[i]).approve(address(balancerRouter), type(uint256).max);
+            IERC20(assets[i]).approve(
+                address(balancerRouter),
+                type(uint256).max
+            );
         }
     }
 
     function _singleBalancerSwap(
-        address tokenIn, 
+        address tokenIn,
         address tokenOut,
-        uint256 amountIn, 
+        uint256 amountIn,
         bytes32 poolId
     ) internal returns (uint256 amountOut) {
         SingleSwap memory swap = SingleSwap(
