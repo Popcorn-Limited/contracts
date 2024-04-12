@@ -8,8 +8,10 @@ import {ITestConfigStorage} from "../abstract/ITestConfigStorage.sol";
 struct PendleTestConfig {
     address asset;
     address pendleMarket;
+    address pendleOracle;
     uint256 slippage;
     uint32 twapDuration;
+    uint256 swapDelay;
 }
 
 contract PendleTestConfigStorage is ITestConfigStorage {
@@ -20,9 +22,23 @@ contract PendleTestConfigStorage is ITestConfigStorage {
         testConfigs.push(
             PendleTestConfig(
                 0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0, // wstETH
-                0xD0354D4e7bCf345fB117cabe41aCaDb724eccCa2, // stETH 26DIC24
+                0xD0354D4e7bCf345fB117cabe41aCaDb724eccCa2, // stETH 26DIC24,
+                0x66a1096C6366b2529274dF4f5D8247827fe4CEA8,
                 0.01e16, 
-                900
+                100,
+                10 minutes
+            )
+        );
+
+        // USDe
+        testConfigs.push(
+            PendleTestConfig(
+                0x4c9EDD5852cd905f086C759E8383e09bff1E68B3, // USDe
+                0xb4460e76D99eCaD95030204D3C25fb33C4833997, // USDe 4APR24
+                0x66a1096C6366b2529274dF4f5D8247827fe4CEA8,
+                0.01e16, 
+                300,
+                10 minutes
             )
         );
     }
@@ -31,8 +47,10 @@ contract PendleTestConfigStorage is ITestConfigStorage {
         return abi.encode(
             testConfigs[i].asset, 
             testConfigs[i].pendleMarket, 
+            testConfigs[i].pendleOracle, 
             testConfigs[i].slippage, 
-            testConfigs[i].twapDuration
+            testConfigs[i].twapDuration,
+            testConfigs[i].swapDelay
         );
     }
 

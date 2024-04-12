@@ -24,10 +24,11 @@ contract PendleAdapter is AdapterBase, WithRewards {
     IPendleRouter public pendleRouter;
     IPendleOracle public pendleOracle;
     address public pendleMarket;
-
+    
     uint256 public lastRate;
     uint256 public slippage;
     uint32 public twapDuration;
+    uint256 public swapDelay;
 
     /*//////////////////////////////////////////////////////////////
                             INITIALIZATION
@@ -68,14 +69,14 @@ contract PendleAdapter is AdapterBase, WithRewards {
         _symbol = string.concat("vc-", IERC20Metadata(baseAsset).symbol());
 
         pendleRouter = IPendleRouter(_pendleRouter);
-        pendleOracle = IPendleOracle(
-            address(0x66a1096C6366b2529274dF4f5D8247827fe4CEA8)
+        address _pendleOracle;
+
+        (pendleMarket, _pendleOracle, slippage, twapDuration, swapDelay) = abi.decode(
+            pendleInitData,
+            (address, address, uint256, uint32, uint256)
         );
 
-        (pendleMarket, slippage, twapDuration) = abi.decode(
-            pendleInitData,
-            (address, uint256, uint32)
-        );
+        pendleOracle = IPendleOracle(_pendleOracle);
 
         (address pendleSYToken, , ) = IPendleMarket(pendleMarket).readTokens();
 
@@ -134,6 +135,23 @@ contract PendleAdapter is AdapterBase, WithRewards {
         returns (uint256 r) {
             lastRate = r;
         } catch {}
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            MANAGEMENT LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    function setSlippage(uint256 newSlippage) public onlyOwner {
+        require(newSlippage < 1e18, 'Too high');
+        slippage = newSlippage;
+    }
+
+    function setTWAPDuration(uint32 newTWAP) public onlyOwner {
+        twapDuration = newTWAP;
+    }
+
+    function setSwapDelay(uint256 newDelay) public onlyOwner {
+        swapDelay = newDelay;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -227,7 +245,7 @@ contract PendleAdapter is AdapterBase, WithRewards {
         );
     }
 
-    function amountToLp(uint256 amount) internal returns (uint256) {
+    function amountToLp(uint256 amount) internal view returns (uint256) {
         return amount.mulDiv(1e18, lastRate, Math.Rounding.Floor);
     }
 

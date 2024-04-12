@@ -7,6 +7,7 @@ import {AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20, Math, IStrategy, 
 import {IPendleRouter, IwstETH, IPendleMarket, IPendleSYToken, IPendleOracle, ApproxParams, LimitOrderData, TokenInput, TokenOutput, SwapData} from "./IPendle.sol";
 import {PendleAdapter} from "./PendleAdapter.sol";
 import {IBalancerRouter, SingleSwap, FundManagement, SwapKind} from "./IBalancer.sol";
+import {ICurveRouter, CurveSwap} from "../curve/ICurve.sol";
 
 /**
  * @title   ERC4626 Pendle Protocol Vault Adapter
@@ -14,7 +15,7 @@ import {IBalancerRouter, SingleSwap, FundManagement, SwapKind} from "./IBalancer
  * @notice  ERC4626 wrapper for Pendle protocol
  *
  * An ERC4626 compliant Wrapper for Pendle Protocol.
- * Only with wstETH base asset
+ * Only with USDe base asset
  */
 
 struct BalancerRewardTokenData {
@@ -23,14 +24,18 @@ struct BalancerRewardTokenData {
     uint256 minTradeAmount; //min amount of reward tokens to execute swaps
 }
 
-contract PendleWstETHAdapter is PendleAdapter {
+contract PendleUSDeAdapter is PendleAdapter {
     using SafeERC20 for IERC20;
     using Math for uint256;
 
-    BalancerRewardTokenData[] rewardTokensData; // ordered as in _rewardTokens
+    BalancerRewardTokenData[] internal rewardTokensData; // ordered as in _rewardTokens
+    CurveSwap internal curveSwap; // to swap to USDe
 
     IBalancerRouter public constant balancerRouter =
         IBalancerRouter(address(0xBA12222222228d8Ba445958a75a0704d566BF2C8));
+
+    ICurveRouter public constant curveRouter = 
+        ICurveRouter(address(0xF0d4c12A5768D806021F80a262B4d39d26C58b8D));
 
     /*//////////////////////////////////////////////////////////////
                             INITIALIZATION
@@ -50,24 +55,9 @@ contract PendleWstETHAdapter is PendleAdapter {
 
         address baseAsset = asset();
         require(
-            baseAsset == 0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0,
-            "Only wstETH"
+            baseAsset == 0x4c9EDD5852cd905f086C759E8383e09bff1E68B3,
+            "Only USDe"
         );
-
-        // initialize lp to asset rate
-        refreshRate();
-    }
-
-    function refreshRate() public override(PendleAdapter) {
-        // for some reason the call reverts if called multiple times within the same tx
-        try
-            pendleOracle.getLpToAssetRate(address(pendleMarket), twapDuration)
-        returns (uint256 r) {
-            // if using wsteth, the rate returned by pendle is against eth
-            // need to apply eth/wsteth rate as well
-            uint256 ethRate = IwstETH(asset()).getWstETHByStETH(1 ether);
-            lastRate = r.mulDiv(ethRate, 1e18, Math.Rounding.Floor);
-        } catch {}
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -75,15 +65,24 @@ contract PendleWstETHAdapter is PendleAdapter {
     //////////////////////////////////////////////////////////////*/
 
     function setHarvestData(
-        BalancerRewardTokenData[] memory rewData
+        BalancerRewardTokenData[] memory rewData,
+        CurveSwap memory _curveSwap
     ) external onlyOwner {
         uint256 len = rewData.length;
         require(len == _rewardTokens.length, "Invalid length");
 
+        // approve balancer
         for (uint256 i = 0; i < len; i++) {
             rewardTokensData.push(rewData[i]);
             _approveSwapTokens(rewData[i].pathAddresses, address(balancerRouter));
         }
+
+        // approve curve
+        curveSwap = _curveSwap;
+        address toApprove = curveSwap.route[0];
+
+        IERC20(toApprove).approve(address(curveRouter), 0);
+        IERC20(toApprove).approve(address(curveRouter), type(uint256).max);
     }
 
     /**
@@ -96,7 +95,7 @@ contract PendleWstETHAdapter is PendleAdapter {
             uint256 amount;
             uint256 rewLen = _rewardTokens.length;
 
-            // swap each reward token to the vault asset
+            // swap each reward token to USDC
             for (uint256 i = 0; i < rewLen; i++) {
                 address rewardToken = _rewardTokens[i];
                 amount = IERC20(rewardToken).balanceOf(address(this));
@@ -114,6 +113,10 @@ contract PendleWstETHAdapter is PendleAdapter {
                     }
                 }
             }
+
+            // swap USDC for USDe on Curve 
+            amount = IERC20(curveSwap.route[0]).balanceOf(address(this));
+            curveRouter.exchange(curveSwap.route, curveSwap.swapParams, amount, 0, curveSwap.pools);
 
             // get all the base asset and add liquidity
             amount = IERC20(asset()).balanceOf(address(this));
