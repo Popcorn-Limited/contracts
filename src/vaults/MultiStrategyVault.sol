@@ -151,6 +151,8 @@ contract MultiStrategyVault is
         uint256 assets,
         uint256 shares
     ) internal override {
+        if (shares == 0 || assets == 0) revert ZeroAmount();
+
         // If _asset is ERC-777, `transferFrom` can trigger a reentrancy BEFORE the transfer happens through the
         // `tokensToSend` hook. On the other hand, the `tokenReceived` hook, that is triggered after the transfer,
         // calls the vault, which is assumed not malicious.
@@ -185,6 +187,7 @@ contract MultiStrategyVault is
         uint256 assets,
         uint256 shares
     ) internal override {
+        if (shares == 0 || assets == 0) revert ZeroAmount();
         if (caller != owner) {
             _spendAllowance(owner, caller, shares);
         }

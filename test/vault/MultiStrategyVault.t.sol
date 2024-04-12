@@ -224,6 +224,14 @@ contract MultiStrategyVaultTest is Test {
         assertEq(asset.balanceOf(alice), alicePreDepositBal);
     }
 
+    function testFail__deposit_zero() public {
+        vault.deposit(0, address(this));
+    }
+
+    function testFail__withdraw_zero() public {
+        vault.withdraw(0, address(this), address(this));
+    }
+
     function testFail__deposit_with_no_approval() public {
         vault.deposit(1e18, address(this));
     }
@@ -329,6 +337,14 @@ contract MultiStrategyVaultTest is Test {
         assertEq(vault.balanceOf(alice), 0);
         assertEq(vault.convertToAssets(vault.balanceOf(alice)), 0);
         assertApproxEqAbs(asset.balanceOf(alice), alicePreDepositBal, 1);
+    }
+
+    function testFail__mint_zero() public {
+        vault.mint(0, address(this));
+    }
+
+    function testFail__redeem_zero() public {
+        vault.redeem(0, address(this), address(this));
     }
 
     function testFail__mint_with_no_approval() public {
