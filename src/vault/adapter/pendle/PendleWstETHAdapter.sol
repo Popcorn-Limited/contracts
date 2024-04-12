@@ -46,7 +46,7 @@ contract PendleWstETHAdapter is PendleAdapter {
         address _pendleRouter,
         bytes memory pendleInitData
     ) external override(PendleAdapter) initializer {
-        __AdapterBase_init(adapterInitData);
+        __PendleBase_init(adapterInitData, _pendleRouter, pendleInitData);
 
         address baseAsset = asset();
         require(
@@ -54,39 +54,8 @@ contract PendleWstETHAdapter is PendleAdapter {
             "Only wstETH"
         );
 
-        _name = string.concat(
-            "VaultCraft Pendle ",
-            IERC20Metadata(baseAsset).name(),
-            " Adapter"
-        );
-        _symbol = string.concat("vc-", IERC20Metadata(baseAsset).symbol());
-
-        pendleRouter = IPendleRouter(_pendleRouter);
-        pendleOracle = IPendleOracle(
-            address(0x66a1096C6366b2529274dF4f5D8247827fe4CEA8)
-        );
-
-        (pendleMarket, slippage, twapDuration) = abi.decode(
-            pendleInitData,
-            (address, uint256, uint32)
-        );
-
-        (address pendleSYToken, , ) = IPendleMarket(pendleMarket).readTokens();
-
-        // make sure base asset and market are compatible
-        _validateAsset(pendleSYToken, baseAsset);
-
-        // approve base asset for deposit
-        IERC20(baseAsset).approve(_pendleRouter, type(uint256).max);
-
-        // approve LP token for withdrawal
-        IERC20(pendleMarket).approve(_pendleRouter, type(uint256).max);
-
         // initialize lp to asset rate
         refreshRate();
-
-        // get reward tokens
-        _rewardTokens = IPendleMarket(pendleMarket).getRewardTokens();
     }
 
     function refreshRate() public override(PendleAdapter) {

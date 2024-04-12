@@ -48,6 +48,14 @@ contract PendleAdapter is AdapterBase, WithRewards {
         address _pendleRouter,
         bytes memory pendleInitData
     ) external virtual initializer {
+        __PendleBase_init(adapterInitData, _pendleRouter, pendleInitData);
+    }
+
+    function __PendleBase_init(        
+        bytes memory adapterInitData,
+        address _pendleRouter,
+        bytes memory pendleInitData
+    ) internal onlyInitializing {
         __AdapterBase_init(adapterInitData);
 
         address baseAsset = asset();
