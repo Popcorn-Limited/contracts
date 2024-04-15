@@ -25,7 +25,6 @@ contract PendleAdapter is AdapterBase, WithRewards {
     IPendleOracle public pendleOracle;
     address public pendleMarket;
     
-    uint256 public lastRate;
     uint256 public slippage;
     uint32 public twapDuration;
     uint256 public swapDelay;
@@ -89,8 +88,8 @@ contract PendleAdapter is AdapterBase, WithRewards {
         // approve LP token for withdrawal
         IERC20(pendleMarket).approve(_pendleRouter, type(uint256).max);
 
-        // initialize rate
-        refreshRate();
+        // initialize oracle
+        _oracleInit();
 
         // get reward tokens
         _rewardTokens = IPendleMarket(pendleMarket).getRewardTokens();
@@ -122,19 +121,10 @@ contract PendleAdapter is AdapterBase, WithRewards {
     function _totalAssets() internal view override returns (uint256 t) {
         uint256 totAssets = IERC20(pendleMarket)
             .balanceOf(address(this))
-            .mulDiv(lastRate, 1e18, Math.Rounding.Floor);
+            .mulDiv(_toAssetRate(), 1e18, Math.Rounding.Floor);
 
         // apply slippage
         t = totAssets - totAssets.mulDiv(slippage, 1e18, Math.Rounding.Floor);
-    }
-
-    function refreshRate() public virtual {
-        // for some reason the call reverts if called multiple times within the same tx
-        try
-            pendleOracle.getLpToAssetRate(address(pendleMarket), twapDuration)
-        returns (uint256 r) {
-            lastRate = r;
-        } catch {}
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -147,7 +137,14 @@ contract PendleAdapter is AdapterBase, WithRewards {
     }
 
     function setTWAPDuration(uint32 newTWAP) public onlyOwner {
-        twapDuration = newTWAP;
+        if(newTWAP > twapDuration) {
+            // need to re initialise the oracle
+            twapDuration = newTWAP;
+            _oracleInit(); 
+        } else {
+            // for shorter durations it's not necessary
+            twapDuration = newTWAP;
+        }
     }
 
     function setSwapDelay(uint256 newDelay) public onlyOwner {
@@ -215,7 +212,6 @@ contract PendleAdapter is AdapterBase, WithRewards {
         uint256 amount,
         uint256
     ) internal virtual override {
-        refreshRate();
         address asset = asset();
 
         // Empty structs
@@ -246,7 +242,7 @@ contract PendleAdapter is AdapterBase, WithRewards {
     }
 
     function amountToLp(uint256 amount) internal view returns (uint256) {
-        return amount.mulDiv(1e18, lastRate, Math.Rounding.Floor);
+        return amount.mulDiv(1e18, _toAssetRate(), Math.Rounding.Floor);
     }
 
     function _validateAsset(address syToken, address baseAsset) internal view {
@@ -274,6 +270,26 @@ contract PendleAdapter is AdapterBase, WithRewards {
         }
 
         if (!isValidMarket) revert InvalidAsset();
+    }
+
+    function _toAssetRate() internal view virtual returns (uint256 rate) {
+        rate = pendleOracle.getLpToSyRate(address(pendleMarket), twapDuration);
+    }
+
+    function _oracleInit() internal {   
+        (
+            bool increaseCardinalityRequired, 
+            uint16 cardinalityNext, 
+            bool oldestObservationSatisfied
+        ) = pendleOracle.getOracleState(pendleMarket, twapDuration);
+
+        if(increaseCardinalityRequired) {
+            IPendleMarket(pendleMarket).increaseObservationsCardinalityNext(cardinalityNext);
+        }
+
+        if (!oldestObservationSatisfied) {
+            // It's necessary to wait for at least the twapDuration, to allow data population.
+        }
     }
 
     /*//////////////////////////////////////////////////////////////

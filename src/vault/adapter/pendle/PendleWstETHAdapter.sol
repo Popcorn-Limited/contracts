@@ -53,21 +53,14 @@ contract PendleWstETHAdapter is PendleAdapter {
             baseAsset == 0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0,
             "Only wstETH"
         );
-
-        // initialize lp to asset rate
-        refreshRate();
     }
+    
+    function _toAssetRate() internal view override returns (uint256 rate) {
+        rate = super._toAssetRate();
 
-    function refreshRate() public override(PendleAdapter) {
-        // for some reason the call reverts if called multiple times within the same tx
-        try
-            pendleOracle.getLpToAssetRate(address(pendleMarket), twapDuration)
-        returns (uint256 r) {
-            // if using wsteth, the rate returned by pendle is against eth
-            // need to apply eth/wsteth rate as well
-            uint256 ethRate = IwstETH(asset()).getWstETHByStETH(1 ether);
-            lastRate = r.mulDiv(ethRate, 1e18, Math.Rounding.Floor);
-        } catch {}
+        // apply eth to wsteth ratio
+        uint256 ethRate = IwstETH(asset()).getWstETHByStETH(1 ether);
+        rate = rate.mulDiv(ethRate, 1e18, Math.Rounding.Floor);
     }
 
     /*//////////////////////////////////////////////////////////////

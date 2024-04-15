@@ -127,6 +127,8 @@ interface IPendleMarket {
 
     // claim rewards in the same order as reward tokens
     function redeemRewards(address user) external returns (uint256[] memory);
+
+    function increaseObservationsCardinalityNext(uint16 cardinalityNext) external;
 }
 
 interface IPendleSYToken {
@@ -156,6 +158,16 @@ interface IPendleOracle {
         address market,
         uint32 duration
     ) external view returns (uint256 ptToAssetRate);
+
+    function getLpToSyRate(
+        address market,
+        uint32 duration
+    ) external view returns (uint256 ptToSyRate);
+
+    function getOracleState(
+        address market,
+        uint32 duration
+    ) external view returns (bool increaseCardinalityRequired, uint16 cardinalityRequired, bool oldestObservationSatisfied);
 }
 
 interface IwstETH {
