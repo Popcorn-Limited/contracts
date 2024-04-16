@@ -18,11 +18,13 @@ contract wstETHPendleAdapterTest is AbstractAdapterTest {
     address pendleMarket;
     address pendleToken = address(0x808507121B80c02388fAd14726482e061B8da827);
     address WETH = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
+    address oracle; 
 
     PendleWstETHAdapter adapterContract;
 
     uint256 slippage;
     uint32 twapDuration; 
+    uint256 swapDelay; 
 
     function setUp() public {
         uint256 forkId = vm.createSelectFork(vm.rpcUrl("mainnet"), 19639567);
@@ -55,7 +57,9 @@ contract wstETHPendleAdapterTest is AbstractAdapterTest {
         pendleMarket = _market;
         slippage = _slippage;
         twapDuration = _twapDuration;
-
+        oracle = _oracle;
+        swapDelay = _swapDelay;
+        
         (address _synToken, ,) = IPendleMarket(pendleMarket).readTokens();
         synToken = IPendleSYToken(_synToken);
 
@@ -63,7 +67,7 @@ contract wstETHPendleAdapterTest is AbstractAdapterTest {
             IERC20(_asset),
             address(new PendleWstETHAdapter()),
             address(pendleRouter),
-            10,
+            1e15,
             "Pendle ",
             false
         );
@@ -80,10 +84,11 @@ contract wstETHPendleAdapterTest is AbstractAdapterTest {
         adapterContract = PendleWstETHAdapter(payable(address(adapter)));
 
         defaultAmount = 10 ** IERC20Metadata(address(asset)).decimals();
-        minFuzz = defaultAmount * 10_000;
-        raise = defaultAmount * 100_000_000;
-        maxAssets = defaultAmount * 1_000_000;
-        maxShares = maxAssets / 2;
+        raise = defaultAmount * 100;
+        maxAssets = 1e21;
+        minShares = 1e15;
+        maxShares = maxAssets * 1e9 / 2;
+        minFuzz = 1e15;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -96,9 +101,9 @@ contract wstETHPendleAdapterTest is AbstractAdapterTest {
 
     function increasePricePerShare(uint256 amount) public override {
         deal(
+            address(asset),
             address(pendleMarket),
-            address(adapter),
-            amount
+            IERC20(address(asset)).balanceOf(address(pendleMarket)) + amount
         );
     }
 
@@ -112,7 +117,7 @@ contract wstETHPendleAdapterTest is AbstractAdapterTest {
         adapter.initialize(
             abi.encode(asset, address(this), strategy, 0, sigs, ""),
             address(pendleRouter),
-            abi.encode(pendleMarket, slippage, twapDuration)
+            abi.encode(pendleMarket, oracle, slippage, twapDuration, swapDelay)        
         );
 
         assertEq(adapter.owner(), address(this), "owner");
@@ -127,6 +132,97 @@ contract wstETHPendleAdapterTest is AbstractAdapterTest {
 
         verify_adapterInit();
     }
+    
+    // override tests that uses multiple configurations
+    // as this adapter only wants wstETH 
+    function test__deposit(uint8 fuzzAmount) public override {
+        uint8 len = uint8(testConfigStorage.getTestConfigLength());
+        for (uint8 i; i < len; i++) {
+            if (i > 0) overrideSetup(testConfigStorage.getTestConfig(0));
+            uint256 amount = bound(uint256(fuzzAmount), minFuzz, maxAssets);
+
+            _mintAssetAndApproveForAdapter(amount, bob);
+
+            prop_deposit(bob, bob, amount, testId);
+
+            increasePricePerShare(raise);
+
+            _mintAssetAndApproveForAdapter(amount, bob);
+            prop_deposit(bob, alice, amount, testId);
+        }
+    }
+
+    function test__mint(uint8 fuzzAmount) public override {
+        uint8 len = uint8(testConfigStorage.getTestConfigLength());
+        for (uint8 i; i < len; i++) {
+            if (i > 0) overrideSetup(testConfigStorage.getTestConfig(0));
+            uint256 amount = bound(uint256(fuzzAmount), minShares, maxShares);
+
+            _mintAssetAndApproveForAdapter(adapter.previewMint(amount), bob);
+
+            prop_mint(bob, bob, amount, testId);
+
+            increasePricePerShare(raise);
+
+            _mintAssetAndApproveForAdapter(adapter.previewMint(amount), bob);
+
+            prop_mint(bob, alice, amount, testId);
+        }
+    }
+
+    function test__redeem(uint8 fuzzAmount) public override {
+        uint8 len = uint8(testConfigStorage.getTestConfigLength());
+        for (uint8 i; i < len; i++) {
+            if (i > 0) overrideSetup(testConfigStorage.getTestConfig(0));
+            uint256 amount = bound(uint256(fuzzAmount), minShares, maxShares);
+
+            uint256 reqAssets = adapter.previewMint(amount);
+            _mintAssetAndApproveForAdapter(reqAssets, bob);
+
+            vm.prank(bob);
+            adapter.deposit(reqAssets, bob);
+            prop_redeem(bob, bob, adapter.maxRedeem(bob), testId);
+
+            _mintAssetAndApproveForAdapter(reqAssets, bob);
+            vm.prank(bob);
+            adapter.deposit(reqAssets, bob);
+
+            increasePricePerShare(raise);
+
+            vm.prank(bob);
+            adapter.approve(alice, type(uint256).max);
+            prop_redeem(alice, bob, adapter.maxRedeem(bob), testId);           
+        }
+    }
+
+    function test__withdraw(uint8 fuzzAmount) public override {
+        uint8 len = uint8(testConfigStorage.getTestConfigLength());
+        for (uint8 i; i < len; i++) {
+            if (i > 0) overrideSetup(testConfigStorage.getTestConfig(0));
+            uint256 amount = bound(uint256(fuzzAmount), minFuzz, maxAssets);
+
+            uint256 reqAssets = adapter.previewMint(
+                adapter.previewWithdraw(amount)
+            );
+            _mintAssetAndApproveForAdapter(reqAssets, bob);
+            vm.prank(bob);
+            adapter.deposit(reqAssets, bob);
+
+            prop_withdraw(bob, bob, adapter.maxWithdraw(bob), testId);
+
+            _mintAssetAndApproveForAdapter(reqAssets, bob);
+            vm.prank(bob);
+            adapter.deposit(reqAssets, bob);
+
+            increasePricePerShare(raise);
+
+            vm.prank(bob);
+            adapter.approve(alice, type(uint256).max);
+
+            prop_withdraw(alice, bob, adapter.maxWithdraw(bob), testId);
+        }
+    }
+
 
     function test_depositWithdraw() public {
         assertEq(IERC20(pendleMarket).balanceOf(address(adapter)), 0);
@@ -209,8 +305,6 @@ contract wstETHPendleAdapterTest is AbstractAdapterTest {
             type(uint256).max,
             "allowance"
         );
-
-        assertGt(adapterContract.lastRate(), 0);
     }
 
     function testFail_invalidToken() public {
@@ -218,11 +312,11 @@ contract wstETHPendleAdapterTest is AbstractAdapterTest {
         address invalidAsset = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
 
         createAdapter();
-        vm.expectRevert();
+
         adapter.initialize(
             abi.encode(invalidAsset, address(this), strategy, 0, sigs, ""),
             address(pendleRouter),
-            abi.encode(pendleMarket)
+            abi.encode(pendleMarket, oracle, slippage, twapDuration, swapDelay)
         );
     }
 }

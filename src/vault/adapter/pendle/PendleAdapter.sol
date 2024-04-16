@@ -273,7 +273,7 @@ contract PendleAdapter is AdapterBase, WithRewards {
     }
 
     function _toAssetRate() internal view virtual returns (uint256 rate) {
-        rate = pendleOracle.getLpToSyRate(address(pendleMarket), twapDuration);
+        rate = pendleOracle.getLpToAssetRate(address(pendleMarket), twapDuration);
     }
 
     function _oracleInit() internal {   
