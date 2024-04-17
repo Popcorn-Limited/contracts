@@ -9,7 +9,7 @@ import {ReentrancyGuardUpgradeable} from "openzeppelin-contracts-upgradeable/uti
 import {PausableUpgradeable} from "openzeppelin-contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {Math} from "openzeppelin-contracts/utils/math/Math.sol";
 import {OwnedUpgradeable} from "../utils/OwnedUpgradeable.sol";
-import {VaultFees, IERC4626, IERC20} from "../interfaces/vault/IVault.sol";
+import {IERC4626, IERC20} from "../interfaces/vault/IVault.sol";
 
 struct Allocation {
     uint256 index;
@@ -35,15 +35,12 @@ contract MultiStrategyVault is
     using SafeERC20 for IERC20;
     using Math for uint256;
 
-    uint256 internal constant SECONDS_PER_YEAR = 365.25 days;
-
-    uint8 internal _decimals;
-    uint8 public constant decimalOffset = 9;
-
     string internal _name;
     string internal _symbol;
 
     bytes32 public contractName;
+
+    uint256 public quitPeriod;
 
     event VaultInitialized(bytes32 contractName, address indexed asset);
 
@@ -58,26 +55,27 @@ contract MultiStrategyVault is
      * @notice Initialize a new Vault.
      * @param asset_ Underlying Asset which users will deposit.
      * @param strategies_ strategies to be used to earn interest for this vault.
-     * @param fees_ Desired fees in 1e18. (1e18 = 100%, 1e14 = 1 BPS)
-     * @param feeRecipient_ Recipient of all vault fees. (Must not be zero address)
+     * @param defaultDepositIndex_ index of the strategy that the vault should use on deposit
+     * @param withdrawalQueue_ indices determining the order in which we should withdraw funds from strategies
      * @param depositLimit_ Maximum amount of assets which can be deposited.
-     * @param owner Owner of the contract. Controls management functions.
+     * @param owner_ Owner of the contract. Controls management functions.
      * @dev This function is called by the factory contract when deploying a new vault.
      * @dev Usually the adapter should already be pre configured. Otherwise a new one can only be added after a ragequit time.
      */
     function initialize(
         IERC20 asset_,
         IERC4626[] calldata strategies_,
-        VaultFees calldata fees_,
-        address feeRecipient_,
+        uint256 defaultDepositIndex_,
+        uint256[] calldata withdrawalQueue_,
         uint256 depositLimit_,
-        address owner
+        address owner_
     ) external initializer {
         __ERC4626_init(IERC20Metadata(address(asset_)));
-        __Owned_init(owner);
+        __Owned_init(owner_);
 
         if (address(asset_) == address(0)) revert InvalidAsset();
 
+        // Set Strategies
         uint256 len = strategies_.length;
         for (uint256 i; i < len; i++) {
             if (strategies_[i].asset() != address(asset_))
@@ -86,18 +84,30 @@ contract MultiStrategyVault is
             asset_.approve(address(strategies_[i]), type(uint256).max);
         }
 
+        // Set DefaultDepositIndex
         if (
-            fees_.deposit >= 1e18 ||
-            fees_.withdrawal >= 1e18 ||
-            fees_.management >= 1e18 ||
-            fees_.performance >= 1e18
-        ) revert InvalidVaultFees();
-        fees = fees_;
+            defaultDepositIndex_ > strategies.length - 1 &&
+            defaultDepositIndex_ != type(uint256).max
+        ) revert InvalidIndex();
 
-        if (feeRecipient_ == address(0)) revert InvalidFeeRecipient();
-        feeRecipient = feeRecipient_;
+        defaultDepositIndex = defaultDepositIndex_;
 
-        highWaterMark = 1e9;
+        // Set WithdrawalQueue
+        if (withdrawalQueue_.length != strategies.length)
+            revert InvalidWithdrawalQueue();
+
+        withdrawalQueue = new uint256[](withdrawalQueue_.length);
+
+        for (uint256 i = 0; i < withdrawalQueue_.length; i++) {
+            uint256 index = withdrawalQueue_[i];
+
+            if (index > strategies.length - 1 && index != type(uint256).max)
+                revert InvalidIndex();
+
+            withdrawalQueue[i] = index;
+        }
+
+        // Set other state variables
         quitPeriod = 3 days;
         depositLimit = depositLimit_;
 
@@ -139,10 +149,6 @@ contract MultiStrategyVault is
         return _symbol;
     }
 
-    function decimals() public view override returns (uint8) {
-        return _decimals;
-    }
-
     /*//////////////////////////////////////////////////////////////
                         DEPOSIT/WITHDRAWAL LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -155,132 +161,12 @@ contract MultiStrategyVault is
         return deposit(assets, msg.sender);
     }
 
-    /**
-     * @notice Deposit exactly `assets` amount of tokens, issuing vault shares to `receiver`.
-     * @param assets Quantity of tokens to deposit.
-     * @param receiver Receiver of issued vault shares.
-     * @return shares Quantity of vault shares issued to `receiver`.
-     */
-    function deposit(
-        uint256 assets,
-        address receiver
-    ) public override nonReentrant whenNotPaused returns (uint256 shares) {
-        if (receiver == address(0)) revert InvalidReceiver();
-        if (assets > maxDeposit(receiver)) revert MaxError(assets);
-
-        // Inititalize account for managementFee on first deposit
-        if (totalSupply() == 0) feesUpdatedAt = block.timestamp;
-
-        uint256 feeShares = _convertToShares(
-            assets.mulDiv(uint256(fees.deposit), 1e18, Math.Rounding.Floor),
-            Math.Rounding.Floor
-        );
-
-        shares = _convertToShares(assets, Math.Rounding.Floor) - feeShares;
-        if (shares == 0) revert ZeroAmount();
-
-        if (feeShares > 0) _mint(feeRecipient, feeShares);
-
-        _mint(receiver, shares);
-
-        IERC20(asset()).safeTransferFrom(msg.sender, address(this), assets);
-
-        // deposit into default index strategy or leave funds idle
-        if (defaultDepositIndex != type(uint256).max) {
-            strategies[defaultDepositIndex].deposit(assets, address(this));
-        }
-
-        emit Deposit(msg.sender, receiver, assets, shares);
-    }
-
     function mint(uint256 shares) external returns (uint256) {
         return mint(shares, msg.sender);
     }
 
-    /**
-     * @notice Mint exactly `shares` vault shares to `receiver`, taking the necessary amount of `asset` from the caller.
-     * @param shares Quantity of shares to mint.
-     * @param receiver Receiver of issued vault shares.
-     * @return assets Quantity of assets deposited by caller.
-     */
-    function mint(
-        uint256 shares,
-        address receiver
-    ) public override nonReentrant whenNotPaused returns (uint256 assets) {
-        if (receiver == address(0)) revert InvalidReceiver();
-        if (shares == 0) revert ZeroAmount();
-
-        // Inititalize account for managementFee on first deposit
-        if (totalSupply() == 0) feesUpdatedAt = block.timestamp;
-
-        uint256 depositFee = uint256(fees.deposit);
-
-        uint256 feeShares = shares.mulDiv(
-            depositFee,
-            1e18 - depositFee,
-            Math.Rounding.Floor
-        );
-
-        assets = _convertToAssets(shares + feeShares, Math.Rounding.Ceil);
-
-        if (assets > maxMint(receiver)) revert MaxError(assets);
-
-        if (feeShares > 0) _mint(feeRecipient, feeShares);
-
-        _mint(receiver, shares);
-
-        IERC20(asset()).safeTransferFrom(msg.sender, address(this), assets);
-
-        // deposit into default index strategy or leave funds idle
-        if (defaultDepositIndex != type(uint256).max) {
-            strategies[defaultDepositIndex].deposit(assets, address(this));
-        }
-
-        emit Deposit(msg.sender, receiver, assets, shares);
-    }
-
     function withdraw(uint256 assets) public returns (uint256) {
         return withdraw(assets, msg.sender, msg.sender);
-    }
-
-    /**
-     * @notice Burn shares from `owner` in exchange for `assets` amount of underlying token.
-     * @param assets Quantity of underlying `asset` token to withdraw.
-     * @param receiver Receiver of underlying token.
-     * @param owner Owner of burned vault shares.
-     * @return shares Quantity of vault shares burned in exchange for `assets`.
-     */
-    function withdraw(
-        uint256 assets,
-        address receiver,
-        address owner
-    ) public override nonReentrant returns (uint256 shares) {
-        if (receiver == address(0)) revert InvalidReceiver();
-        if (assets > maxWithdraw(owner)) revert MaxError(assets);
-
-        shares = _convertToShares(assets, Math.Rounding.Ceil);
-        if (shares == 0) revert ZeroAmount();
-
-        uint256 withdrawalFee = uint256(fees.withdrawal);
-
-        uint256 feeShares = shares.mulDiv(
-            withdrawalFee,
-            1e18 - withdrawalFee,
-            Math.Rounding.Floor
-        );
-
-        shares += feeShares;
-
-        if (msg.sender != owner)
-            _approve(owner, msg.sender, allowance(owner, msg.sender) - shares);
-
-        _burn(owner, shares);
-
-        if (feeShares > 0) _mint(feeRecipient, feeShares);
-
-        _withdrawStrategyFunds(assets, receiver);
-
-        emit Withdraw(msg.sender, receiver, owner, assets, shares);
     }
 
     function redeem(uint256 shares) external returns (uint256) {
@@ -288,39 +174,66 @@ contract MultiStrategyVault is
     }
 
     /**
-     * @notice Burn exactly `shares` vault shares from `owner` and send underlying `asset` tokens to `receiver`.
-     * @param shares Quantity of vault shares to exchange for underlying tokens.
-     * @param receiver Receiver of underlying tokens.
-     * @param owner Owner of burned vault shares.
-     * @return assets Quantity of `asset` sent to `receiver`.
+     * @dev Deposit/mint common workflow.
      */
-    function redeem(
-        uint256 shares,
+    function _deposit(
+        address caller,
         address receiver,
-        address owner
-    ) public override nonReentrant returns (uint256 assets) {
-        if (receiver == address(0)) revert InvalidReceiver();
-        if (shares == 0) revert ZeroAmount();
-        if (shares > maxRedeem(owner)) revert MaxError(shares);
+        uint256 assets,
+        uint256 shares
+    ) internal override {
+        if (shares == 0 || assets == 0) revert ZeroAmount();
 
-        if (msg.sender != owner)
-            _approve(owner, msg.sender, allowance(owner, msg.sender) - shares);
-
-        uint256 feeShares = shares.mulDiv(
-            uint256(fees.withdrawal),
-            1e18,
-            Math.Rounding.Floor
+        // If _asset is ERC-777, `transferFrom` can trigger a reentrancy BEFORE the transfer happens through the
+        // `tokensToSend` hook. On the other hand, the `tokenReceived` hook, that is triggered after the transfer,
+        // calls the vault, which is assumed not malicious.
+        //
+        // Conclusion: we need to do the transfer before we mint so that any reentrancy would happen before the
+        // assets are transferred and before the shares are minted, which is a valid state.
+        // slither-disable-next-line reentrancy-no-eth
+        SafeERC20.safeTransferFrom(
+            IERC20(asset()),
+            caller,
+            address(this),
+            assets
         );
 
-        assets = _convertToAssets(shares - feeShares, Math.Rounding.Floor);
+        // deposit into default index strategy or leave funds idle
+        if (defaultDepositIndex != type(uint256).max) {
+            strategies[defaultDepositIndex].deposit(assets, address(this));
+        }
 
+        _mint(receiver, shares);
+
+        emit Deposit(caller, receiver, assets, shares);
+    }
+
+    /**
+     * @dev Withdraw/redeem common workflow.
+     */
+    function _withdraw(
+        address caller,
+        address receiver,
+        address owner,
+        uint256 assets,
+        uint256 shares
+    ) internal override {
+        if (shares == 0 || assets == 0) revert ZeroAmount();
+        if (caller != owner) {
+            _spendAllowance(owner, caller, shares);
+        }
+
+        // If _asset is ERC-777, `transfer` can trigger a reentrancy AFTER the transfer happens through the
+        // `tokensReceived` hook. On the other hand, the `tokensToSend` hook, that is triggered before the transfer,
+        // calls the vault, which is assumed not malicious.
+        //
+        // Conclusion: we need to do the transfer after the burn so that any reentrancy would happen after the
+        // shares are burned and after the assets are transferred, which is a valid state.
         _burn(owner, shares);
-
-        if (feeShares > 0) _mint(feeRecipient, feeShares);
 
         _withdrawStrategyFunds(assets, receiver);
 
-        emit Withdraw(msg.sender, receiver, owner, assets, shares);
+        emit Withdraw(caller, receiver, owner, assets, shares);
     }
 
     function _withdrawStrategyFunds(uint256 amount, address receiver) internal {
@@ -383,78 +296,6 @@ contract MultiStrategyVault is
         return assets;
     }
 
-    /**
-     * @notice Simulate the effects of a deposit at the current block, given current on-chain conditions.
-     * @param assets Exact amount of underlying `asset` token to deposit
-     * @return shares of the vault issued in exchange to the user for `assets`
-     * @dev This method accounts for issuance of accrued fee shares.
-     */
-    function previewDeposit(
-        uint256 assets
-    ) public view override returns (uint256 shares) {
-        assets -= assets.mulDiv(
-            uint256(fees.deposit),
-            1e18,
-            Math.Rounding.Floor
-        );
-        shares = _convertToShares(assets, Math.Rounding.Floor);
-    }
-
-    /**
-     * @notice Simulate the effects of a mint at the current block, given current on-chain conditions.
-     * @param shares Exact amount of vault shares to mint.
-     * @return assets quantity of underlying needed in exchange to mint `shares`.
-     * @dev This method accounts for issuance of accrued fee shares.
-     */
-    function previewMint(
-        uint256 shares
-    ) public view override returns (uint256 assets) {
-        uint256 depositFee = uint256(fees.deposit);
-        shares += shares.mulDiv(
-            depositFee,
-            1e18 - depositFee,
-            Math.Rounding.Floor
-        );
-        assets = _convertToAssets(shares, Math.Rounding.Ceil);
-    }
-
-    /**
-     * @notice Simulate the effects of a withdrawal at the current block, given current on-chain conditions.
-     * @param assets Exact amount of `assets` to withdraw
-     * @return shares to be burned in exchange for `assets`
-     * @dev This method accounts for both issuance of fee shares and withdrawal fee.
-     */
-    function previewWithdraw(
-        uint256 assets
-    ) public view override returns (uint256 shares) {
-        shares = _convertToShares(assets, Math.Rounding.Ceil);
-
-        uint256 withdrawalFee = uint256(fees.withdrawal);
-        shares += shares.mulDiv(
-            withdrawalFee,
-            1e18 - withdrawalFee,
-            Math.Rounding.Floor
-        );
-    }
-
-    /**
-     * @notice Simulate the effects of a redemption at the current block, given current on-chain conditions.
-     * @param shares Exact amount of `shares` to redeem
-     * @return assets quantity of underlying returned in exchange for `shares`.
-     * @dev This method accounts for both issuance of fee shares and withdrawal fee.
-     */
-    function previewRedeem(
-        uint256 shares
-    ) public view override returns (uint256 assets) {
-        uint256 feeShares = shares.mulDiv(
-            uint256(fees.withdrawal),
-            1e18,
-            Math.Rounding.Floor
-        );
-
-        assets = _convertToAssets(shares - feeShares, Math.Rounding.Floor);
-    }
-
     /*//////////////////////////////////////////////////////////////
                      DEPOSIT/WITHDRAWAL LIMIT LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -476,159 +317,6 @@ contract MultiStrategyVault is
     }
 
     /*//////////////////////////////////////////////////////////////
-                        FEE ACCOUNTING LOGIC
-    //////////////////////////////////////////////////////////////*/
-
-    /**
-     * @notice Management fee that has accrued since last fee harvest.
-     * @return Accrued management fee in underlying `asset` token.
-     * @dev Management fee is annualized per minute, based on 525,600 minutes per year. Total assets are calculated using
-     *  the average of their current value and the value at the previous fee harvest checkpoint. This method is similar to
-     *  calculating a definite integral using the trapezoid rule.
-     */
-    function accruedManagementFee() public view returns (uint256) {
-        uint256 managementFee = fees.management;
-        return
-            managementFee > 0
-                ? managementFee.mulDiv(
-                    totalAssets() * (block.timestamp - feesUpdatedAt),
-                    SECONDS_PER_YEAR,
-                    Math.Rounding.Floor
-                ) / 1e18
-                : 0;
-    }
-
-    /**
-     * @notice Performance fee that has accrued since last fee harvest.
-     * @return Accrued performance fee in underlying `asset` token.
-     * @dev Performance fee is based on a high water mark value. If vault share value has increased above the
-     *   HWM in a fee period, issue fee shares to the vault equal to the performance fee.
-     */
-    function accruedPerformanceFee() public view returns (uint256) {
-        uint256 highWaterMark_ = highWaterMark;
-        uint256 shareValue = convertToAssets(1e18);
-        uint256 performanceFee = fees.performance;
-
-        return
-            performanceFee > 0 && shareValue > highWaterMark_
-                ? performanceFee.mulDiv(
-                    (shareValue - highWaterMark_) * totalSupply(),
-                    1e36,
-                    Math.Rounding.Floor
-                )
-                : 0;
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                            FEE LOGIC
-    //////////////////////////////////////////////////////////////*/
-
-    uint256 public highWaterMark;
-    uint256 public assetsCheckpoint;
-    uint256 public feesUpdatedAt;
-
-    error InsufficientWithdrawalAmount(uint256 amount);
-
-    /// @notice Minimal function to call `takeFees` modifier.
-    function takeManagementAndPerformanceFees()
-        external
-        nonReentrant
-        takeFees
-    {}
-
-    /// @notice Collect management and performance fees and update vault share high water mark.
-    modifier takeFees() {
-        uint256 totalFee = accruedManagementFee() + accruedPerformanceFee();
-        uint256 currentAssets = totalAssets();
-        uint256 shareValue = convertToAssets(1e18);
-
-        if (shareValue > highWaterMark) highWaterMark = shareValue;
-
-        if (totalFee > 0 && currentAssets > 0) {
-            uint256 supply = totalSupply();
-            uint256 feeInShare = supply == 0
-                ? totalFee
-                : totalFee.mulDiv(
-                    supply,
-                    currentAssets - totalFee,
-                    Math.Rounding.Floor
-                );
-            _mint(feeRecipient, feeInShare);
-        }
-
-        feesUpdatedAt = block.timestamp;
-
-        _;
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                            FEE MANAGEMENT LOGIC
-    //////////////////////////////////////////////////////////////*/
-
-    VaultFees public fees;
-
-    VaultFees public proposedFees;
-    uint256 public proposedFeeTime;
-
-    address public feeRecipient;
-
-    event NewFeesProposed(VaultFees newFees, uint256 timestamp);
-    event ChangedFees(VaultFees oldFees, VaultFees newFees);
-    event FeeRecipientUpdated(address oldFeeRecipient, address newFeeRecipient);
-
-    error InvalidVaultFees();
-    error InvalidFeeRecipient();
-    error NotPassedQuitPeriod(uint256 quitPeriod);
-
-    /**
-     * @notice Propose new fees for this vault. Caller must be owner.
-     * @param newFees Fees for depositing, withdrawal, management and performance in 1e18.
-     * @dev Fees can be 0 but never 1e18 (1e18 = 100%, 1e14 = 1 BPS)
-     */
-    function proposeFees(VaultFees calldata newFees) external onlyOwner {
-        if (
-            newFees.deposit >= 1e18 ||
-            newFees.withdrawal >= 1e18 ||
-            newFees.management >= 1e18 ||
-            newFees.performance >= 1e18
-        ) revert InvalidVaultFees();
-
-        proposedFees = newFees;
-        proposedFeeTime = block.timestamp;
-
-        emit NewFeesProposed(newFees, block.timestamp);
-    }
-
-    /// @notice Change fees to the previously proposed fees after the quit period has passed.
-    function changeFees() external takeFees {
-        if (
-            proposedFeeTime == 0 ||
-            block.timestamp < proposedFeeTime + quitPeriod
-        ) revert NotPassedQuitPeriod(quitPeriod);
-
-        emit ChangedFees(fees, proposedFees);
-
-        fees = proposedFees;
-        feesUpdatedAt = block.timestamp;
-
-        delete proposedFees;
-        delete proposedFeeTime;
-    }
-
-    /**
-     * @notice Change `feeRecipient`. Caller must be Owner.
-     * @param _feeRecipient The new fee recipient.
-     * @dev Accrued fees wont be transferred to the new feeRecipient.
-     */
-    function setFeeRecipient(address _feeRecipient) external onlyOwner {
-        if (_feeRecipient == address(0)) revert InvalidFeeRecipient();
-
-        emit FeeRecipientUpdated(feeRecipient, _feeRecipient);
-
-        feeRecipient = _feeRecipient;
-    }
-
-    /*//////////////////////////////////////////////////////////////
                           STRATEGY LOGIC
     //////////////////////////////////////////////////////////////*/
 
@@ -644,7 +332,8 @@ contract MultiStrategyVault is
     error VaultAssetMismatchNewAdapterAsset();
     error InvalidIndex();
     error InvalidWithdrawalQueue();
-
+    error NotPassedQuitPeriod(uint256 quitPeriod_);
+    
     function getStrategies() external view returns (IERC4626[] memory) {
         return strategies;
     }
@@ -701,7 +390,7 @@ contract MultiStrategyVault is
      * @dev Additionally it will zero old allowances and set new ones
      * @dev Last we update HWM and assetsCheckpoint for fees to make sure they adjust to the new adapter
      */
-    function changeStrategies() external takeFees {
+    function changeStrategies() external {
         if (
             proposedStrategyTime == 0 ||
             block.timestamp < proposedStrategyTime + quitPeriod
@@ -756,33 +445,6 @@ contract MultiStrategyVault is
                     address(this)
                 );
         }
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                          RAGE QUIT LOGIC
-    //////////////////////////////////////////////////////////////*/
-
-    uint256 public quitPeriod;
-
-    event QuitPeriodSet(uint256 quitPeriod);
-
-    error InvalidQuitPeriod();
-
-    /**
-     * @notice Set a quitPeriod for rage quitting after new adapter or fees are proposed. Caller must be Owner.
-     * @param _quitPeriod Time to rage quit after proposal.
-     */
-    function setQuitPeriod(uint256 _quitPeriod) external onlyOwner {
-        if (
-            block.timestamp < proposedStrategyTime + quitPeriod ||
-            block.timestamp < proposedFeeTime + quitPeriod
-        ) revert NotPassedQuitPeriod(quitPeriod);
-        if (_quitPeriod < 1 days || _quitPeriod > 7 days)
-            revert InvalidQuitPeriod();
-
-        quitPeriod = _quitPeriod;
-
-        emit QuitPeriodSet(quitPeriod);
     }
 
     /*//////////////////////////////////////////////////////////////
