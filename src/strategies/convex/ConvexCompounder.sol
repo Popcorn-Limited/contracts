@@ -3,8 +3,7 @@
 
 pragma solidity ^0.8.15;
 
-import {AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20, Math, IStrategy, IAdapter} from "../abstracts/AdapterBase.sol";
-import {WithRewards, IWithRewards} from "../abstracts/WithRewards.sol";
+import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math, IStrategy, IAdapter} from "../BaseStrategy.sol";
 import {IConvexBooster, IConvexRewards, IRewards} from "./IConvex.sol";
 import {ICurveLp, IGauge, ICurveRouter, CurveSwap, IMinter} from "../curve/ICurve.sol";
 
@@ -17,7 +16,7 @@ import {ICurveLp, IGauge, ICurveRouter, CurveSwap, IMinter} from "../curve/ICurv
  * Allows wrapping Convex Vaults with or without an active convexBooster.
  * Compounds rewards into the vault underlying.
  */
-contract ConvexCompounder is AdapterBase, WithRewards {
+contract ConvexCompounder is BaseStrategy {
     using SafeERC20 for IERC20;
     using Math for uint256;
 

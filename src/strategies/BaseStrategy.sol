@@ -3,19 +3,16 @@
 
 pragma solidity ^0.8.15;
 
-import {ERC4626Upgradeable, IERC20, IERC20Metadata, ERC20Upgradeable as ERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
+import {ERC4626Upgradeable, IERC20Metadata, ERC20Upgradeable as ERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuardUpgradeable} from "openzeppelin-contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
-import {Math} from "openzeppelin-contracts/utils/math/Math.sol";
 import {PausableUpgradeable} from "openzeppelin-contracts-upgradeable/utils/PausableUpgradeable.sol";
-import {IStrategy} from "../../../interfaces/vault/IStrategy.sol";
-import {IAdapter, IERC4626} from "../../../interfaces/vault/IAdapter.sol";
-import {EIP165} from "../../../utils/EIP165.sol";
-import {OnlyStrategy} from "./OnlyStrategy.sol";
-import {OwnedUpgradeable} from "../../../utils/OwnedUpgradeable.sol";
+import {Math} from "openzeppelin-contracts/utils/math/Math.sol";
+import {OwnedUpgradeable} from "../utils/OwnedUpgradeable.sol";
+import {IERC4626, IERC20} from "../interfaces/vault/IVault.sol";
 
 /**
- * @title   AdapterBase
+ * @title   BaseStrategy
  * @author  RedVeil
  * @notice  See the following for the full EIP-4626 specification https://eips.ethereum.org/EIPS/eip-4626.
  *
@@ -24,24 +21,14 @@ import {OwnedUpgradeable} from "../../../utils/OwnedUpgradeable.sol";
  * All specific interactions for the underlying protocol need to be overriden in the actual implementation.
  * The adapter can be initialized with a strategy that can perform additional operations. (Leverage, Compounding, etc.)
  */
-abstract contract AdapterBase is
+abstract contract BaseStrategy is
     ERC4626Upgradeable,
     PausableUpgradeable,
     OwnedUpgradeable,
-    ReentrancyGuardUpgradeable,
-    EIP165,
-    OnlyStrategy
+    ReentrancyGuardUpgradeable
 {
     using SafeERC20 for IERC20;
     using Math for uint256;
-
-    uint8 internal _decimals;
-
-    error StrategySetupFailed();
-
-    // constructor() {
-    //     _disableInitializers();
-    // }
 
     /**
      * @notice Initialize a new Adapter.
@@ -77,22 +64,10 @@ abstract contract AdapterBase is
         INITIAL_CHAIN_ID = block.chainid;
         INITIAL_DOMAIN_SEPARATOR = computeDomainSeparator();
 
-        _decimals = IERC20Metadata(asset).decimals() + decimalOffset; // Asset decimals + decimal offset to combat inflation attacks
-
-        strategy = IStrategy(_strategy);
-        strategyConfig = _strategyConfig;
-        harvestCooldown = _harvestCooldown;
-
-        if (_strategy != address(0)) _verifyAndSetupStrategy(_requiredSigs);
-
-        highWaterMark = 1e9;
         lastHarvest = block.timestamp;
         autoHarvest = true;
     }
 
-    function decimals() public view override returns (uint8) {
-        return _decimals;
-    }
     /*//////////////////////////////////////////////////////////////
                         DEPOSIT/WITHDRAWAL LOGIC
     //////////////////////////////////////////////////////////////*/

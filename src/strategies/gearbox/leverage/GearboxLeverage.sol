@@ -2,8 +2,7 @@
 // Docgen-SOLC: 0.8.15
 
 pragma solidity ^0.8.15;
-import {Math} from "openzeppelin-contracts/utils/math/Math.sol";
-import {AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20} from "../../abstracts/AdapterBase.sol";
+import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math} from "../../BaseStrategy.sol";
 import {
     ICreditFacadeV3, ICreditManagerV3, MultiCall, ICreditFacadeV3Multicall, CollateralDebtData, CollateralCalcTask
 } from "./IGearboxV3.sol";
@@ -16,7 +15,7 @@ import {
  * An ERC4626 compliant Wrapper for https://github.com/Gearbox-protocol/core-v2/blob/main/contracts/pool/PoolService.sol.
  * Allows wrapping Passive pools.
  */
-abstract contract GearboxLeverage is AdapterBase {
+abstract contract GearboxLeverage is BaseStrategy {
     using SafeERC20 for IERC20;
 
     string internal _name;

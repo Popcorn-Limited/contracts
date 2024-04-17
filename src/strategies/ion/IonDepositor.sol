@@ -3,7 +3,7 @@
 
 pragma solidity ^0.8.15;
 
-import {AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20, Math} from "../abstracts/AdapterBase.sol";
+import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math} from "../BaseStrategy.sol";
 import {IIonPool} from "./IIonProtocol.sol";
 
 /**
@@ -14,7 +14,7 @@ import {IIonPool} from "./IIonProtocol.sol";
  * An ERC4626 compliant Wrapper for ....
  */
 
-contract IonDepositor is AdapterBase {
+contract IonDepositor is BaseStrategy {
     using SafeERC20 for IERC20;
     using Math for uint256;
 

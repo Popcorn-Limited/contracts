@@ -3,7 +3,7 @@
 
 pragma solidity ^0.8.15;
 
-import {AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20, Math, IStrategy, IAdapter} from "../abstracts/AdapterBase.sol";
+import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math} from "../BaseStrategy.sol";
 import {IwstETH} from "./IwstETH.sol";
 import {ILido} from "./ILido.sol";
 import {Math} from "openzeppelin-contracts/utils/math/Math.sol";
@@ -16,7 +16,7 @@ import {ILendingPool, IAToken, IFlashLoanReceiver, IProtocolDataProvider, IPoolA
 /// @notice ERC4626 wrapper for leveraging stETH yield
 /// @dev The strategy takes wstETH and deposits it into a lending protocol (aave).
 /// Then it borrows ETH, swap for wstETH and redeposits it
-contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
+contract LeveragedWstETHAdapter is BaseStrategy, IFlashLoanReceiver {
     // using FixedPointMathLib for uint256;
     using SafeERC20 for IERC20;
     using Math for uint256;

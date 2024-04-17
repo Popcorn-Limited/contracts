@@ -3,8 +3,7 @@
 
 pragma solidity ^0.8.15;
 
-import {AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20, Math, IStrategy, IAdapter} from "../../../abstracts/AdapterBase.sol";
-import {WithRewards, IWithRewards} from "../../../abstracts/WithRewards.sol";
+import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math} from "../../../BaseStrategy.sol";
 import {ICurveLp, IGauge, ICurveRouter, CurveSwap, IMinter} from "../../ICurve.sol";
 
 /**
@@ -14,7 +13,7 @@ import {ICurveLp, IGauge, ICurveRouter, CurveSwap, IMinter} from "../../ICurve.s
  * An ERC4626 compliant Wrapper for https://github.com/curvefi/curve-xchain-factory/blob/master/contracts/implementations/ChildGauge.vy.
  * Allows wrapping Curve Child Gauge Vaults.
  */
-contract CurveGaugeCompounder is AdapterBase, WithRewards {
+contract CurveGaugeCompounder is BaseStrategy {
     using SafeERC20 for IERC20;
     using Math for uint256;
 

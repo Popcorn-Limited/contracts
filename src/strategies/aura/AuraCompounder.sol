@@ -3,8 +3,7 @@
 
 pragma solidity ^0.8.15;
 
-import {AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20, Math, IStrategy, IAdapter} from "../abstracts/AdapterBase.sol";
-import {WithRewards, IWithRewards} from "../abstracts/WithRewards.sol";
+import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math, IStrategy, IAdapter} from "../BaseStrategy.sol";
 import {IAuraBooster, IAuraRewards, IAuraStaking} from "./IAura.sol";
 import {IBalancerVault, SwapKind, IAsset, BatchSwapStep, FundManagement, JoinPoolRequest} from "../../../interfaces/external/balancer/IBalancerVault.sol";
 
@@ -16,7 +15,7 @@ import {IBalancerVault, SwapKind, IAsset, BatchSwapStep, FundManagement, JoinPoo
  * An ERC4626 compliant Wrapper for https://github.com/sushiswap/sushiswap/blob/archieve/canary/contracts/Aura.sol.
  * Allows wrapping Aura Vaults.
  */
-contract AuraCompounder is AdapterBase, WithRewards {
+contract AuraCompounder is BaseStrategy {
     using SafeERC20 for IERC20;
     using Math for uint256;
 
