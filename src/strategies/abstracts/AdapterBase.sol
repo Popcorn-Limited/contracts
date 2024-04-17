@@ -36,7 +36,6 @@ abstract contract AdapterBase is
     using Math for uint256;
 
     uint8 internal _decimals;
-    uint8 public constant decimalOffset = 9;
 
     error StrategySetupFailed();
 
@@ -94,39 +93,64 @@ abstract contract AdapterBase is
     function decimals() public view override returns (uint8) {
         return _decimals;
     }
-
     /*//////////////////////////////////////////////////////////////
                         DEPOSIT/WITHDRAWAL LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    error MaxError(uint256 amount);
     error ZeroAmount();
+    error InvalidReceiver();
+    error MaxError(uint256 amount);
+
+    function deposit(uint256 assets) public returns (uint256) {
+        return deposit(assets, msg.sender);
+    }
+
+    function mint(uint256 shares) external returns (uint256) {
+        return mint(shares, msg.sender);
+    }
+
+    function withdraw(uint256 assets) public returns (uint256) {
+        return withdraw(assets, msg.sender, msg.sender);
+    }
+
+    function redeem(uint256 shares) external returns (uint256) {
+        return redeem(shares, msg.sender, msg.sender);
+    }
 
     /**
-     * @notice Deposit `assets` into the underlying protocol and mints vault shares to `receiver`.
-     * @dev Executes harvest if `harvestCooldown` is passed since last invocation.
+     * @dev Deposit/mint common workflow.
      */
     function _deposit(
         address caller,
         address receiver,
         uint256 assets,
         uint256 shares
-    ) internal virtual override nonReentrant {
+    ) internal override {
         if (shares == 0 || assets == 0) revert ZeroAmount();
 
-        IERC20(asset()).safeTransferFrom(caller, address(this), assets);
+        // If _asset is ERC-777, `transferFrom` can trigger a reentrancy BEFORE the transfer happens through the
+        // `tokensToSend` hook. On the other hand, the `tokenReceived` hook, that is triggered after the transfer,
+        // calls the vault, which is assumed not malicious.
+        //
+        // Conclusion: we need to do the transfer before we mint so that any reentrancy would happen before the
+        // assets are transferred and before the shares are minted, which is a valid state.
+        // slither-disable-next-line reentrancy-no-eth
+        SafeERC20.safeTransferFrom(
+            IERC20(asset()),
+            caller,
+            address(this),
+            assets
+        );
 
         _protocolDeposit(assets, shares);
-        _mint(receiver, shares);
 
-        if (autoHarvest) harvest();
+        _mint(receiver, shares);
 
         emit Deposit(caller, receiver, assets, shares);
     }
 
     /**
-     * @notice Withdraws `assets` from the underlying protocol and burns vault shares from `owner`.
-     * @dev Executes harvest if `harvestCooldown` is passed since last invocation.
+     * @dev Withdraw/redeem common workflow.
      */
     function _withdraw(
         address caller,
@@ -134,22 +158,25 @@ abstract contract AdapterBase is
         address owner,
         uint256 assets,
         uint256 shares
-    ) internal virtual override {
+    ) internal override {
         if (shares == 0 || assets == 0) revert ZeroAmount();
-
         if (caller != owner) {
             _spendAllowance(owner, caller, shares);
         }
 
-        if (!paused()) {
-            _protocolWithdraw(assets, shares);
-        }
-
+        // If _asset is ERC-777, `transfer` can trigger a reentrancy AFTER the transfer happens through the
+        // `tokensReceived` hook. On the other hand, the `tokensToSend` hook, that is triggered before the transfer,
+        // calls the vault, which is assumed not malicious.
+        //
+        // Conclusion: we need to do the transfer after the burn so that any reentrancy would happen after the
+        // shares are burned and after the assets are transferred, which is a valid state.
         _burn(owner, shares);
 
-        IERC20(asset()).safeTransfer(receiver, assets);
-
-        if (autoHarvest) harvest();
+        if (paused()) {
+            IERC20(asset()).safeTransfer(receiver, assets);
+        } else {
+            _protocolWithdraw(assets, shares, receiver);
+        }
 
         emit Withdraw(caller, receiver, owner, assets, shares);
     }
@@ -184,52 +211,6 @@ abstract contract AdapterBase is
         uint256 shares
     ) public view virtual returns (uint256) {}
 
-    /**
-     * @notice Simulate the effects of a deposit at the current block, given current on-chain conditions.
-     * @dev Return 0 if paused since no further deposits are allowed.
-     * @dev Override this function if the underlying protocol has a unique deposit logic and/or deposit fees.
-     */
-    function previewDeposit(
-        uint256 assets
-    ) public view virtual override returns (uint256) {
-        return paused() ? 0 : _convertToShares(assets,  Math.Rounding.Floor);
-    }
-
-    /**
-     * @notice Simulate the effects of a mint at the current block, given current on-chain conditions.
-     * @dev Return 0 if paused since no further deposits are allowed.
-     * @dev Override this function if the underlying protocol has a unique deposit logic and/or deposit fees.
-     */
-    function previewMint(
-        uint256 shares
-    ) public view virtual override returns (uint256) {
-        return paused() ? 0 : _convertToAssets(shares,  Math.Rounding.Ceil);
-    }
-
-    function _convertToShares(
-        uint256 assets,
-        Math.Rounding rounding
-    ) internal view virtual override returns (uint256 shares) {
-        return
-            assets.mulDiv(
-                totalSupply() + 10 ** decimalOffset,
-                totalAssets() + 1,
-                rounding
-            );
-    }
-
-    function _convertToAssets(
-        uint256 shares,
-        Math.Rounding rounding
-    ) internal view virtual override returns (uint256) {
-        return
-            shares.mulDiv(
-                totalAssets() + 1,
-                totalSupply() + 10 ** decimalOffset,
-                rounding
-            );
-    }
-
     /*//////////////////////////////////////////////////////////////
                      DEPOSIT/WITHDRAWAL LIMIT LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -254,108 +235,9 @@ abstract contract AdapterBase is
         return paused() ? 0 : type(uint256).max;
     }
 
-    /*//////////////////////////////////////////////////////////////
-                            STRATEGY LOGIC
-    //////////////////////////////////////////////////////////////*/
-
-    IStrategy public strategy;
-    bytes public strategyConfig;
-    uint256 public lastHarvest;
-    bool public autoHarvest;
-
-    event Harvested();
-    event AutoHarvestToggled(bool oldValue, bool newValue);
-
-    /**
-     * @notice Execute Strategy and take fees.
-     * @dev Delegatecall to strategy's harvest() function. All necessary data is passed via `strategyConfig`.
-     * @dev Delegatecall is used to in case any logic requires the adapters address as a msg.sender. (e.g. Synthetix staking)
-     */
-    function harvest() public virtual takeFees {
-        if (
-            address(strategy) != address(0) &&
-            ((lastHarvest + harvestCooldown) < block.timestamp)
-        ) {
-            // solhint-disable
-            (bool success, ) = address(strategy).delegatecall(
-                abi.encodeWithSignature("harvest()")
-            );
-            if (!success) revert();
-            lastHarvest = block.timestamp;
-        }
-
-        emit Harvested();
-    }
-
-    // @ev Exists for compatibility for flywheel systems.
-    function claimRewards() external {
-        harvest();
-    }
-
-    /**
-     * @notice Allows the strategy to deposit assets into the underlying protocol without minting new adapter shares.
-     * @dev This can be used e.g. for a compounding strategy to increase the value of each adapter share.
-     */
-    function strategyDeposit(
-        uint256 amount,
-        uint256 shares
-    ) public onlyStrategy {
-        _protocolDeposit(amount, shares);
-    }
-
-    /**
-     * @notice Allows the strategy to withdraw assets from the underlying protocol without burning adapter shares.
-     * @dev This can be used e.g. for a leverage strategy to reduce leverage without the need for the strategy to hold any adapter shares.
-     */
-    function strategyWithdraw(
-        uint256 amount,
-        uint256 shares
-    ) public onlyStrategy {
-        _protocolWithdraw(amount, shares);
-    }
-
-    /**
-     * @notice Verifies that the Adapter and Strategy are compatible and sets up the strategy.
-     * @dev This checks EIP165 compatibility and potentially other strategy specific checks (matching assets...).
-     * @dev It aftwards sets up anything required by the strategy to call `harvest()` like approvals etc.
-     */
-    function _verifyAndSetupStrategy(bytes4[8] memory requiredSigs) internal {
-        strategy.verifyAdapterSelectorCompatibility(requiredSigs);
-        strategy.verifyAdapterCompatibility(strategyConfig);
-        (bool success, ) = address(strategy).delegatecall(
-            abi.encodeWithSignature("setUp(bytes)", strategyConfig)
-        );
-
-        if (!success) revert StrategySetupFailed();
-    }
-
     function toggleAutoHarvest() external onlyOwner {
         emit AutoHarvestToggled(autoHarvest, !autoHarvest);
         autoHarvest = !autoHarvest;
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                      HARVEST COOLDOWN LOGIC
-  //////////////////////////////////////////////////////////////*/
-
-    uint256 public harvestCooldown;
-
-    event HarvestCooldownChanged(uint256 oldCooldown, uint256 newCooldown);
-
-    error InvalidHarvestCooldown(uint256 cooldown);
-
-    /**
-     * @notice Set a new harvestCooldown for this adapter. Caller must be owner.
-     * @param newCooldown Time in seconds that must pass before a harvest can be called again.
-     * @dev Cant be longer than 1 day.
-     */
-    function setHarvestCooldown(uint256 newCooldown) external onlyOwner {
-        // Dont wait more than X seconds
-        if (newCooldown >= 1 days) revert InvalidHarvestCooldown(newCooldown);
-
-        emit HarvestCooldownChanged(harvestCooldown, newCooldown);
-
-        harvestCooldown = newCooldown;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -388,7 +270,7 @@ abstract contract AdapterBase is
                 ? performanceFee_.mulDiv(
                     (shareValue - highWaterMark_) * totalSupply(),
                     1e36,
-                     Math.Rounding.Floor
+                    Math.Rounding.Floor
                 )
                 : 0;
     }
@@ -446,19 +328,10 @@ abstract contract AdapterBase is
     /// @notice Withdraw from the underlying protocol.
     function _protocolWithdraw(
         uint256 assets,
-        uint256 shares
+        uint256 shares,
+        address recipient
     ) internal virtual {
         // OPTIONAL - convertIntoUnderlyingShares(assets,shares)
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                      EIP-165 LOGIC
-  //////////////////////////////////////////////////////////////*/
-
-    function supportsInterface(
-        bytes4 interfaceId
-    ) public view virtual override returns (bool) {
-        return interfaceId == type(IAdapter).interfaceId;
     }
 
     /*//////////////////////////////////////////////////////////////
