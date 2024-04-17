@@ -21,6 +21,7 @@ contract MultiStrategyVaultTest is Test {
 
     MockERC20 asset;
     IERC4626[] strategies;
+    uint256[] withdrawalQueue;
     MultiStrategyVault vault;
 
     address strategyImplementation;
@@ -33,7 +34,6 @@ contract MultiStrategyVaultTest is Test {
 
     event NewStrategiesProposed();
     event ChangedStrategies();
-    event QuitPeriodSet(uint256 quitPeriod);
     event Paused(address account);
     event Unpaused(address account);
     event DepositLimitSet(uint256 depositLimit);
@@ -54,18 +54,17 @@ contract MultiStrategyVaultTest is Test {
         strategies.push(_createStrategy(IERC20(address(asset))));
         strategies.push(_createStrategy(IERC20(address(asset))));
 
+        withdrawalQueue.push(1);
+        withdrawalQueue.push(0);
+
         vault.initialize(
             IERC20(address(asset)),
             strategies,
+            uint256(0),
+            withdrawalQueue,
             type(uint256).max,
             address(this)
         );
-
-        uint256[] memory withdrawalQueue = new uint256[](2);
-        withdrawalQueue[0] = 0;
-        withdrawalQueue[1] = 1;
-
-        vault.setWithdrawalQueue(withdrawalQueue);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -94,6 +93,8 @@ contract MultiStrategyVaultTest is Test {
         newVault.initialize(
             IERC20(address(asset)),
             strategies,
+            uint256(0),
+            withdrawalQueue,
             type(uint256).max,
             bob
         );
@@ -119,13 +120,14 @@ contract MultiStrategyVaultTest is Test {
     }
 
     function testFail__initialize_asset_is_zero() public {
-        address vaultAddress = address(new MultiStrategyVault());
-        vm.label(vaultAddress, "vault");
+        address vaultAddress = Clones.clone(implementation);
+        MultiStrategyVault newVault = MultiStrategyVault(vaultAddress);
 
-        vault = MultiStrategyVault(vaultAddress);
-        vault.initialize(
+        newVault.initialize(
             IERC20(address(0)),
             strategies,
+            uint256(0),
+            withdrawalQueue,
             type(uint256).max,
             address(this)
         );
@@ -137,12 +139,14 @@ contract MultiStrategyVaultTest is Test {
         IERC4626[] memory newStrategies = new IERC4626[](1);
         newStrategies[0] = _createStrategy(IERC20(address(newAsset)));
 
-        address vaultAddress = address(new MultiStrategyVault());
+        address vaultAddress = Clones.clone(implementation);
+        MultiStrategyVault newVault = MultiStrategyVault(vaultAddress);
 
-        vault = MultiStrategyVault(vaultAddress);
-        vault.initialize(
+        newVault.initialize(
             IERC20(address(asset)),
             newStrategies,
+            uint256(0),
+            withdrawalQueue,
             type(uint256).max,
             address(this)
         );
@@ -150,14 +154,81 @@ contract MultiStrategyVaultTest is Test {
 
     function testFail__initialize_strategy_addressZero() public {
         MockERC20 newAsset = new MockERC20("New Mock Token", "NTKN", 18);
-        address vaultAddress = address(new MultiStrategyVault());
 
-        vault = MultiStrategyVault(vaultAddress);
-        vault.initialize(
+        address vaultAddress = Clones.clone(implementation);
+        MultiStrategyVault newVault = MultiStrategyVault(vaultAddress);
+
+        newVault.initialize(
             IERC20(address(asset)),
             new IERC4626[](1),
+            uint256(0),
+            withdrawalQueue,
             type(uint256).max,
             address(this)
+        );
+    }
+
+    function testFail__initialize_depositIndex_out_of_bound() public {
+        address vaultAddress = Clones.clone(implementation);
+        MultiStrategyVault newVault = MultiStrategyVault(vaultAddress);
+
+        newVault.initialize(
+            IERC20(address(asset)),
+            strategies,
+            uint256(3),
+            withdrawalQueue,
+            type(uint256).max,
+            bob
+        );
+    }
+
+    function testFail__initialize_withdrawalQueue_too_long() public {
+        address vaultAddress = Clones.clone(implementation);
+        MultiStrategyVault newVault = MultiStrategyVault(vaultAddress);
+
+        uint256[] memory newWithdrawalQueue = new uint256[](3);
+
+        newVault.initialize(
+            IERC20(address(asset)),
+            strategies,
+            uint256(0),
+            newWithdrawalQueue,
+            type(uint256).max,
+            bob
+        );
+    }
+
+    function testFail__initialize_withdrawalQueue_too_short() public {
+        address vaultAddress = Clones.clone(implementation);
+        MultiStrategyVault newVault = MultiStrategyVault(vaultAddress);
+
+        uint256[] memory newWithdrawalQueue = new uint256[](1);
+
+        newVault.initialize(
+            IERC20(address(asset)),
+            strategies,
+            uint256(0),
+            newWithdrawalQueue,
+            type(uint256).max,
+            bob
+        );
+    }
+
+    function testFail__initialize_withdrawalQueue_index_out_of_bounds() public {
+        address vaultAddress = Clones.clone(implementation);
+        MultiStrategyVault newVault = MultiStrategyVault(vaultAddress);
+
+        uint256[] memory newWithdrawalQueue = new uint256[](2);
+        newWithdrawalQueue[0] = 0;
+        newWithdrawalQueue[0] = 2;
+
+        newVault.initialize(
+            IERC20(address(asset)),
+            strategies,
+            uint256(0),
+            newWithdrawalQueue,
+            type(uint256).max,
+            bob
         );
     }
 
@@ -748,51 +819,6 @@ contract MultiStrategyVaultTest is Test {
         allocations[1] = Allocation({index: 1, amount: 10e18});
 
         vault.pushFunds(allocations);
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                          SET RAGE QUIT
-    //////////////////////////////////////////////////////////////*/
-
-    function test__setQuitPeriod() public {
-        // Pass the inital quit period
-        vm.warp(block.timestamp + 3 days);
-
-        uint256 newQuitPeriod = 1 days;
-        vm.expectEmit(false, false, false, true, address(vault));
-        emit QuitPeriodSet(newQuitPeriod);
-
-        vault.setQuitPeriod(newQuitPeriod);
-
-        assertEq(vault.quitPeriod(), newQuitPeriod);
-    }
-
-    function testFail__setQuitPeriod_NonOwner() public {
-        vm.prank(alice);
-        vault.setQuitPeriod(1 days);
-    }
-
-    function testFail__setQuitPeriod_too_low() public {
-        vault.setQuitPeriod(23 hours);
-    }
-
-    function testFail__setQuitPeriod_too_high() public {
-        vault.setQuitPeriod(8 days);
-    }
-
-    function testFail__setQuitPeriod_during_initial_quitPeriod() public {
-        vault.setQuitPeriod(1 days);
-    }
-
-    function testFail__setQuitPeriod_during_strategy_quitPeriod() public {
-        IERC4626 newAdapter = _createStrategy(IERC20(address(asset)));
-
-        // Pass the inital quit period
-        vm.warp(block.timestamp + 3 days);
-
-        vault.proposeStrategies(strategies);
-
-        vault.setQuitPeriod(1 days);
     }
 
     /*//////////////////////////////////////////////////////////////

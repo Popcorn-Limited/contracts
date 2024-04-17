@@ -40,6 +40,8 @@ contract MultiStrategyVault is
 
     bytes32 public contractName;
 
+    uint256 public quitPeriod;
+
     event VaultInitialized(bytes32 contractName, address indexed asset);
 
     error InvalidAsset();
@@ -53,22 +55,27 @@ contract MultiStrategyVault is
      * @notice Initialize a new Vault.
      * @param asset_ Underlying Asset which users will deposit.
      * @param strategies_ strategies to be used to earn interest for this vault.
+     * @param defaultDepositIndex_ index of the strategy that the vault should use on deposit
+     * @param withdrawalQueue_ indices determining the order in which we should withdraw funds from strategies
      * @param depositLimit_ Maximum amount of assets which can be deposited.
-     * @param owner Owner of the contract. Controls management functions.
+     * @param owner_ Owner of the contract. Controls management functions.
      * @dev This function is called by the factory contract when deploying a new vault.
      * @dev Usually the adapter should already be pre configured. Otherwise a new one can only be added after a ragequit time.
      */
     function initialize(
         IERC20 asset_,
         IERC4626[] calldata strategies_,
+        uint256 defaultDepositIndex_,
+        uint256[] calldata withdrawalQueue_,
         uint256 depositLimit_,
-        address owner
+        address owner_
     ) external initializer {
         __ERC4626_init(IERC20Metadata(address(asset_)));
-        __Owned_init(owner);
+        __Owned_init(owner_);
 
         if (address(asset_) == address(0)) revert InvalidAsset();
 
+        // Set Strategies
         uint256 len = strategies_.length;
         for (uint256 i; i < len; i++) {
             if (strategies_[i].asset() != address(asset_))
@@ -77,6 +84,30 @@ contract MultiStrategyVault is
             asset_.approve(address(strategies_[i]), type(uint256).max);
         }
 
+        // Set DefaultDepositIndex
+        if (
+            defaultDepositIndex_ > strategies.length - 1 &&
+            defaultDepositIndex_ != type(uint256).max
+        ) revert InvalidIndex();
+
+        defaultDepositIndex = defaultDepositIndex_;
+
+        // Set WithdrawalQueue
+        if (withdrawalQueue_.length != strategies.length)
+            revert InvalidWithdrawalQueue();
+
+        withdrawalQueue = new uint256[](withdrawalQueue_.length);
+
+        for (uint256 i = 0; i < withdrawalQueue_.length; i++) {
+            uint256 index = withdrawalQueue_[i];
+
+            if (index > strategies.length - 1 && index != type(uint256).max)
+                revert InvalidIndex();
+
+            withdrawalQueue[i] = index;
+        }
+
+        // Set other state variables
         quitPeriod = 3 days;
         depositLimit = depositLimit_;
 
@@ -301,7 +332,8 @@ contract MultiStrategyVault is
     error VaultAssetMismatchNewAdapterAsset();
     error InvalidIndex();
     error InvalidWithdrawalQueue();
-
+    error NotPassedQuitPeriod(uint256 quitPeriod_);
+    
     function getStrategies() external view returns (IERC4626[] memory) {
         return strategies;
     }
@@ -413,32 +445,6 @@ contract MultiStrategyVault is
                     address(this)
                 );
         }
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                          RAGE QUIT LOGIC
-    //////////////////////////////////////////////////////////////*/
-
-    uint256 public quitPeriod;
-
-    event QuitPeriodSet(uint256 quitPeriod);
-
-    error InvalidQuitPeriod();
-    error NotPassedQuitPeriod(uint256 quitPeriod);
-
-    /**
-     * @notice Set a quitPeriod for rage quitting after new adapter or fees are proposed. Caller must be Owner.
-     * @param _quitPeriod Time to rage quit after proposal.
-     */
-    function setQuitPeriod(uint256 _quitPeriod) external onlyOwner {
-        if (block.timestamp < proposedStrategyTime + quitPeriod)
-            revert NotPassedQuitPeriod(quitPeriod);
-        if (_quitPeriod < 1 days || _quitPeriod > 7 days)
-            revert InvalidQuitPeriod();
-
-        quitPeriod = _quitPeriod;
-
-        emit QuitPeriodSet(quitPeriod);
     }
 
     /*//////////////////////////////////////////////////////////////
