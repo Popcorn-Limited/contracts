@@ -137,6 +137,13 @@ interface IPendleSYToken {
 
     // returns all tokens that can be redeemed from this SY token
     function getTokensOut() external view returns (address[] memory);
+
+    function totalSupply() external view returns (uint256);
+}
+
+interface IUSDeSYToken is IPendleSYToken {
+    // returns all tokens that can mint this SY token
+    function supplyCap() external view returns (uint256);
 }
 
 interface IPendleGauge {

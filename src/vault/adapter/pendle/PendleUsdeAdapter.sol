@@ -4,7 +4,7 @@
 pragma solidity ^0.8.15;
 
 import {AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20, Math, IStrategy, IAdapter, IERC4626} from "../abstracts/AdapterBase.sol";
-import {IPendleRouter, IwstETH, IPendleMarket, IPendleSYToken, IPendleOracle, ApproxParams, LimitOrderData, TokenInput, TokenOutput, SwapData} from "./IPendle.sol";
+import {IPendleMarket, IUSDeSYToken} from "./IPendle.sol";
 import {PendleAdapter} from "./PendleAdapter.sol";
 import {IBalancerRouter, SingleSwap, FundManagement, SwapKind} from "./IBalancer.sol";
 import {ICurveRouter, CurveSwap} from "../curve/ICurve.sol";
@@ -37,6 +37,8 @@ contract PendleUSDeAdapter is PendleAdapter {
     ICurveRouter public constant curveRouter = 
         ICurveRouter(address(0xF0d4c12A5768D806021F80a262B4d39d26C58b8D));
 
+    IUSDeSYToken SYToken; 
+
     /*//////////////////////////////////////////////////////////////
                             INITIALIZATION
     //////////////////////////////////////////////////////////////*/
@@ -58,6 +60,14 @@ contract PendleUSDeAdapter is PendleAdapter {
             baseAsset == 0x4c9EDD5852cd905f086C759E8383e09bff1E68B3,
             "Only USDe"
         );
+
+        (address pendleSYToken, , ) = IPendleMarket(pendleMarket).readTokens();
+        SYToken = IUSDeSYToken(pendleSYToken);
+    }
+
+    /// @notice USDe market has a supply cap
+    function maxDeposit(address) public view override returns (uint256) {
+        return SYToken.supplyCap() - SYToken.totalSupply();
     }
 
     /*//////////////////////////////////////////////////////////////

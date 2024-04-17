@@ -28,6 +28,7 @@ contract PendleAdapter is AdapterBase, WithRewards {
     uint256 public slippage;
     uint32 public twapDuration;
     uint256 public swapDelay;
+    uint256 public feeTier;
 
     /*//////////////////////////////////////////////////////////////
                             INITIALIZATION
@@ -70,9 +71,9 @@ contract PendleAdapter is AdapterBase, WithRewards {
         pendleRouter = IPendleRouter(_pendleRouter);
         address _pendleOracle;
 
-        (pendleMarket, _pendleOracle, slippage, twapDuration, swapDelay) = abi.decode(
+        (pendleMarket, _pendleOracle, slippage, twapDuration, swapDelay, feeTier) = abi.decode(
             pendleInitData,
-            (address, address, uint256, uint32, uint256)
+            (address, address, uint256, uint32, uint256, uint256)
         );
 
         pendleOracle = IPendleOracle(_pendleOracle);
@@ -117,7 +118,6 @@ contract PendleAdapter is AdapterBase, WithRewards {
                             ACCOUNTING LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    // uses last stored rate to approximate total underlying
     function _totalAssets() internal view override returns (uint256 t) {
         uint256 totAssets = IERC20(pendleMarket)
             .balanceOf(address(this))
@@ -125,6 +125,9 @@ contract PendleAdapter is AdapterBase, WithRewards {
 
         // apply slippage
         t = totAssets - totAssets.mulDiv(slippage, 1e18, Math.Rounding.Floor);
+
+        // apply pendle fee
+        t -= t.mulDiv(feeTier, 1e18, Math.Rounding.Floor);
     }
 
     /*//////////////////////////////////////////////////////////////
