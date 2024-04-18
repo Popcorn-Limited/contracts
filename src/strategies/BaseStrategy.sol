@@ -46,13 +46,14 @@ abstract contract BaseStrategy is
     function __BaseStrategy_init(
         address asset_,
         address owner_,
+        bool autoHarvest_
     ) internal onlyInitializing {
         __Owned_init(owner_);
         __Pausable_init();
         __ERC4626_init(IERC20Metadata(asset_));
 
-        lastHarvest = block.timestamp;
-        autoHarvest = true;
+        highWaterMark = convertToAssets(1e18);
+        autoHarvest = autoHarvest_;
 
         INITIAL_CHAIN_ID = block.chainid;
         INITIAL_DOMAIN_SEPARATOR = computeDomainSeparator();
@@ -111,7 +112,7 @@ abstract contract BaseStrategy is
 
         _mint(receiver, shares);
 
-        if(autoHarvest) harvest();
+        if (autoHarvest) harvest();
 
         emit Deposit(caller, receiver, assets, shares);
     }
@@ -145,7 +146,7 @@ abstract contract BaseStrategy is
             _protocolWithdraw(assets, shares, receiver);
         }
 
-        if(autoHarvest) harvest();
+        if (autoHarvest) harvest();
 
         emit Withdraw(caller, receiver, owner, assets, shares);
     }
@@ -205,8 +206,37 @@ abstract contract BaseStrategy is
     }
 
     /*//////////////////////////////////////////////////////////////
-                      FEE LOGIC
-  //////////////////////////////////////////////////////////////*/
+                          INTERNAL HOOKS LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice deposit into the underlying protocol.
+    function _protocolDeposit(uint256 assets, uint256 shares) internal virtual {
+        // OPTIONAL - convertIntoUnderlyingShares(assets,shares)
+    }
+
+    /// @notice Withdraw from the underlying protocol.
+    function _protocolWithdraw(
+        uint256 assets,
+        uint256 shares,
+        address recipient
+    ) internal virtual {
+        // OPTIONAL - convertIntoUnderlyingShares(assets,shares)
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            STRATEGY LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    function harvest() public virtual takeFees {}
+
+    function toggleAutoHarvest() external onlyOwner {
+        emit AutoHarvestToggled(autoHarvest, !autoHarvest);
+        autoHarvest = !autoHarvest;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            FEE LOGIC
+    //////////////////////////////////////////////////////////////*/
 
     uint256 public performanceFee;
     uint256 public highWaterMark;
@@ -266,7 +296,7 @@ abstract contract BaseStrategy is
 
     /*//////////////////////////////////////////////////////////////
                       PAUSING LOGIC
-  //////////////////////////////////////////////////////////////*/
+    //////////////////////////////////////////////////////////////*/
 
     /// @notice Pause Deposits and withdraw all funds from the underlying protocol. Caller must be owner.
     function pause() external onlyOwner {
@@ -279,37 +309,6 @@ abstract contract BaseStrategy is
         _protocolDeposit(totalAssets(), totalSupply());
         _unpause();
     }
-
-    /*//////////////////////////////////////////////////////////////
-                          INTERNAL HOOKS LOGIC
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice deposit into the underlying protocol.
-    function _protocolDeposit(uint256 assets, uint256 shares) internal virtual {
-        // OPTIONAL - convertIntoUnderlyingShares(assets,shares)
-    }
-
-    /// @notice Withdraw from the underlying protocol.
-    function _protocolWithdraw(
-        uint256 assets,
-        uint256 shares,
-        address recipient
-    ) internal virtual {
-        // OPTIONAL - convertIntoUnderlyingShares(assets,shares)
-    }
-
-        /*//////////////////////////////////////////////////////////////
-                            STRATEGY LOGIC
-    //////////////////////////////////////////////////////////////*/
-
-    function harvest() public virtual takeFees {
-        }
-
-    function toggleAutoHarvest() external onlyOwner {
-        emit AutoHarvestToggled(autoHarvest, !autoHarvest);
-        autoHarvest = !autoHarvest;
-    }
-
 
     /*//////////////////////////////////////////////////////////////
                       EIP-2612 LOGIC
