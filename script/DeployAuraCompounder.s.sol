@@ -1,0 +1,134 @@
+// SPDX-License-Identifier: GPL-3.0
+// Docgen-SOLC: 0.8.15
+pragma solidity ^0.8.15;
+
+import {Script} from "forge-std/Script.sol";
+import {IBaseStrategy} from "../src/interfaces/IBaseStrategy.sol";
+import {AuraCompounder, BatchSwapStep, IAsset, IERC20} from "../src/strategies/aura/AuraCompounder.sol";
+
+contract DeployStrategy is Script {
+    address deployer;
+
+    // Base strategy config
+    address asset;
+    address owner;
+    bool autoHarvest;
+
+    // Protool specific config
+    uint256 pid;
+    address balVault;
+    address auraBooster;
+    bytes32 balPoolId;
+    address[] underlyings;
+
+    // Harvest values
+    BatchSwapStep[][] swaps;
+    IAsset[][] assets;
+    int256[][] limits;
+    uint256[] minTradeAmounts;
+    IERC20 baseAsset;
+    uint256 indexIn;
+    uint256 indexInUserData;
+    uint256 amountsInLen;
+
+    function run() public {
+        /// ---------- Strategy Configuration ---------- ///
+
+        // @dev Edit the base strategy config
+        asset = address(0);
+        owner = address(0);
+        autoHarvest = false;
+
+        // @dev Edit the protocol specific config
+        pid = 189;
+        balVault = 0xBA12222222228d8Ba445958a75a0704d566BF2C8;
+        auraBooster = 0xA57b8d98dAE62B26Ec3bcC4a365338157060B234;
+        balPoolId = 0x596192bb6e41802428ac943d2f1476c1af25cc0e000000000000000000000659;
+        underlyings = [
+            0x596192bB6e41802428Ac943D2f1476C1Af25CC0E,
+            0xbf5495Efe5DB9ce00f80364C8B423567e58d2110,
+            0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2
+        ];
+
+        // @dev Edit the harvest values
+
+        // Add BAL swap
+        swaps.push();
+        swaps[0].push(
+            // trade BAL for WETH
+            BatchSwapStep(
+                0x5c6ee304399dbdb9c8ef030ab642b10820db8f56000200000000000000000014,
+                0,
+                1,
+                0,
+                ""
+            )
+        );
+        assets.push(
+            [
+                IAsset(0xba100000625a3754423978a60c9317c58a424e3D),
+                IAsset(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2)
+            ]
+        ); // BAL
+        limits.push([type(int).max, type(int).max]);
+
+        // Add AURA swap
+        swaps.push();
+        swaps[1].push(
+            // trade AURA for WETH
+            BatchSwapStep(
+                0xcfca23ca9ca720b6e98e3eb9b6aa0ffc4a5c08b9000200000000000000000274,
+                0,
+                1,
+                0,
+                ""
+            )
+        );
+        assets.push(
+            [
+                IAsset(0xC0c293ce456fF0ED870ADd98a0828Dd4d2903DBF),
+                IAsset(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2)
+            ]
+        ); // AURA
+        limits.push([type(int).max, type(int).max]);
+
+        // Set minTradeAmounts
+        minTradeAmounts.push(0);
+        minTradeAmounts.push(0);
+
+        // Set other values
+        baseAsset = address(0);
+        indexIn = uint256(0);
+        indexInUserData = uint256(0);
+        amountsInLen = uint256(0);
+
+        /// ---------- Actual Deployment ---------- ///
+
+        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
+        deployer = vm.addr(deployerPrivateKey);
+
+        vm.startBroadcast(deployerPrivateKey);
+
+        AuraCompounder strategy = new AuraCompounder();
+
+        strategy.initialize(
+            asset,
+            owner,
+            autoHarvest,
+            abi.encode(pid, balVault, auraBooster, balPoolId, underlyings)
+        );
+
+        strategy.setHarvestValues(
+            swaps,
+            assets,
+            limits,
+            minTradeAmounts,
+            baseAsset,
+            indexIn,
+            indexInUserData,
+            amountsInLen
+        );
+
+        vm.stopBroadcast();
+    }
+}

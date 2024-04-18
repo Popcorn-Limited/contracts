@@ -6,19 +6,17 @@ pragma solidity ^0.8.15;
 import {Test} from "forge-std/Test.sol";
 
 import {PropertyTest} from "./PropertyTest.prop.sol";
-import {IAdapter, IERC4626} from "../../../../src/interfaces/vault/IAdapter.sol";
 
-import {IStrategy} from "../../../../src/interfaces/vault/IStrategy.sol";
 import {IERC20, IERC20Metadata} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
-import {ITestConfigStorage} from "./ITestConfigStorage.sol";
-import {MockStrategy} from "../../../utils/mocks/MockStrategy.sol";
 import {Math} from "openzeppelin-contracts/utils/math/Math.sol";
 import {Clones} from "openzeppelin-contracts/proxy/Clones.sol";
 
+import {ITestConfigStorage} from "./ITestConfigStorage.sol";
+
+import {IBaseStrategy} from "../../../src/interfaces/IBaseStrategy.sol";
+
 abstract contract AbstractAdapterTest is PropertyTest {
     using Math for uint256;
-
-    ITestConfigStorage testConfigStorage;
 
     string baseTestId; // Depends on external Protocol (e.g. Beefy,Yearn...)
     string testId; // baseTestId + Asset
@@ -42,8 +40,7 @@ abstract contract AbstractAdapterTest is PropertyTest {
 
     IERC20 asset;
     address implementation;
-    IAdapter adapter;
-    IStrategy strategy;
+    IBaseStrategy adapter;
     address externalRegistry;
 
     bytes4[8] sigs;
@@ -56,12 +53,11 @@ abstract contract AbstractAdapterTest is PropertyTest {
         address externalRegistry_,
         uint256 delta_,
         string memory baseTestId_,
-        bool useStrategy_
     ) public virtual {
         asset = asset_;
 
         implementation = implementation_;
-        adapter = IAdapter(Clones.clone(implementation_));
+        adapter = IBaseStrategy(Clones.clone(implementation_));
         externalRegistry = externalRegistry_;
 
         // Setup PropertyTest
@@ -102,7 +98,7 @@ abstract contract AbstractAdapterTest is PropertyTest {
 
     // Clone a new Adapter and set it to `adapter`
     function createAdapter() public virtual {
-        adapter = IAdapter(Clones.clone(implementation));
+        adapter = IBaseStrategy(Clones.clone(implementation));
         vm.label(address(adapter), "adapter");
     }
 
@@ -610,29 +606,6 @@ abstract contract AbstractAdapterTest is PropertyTest {
         adapter.deposit(defaultAmount, bob);
 
         assertEq(lastHarvest, adapter.lastHarvest(), "should not auto harvest");
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                        HARVEST COOLDOWN
-    //////////////////////////////////////////////////////////////*/
-
-    event HarvestCooldownChanged(uint256 oldCooldown, uint256 newCooldown);
-
-    function test__setHarvestCooldown() public virtual {
-        vm.expectEmit(false, false, false, true, address(adapter));
-        emit HarvestCooldownChanged(0, 1 hours);
-        adapter.setHarvestCooldown(1 hours);
-
-        assertEq(adapter.harvestCooldown(), 1 hours);
-    }
-
-    function testFail__setHarvestCooldown_nonOwner() public virtual {
-        vm.prank(alice);
-        adapter.setHarvestCooldown(1 hours);
-    }
-
-    function testFail__setHarvestCooldown_invalid_fee() public virtual {
-        adapter.setHarvestCooldown(2 days);
     }
 
     /*//////////////////////////////////////////////////////////////

@@ -2,7 +2,7 @@
 
 // SPDX-License-Identifier: GPL-3.0
 
-pragma solidity ^0.8.15;
+pragma solidity ^0.8.25;
 
 import {ERC4626Upgradeable as ERC4626, IERC20, IERC20Metadata, ERC20, SafeERC20, Math, IStrategy, IAdapter} from "../abstracts/AdapterBase.sol";
 

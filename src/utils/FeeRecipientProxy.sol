@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
-// Docgen-SOLC: 0.8.15
+// Docgen-SOLC: 0.8.25
 
-pragma solidity ^0.8.15;
+pragma solidity ^0.8.25;
 
 import { Owned } from "../utils/Owned.sol";
 import { IERC20 } from "openzeppelin-contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";

@@ -1,11 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0
-// Docgen-SOLC: 0.8.15
+// Docgen-SOLC: 0.8.25
 
-pragma solidity ^0.8.15;
+pragma solidity ^0.8.25;
 import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math} from "../../BaseStrategy.sol";
-import {
-    ICreditFacadeV3, ICreditManagerV3, MultiCall, ICreditFacadeV3Multicall, CollateralDebtData, CollateralCalcTask
-} from "./IGearboxV3.sol";
+import {ICreditFacadeV3, ICreditManagerV3, MultiCall, ICreditFacadeV3Multicall, CollateralDebtData, CollateralCalcTask} from "./IGearboxV3.sol";
 
 /**
  * @title   Gearbox Passive Pool Adapter
@@ -27,7 +25,8 @@ abstract contract GearboxLeverage is BaseStrategy {
     ICreditFacadeV3 public creditFacade;
     ICreditManagerV3 public creditManager;
 
-    address public constant YEARN_USDC_ADAPTER = 0x2fA039b014FF3167472a1DA127212634E7a57564;
+    address public constant YEARN_USDC_ADAPTER =
+        0x2fA039b014FF3167472a1DA127212634E7a57564;
 
     /*//////////////////////////////////////////////////////////////
                                 INITIALIZATION
@@ -44,22 +43,30 @@ abstract contract GearboxLeverage is BaseStrategy {
      * @dev This function is called by the factory contract when deploying a new vault.
      */
     function initialize(
-        bytes memory adapterInitData,
-        address,
+        address asset_,
+        address owner_,
+        bool autoHarvest_,
         bytes memory gearboxInitData
     ) external initializer {
-        __BaseStrategy_init(adapterInitData);
+        __BaseStrategy_init(asset_, owner_, autoHarvest_);
 
-        (address _creditFacade, address _creditManager, address _strategyAdapter) = abi.decode(
-            gearboxInitData, (address, address, address)
-        );
+        (
+            address _creditFacade,
+            address _creditManager,
+            address _strategyAdapter
+        ) = abi.decode(gearboxInitData, (address, address, address));
 
         strategyAdapter = _strategyAdapter;
         creditFacade = ICreditFacadeV3(_creditFacade);
         creditManager = ICreditManagerV3(_creditManager);
-        creditAccount = ICreditFacadeV3(_creditFacade).openCreditAccount(address(this), new MultiCall[](0), 0);
+        creditAccount = ICreditFacadeV3(_creditFacade).openCreditAccount(
+            address(this),
+            new MultiCall[](0),
+            0
+        );
 
-        (   uint256 debt,
+        (
+            uint256 debt,
             uint256 cumulativeIndexLastUpdate,
             uint128 cumulativeQuotaInterest,
             uint128 quotaFees,
@@ -111,9 +118,7 @@ abstract contract GearboxLeverage is BaseStrategy {
         return type(uint256).max;
     }
 
-    function maxWithdraw(
-        address owner
-    ) public view override returns (uint256) {
+    function maxWithdraw(address owner) public view override returns (uint256) {
         return convertToAssets(balanceOf(owner));
     }
 
@@ -139,7 +144,7 @@ abstract contract GearboxLeverage is BaseStrategy {
     }
 
     function _protocolWithdraw(uint256 assets, uint256) internal override {
-        if(_creditAccountIsLiquidatable()){
+        if (_creditAccountIsLiquidatable()) {
             revert CreditAccountLiquidatable();
         }
 
@@ -155,27 +160,41 @@ abstract contract GearboxLeverage is BaseStrategy {
         creditFacade.multicall(creditAccount, calls);
     }
 
-    function setTargetLeverageRatio(
-        uint256 _leverageRatio
-    ) public onlyOwner {
+    function setTargetLeverageRatio(uint256 _leverageRatio) public onlyOwner {
         targetLeverageRatio = _leverageRatio;
     }
 
     /*//////////////////////////////////////////////////////////////
                           HARVEST LOGIC
     //////////////////////////////////////////////////////////////*/
-    function adjustLeverage(uint256 amount, bytes memory data) public onlyOwner {
-        (uint256 currentLeverageRatio, CollateralDebtData memory collateralDebtData) = _calculateLeverageRatio();
+    function adjustLeverage(
+        uint256 amount,
+        bytes memory data
+    ) public onlyOwner {
+        (
+            uint256 currentLeverageRatio,
+            CollateralDebtData memory collateralDebtData
+        ) = _calculateLeverageRatio();
         uint256 currentCollateral = collateralDebtData.totalValue;
         uint256 currentDebt = collateralDebtData.debt;
 
-        if(currentLeverageRatio > targetLeverageRatio) {
-            if(Math.ceilDiv((currentDebt - amount), (currentCollateral - amount)) < targetLeverageRatio) {
+        if (currentLeverageRatio > targetLeverageRatio) {
+            if (
+                Math.ceilDiv(
+                    (currentDebt - amount),
+                    (currentCollateral - amount)
+                ) < targetLeverageRatio
+            ) {
                 _gearboxStrategyWithdraw(data);
                 _reduceLeverage(amount);
             }
         } else {
-            if(Math.ceilDiv((currentDebt + amount), (currentCollateral + amount)) < targetLeverageRatio) {
+            if (
+                Math.ceilDiv(
+                    (currentDebt + amount),
+                    (currentCollateral + amount)
+                ) < targetLeverageRatio
+            ) {
                 _increaseLeverage(amount);
                 _gearboxStrategyDeposit(data);
             }
@@ -184,20 +203,31 @@ abstract contract GearboxLeverage is BaseStrategy {
 
     /*//////////////////////////////////////////////////////////////
                           HELPERS
-    ///////////////////////////////////////////////
+    /////////////////////////////////////////////////////////////*/
 
-    //////////////*/
-
-    function _calculateLeverageRatio() internal view returns (uint256, CollateralDebtData memory){
+    function _calculateLeverageRatio()
+        internal
+        view
+        returns (uint256, CollateralDebtData memory)
+    {
         CollateralDebtData memory collateralDebtData = _getCreditAccountData();
-        return (Math.ceilDiv(collateralDebtData.debt, collateralDebtData.totalValue), collateralDebtData);
+        return (
+            Math.ceilDiv(
+                collateralDebtData.debt,
+                collateralDebtData.totalValue
+            ),
+            collateralDebtData
+        );
     }
 
     function _reduceLeverage(uint256 amount) internal {
         MultiCall[] memory calls = new MultiCall[](1);
         calls[0] = MultiCall({
             target: address(creditFacade),
-            callData: abi.encodeCall(ICreditFacadeV3Multicall.decreaseDebt, (amount))
+            callData: abi.encodeCall(
+                ICreditFacadeV3Multicall.decreaseDebt,
+                (amount)
+            )
         });
 
         creditFacade.multicall(creditAccount, calls);
@@ -207,30 +237,45 @@ abstract contract GearboxLeverage is BaseStrategy {
         MultiCall[] memory calls = new MultiCall[](1);
         calls[0] = MultiCall({
             target: address(creditFacade),
-            callData: abi.encodeCall(ICreditFacadeV3Multicall.increaseDebt, (amount))
+            callData: abi.encodeCall(
+                ICreditFacadeV3Multicall.increaseDebt,
+                (amount)
+            )
         });
 
         creditFacade.multicall(creditAccount, calls);
     }
 
-    function _getCreditAccountData() internal view returns (CollateralDebtData memory){
-        return ICreditManagerV3(creditFacade.creditManager()).calcDebtAndCollateral(
-            creditAccount, CollateralCalcTask.GENERIC_PARAMS
-        );
+    function _getCreditAccountData()
+        internal
+        view
+        returns (CollateralDebtData memory)
+    {
+        return
+            ICreditManagerV3(creditFacade.creditManager())
+                .calcDebtAndCollateral(
+                    creditAccount,
+                    CollateralCalcTask.GENERIC_PARAMS
+                );
     }
 
-    function _creditAccountIsLiquidatable() internal view returns(bool) {
+    function _creditAccountIsLiquidatable() internal view returns (bool) {
         bool _creditFacadeIsExpired;
         uint40 _expirationDate = creditFacade.expirationDate();
-        if(!creditFacade.expirable()){
+        if (!creditFacade.expirable()) {
             _creditFacadeIsExpired = false;
-        }else {
-            _creditFacadeIsExpired = (_expirationDate != 0 && block.timestamp >= _expirationDate);
+        } else {
+            _creditFacadeIsExpired = (_expirationDate != 0 &&
+                block.timestamp >= _expirationDate);
         }
 
         CollateralDebtData memory collateralDebtData = _getCreditAccountData();
-        bool isUnhealthy = collateralDebtData.twvUSD < collateralDebtData.totalDebtUSD;
-        if (collateralDebtData.debt == 0 || !isUnhealthy && !_creditFacadeIsExpired) {
+        bool isUnhealthy = collateralDebtData.twvUSD <
+            collateralDebtData.totalDebtUSD;
+        if (
+            collateralDebtData.debt == 0 ||
+            (!isUnhealthy && !_creditFacadeIsExpired)
+        ) {
             return false;
         }
 

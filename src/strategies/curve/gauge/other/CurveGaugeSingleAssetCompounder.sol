@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
-// Docgen-SOLC: 0.8.15
+// Docgen-SOLC: 0.8.25
 
-pragma solidity ^0.8.15;
+pragma solidity ^0.8.25;
 
 import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math} from "../../../BaseStrategy.sol";
 import {ICurveLp, IGauge, ICurveRouter, CurveSwap} from "./IArbCurve.sol";
@@ -34,11 +34,12 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy {
     error InvalidAsset();
 
     function initialize(
-        bytes memory adapterInitData,
-        address,
+        address asset_,
+        address owner_,
+        bool autoHarvest_,
         bytes memory curveInitData
     ) external initializer {
-        __BaseStrategy_init(adapterInitData);
+        __BaseStrategy_init(asset_, owner_, autoHarvest_);
 
         (address _lpToken, address _gauge, int128 _indexIn) = abi.decode(
             curveInitData,
@@ -49,7 +50,7 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy {
         gauge = IGauge(_gauge);
         indexIn = _indexIn;
         nCoins = ICurveLp(_lpToken).N_COINS();
-        
+
         _name = string.concat(
             "VaultCraft CurveGaugeSingleAssetCompounder ",
             IERC20Metadata(asset()).name(),
@@ -128,6 +129,45 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy {
                             STRATEGY LOGIC
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice Claim rewards from the gauge
+    function claim() public override returns (bool success) {
+        try gauge.claim_rewards() {
+            success = true;
+        } catch {}
+    }
+
+    /**
+     * @notice Claim rewards and compound them into the vault
+     */
+    function harvest() public override takeFees {
+        claim();
+
+        ICurveRouter router_ = curveRouter;
+        uint256 amount;
+        uint256 rewLen = _rewardTokens.length;
+        for (uint256 i = 0; i < rewLen; i++) {
+            address rewardToken = _rewardTokens[i];
+            amount = IERC20(rewardToken).balanceOf(address(this));
+            if (amount > minTradeAmounts[i]) {
+                _exchange(router_, swaps[rewardToken], amount);
+            }
+        }
+
+        uint256 depositAmount = IERC20(asset()).balanceOf(address(this));
+        if (depositAmount > 0) _protocolDeposit(depositAmount, 0);
+
+        emit Harvested();
+    }
+
+    function _exchange(
+        ICurveRouter router,
+        CurveSwap memory swap,
+        uint256 amount
+    ) internal {
+        if (amount == 0) revert ZeroAmount();
+        router.exchange(swap.route, swap.swapParams, amount, 0, swap.pools);
+    }
+
     address[] internal _rewardTokens;
     uint256[] public minTradeAmounts; // ordered as in rewardsTokens()
 
@@ -163,49 +203,4 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy {
         minTradeAmounts = minTradeAmounts_;
         discountBps = discountBps_;
     }
-
-    /**
-     * @notice Claim rewards and compound them into the vault
-     */
-    function harvest() public override takeFees {
-        if ((lastHarvest + harvestCooldown) < block.timestamp) {
-            claim();
-
-            ICurveRouter router_ = curveRouter;
-            uint256 amount;
-            uint256 rewLen = _rewardTokens.length;
-            for (uint256 i = 0; i < rewLen; i++) {
-                address rewardToken = _rewardTokens[i];
-                amount = IERC20(rewardToken).balanceOf(address(this));
-                if (amount > minTradeAmounts[i]) {
-                    _exchange(router_, swaps[rewardToken], amount);
-                }
-            }
-
-            uint256 depositAmount = IERC20(asset()).balanceOf(address(this));
-            if (depositAmount > 0) _protocolDeposit(depositAmount, 0);
-
-            lastHarvest = block.timestamp;
-        }
-
-        emit Harvested();
-    }
-
-    function _exchange(
-        ICurveRouter router,
-        CurveSwap memory swap,
-        uint256 amount
-    ) internal {
-        if (amount == 0) revert ZeroAmount();
-        router.exchange(swap.route, swap.swapParams, amount, 0, swap.pools);
-    }
-
-    /// @notice Claim rewards from the gauge
-    function claim() public override returns (bool success) {
-        try gauge.claim_rewards() {
-            success = true;
-        } catch {}
-    }
-
-   
 }

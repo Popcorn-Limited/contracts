@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
-// Docgen-SOLC: 0.8.15
+// Docgen-SOLC: 0.8.25
 
-pragma solidity ^0.8.15;
+pragma solidity ^0.8.25;
 
 import {IOwned} from "../IOwned.sol";
 import {IERC4626} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
@@ -30,9 +30,10 @@ interface IBaseStrategy is IERC4626, IOwned, IPermit, IPausable {
     function setHarvestCooldown(uint256 harvestCooldown) external;
 
     function initialize(
-        bytes memory adapterBaseData,
-        address externalRegistry,
-        bytes memory adapterData
+        address asset_,
+        address owner_,
+        bool autoHarvest_,
+        bytes memory adapterData_
     ) external;
 
     function decimals() external view returns (uint8);

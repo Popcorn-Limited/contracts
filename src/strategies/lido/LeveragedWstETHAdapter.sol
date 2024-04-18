@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
-// Docgen-SOLC: 0.8.15
+// Docgen-SOLC: 0.8.25
 
-pragma solidity ^0.8.15;
+pragma solidity ^0.8.25;
 
 import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math} from "../BaseStrategy.sol";
 import {IwstETH} from "./IwstETH.sol";
@@ -63,11 +63,12 @@ contract LeveragedWstETHAdapter is BaseStrategy, IFlashLoanReceiver {
      * @dev This function is called by the factory contract when deploying a new vault.
      */
     function initialize(
-        bytes memory adapterInitData,
-        address aaveDataProvider,
+        address asset_,
+        address owner_,
+        bool autoHarvest_,
         bytes memory _initData
     ) public initializer {
-        __BaseStrategy_init(adapterInitData);
+        __BaseStrategy_init(asset_, owner_, autoHarvest_);
 
         (
             address _poolAddressesProvider,
@@ -114,7 +115,7 @@ contract LeveragedWstETHAdapter is BaseStrategy, IFlashLoanReceiver {
         // approve curve router to pull stETH for swapping
         IERC20(stETH).approve(address(StableSwapSTETH), type(uint256).max);
 
-        // set efficiency mode 
+        // set efficiency mode
         lendingPool.setUserEMode(uint8(1));
 
         // turn off auto harvest
@@ -417,12 +418,9 @@ contract LeveragedWstETHAdapter is BaseStrategy, IFlashLoanReceiver {
     //////////////////////////////////////////////////////////////*/
 
     function harvest() public override {
-        if ((lastHarvest + harvestCooldown) < block.timestamp) {
-                adjustLeverage();
+        adjustLeverage();
 
-                lastHarvest = block.timestamp;
-                emit Harvested();
-        }
+        emit Harvested();
     }
 
     // amount of WETH to borrow OR amount of WETH to repay (converted into wstETH amount internally)

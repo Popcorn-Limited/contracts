@@ -1,4 +1,4 @@
-pragma solidity ^0.8.15;
+pragma solidity ^0.8.25;
 
 import {IERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 

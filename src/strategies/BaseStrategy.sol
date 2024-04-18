@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
-// Docgen-SOLC: 0.8.15
+// Docgen-SOLC: 0.8.25
 
-pragma solidity ^0.8.15;
+pragma solidity ^0.8.25;
 
 import {ERC4626Upgradeable, IERC20Metadata, ERC20Upgradeable as ERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
@@ -32,16 +32,9 @@ abstract contract BaseStrategy is
 
     /**
      * @notice Initialize a new Adapter.
-     * @param popERC4626InitData Encoded data for the base adapter initialization.
-     * @dev `asset` - The underlying asset
-     * @dev `_owner` - Owner of the contract. Controls management functions.
-     * @dev `_strategy` - An optional strategy to enrich the adapter with additional functionality.
-     * @dev `_harvestCooldown` - Cooldown period between harvests.
-     * @dev `_requiredSigs` - Function signatures required by the strategy (EIP-165)
-     * @dev `_strategyConfig` - Additional data which can be used by the strategy on `harvest()`
-     * @dev This function is called by the factory contract when deploying a new vault.
-     * @dev Each Adapter implementation should implement checks to make sure that the adapter is wrapping the underlying protocol correctly.
-     * @dev If a strategy is provided, it will be verified to make sure it implements the required functions.
+     * @param asset_ The underlying asset used for deposit/withdraw and accounting
+     * @param owner_ Owner of the contract. Controls management functions.
+     * @param autoHarvest_ Controls if the harvest function gets called on deposit/withdrawal
      */
     function __BaseStrategy_init(
         address asset_,
@@ -91,7 +84,7 @@ abstract contract BaseStrategy is
         address receiver,
         uint256 assets,
         uint256 shares
-    ) internal override takeFees {
+    ) internal override nonReentrant takeFees {
         if (shares == 0 || assets == 0) revert ZeroAmount();
 
         // If _asset is ERC-777, `transferFrom` can trigger a reentrancy BEFORE the transfer happens through the
@@ -126,7 +119,7 @@ abstract contract BaseStrategy is
         address owner,
         uint256 assets,
         uint256 shares
-    ) internal override takeFees {
+    ) internal override nonReentrant takeFees {
         if (shares == 0 || assets == 0) revert ZeroAmount();
         if (caller != owner) {
             _spendAllowance(owner, caller, shares);
@@ -226,6 +219,12 @@ abstract contract BaseStrategy is
     /*//////////////////////////////////////////////////////////////
                             STRATEGY LOGIC
     //////////////////////////////////////////////////////////////*/
+
+    function claim() public virtual returns (bool success) {
+        // try auraRewards.getReward() {
+        //     success = true;
+        // } catch {}
+    }
 
     function harvest() public virtual takeFees {}
 

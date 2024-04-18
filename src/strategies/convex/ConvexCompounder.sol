@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
-// Docgen-SOLC: 0.8.15
+// Docgen-SOLC: 0.8.25
 
-pragma solidity ^0.8.15;
+pragma solidity ^0.8.25;
 
 import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math, IStrategy, IAdapter} from "../BaseStrategy.sol";
 import {IConvexBooster, IConvexRewards, IRewards} from "./IConvex.sol";
@@ -49,22 +49,27 @@ contract ConvexCompounder is BaseStrategy {
      * @dev This function is called by the factory contract when deploying a new vault.
      */
     function initialize(
-        bytes memory adapterInitData,
-        address registry,
+        address asset_,
+        address owner_,
+        bool autoHarvest_,
         bytes memory convexInitData
     ) external initializer {
-        (uint256 _pid, address _curvePool, address _curveLpToken) = abi.decode(convexInitData, (uint256, address, address));
+        (
+            uint256 _pid,
+            address _curvePool,
+            address _curveLpToken,
+            address _convexBooster
+        ) = abi.decode(convexInitData, (uint256, address, address, address));
 
-        (, , , address _convexRewards, , ) = IConvexBooster(
-            registry
-        ).poolInfo(_pid);
+        (, , , address _convexRewards, , ) = IConvexBooster(_convexBooster)
+            .poolInfo(_pid);
 
-        convexBooster = IConvexBooster(registry);
+        convexBooster = IConvexBooster(_convexBooster);
         convexRewards = IConvexRewards(_convexRewards);
         pid = _pid;
         nCoins = ICurveLp(_curvePool).N_COINS();
 
-        __BaseStrategy_init(adapterInitData);
+        __BaseStrategy_init(asset_, owner_, autoHarvest_);
 
         if (_curveLpToken != asset()) revert AssetMismatch();
 
@@ -73,7 +78,10 @@ contract ConvexCompounder is BaseStrategy {
             IERC20Metadata(_curveLpToken).name(),
             " Adapter"
         );
-        _symbol = string.concat("vcCvx-", IERC20Metadata(_curveLpToken).symbol());
+        _symbol = string.concat(
+            "vcCvx-",
+            IERC20Metadata(_curveLpToken).symbol()
+        );
 
         IERC20(_curveLpToken).approve(registry, type(uint256).max);
     }
@@ -134,6 +142,54 @@ contract ConvexCompounder is BaseStrategy {
                             STRATEGY LOGIC
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice Claim liquidity mining rewards given that it's active
+    function claim() public override returns (bool success) {
+        try convexRewards.getReward(address(this), true) {
+            success = true;
+        } catch {}
+    }
+
+    /**
+     * @notice Claim rewards and compound them into the vault
+     */
+    function harvest() public override takeFees {
+        claim();
+
+        ICurveRouter router_ = curveRouter;
+        uint256 amount;
+        uint256 rewLen = _rewardTokens.length;
+        for (uint256 i = 0; i < rewLen; i++) {
+            address rewardToken = _rewardTokens[i];
+            amount = IERC20(rewardToken).balanceOf(address(this));
+            if (amount > minTradeAmounts[i]) {
+                _exchange(router_, swaps[rewardToken], amount);
+            }
+        }
+
+        amount = IERC20(depositAsset).balanceOf(address(this));
+        if (amount > 0) {
+            uint256[] memory amounts = new uint256[](nCoins);
+            amounts[uint256(uint128(indexIn))] = amount;
+
+            address asset_ = asset();
+
+            ICurveLp(asset_).add_liquidity(amounts, 0);
+
+            _protocolDeposit(IERC20(asset_).balanceOf(address(this)), 0);
+        }
+
+        emit Harvested();
+    }
+
+    function _exchange(
+        ICurveRouter router,
+        CurveSwap memory swap,
+        uint256 amount
+    ) internal {
+        if (amount == 0) revert ZeroAmount();
+        router.exchange(swap.route, swap.swapParams, amount, 0, swap.pools);
+    }
+
     address[] internal _rewardTokens;
     uint256[] public minTradeAmounts; // ordered as in rewardsTokens()
 
@@ -190,58 +246,4 @@ contract ConvexCompounder is BaseStrategy {
             IERC20(rewardTokens_[i]).approve(curveRouter_, type(uint256).max);
         }
     }
-
-    /**
-     * @notice Claim rewards and compound them into the vault
-     */
-    function harvest() public override takeFees {
-        if ((lastHarvest + harvestCooldown) < block.timestamp) {
-            claim();
-
-            ICurveRouter router_ = curveRouter;
-            uint256 amount;
-            uint256 rewLen = _rewardTokens.length;
-            for (uint256 i = 0; i < rewLen; i++) {
-                address rewardToken = _rewardTokens[i];
-                amount = IERC20(rewardToken).balanceOf(address(this));
-                if (amount > minTradeAmounts[i]) {
-                    _exchange(router_, swaps[rewardToken], amount);
-                }
-            }
-
-            amount = IERC20(depositAsset).balanceOf(address(this));
-            if (amount > 0) {
-                uint256[] memory amounts = new uint256[](nCoins);
-                amounts[uint256(uint128(indexIn))] = amount;
-
-                address asset_ = asset();
-
-                ICurveLp(asset_).add_liquidity(amounts, 0);
-
-                _protocolDeposit(IERC20(asset_).balanceOf(address(this)), 0);
-            }
-
-            lastHarvest = block.timestamp;
-        }
-
-        emit Harvested();
-    }
-
-    function _exchange(
-        ICurveRouter router,
-        CurveSwap memory swap,
-        uint256 amount
-    ) internal {
-        if (amount == 0) revert ZeroAmount();
-        router.exchange(swap.route, swap.swapParams, amount, 0, swap.pools);
-    }
-
-    /// @notice Claim liquidity mining rewards given that it's active
-    function claim() public override returns (bool success) {
-        try convexRewards.getReward(address(this), true) {
-            success = true;
-        } catch {}
-    }
-
-   
 }

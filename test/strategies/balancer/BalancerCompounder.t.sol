@@ -162,53 +162,53 @@ contract BalancerCompounderTest is AbstractAdapterTest {
         assertGt(adapter.totalAssets(), oldTa);
     }
 
-    // function test__harvest_no_rewards() public {
-    //     // add BAL swap
-    //     swaps.push(
-    //         BatchSwapStep(
-    //             0x5c6ee304399dbdb9c8ef030ab642b10820db8f56000200000000000000000014,
-    //             0,
-    //             1,
-    //             0,
-    //             ""
-    //         )
-    //     ); // trade BAL for WETH
-    //     assets.push(IAsset(0xba100000625a3754423978a60c9317c58a424e3D)); // BAL
-    //     assets.push(IAsset(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2)); // WETH
-    //     limits.push(type(int256).max); // BAL limit
-    //     limits.push(-1); // WETH limit
+    function test__harvest_no_rewards() public {
+        // add BAL swap
+        swaps.push(
+            BatchSwapStep(
+                0x5c6ee304399dbdb9c8ef030ab642b10820db8f56000200000000000000000014,
+                0,
+                1,
+                0,
+                ""
+            )
+        ); // trade BAL for WETH
+        assets.push(IAsset(0xba100000625a3754423978a60c9317c58a424e3D)); // BAL
+        assets.push(IAsset(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2)); // WETH
+        limits.push(type(int256).max); // BAL limit
+        limits.push(-1); // WETH limit
 
-    //     // set minTradeAmounts
-    //     minTradeAmount = 0;
+        // set minTradeAmounts
+        minTradeAmount = 0;
 
-    //     // set underlyings
-    //     underlyings.push(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2); // WETH
-    //     underlyings.push(0xE7e2c68d3b13d905BBb636709cF4DfD21076b9D2); // LP-Token
-    //     underlyings.push(0xf951E335afb289353dc249e82926178EaC7DEd78); // swETH
+        // set underlyings
+        underlyings.push(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2); // WETH
+        underlyings.push(0xE7e2c68d3b13d905BBb636709cF4DfD21076b9D2); // LP-Token
+        underlyings.push(0xf951E335afb289353dc249e82926178EaC7DEd78); // swETH
 
-    //     BalancerCompounder(address(adapter)).setHarvestValues(
-    //         HarvestValue(
-    //             swaps,
-    //             assets,
-    //             limits,
-    //             minTradeAmount,
-    //             0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2,
-    //             underlyings,
-    //             0,
-    //             2,
-    //             0xe7e2c68d3b13d905bbb636709cf4dfd21076b9d20000000000000000000005ca
-    //         )
-    //     );
+        BalancerCompounder(address(adapter)).setHarvestValues(
+            HarvestValue(
+                swaps,
+                assets,
+                limits,
+                minTradeAmount,
+                0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2,
+                underlyings,
+                0,
+                2,
+                0xe7e2c68d3b13d905bbb636709cf4dfd21076b9d20000000000000000000005ca
+            )
+        );
 
-    //     _mintAssetAndApproveForAdapter(100e18, bob);
+        _mintAssetAndApproveForAdapter(100e18, bob);
 
-    //     vm.prank(bob);
-    //     adapter.deposit(100e18, bob);
+        vm.prank(bob);
+        adapter.deposit(100e18, bob);
 
-    //     uint256 oldTa = adapter.totalAssets();
+        uint256 oldTa = adapter.totalAssets();
 
-    //     adapter.harvest();
+        adapter.harvest();
 
-    //     assertEq(adapter.totalAssets(), oldTa);
-    // }
+        assertEq(adapter.totalAssets(), oldTa);
+    }
 }

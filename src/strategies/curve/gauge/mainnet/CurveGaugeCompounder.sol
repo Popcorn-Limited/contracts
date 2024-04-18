@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
-// Docgen-SOLC: 0.8.15
+// Docgen-SOLC: 0.8.25
 
-pragma solidity ^0.8.15;
+pragma solidity ^0.8.25;
 
 import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math} from "../../../BaseStrategy.sol";
 import {ICurveLp, IGauge, ICurveRouter, CurveSwap, IMinter} from "../../ICurve.sol";
@@ -32,15 +32,19 @@ contract CurveGaugeCompounder is BaseStrategy {
     error InvalidAsset();
 
     function initialize(
-        bytes memory adapterInitData,
-        address registry,
+        address asset_,
+        address owner_,
+        bool autoHarvest_,
         bytes memory curveInitData
     ) external initializer {
-        __BaseStrategy_init(adapterInitData);
+        __BaseStrategy_init(asset_, owner_, autoHarvest_);
 
-        (address _gauge, address _pool) = abi.decode(curveInitData, (address, address));
+        (address _gauge, address _pool, address _minter) = abi.decode(
+            curveInitData,
+            (address, address, address)
+        );
 
-        minter = IMinter(registry);
+        minter = IMinter(_minter);
         gauge = IGauge(_gauge);
         pool = ICurveLp(_pool);
 
@@ -106,6 +110,55 @@ contract CurveGaugeCompounder is BaseStrategy {
                             STRATEGY LOGIC
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice Claim rewards from the gauge
+    function claim() public override returns (bool success) {
+        try gauge.claim_rewards() {
+            try minter.mint(address(gauge)) {
+                success = true;
+            } catch {}
+        } catch {}
+    }
+
+    /**
+     * @notice Claim rewards and compound them into the vault
+     */
+    function harvest() public override takeFees {
+        claim();
+
+        ICurveRouter router_ = curveRouter;
+        uint256 amount;
+        uint256 rewLen = _rewardTokens.length;
+        for (uint256 i = 0; i < rewLen; i++) {
+            address rewardToken = _rewardTokens[i];
+            amount = IERC20(rewardToken).balanceOf(address(this));
+            if (amount > minTradeAmounts[i]) {
+                _exchange(router_, swaps[rewardToken], amount);
+            }
+        }
+
+        amount = IERC20(depositAsset).balanceOf(address(this));
+        if (amount > 0) {
+            uint256[] memory amounts = new uint256[](nCoins);
+            amounts[uint256(uint128(indexIn))] = amount;
+
+            ICurveLp(pool).add_liquidity(amounts, 0);
+
+            address asset_ = asset();
+            _protocolDeposit(IERC20(asset_).balanceOf(address(this)), 0);
+        }
+
+        emit Harvested();
+    }
+
+    function _exchange(
+        ICurveRouter router,
+        CurveSwap memory swap,
+        uint256 amount
+    ) internal {
+        if (amount == 0) revert ZeroAmount();
+        router.exchange(swap.route, swap.swapParams, amount, 0, swap.pools);
+    }
+
     address[] internal _rewardTokens;
     uint256[] public minTradeAmounts; // ordered as in rewardsTokens()
 
@@ -133,11 +186,10 @@ contract CurveGaugeCompounder is BaseStrategy {
         }
 
         ICurveLp _pool = pool;
-        address depositAsset_ = _pool.coins(
-            uint256(uint128(indexIn_))
-        );
+        address depositAsset_ = _pool.coins(uint256(uint128(indexIn_)));
 
-        if (depositAsset != address(0)) IERC20(depositAsset).approve(address(_pool), 0);
+        if (depositAsset != address(0))
+            IERC20(depositAsset).approve(address(_pool), 0);
         IERC20(depositAsset_).approve(address(_pool), type(uint256).max);
 
         depositAsset = depositAsset_;
@@ -163,59 +215,4 @@ contract CurveGaugeCompounder is BaseStrategy {
             IERC20(rewardTokens_[i]).approve(curveRouter_, type(uint256).max);
         }
     }
-
-    /**
-     * @notice Claim rewards and compound them into the vault
-     */
-    function harvest() public override takeFees {
-        if ((lastHarvest + harvestCooldown) < block.timestamp) {
-            claim();
-
-            ICurveRouter router_ = curveRouter;
-            uint256 amount;
-            uint256 rewLen = _rewardTokens.length;
-            for (uint256 i = 0; i < rewLen; i++) {
-                address rewardToken = _rewardTokens[i];
-                amount = IERC20(rewardToken).balanceOf(address(this));
-                if (amount > minTradeAmounts[i]) {
-                    _exchange(router_, swaps[rewardToken], amount);
-                }
-            }
-
-            amount = IERC20(depositAsset).balanceOf(address(this));
-            if (amount > 0) {
-                uint256[] memory amounts = new uint256[](nCoins);
-                amounts[uint256(uint128(indexIn))] = amount;
-
-                ICurveLp(pool).add_liquidity(amounts, 0);
-
-                address asset_ = asset();
-                _protocolDeposit(IERC20(asset_).balanceOf(address(this)), 0);
-            }
-
-            lastHarvest = block.timestamp;
-        }
-
-        emit Harvested();
-    }
-
-    function _exchange(
-        ICurveRouter router,
-        CurveSwap memory swap,
-        uint256 amount
-    ) internal {
-        if (amount == 0) revert ZeroAmount();
-        router.exchange(swap.route, swap.swapParams, amount, 0, swap.pools);
-    }
-
-    /// @notice Claim rewards from the gauge
-    function claim() public override returns (bool success) {
-        try gauge.claim_rewards() {
-            try minter.mint(address(gauge)) {
-                success = true;
-            } catch {}
-        } catch {}
-    }
-
-   
 }

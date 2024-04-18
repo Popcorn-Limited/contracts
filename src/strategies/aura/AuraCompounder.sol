@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
-// Docgen-SOLC: 0.8.15
+// Docgen-SOLC: 0.8.25
 
-pragma solidity ^0.8.15;
+pragma solidity ^0.8.25;
 
 import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math, IStrategy, IAdapter} from "../BaseStrategy.sol";
 import {IAuraBooster, IAuraRewards, IAuraStaking} from "./IAura.sol";
@@ -51,20 +51,25 @@ contract AuraCompounder is BaseStrategy {
      * @dev This function is called by the factory contract when deploying a new vault.
      */
     function initialize(
-        bytes memory adapterInitData,
-        address registry,
+        address asset_,
+        address owner_,
+        bool autoHarvest_,
         bytes memory auraInitData
     ) external initializer {
-        __BaseStrategy_init(adapterInitData);
+        __BaseStrategy_init(asset_, owner_, autoHarvest_);
 
         (
             uint256 _pid,
             address _balVault,
+            address _auraBooster,
             bytes32 _balPoolId,
             address[] memory _underlyings
-        ) = abi.decode(auraInitData, (uint256, address, bytes32, address[]));
+        ) = abi.decode(
+                auraInitData,
+                (uint256, address, address, bytes32, address[])
+            );
 
-        auraBooster = IAuraBooster(registry);
+        auraBooster = IAuraBooster(_auraBooster);
         pid = _pid;
         balVault = _balVault;
         balPoolId = _balPoolId;
@@ -114,9 +119,13 @@ contract AuraCompounder is BaseStrategy {
 
     /// @notice Calculates the total amount of underlying tokens the Vault holds.
     /// @return The total amount of underlying tokens the Vault holds.
-
     function _totalAssets() internal view override returns (uint256) {
         return auraRewards.balanceOf(address(this));
+    }
+
+    /// @notice The token rewarded
+    function rewardTokens() external view override returns (address[] memory) {
+        return _rewardToken;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -142,70 +151,61 @@ contract AuraCompounder is BaseStrategy {
         } catch {}
     }
 
-    /// @notice The token rewarded
-    function rewardTokens() external view override returns (address[] memory) {
-        return _rewardToken;
-    }
-
     /**
      * @notice Execute Strategy and take fees.
      * @dev Delegatecall to strategy's harvest() function. All necessary data is passed via `strategyConfig`.
      * @dev Delegatecall is used to in case any logic requires the adapters address as a msg.sender. (e.g. Synthetix staking)
      */
     function harvest() public override takeFees {
-        if ((lastHarvest + harvestCooldown) < block.timestamp) {
-            claim();
+        claim();
 
-            // Trade to base asset
-            uint256 len = _rewardToken.length;
-            for (uint256 i = 0; i < len; i++) {
-                uint256 rewardBal = IERC20(_rewardToken[i]).balanceOf(
-                    address(this)
+        // Trade to base asset
+        uint256 len = _rewardToken.length;
+        for (uint256 i = 0; i < len; i++) {
+            uint256 rewardBal = IERC20(_rewardToken[i]).balanceOf(
+                address(this)
+            );
+            if (rewardBal >= minTradeAmounts[i]) {
+                swaps[_rewardToken[i]][0].amount = rewardBal;
+                IBalancerVault(balVault).batchSwap(
+                    SwapKind.GIVEN_IN,
+                    swaps[_rewardToken[i]],
+                    assets[_rewardToken[i]],
+                    FundManagement(
+                        address(this),
+                        false,
+                        payable(address(this)),
+                        false
+                    ),
+                    limits[_rewardToken[i]],
+                    block.timestamp
                 );
-                if (rewardBal >= minTradeAmounts[i]) {
-                    swaps[_rewardToken[i]][0].amount = rewardBal;
-                    IBalancerVault(balVault).batchSwap(
-                        SwapKind.GIVEN_IN,
-                        swaps[_rewardToken[i]],
-                        assets[_rewardToken[i]],
-                        FundManagement(
-                            address(this),
-                            false,
-                            payable(address(this)),
-                            false
-                        ),
-                        limits[_rewardToken[i]],
-                        block.timestamp
-                    );
-                }
             }
-            uint256 poolAmount = baseAsset.balanceOf(address(this));
-            if (poolAmount > 0) {
-                uint256[] memory amounts = new uint256[](underlyings.length);
-                amounts[indexIn] = poolAmount;
+        }
+        uint256 poolAmount = baseAsset.balanceOf(address(this));
+        if (poolAmount > 0) {
+            uint256[] memory amounts = new uint256[](underlyings.length);
+            amounts[indexIn] = poolAmount;
 
-                bytes memory userData;
-                if (underlyings.length != amountsInLen) {
-                    uint256[] memory amountsIn = new uint256[](amountsInLen);
-                    amountsIn[indexInUserData] = poolAmount;
-                    userData = abi.encode(1, amountsIn, 0); // Exact In Enum, inAmounts, minOut
-                } else {
-                    userData = abi.encode(1, amounts, 0); // Exact In Enum, inAmounts, minOut
-                }
-
-                // Pool base asset
-                IBalancerVault(balVault).joinPool(
-                    balPoolId,
-                    address(this),
-                    address(this),
-                    JoinPoolRequest(underlyings, amounts, userData, false)
-                );
-
-                // redeposit
-                _protocolDeposit(IERC20(asset()).balanceOf(address(this)), 0);
-
-                lastHarvest = block.timestamp;
+            bytes memory userData;
+            if (underlyings.length != amountsInLen) {
+                uint256[] memory amountsIn = new uint256[](amountsInLen);
+                amountsIn[indexInUserData] = poolAmount;
+                userData = abi.encode(1, amountsIn, 0); // Exact In Enum, inAmounts, minOut
+            } else {
+                userData = abi.encode(1, amounts, 0); // Exact In Enum, inAmounts, minOut
             }
+
+            // Pool base asset
+            IBalancerVault(balVault).joinPool(
+                balPoolId,
+                address(this),
+                address(this),
+                JoinPoolRequest(underlyings, amounts, userData, false)
+            );
+
+            // redeposit
+            _protocolDeposit(IERC20(asset()).balanceOf(address(this)), 0);
         }
 
         emit Harvested();

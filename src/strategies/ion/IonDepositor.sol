@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
-// Docgen-SOLC: 0.8.15
+// Docgen-SOLC: 0.8.25
 
-pragma solidity ^0.8.15;
+pragma solidity ^0.8.25;
 
 import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math} from "../BaseStrategy.sol";
 import {IIonPool} from "./IIonProtocol.sol";
@@ -38,11 +38,12 @@ contract IonDepositor is BaseStrategy {
      * @dev This function is called by the factory contract when deploying a new vault.
      */
     function initialize(
-        bytes memory adapterInitData,
-        address,
+        address asset_,
+        address owner_,
+        bool autoHarvest_,
         bytes memory ionInitData
     ) external initializer {
-        __BaseStrategy_init(adapterInitData);
+        __BaseStrategy_init(asset_, owner_, autoHarvest_);
 
         address _asset = asset();
         address _ionPool = abi.decode(ionInitData, (address));

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
-// Docgen-SOLC: 0.8.15
+// Docgen-SOLC: 0.8.25
 
-pragma solidity ^0.8.15;
+pragma solidity ^0.8.25;
 
 import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math, IStrategy, IAdapter} from "../BaseStrategy.sol";
 import {IBalancerVault, SwapKind, IAsset, BatchSwapStep, FundManagement, JoinPoolRequest} from "../../../interfaces/external/balancer/IBalancerVault.sol";
@@ -56,18 +56,19 @@ contract BalancerCompounder is BaseStrategy {
      * @dev This function is called by the factory contract when deploying a new vault.
      */
     function initialize(
-        bytes memory adapterInitData,
-        address registry,
+        address asset_,
+        address owner_,
+        bool autoHarvest_,
         bytes memory balancerInitData
     ) external initializer {
-        (address _gauge, address _balVault) = abi.decode(
+        (address _gauge, address _balVault, address _balMinter) = abi.decode(
             balancerInitData,
-            (address, address)
+            (address, address, address)
         );
 
         if (IGauge(_gauge).is_killed()) revert Disabled();
 
-        balMinter = IMinter(registry);
+        balMinter = IMinter(_balMinter);
         balVault = IBalancerVault(_balVault);
         gauge = IGauge(_gauge);
 
@@ -75,7 +76,7 @@ contract BalancerCompounder is BaseStrategy {
         _rewardToken = rewardToken_;
         _rewardTokens.push(rewardToken_);
 
-        __BaseStrategy_init(adapterInitData);
+        __BaseStrategy_init(asset_, owner_, autoHarvest_);
 
         IERC20(asset()).approve(_gauge, type(uint256).max);
         IERC20(_rewardToken).approve(_balVault, type(uint256).max);
@@ -114,6 +115,11 @@ contract BalancerCompounder is BaseStrategy {
         return gauge.balanceOf(address(this));
     }
 
+    /// @notice The token rewarded
+    function rewardTokens() external view override returns (address[] memory) {
+        return _rewardTokens;
+    }
+
     /*//////////////////////////////////////////////////////////////
                           INTERNAL HOOKS LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -131,6 +137,7 @@ contract BalancerCompounder is BaseStrategy {
     ) internal virtual override {
         gauge.withdraw(amount, false);
     }
+    
     /*//////////////////////////////////////////////////////////////
                             STRATEGY LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -141,81 +148,72 @@ contract BalancerCompounder is BaseStrategy {
         } catch {}
     }
 
-    /// @notice The token rewarded
-    function rewardTokens() external view override returns (address[] memory) {
-        return _rewardTokens;
-    }
     /**
      * @notice Execute Strategy and take fees.
      * @dev Delegatecall to strategy's harvest() function. All necessary data is passed via `strategyConfig`.
      * @dev Delegatecall is used to in case any logic requires the adapters address as a msg.sender. (e.g. Synthetix staking)
      */
     function harvest() public override takeFees {
-        if ((lastHarvest + harvestCooldown) < block.timestamp) {
-            claim();
+        claim();
 
-            HarvestValue memory harvestValue_ = harvestValue;
+        HarvestValue memory harvestValue_ = harvestValue;
 
-            // Trade to base asset
-            uint256 rewardBal = IERC20(_rewardToken).balanceOf(address(this));
-            if (rewardBal >= harvestValue_.minTradeAmount) {
-                harvestValue_.swaps[0].amount = rewardBal;
-                balVault.batchSwap(
-                    SwapKind.GIVEN_IN,
-                    harvestValue_.swaps,
-                    harvestValue_.assets,
-                    FundManagement(
-                        address(this),
-                        false,
-                        payable(address(this)),
-                        false
-                    ),
-                    harvestValue_.limits,
-                    block.timestamp
-                );
-            }
-
-            uint256 poolAmount = IERC20(harvestValue_.baseAsset).balanceOf(
-                address(this)
+        // Trade to base asset
+        uint256 rewardBal = IERC20(_rewardToken).balanceOf(address(this));
+        if (rewardBal >= harvestValue_.minTradeAmount) {
+            harvestValue_.swaps[0].amount = rewardBal;
+            balVault.batchSwap(
+                SwapKind.GIVEN_IN,
+                harvestValue_.swaps,
+                harvestValue_.assets,
+                FundManagement(
+                    address(this),
+                    false,
+                    payable(address(this)),
+                    false
+                ),
+                harvestValue_.limits,
+                block.timestamp
             );
-            if (poolAmount > 0) {
-                uint256[] memory amounts = new uint256[](
-                    harvestValue_.underlyings.length
-                );
-                amounts[harvestValue_.indexIn] = poolAmount;
+        }
 
-                bytes memory userData;
-                if (
-                    harvestValue_.underlyings.length !=
+        uint256 poolAmount = IERC20(harvestValue_.baseAsset).balanceOf(
+            address(this)
+        );
+        if (poolAmount > 0) {
+            uint256[] memory amounts = new uint256[](
+                harvestValue_.underlyings.length
+            );
+            amounts[harvestValue_.indexIn] = poolAmount;
+
+            bytes memory userData;
+            if (
+                harvestValue_.underlyings.length != harvestValue_.amountsInLen
+            ) {
+                uint256[] memory amountsIn = new uint256[](
                     harvestValue_.amountsInLen
-                ) {
-                    uint256[] memory amountsIn = new uint256[](
-                        harvestValue_.amountsInLen
-                    );
-                    amountsIn[harvestValue_.indexIn] = poolAmount;
-                    userData = abi.encode(1, amountsIn, 0); // Exact In Enum, inAmounts, minOut
-                } else {
-                    userData = abi.encode(1, amounts, 0); // Exact In Enum, inAmounts, minOut
-                }
-
-                // Pool base asset
-                balVault.joinPool(
-                    harvestValue_.balPoolId,
-                    address(this),
-                    address(this),
-                    JoinPoolRequest(
-                        harvestValue_.underlyings,
-                        amounts,
-                        userData,
-                        false
-                    )
                 );
-
-                // redeposit
-                _protocolDeposit(IERC20(asset()).balanceOf(address(this)), 0);
-
-                lastHarvest = block.timestamp;
+                amountsIn[harvestValue_.indexIn] = poolAmount;
+                userData = abi.encode(1, amountsIn, 0); // Exact In Enum, inAmounts, minOut
+            } else {
+                userData = abi.encode(1, amounts, 0); // Exact In Enum, inAmounts, minOut
             }
+
+            // Pool base asset
+            balVault.joinPool(
+                harvestValue_.balPoolId,
+                address(this),
+                address(this),
+                JoinPoolRequest(
+                    harvestValue_.underlyings,
+                    amounts,
+                    userData,
+                    false
+                )
+            );
+
+            // redeposit
+            _protocolDeposit(IERC20(asset()).balanceOf(address(this)), 0);
         }
 
         emit Harvested();
@@ -228,6 +226,4 @@ contract BalancerCompounder is BaseStrategy {
     ) public onlyOwner {
         harvestValue = harvestValue_;
     }
-
-   
 }

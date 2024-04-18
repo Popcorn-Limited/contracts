@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
-// Docgen-SOLC: 0.8.15
+// Docgen-SOLC: 0.8.25
 
-pragma solidity ^0.8.15;
+pragma solidity ^0.8.25;
 
 import {ERC4626Upgradeable, IERC20Metadata, ERC20Upgradeable as ERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
@@ -181,7 +181,7 @@ contract MultiStrategyVault is
         address receiver,
         uint256 assets,
         uint256 shares
-    ) internal override {
+    ) internal override nonReentrant {
         if (shares == 0 || assets == 0) revert ZeroAmount();
 
         // If _asset is ERC-777, `transferFrom` can trigger a reentrancy BEFORE the transfer happens through the
@@ -217,7 +217,7 @@ contract MultiStrategyVault is
         address owner,
         uint256 assets,
         uint256 shares
-    ) internal override {
+    ) internal override nonReentrant {
         if (shares == 0 || assets == 0) revert ZeroAmount();
         if (caller != owner) {
             _spendAllowance(owner, caller, shares);
