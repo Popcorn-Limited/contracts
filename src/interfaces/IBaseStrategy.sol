@@ -8,17 +8,7 @@ import {IERC4626} from "openzeppelin-contracts-upgradeable/token/ERC20/extension
 import {IPermit} from "../IPermit.sol";
 import {IPausable} from "../IPausable.sol";
 
-interface IAdapter is IERC4626, IOwned, IPermit, IPausable {
-    function strategy() external view returns (address);
-
-    function strategyConfig() external view returns (bytes memory);
-
-    function strategyDeposit(uint256 assets, uint256 shares) external;
-
-    function strategyWithdraw(uint256 assets, uint256 shares) external;
-
-    function supportsInterface(bytes4 interfaceId) external view returns (bool);
-
+interface IBaseStrategy is IERC4626, IOwned, IPermit, IPausable {
     function setPerformanceFee(uint256 fee) external;
 
     function performanceFee() external view returns (uint256);

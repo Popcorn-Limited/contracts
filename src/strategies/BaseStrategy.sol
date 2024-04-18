@@ -43,29 +43,19 @@ abstract contract BaseStrategy is
      * @dev Each Adapter implementation should implement checks to make sure that the adapter is wrapping the underlying protocol correctly.
      * @dev If a strategy is provided, it will be verified to make sure it implements the required functions.
      */
-    function __AdapterBase_init(
-        bytes memory popERC4626InitData
+    function __BaseStrategy_init(
+        address asset_,
+        address owner_,
     ) internal onlyInitializing {
-        (
-            address asset,
-            address _owner,
-            address _strategy,
-            uint256 _harvestCooldown,
-            bytes4[8] memory _requiredSigs,
-            bytes memory _strategyConfig
-        ) = abi.decode(
-                popERC4626InitData,
-                (address, address, address, uint256, bytes4[8], bytes)
-            );
-        __Owned_init(_owner);
+        __Owned_init(owner_);
         __Pausable_init();
-        __ERC4626_init(IERC20Metadata(asset));
-
-        INITIAL_CHAIN_ID = block.chainid;
-        INITIAL_DOMAIN_SEPARATOR = computeDomainSeparator();
+        __ERC4626_init(IERC20Metadata(asset_));
 
         lastHarvest = block.timestamp;
         autoHarvest = true;
+
+        INITIAL_CHAIN_ID = block.chainid;
+        INITIAL_DOMAIN_SEPARATOR = computeDomainSeparator();
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -100,7 +90,7 @@ abstract contract BaseStrategy is
         address receiver,
         uint256 assets,
         uint256 shares
-    ) internal override {
+    ) internal override takeFees {
         if (shares == 0 || assets == 0) revert ZeroAmount();
 
         // If _asset is ERC-777, `transferFrom` can trigger a reentrancy BEFORE the transfer happens through the
@@ -121,6 +111,8 @@ abstract contract BaseStrategy is
 
         _mint(receiver, shares);
 
+        if(autoHarvest) harvest();
+
         emit Deposit(caller, receiver, assets, shares);
     }
 
@@ -133,7 +125,7 @@ abstract contract BaseStrategy is
         address owner,
         uint256 assets,
         uint256 shares
-    ) internal override {
+    ) internal override takeFees {
         if (shares == 0 || assets == 0) revert ZeroAmount();
         if (caller != owner) {
             _spendAllowance(owner, caller, shares);
@@ -152,6 +144,8 @@ abstract contract BaseStrategy is
         } else {
             _protocolWithdraw(assets, shares, receiver);
         }
+
+        if(autoHarvest) harvest();
 
         emit Withdraw(caller, receiver, owner, assets, shares);
     }
@@ -208,11 +202,6 @@ abstract contract BaseStrategy is
      */
     function maxMint(address) public view virtual override returns (uint256) {
         return paused() ? 0 : type(uint256).max;
-    }
-
-    function toggleAutoHarvest() external onlyOwner {
-        emit AutoHarvestToggled(autoHarvest, !autoHarvest);
-        autoHarvest = !autoHarvest;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -308,6 +297,19 @@ abstract contract BaseStrategy is
     ) internal virtual {
         // OPTIONAL - convertIntoUnderlyingShares(assets,shares)
     }
+
+        /*//////////////////////////////////////////////////////////////
+                            STRATEGY LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    function harvest() public virtual takeFees {
+        }
+
+    function toggleAutoHarvest() external onlyOwner {
+        emit AutoHarvestToggled(autoHarvest, !autoHarvest);
+        autoHarvest = !autoHarvest;
+    }
+
 
     /*//////////////////////////////////////////////////////////////
                       EIP-2612 LOGIC

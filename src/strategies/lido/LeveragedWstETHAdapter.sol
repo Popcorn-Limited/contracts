@@ -67,7 +67,7 @@ contract LeveragedWstETHAdapter is BaseStrategy, IFlashLoanReceiver {
         address aaveDataProvider,
         bytes memory _initData
     ) public initializer {
-        __AdapterBase_init(adapterInitData);
+        __BaseStrategy_init(adapterInitData);
 
         (
             address _poolAddressesProvider,

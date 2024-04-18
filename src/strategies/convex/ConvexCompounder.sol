@@ -64,7 +64,7 @@ contract ConvexCompounder is BaseStrategy {
         pid = _pid;
         nCoins = ICurveLp(_curvePool).N_COINS();
 
-        __AdapterBase_init(adapterInitData);
+        __BaseStrategy_init(adapterInitData);
 
         if (_curveLpToken != asset()) revert AssetMismatch();
 
@@ -243,15 +243,5 @@ contract ConvexCompounder is BaseStrategy {
         } catch {}
     }
 
-    /*//////////////////////////////////////////////////////////////
-                      EIP-165 LOGIC
-  //////////////////////////////////////////////////////////////*/
-
-    function supportsInterface(
-        bytes4 interfaceId
-    ) public pure override(WithRewards, AdapterBase) returns (bool) {
-        return
-            interfaceId == type(IWithRewards).interfaceId ||
-            interfaceId == type(IAdapter).interfaceId;
-    }
+   
 }

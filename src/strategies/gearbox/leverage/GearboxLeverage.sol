@@ -48,7 +48,7 @@ abstract contract GearboxLeverage is BaseStrategy {
         address,
         bytes memory gearboxInitData
     ) external initializer {
-        __AdapterBase_init(adapterInitData);
+        __BaseStrategy_init(adapterInitData);
 
         (address _creditFacade, address _creditManager, address _strategyAdapter) = abi.decode(
             gearboxInitData, (address, address, address)

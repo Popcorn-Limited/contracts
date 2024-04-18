@@ -38,7 +38,7 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy {
         address,
         bytes memory curveInitData
     ) external initializer {
-        __AdapterBase_init(adapterInitData);
+        __BaseStrategy_init(adapterInitData);
 
         (address _lpToken, address _gauge, int128 _indexIn) = abi.decode(
             curveInitData,
@@ -207,15 +207,5 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy {
         } catch {}
     }
 
-    /*//////////////////////////////////////////////////////////////
-                      EIP-165 LOGIC
-  //////////////////////////////////////////////////////////////*/
-
-    function supportsInterface(
-        bytes4 interfaceId
-    ) public pure override(WithRewards, AdapterBase) returns (bool) {
-        return
-            interfaceId == type(IWithRewards).interfaceId ||
-            interfaceId == type(IAdapter).interfaceId;
-    }
+   
 }

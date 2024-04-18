@@ -42,7 +42,7 @@ contract IonDepositor is BaseStrategy {
         address,
         bytes memory ionInitData
     ) external initializer {
-        __AdapterBase_init(adapterInitData);
+        __BaseStrategy_init(adapterInitData);
 
         address _asset = asset();
         address _ionPool = abi.decode(ionInitData, (address));

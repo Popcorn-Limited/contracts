@@ -75,7 +75,7 @@ contract BalancerCompounder is BaseStrategy {
         _rewardToken = rewardToken_;
         _rewardTokens.push(rewardToken_);
 
-        __AdapterBase_init(adapterInitData);
+        __BaseStrategy_init(adapterInitData);
 
         IERC20(asset()).approve(_gauge, type(uint256).max);
         IERC20(_rewardToken).approve(_balVault, type(uint256).max);
@@ -229,15 +229,5 @@ contract BalancerCompounder is BaseStrategy {
         harvestValue = harvestValue_;
     }
 
-    /*//////////////////////////////////////////////////////////////
-                      EIP-165 LOGIC
-  //////////////////////////////////////////////////////////////*/
-
-    function supportsInterface(
-        bytes4 interfaceId
-    ) public pure override(WithRewards, AdapterBase) returns (bool) {
-        return
-            interfaceId == type(IWithRewards).interfaceId ||
-            interfaceId == type(IAdapter).interfaceId;
-    }
+   
 }

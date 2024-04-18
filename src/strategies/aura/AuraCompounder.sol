@@ -55,7 +55,7 @@ contract AuraCompounder is BaseStrategy {
         address registry,
         bytes memory auraInitData
     ) external initializer {
-        __AdapterBase_init(adapterInitData);
+        __BaseStrategy_init(adapterInitData);
 
         (
             uint256 _pid,
@@ -232,7 +232,7 @@ contract AuraCompounder is BaseStrategy {
         uint256 amountsInLen_
     ) external onlyOwner {
         delete _rewardToken;
-        for (uint i; i < assets_.length;) {
+        for (uint i; i < assets_.length; ) {
             _rewardToken.push(address(assets_[i][0]));
             _setTradeData(swaps_[i], assets_[i], limits_[i]);
             IERC20(address(assets_[i][0])).approve(balVault, type(uint).max);
@@ -240,12 +240,12 @@ contract AuraCompounder is BaseStrategy {
                 ++i;
             }
         }
-        
+
         if (address(baseAsset) != address(0)) {
             baseAsset.approve(balVault, 0);
         }
         baseAsset_.approve(balVault, type(uint).max);
-        
+
         minTradeAmounts = minTradeAmounts_;
         baseAsset = baseAsset_;
         indexIn = indexIn_;
@@ -268,17 +268,5 @@ contract AuraCompounder is BaseStrategy {
 
         limits[key] = limits_;
         assets[key] = assets_;
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                      EIP-165 LOGIC
-  //////////////////////////////////////////////////////////////*/
-
-    function supportsInterface(
-        bytes4 interfaceId
-    ) public pure override(WithRewards, AdapterBase) returns (bool) {
-        return
-            interfaceId == type(IWithRewards).interfaceId ||
-            interfaceId == type(IAdapter).interfaceId;
     }
 }
