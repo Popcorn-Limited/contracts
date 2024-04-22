@@ -110,8 +110,7 @@ interface IPendleRouter {
         uint256 netLpToRemove,
         TokenOutput calldata output,
         LimitOrderData calldata limit
-    )
-        external
+    ) external
         returns (uint256 netTokenOut, uint256 netSyFee, uint256 netSyInterm);
 }
 

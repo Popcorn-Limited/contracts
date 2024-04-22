@@ -119,15 +119,18 @@ contract PendleAdapter is AdapterBase, WithRewards {
     //////////////////////////////////////////////////////////////*/
 
     function _totalAssets() internal view override returns (uint256 t) {
-        uint256 totAssets = IERC20(pendleMarket)
+        // the pendle oracle call over estimates the underlying
+        // if i withdraw all my lp balance i would get less out - thus reverting
+        t = IERC20(pendleMarket)
             .balanceOf(address(this))
             .mulDiv(_toAssetRate(), 1e18, Math.Rounding.Floor);
 
-        // apply slippage
-        t = totAssets - totAssets.mulDiv(slippage, 1e18, Math.Rounding.Floor);
+        // by adding an estimate fee we under estimate the underlying 
+        // the withdraw will produce a floating amount
+        uint256 fee = t.mulDiv(1e18, 5e18, Math.Rounding.Floor).mulDiv(feeTier, 1e18, Math.Rounding.Floor);
 
-        // apply pendle fee
-        t -= t.mulDiv(feeTier, 1e18, Math.Rounding.Floor);
+        // add floating balance
+        t = t - fee + IERC20(asset()).balanceOf(address(this));
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -192,10 +195,14 @@ contract PendleAdapter is AdapterBase, WithRewards {
         LimitOrderData memory limitOrderData;
         SwapData memory swapData;
 
+        uint256 netInput = amount == maxDeposit(address(this)) 
+            ? amount 
+            : IERC20(asset).balanceOf(address(this));  // amount + floating
+
         address asset = asset();
         TokenInput memory tokenInput = TokenInput(
             asset,
-            amount,
+            netInput,
             asset,
             address(0),
             swapData
@@ -217,35 +224,38 @@ contract PendleAdapter is AdapterBase, WithRewards {
     ) internal virtual override {
         address asset = asset();
 
+        uint256 floating = IERC20(asset).balanceOf(address(this)); 
+        uint256 protocolAmount = amount - floating;
+
         // Empty structs
         LimitOrderData memory limitOrderData;
         SwapData memory swapData;
 
         TokenOutput memory tokenOutput = TokenOutput(
             asset,
-            amount,
+            protocolAmount, 
             asset,
             address(0),
             swapData
         );
 
-        uint256 lpAmount = amount == totalAssets()
-            ? IERC20(pendleMarket).balanceOf(address(this))
-            : amountToLp(
-                amount + amount.mulDiv(slippage, 1e18, Math.Rounding.Floor)
-            );
+        uint256 protocolTotAssets = totalAssets() - floating;
 
         pendleRouter.removeLiquiditySingleToken(
             address(this),
             pendleMarket,
-            lpAmount,
+            amountToLp(protocolAmount, protocolTotAssets),
             tokenOutput,
             limitOrderData
         );
     }
 
-    function amountToLp(uint256 amount) internal view returns (uint256) {
-        return amount.mulDiv(1e18, _toAssetRate(), Math.Rounding.Floor);
+    function amountToLp(uint256 amount, uint256 totAssets) internal view returns (uint256 lpAmount) {
+        uint256 lpBalance = IERC20(pendleMarket).balanceOf(address(this));
+
+        amount == totAssets
+            ? lpAmount = lpBalance 
+            : lpAmount = lpBalance.mulDiv(amount, totAssets, Math.Rounding.Floor);
     }
 
     function _validateAsset(address syToken, address baseAsset) internal view {
@@ -276,7 +286,7 @@ contract PendleAdapter is AdapterBase, WithRewards {
     }
 
     function _toAssetRate() internal view virtual returns (uint256 rate) {
-        rate = pendleOracle.getLpToAssetRate(address(pendleMarket), twapDuration);
+        rate = pendleOracle.getLpToSyRate(address(pendleMarket), twapDuration);
     }
 
     function _oracleInit() internal {   
