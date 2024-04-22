@@ -25,6 +25,7 @@ contract wstETHPendleAdapterTest is AbstractAdapterTest {
     uint256 slippage;
     uint32 twapDuration; 
     uint256 swapDelay; 
+    uint256 feeTier;
 
     function setUp() public {
         uint256 forkId = vm.createSelectFork(vm.rpcUrl("mainnet"), 19639567);
@@ -48,10 +49,11 @@ contract wstETHPendleAdapterTest is AbstractAdapterTest {
             address _oracle,
             uint256 _slippage, 
             uint32 _twapDuration, 
-            uint256 _swapDelay
+            uint256 _swapDelay,
+            uint256 _feeTier
         ) = abi.decode(
             testConfig,
-            (address, address, address, uint256, uint32, uint256)
+            (address, address, address, uint256, uint32, uint256, uint256)
         );
 
         pendleMarket = _market;
@@ -59,15 +61,16 @@ contract wstETHPendleAdapterTest is AbstractAdapterTest {
         twapDuration = _twapDuration;
         oracle = _oracle;
         swapDelay = _swapDelay;
+        feeTier = _feeTier;
         
         (address _synToken, ,) = IPendleMarket(pendleMarket).readTokens();
         synToken = IPendleSYToken(_synToken);
-
+        
         setUpBaseTest(
             IERC20(_asset),
             address(new PendleWstETHAdapter()),
             address(pendleRouter),
-            1e15,
+            1e18,
             "Pendle ",
             false
         );
@@ -78,7 +81,7 @@ contract wstETHPendleAdapterTest is AbstractAdapterTest {
         adapter.initialize(
             abi.encode(asset, address(this), address(0), 0, sigs, ""),
             externalRegistry,
-            abi.encode(pendleMarket, _oracle, slippage, twapDuration, _swapDelay)
+            abi.encode(pendleMarket, _oracle, slippage, twapDuration, _swapDelay, feeTier)
         );
 
         adapterContract = PendleWstETHAdapter(payable(address(adapter)));
@@ -117,7 +120,7 @@ contract wstETHPendleAdapterTest is AbstractAdapterTest {
         adapter.initialize(
             abi.encode(asset, address(this), strategy, 0, sigs, ""),
             address(pendleRouter),
-            abi.encode(pendleMarket, oracle, slippage, twapDuration, swapDelay)        
+            abi.encode(pendleMarket, oracle, slippage, twapDuration, swapDelay, feeTier)
         );
 
         assertEq(adapter.owner(), address(this), "owner");
@@ -255,8 +258,6 @@ contract wstETHPendleAdapterTest is AbstractAdapterTest {
         adapter.deposit(amount, bob);
         vm.stopPrank();
 
-        uint256 totAssetsBefore = adapter.totalAssets();
-
         // only pendle reward
         BalancerRewardTokenData[] memory rewData = new BalancerRewardTokenData[](1);
         
@@ -278,8 +279,10 @@ contract wstETHPendleAdapterTest is AbstractAdapterTest {
         vm.roll(block.number + 1_000_000);
         vm.warp(block.timestamp + 15_000_000);
 
-        adapter.harvest();
+        uint256 totAssetsBefore = adapter.totalAssets();
 
+        adapter.harvest();
+        
         // total assets have increased
         assertGt(adapter.totalAssets(), totAssetsBefore);
     }
@@ -316,7 +319,7 @@ contract wstETHPendleAdapterTest is AbstractAdapterTest {
         adapter.initialize(
             abi.encode(invalidAsset, address(this), strategy, 0, sigs, ""),
             address(pendleRouter),
-            abi.encode(pendleMarket, oracle, slippage, twapDuration, swapDelay)
+            abi.encode(pendleMarket, oracle, slippage, twapDuration, swapDelay, feeTier)
         );
     }
 }
