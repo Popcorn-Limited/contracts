@@ -3,7 +3,7 @@
 
 pragma solidity ^0.8.25;
 
-import {AuraCompounder, IERC20, BatchSwapStep, IAsset, AuraValues, HarvestValues, TradePath} from "../../../src/strategies/aura/AuraCompounder.sol";
+import {AuraCompounder, IERC20, BatchSwapStep, IAsset, AuraValues, HarvestValues, TradePath, TradePath2, TradePath3} from "../../../src/strategies/aura/AuraCompounder.sol";
 import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson} from "../BaseStrategyTest.sol";
 
 contract AuraCompounderTest is BaseStrategyTest {
@@ -39,6 +39,7 @@ contract AuraCompounderTest is BaseStrategyTest {
             abi.encode(auraValues_)
         );
 
+        // Set Harvest values
         _setHarvestValues(json_, index_, address(strategy));
 
         return IBaseStrategy(address(strategy));
@@ -52,66 +53,6 @@ contract AuraCompounderTest is BaseStrategyTest {
         address strategy
     ) internal {
         // Read harvest values
-        // BatchSwapStep[][] memory swaps = abi.decode(
-        //     json_.parseRaw(
-        //         string.concat(".configs[", index_, "].specific.harvest.swaps")
-        //     ),
-        //     (BatchSwapStep[][])
-        // );
-        // IAsset[][] memory assets = abi.decode(
-        //     json_.parseRaw(
-        //         string.concat(".configs[", index_, "].specific.harvest.assets")
-        //     ),
-        //     (IAsset[][])
-        // );
-        // int256[][] memory limits = abi.decode(
-        //     json_.parseRaw(
-        //         string.concat(
-        //             ".configs[",
-        //             index_,
-        //             "].specific.harvest.minTradeAmounts"
-        //         )
-        //     ),
-        //     (int256[][])
-        // );
-        // uint256[] memory minTradeAmounts = abi.decode(
-        //     json_.parseRaw(
-        //         string.concat(
-        //             ".configs[",
-        //             index_,
-        //             "].specific.harvest.minTradeAmounts"
-        //         )
-        //     ),
-        //     (uint256[])
-        // );
-
-        // IERC20 baseAsset = IERC20(
-        //     json_.readAddress(
-        //         string.concat(
-        //             ".configs[",
-        //             index_,
-        //             "].specific.harvest.baseAsset"
-        //         )
-        //     )
-        // );
-        // uint256 indexIn = json_.readUint(
-        //     string.concat(".configs[", index_, "].specific.harvest.indexIn")
-        // );
-        // uint256 indexInUserData = json_.readUint(
-        //     string.concat(
-        //         ".configs[",
-        //         index_,
-        //         "].specific.harvest.indexInUserData"
-        //     )
-        // );
-        // uint256 amountsInLen = json_.readUint(
-        //     string.concat(
-        //         ".configs[",
-        //         index_,
-        //         "].specific.harvest.amountsInLen"
-        //     )
-        // );
-
         HarvestValues memory harvestValues_ = abi.decode(
             json_.parseRaw(
                 string.concat(
@@ -123,28 +64,7 @@ contract AuraCompounderTest is BaseStrategyTest {
             (HarvestValues)
         );
 
-        // TradePath memory tradePath0 = abi.decode(
-        //     json_.parseRaw(
-        //         string.concat(
-        //             ".configs[",
-        //             index_,
-        //             "].specific.harvest.tradePaths[0]"
-        //         )
-        //     ),
-        //     (TradePath)
-        // );
-        // TradePath memory tradePath1 = abi.decode(
-        //     json_.parseRaw(
-        //         string.concat(
-        //             ".configs[",
-        //             index_,
-        //             "].specific.harvest.tradePaths[1]"
-        //         )
-        //     ),
-        //     (TradePath)
-        // );
-
-        TradePath[] memory tradePaths_ = abi.decode(
+        TradePath2[] memory tradePaths_ = abi.decode(
             json_.parseRaw(
                 string.concat(
                     ".configs[",
@@ -152,17 +72,11 @@ contract AuraCompounderTest is BaseStrategyTest {
                     "].specific.harvest.tradePaths"
                 )
             ),
-            (TradePath[])
+            (TradePath2[])
         );
 
-        emit log_uint(tradePaths_[0].assetOutIndex[0]);
-
-        // TradePath[] memory tradePaths_ = new TradePath[](2);
-        // tradePaths_[0] = tradePath0;
-        // tradePaths_[1] = tradePath1;
-
         // Set harvest values
-        AuraCompounder(strategy).setHarvestValues(harvestValues_, tradePaths_);
+        AuraCompounder(strategy).setHarvestValues(harvestValues_, tradePaths2_);
     }
 
     // function _increasePricePerShare(uint256 amount) internal override {

@@ -22,23 +22,19 @@ struct HarvestValues {
     uint256 indexInUserData;
 }
 
-struct TradePath {
-    uint256[] amount;
-    uint256[] assetInIndex;
-    uint256[] assetOutIndex;
-    address[] assets;
+struct HarvestTradePath {
+    IAsset[] assets;
     int256[] limits;
     uint256 minTradeAmount;
-    bytes32[] poolId;
-    bytes[] userData;
+    BatchSwapStep[] swaps;
 }
 
-// struct TradePath {
-//     address[] assets;
-//     int256[] limits;
-//     uint256 minTradeAmount;
-//     BatchSwapStep[] swaps;
-// }
+struct TradePath {
+    IAsset[] assets;
+    int256[] limits;
+    uint256 minTradeAmount;
+    bytes swaps;
+}
 
 /**
  * @title  Aura Adapter
@@ -146,8 +142,10 @@ contract AuraCompounder is BaseStrategy {
     //////////////////////////////////////////////////////////////*/
 
     function _protocolDeposit(uint256 assets, uint256) internal override {
-        IAuraBooster(auraValues.auraBooster).deposit(
-            auraValues.pid,
+        // Caching
+        AuraValues memory auraValues_ = auraValues;
+        IAuraBooster(auraValues_.auraBooster).deposit(
+            auraValues_.pid,
             assets,
             true
         );
@@ -175,88 +173,91 @@ contract AuraCompounder is BaseStrategy {
 
     /**
      * @notice Execute Strategy and take fees.
-     * @dev Delegatecall to strategy's harvest() function. All necessary data is passed via `strategyConfig`.
-     * @dev Delegatecall is used to in case any logic requires the adapters address as a msg.sender. (e.g. Synthetix staking)
      */
     function harvest() public override takeFees {
         claim();
 
+        // Caching
+        AuraValues memory auraValues_ = auraValues;
+        address[] memory rewardTokens_ = _rewardTokens;
+        HarvestValues memory harvestValues_ = harvestValues;
+
         // Trade to base asset
-        // uint256 len = _rewardTokens.length;
-        // for (uint256 i = 0; i < len; i++) {
-        //     uint256 rewardBal = IERC20(_rewardTokens[i]).balanceOf(
-        //         address(this)
-        //     );
-        //     if (rewardBal >= tradePaths[i].minTradeAmount) {
-        //         tradePaths[i].swaps[0].amount = rewardBal;
+        uint256 len = rewardTokens_.length;
+        for (uint256 i = 0; i < len; i++) {
+            uint256 rewardBal = IERC20(rewardTokens_[i]).balanceOf(
+                address(this)
+            );
 
-        //         IAsset[] memory balAssets = new IAsset[](
-        //             tradePaths[i].assets.length
-        //         );
+            // More caching
+            TradePath memory tradePath = tradePaths[i];
+            if (rewardBal >= tradePath.minTradeAmount) {
+                // Decode since nested struct[] isnt allowed in storage
+                BatchSwapStep[] memory swaps = abi.decode(
+                    tradePath.swaps,
+                    (BatchSwapStep[])
+                );
+                // Use the actual rewardBal as the amount to sell
+                swaps[0].amount = rewardBal;
 
-        //         IBalancerVault(auraValues.balVault).batchSwap(
-        //             SwapKind.GIVEN_IN,
-        //             tradePaths[i].swaps,
-        //             balAssets,
-        //             FundManagement(
-        //                 address(this),
-        //                 false,
-        //                 payable(address(this)),
-        //                 false
-        //             ),
-        //             tradePaths[i].limits,
-        //             block.timestamp
-        //         );
-        //     }
-        // }
-        // uint256 poolAmount = IERC20(harvestValues.baseAsset).balanceOf(
-        //     address(this)
-        // );
-        // if (poolAmount > 0) {
-        //     uint256[] memory amounts = new uint256[](
-        //         auraValues.underlyings.length
-        //     );
-        //     amounts[harvestValues.indexIn] = poolAmount;
+                // Swap to base asset
+                IBalancerVault(auraValues_.balVault).batchSwap(
+                    SwapKind.GIVEN_IN,
+                    swaps,
+                    tradePath.assets,
+                    FundManagement(
+                        address(this),
+                        false,
+                        payable(address(this)),
+                        false
+                    ),
+                    tradePath.limits,
+                    block.timestamp
+                );
+            }
+        }
+        // Get the required Lp Token
+        uint256 poolAmount = IERC20(harvestValues_.baseAsset).balanceOf(
+            address(this)
+        );
+        if (poolAmount > 0) {
+            uint256[] memory amounts = new uint256[](
+                auraValues.underlyings.length
+            );
+            // Use the actual base asset balance to pool.
+            amounts[harvestValues_.indexIn] = poolAmount;
 
-        //     bytes memory userData;
-        //     if (auraValues.underlyings.length != harvestValues.amountsInLen) {
-        //         uint256[] memory amountsIn = new uint256[](
-        //             harvestValues.amountsInLen
-        //         );
-        //         amountsIn[harvestValues.indexInUserData] = poolAmount;
-        //         userData = abi.encode(1, amountsIn, 0); // Exact In Enum, inAmounts, minOut
-        //     } else {
-        //         userData = abi.encode(1, amounts, 0); // Exact In Enum, inAmounts, minOut
-        //     }
+            // Some pools need to be encoded with a different length array than the actual input amount array
+            bytes memory userData;
+            if (auraValues_.underlyings.length != harvestValues_.amountsInLen) {
+                uint256[] memory amountsIn = new uint256[](
+                    harvestValues_.amountsInLen
+                );
+                amountsIn[harvestValues_.indexInUserData] = poolAmount;
+                userData = abi.encode(1, amountsIn, 0); // Exact In Enum, inAmounts, minOut
+            } else {
+                userData = abi.encode(1, amounts, 0); // Exact In Enum, inAmounts, minOut
+            }
 
-        //     // Pool base asset
-        //     IBalancerVault(auraValues.balVault).joinPool(
-        //         auraValues.balPoolId,
-        //         address(this),
-        //         address(this),
-        //         JoinPoolRequest(
-        //             auraValues.underlyings,
-        //             amounts,
-        //             userData,
-        //             false
-        //         )
-        //     );
+            // Pool base asset
+            IBalancerVault(auraValues_.balVault).joinPool(
+                auraValues_.balPoolId,
+                address(this),
+                address(this),
+                JoinPoolRequest(
+                    auraValues_.underlyings,
+                    amounts,
+                    userData,
+                    false
+                )
+            );
 
-        //     // redeposit
-        //     _protocolDeposit(IERC20(asset()).balanceOf(address(this)), 0);
-        // }
+            // redeposit
+            _protocolDeposit(IERC20(asset()).balanceOf(address(this)), 0);
+        }
 
         emit Harvested();
     }
-
-    // mapping(address => BatchSwapStep[]) internal swaps;
-    // mapping(address => IAsset[]) internal assets;
-    // mapping(address => int256[]) internal limits;
-    // uint256[] internal minTradeAmounts;
-    // IERC20 internal baseAsset;
-    // uint256 internal indexIn;
-    // uint256 internal indexInUserData;
-    // uint256 internal amountsInLen;
 
     HarvestValues internal harvestValues;
     TradePath[] internal tradePaths;
@@ -264,7 +265,7 @@ contract AuraCompounder is BaseStrategy {
 
     function setHarvestValues(
         HarvestValues memory harvestValues_,
-        TradePath[] memory tradePaths_
+        HarvestTradePath[] memory tradePaths_
     ) external onlyOwner {
         // Remove old rewardToken
         for (uint i; i < _rewardTokens.length; ) {
@@ -277,8 +278,8 @@ contract AuraCompounder is BaseStrategy {
 
         // Add new rewardToken
         for (uint i; i < tradePaths_.length; ) {
-            _rewardTokens.push(tradePaths_[i].assets[0]);
-            IERC20(tradePaths_[i].assets[0]).approve(
+            _rewardTokens.push(address(tradePaths_[i].assets[0]));
+            IERC20(address(tradePaths_[i].assets[0])).approve(
                 auraValues.balVault,
                 type(uint).max
             );
@@ -300,27 +301,18 @@ contract AuraCompounder is BaseStrategy {
 
         //Set new trade paths
         delete tradePaths;
-        // for (uint i; i < tradePaths_.length; ) {
-        //     tradePaths.push();
-        //     tradePaths[i] = tradePaths_[i];
-        // }
-        // tradePaths = tradePaths_;
+        for (uint i; i < tradePaths_.length; ) {
+            tradePaths.push(
+                TradePath({
+                    assets: tradePaths_[i].assets,
+                    limits: tradePaths_[i].limits,
+                    minTradeAmount: tradePaths_[i].minTradeAmount,
+                    swaps: abi.encode(tradePaths_[i].swaps)
+                })
+            );
+            unchecked {
+                ++i;
+            }
+        }
     }
-
-    // function _setTradeData(
-    //     BatchSwapStep[] memory swaps_,
-    //     IAsset[] memory assets_,
-    //     int256[] memory limits_
-    // ) internal {
-    //     address key = address(assets_[0]);
-    //     delete swaps[key];
-
-    //     uint256 len = swaps_.length;
-    //     for (uint256 i; i < len; i++) {
-    //         swaps[key].push(swaps_[i]);
-    //     }
-
-    //     limits[key] = limits_;
-    //     assets[key] = assets_;
-    // }
 }
