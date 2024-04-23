@@ -33,6 +33,13 @@ struct TradePath {
     bytes[] userData;
 }
 
+// struct TradePath {
+//     address[] assets;
+//     int256[] limits;
+//     uint256 minTradeAmount;
+//     BatchSwapStep[] swaps;
+// }
+
 /**
  * @title  Aura Adapter
  * @author amatureApe
@@ -269,17 +276,17 @@ contract AuraCompounder is BaseStrategy {
         delete _rewardTokens;
 
         // Add new rewardToken
-        // for (uint i; i < tradePaths_.length; ) {
-        //     _rewardTokens.push(tradePaths_[i].assets[0]);
-        //     IERC20(tradePaths_[i].assets[0]).approve(
-        //         auraValues.balVault,
-        //         type(uint).max
-        //     );
-        //     unchecked {
-        //         ++i;
-        //     }
-        // }
-        
+        for (uint i; i < tradePaths_.length; ) {
+            _rewardTokens.push(tradePaths_[i].assets[0]);
+            IERC20(tradePaths_[i].assets[0]).approve(
+                auraValues.balVault,
+                type(uint).max
+            );
+            unchecked {
+                ++i;
+            }
+        }
+
         // Reset old base asset
         if (harvestValues.baseAsset != address(0)) {
             IERC20(harvestValues.baseAsset).approve(auraValues.balVault, 0);
@@ -293,9 +300,11 @@ contract AuraCompounder is BaseStrategy {
 
         //Set new trade paths
         delete tradePaths;
-        for (uint i; i < tradePaths_.length; ) {
-            tradePaths.push(tradePaths_[i]);
-        }
+        // for (uint i; i < tradePaths_.length; ) {
+        //     tradePaths.push();
+        //     tradePaths[i] = tradePaths_[i];
+        // }
+        // tradePaths = tradePaths_;
     }
 
     // function _setTradeData(
