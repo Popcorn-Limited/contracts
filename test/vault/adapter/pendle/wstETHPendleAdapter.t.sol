@@ -18,14 +18,11 @@ contract wstETHPendleAdapterTest is AbstractAdapterTest {
     address pendleMarket;
     address pendleToken = address(0x808507121B80c02388fAd14726482e061B8da827);
     address WETH = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
-    address oracle; 
+    address pendleRouterStatic; 
 
     PendleWstETHAdapter adapterContract;
 
-    uint256 slippage;
-    uint32 twapDuration; 
     uint256 swapDelay; 
-    uint256 feeTier;
 
     function setUp() public {
         uint256 forkId = vm.createSelectFork(vm.rpcUrl("mainnet"), 19639567);
@@ -46,22 +43,16 @@ contract wstETHPendleAdapterTest is AbstractAdapterTest {
         (
             address _asset, 
             address _market, 
-            address _oracle,
-            uint256 _slippage, 
-            uint32 _twapDuration, 
-            uint256 _swapDelay,
-            uint256 _feeTier
+            address _pendleRouterStatic,
+            uint256 _swapDelay
         ) = abi.decode(
             testConfig,
-            (address, address, address, uint256, uint32, uint256, uint256)
+            (address, address, address, uint256)
         );
 
         pendleMarket = _market;
-        slippage = _slippage;
-        twapDuration = _twapDuration;
-        oracle = _oracle;
+        pendleRouterStatic = _pendleRouterStatic;
         swapDelay = _swapDelay;
-        feeTier = _feeTier;
         
         (address _synToken, ,) = IPendleMarket(pendleMarket).readTokens();
         synToken = IPendleSYToken(_synToken);
@@ -81,7 +72,7 @@ contract wstETHPendleAdapterTest is AbstractAdapterTest {
         adapter.initialize(
             abi.encode(asset, address(this), address(0), 0, sigs, ""),
             externalRegistry,
-            abi.encode(pendleMarket, _oracle, slippage, twapDuration, _swapDelay, feeTier)
+            abi.encode(pendleMarket, _pendleRouterStatic, _swapDelay)
         );
 
         adapterContract = PendleWstETHAdapter(payable(address(adapter)));
@@ -89,7 +80,7 @@ contract wstETHPendleAdapterTest is AbstractAdapterTest {
         defaultAmount = 10 ** IERC20Metadata(address(asset)).decimals();
         raise = defaultAmount * 100;
         maxAssets = 1e21;
-        minShares = 1e15;
+        minShares = 1e14;
         maxShares = maxAssets * 1e9 / 2;
         minFuzz = 1e15;
     }
@@ -120,7 +111,7 @@ contract wstETHPendleAdapterTest is AbstractAdapterTest {
         adapter.initialize(
             abi.encode(asset, address(this), strategy, 0, sigs, ""),
             address(pendleRouter),
-            abi.encode(pendleMarket, oracle, slippage, twapDuration, swapDelay, feeTier)
+            abi.encode(pendleMarket, pendleRouterStatic, swapDelay)
         );
 
         assertEq(adapter.owner(), address(this), "owner");
@@ -319,7 +310,7 @@ contract wstETHPendleAdapterTest is AbstractAdapterTest {
         adapter.initialize(
             abi.encode(invalidAsset, address(this), strategy, 0, sigs, ""),
             address(pendleRouter),
-            abi.encode(pendleMarket, oracle, slippage, twapDuration, swapDelay, feeTier)
+            abi.encode(pendleMarket, pendleRouterStatic, swapDelay)
         );
     }
 }

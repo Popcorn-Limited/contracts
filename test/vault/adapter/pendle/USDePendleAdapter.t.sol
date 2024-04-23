@@ -9,6 +9,7 @@ import {PendleUSDeAdapter, CurveSwap, BalancerRewardTokenData, Math, IERC20, IER
 import {IPendleRouter, IPendleMarket, IPendleSYToken} from "../../../../src/vault/adapter/pendle/IPendle.sol";
 import {PendleTestConfigStorage, PendleTestConfig} from "./PendleTestConfigStorage.sol";
 import {AbstractAdapterTest, ITestConfigStorage, IAdapter} from "../abstract/AbstractAdapterTest.sol";
+import "forge-std/console.sol";
 
 contract USDePendleAdapterTest is AbstractAdapterTest {
     using Math for uint256;
@@ -21,14 +22,11 @@ contract USDePendleAdapterTest is AbstractAdapterTest {
     address WETH = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
     address USDC = address(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
     address USDe = address(0x4c9EDD5852cd905f086C759E8383e09bff1E68B3);
-    address oracle;
+    address pendleRouterStatic;
 
     PendleUSDeAdapter adapterContract;
 
-    uint256 slippage;
-    uint32 twapDuration; 
     uint256 swapDelay; 
-    uint256 feeTier;
     
     function setUp() public {
         // uint256 forkId = vm.createSelectFork(vm.rpcUrl("mainnet"), 19410160);
@@ -50,22 +48,16 @@ contract USDePendleAdapterTest is AbstractAdapterTest {
         (
             address _asset, 
             address _market, 
-            address _oracle,
-            uint256 _slippage, 
-            uint32 _twapDuration, 
-            uint256 _swapDelay,
-            uint256 _feeTier
+            address _pendleRouterStatic,
+            uint256 _swapDelay
         ) = abi.decode(
             testConfig,
-            (address, address, address, uint256, uint32, uint256, uint256)
+            (address, address, address, uint256)
         );
 
         pendleMarket = _market;        
-        slippage = _slippage;
-        twapDuration = _twapDuration;
-        oracle = _oracle;
+        pendleRouterStatic = _pendleRouterStatic;
         swapDelay = _swapDelay;
-        feeTier = _feeTier;
 
         (address _synToken, ,) = IPendleMarket(pendleMarket).readTokens();
         synToken = IPendleSYToken(_synToken);
@@ -85,7 +77,7 @@ contract USDePendleAdapterTest is AbstractAdapterTest {
         adapter.initialize(
             abi.encode(asset, address(this), address(0), 0, sigs, ""),
             externalRegistry,
-            abi.encode(pendleMarket, _oracle, slippage, twapDuration, _swapDelay, feeTier)
+            abi.encode(pendleMarket, _pendleRouterStatic, _swapDelay)
         );
 
         adapterContract = PendleUSDeAdapter(payable(address(adapter)));
@@ -93,14 +85,10 @@ contract USDePendleAdapterTest is AbstractAdapterTest {
         defaultAmount = 10 ** IERC20Metadata(address(asset)).decimals();
         minFuzz = 1e16;
         raise = defaultAmount * 100;
-        maxAssets = 1e20;
+        maxAssets = 1e22;
         minShares = 1e16;
         maxShares = maxAssets * 1e9 / 2;
         minFuzz = 1e16;
-
-        // the oracle needs time after initialization to populate data
-        // vm.roll(block.number + 10);
-        // vm.warp(block.timestamp + 10*15);
 
         adapter.toggleAutoHarvest();
     }
@@ -131,7 +119,7 @@ contract USDePendleAdapterTest is AbstractAdapterTest {
         adapter.initialize(
             abi.encode(asset, address(this), strategy, 0, sigs, ""),
             address(pendleRouter),
-            abi.encode(pendleMarket, oracle, slippage, twapDuration, swapDelay, feeTier)
+            abi.encode(pendleMarket, pendleRouterStatic, swapDelay)
         );
 
         assertEq(adapter.owner(), address(this), "owner");
@@ -160,13 +148,14 @@ contract USDePendleAdapterTest is AbstractAdapterTest {
         // Deposit smth so withdraw on pause is not 0
         _mintAsset(amount, address(this));
         asset.approve(address(adapter), amount);
+        console.log(amount);
         adapter.deposit(amount, address(this));
         adapter.pause();
         assertEq(adapter.maxDeposit(bob), 0);
     }
 
     // override tests that uses multiple configurations
-    // as this adapter only wants wstETH 
+    // as this adapter only wants USDe 
     function test__deposit(uint8 fuzzAmount) public override {
         uint8 len = uint8(testConfigStorage.getTestConfigLength());
         for (uint8 i; i < len; i++) {
@@ -279,6 +268,7 @@ contract USDePendleAdapterTest is AbstractAdapterTest {
         uint256 floating = IERC20(adapter.asset()).balanceOf(address(adapter));
 
         assertEq(IERC20(pendleMarket).balanceOf(address(adapter)), 0);
+        assertEq(floating, 0);
     }
 
     function test__harvest() public override {
@@ -374,7 +364,7 @@ contract USDePendleAdapterTest is AbstractAdapterTest {
         adapter.initialize(
             abi.encode(invalidAsset, address(this), strategy, 0, sigs, ""),
             address(pendleRouter),
-            abi.encode(pendleMarket, oracle, slippage, twapDuration, swapDelay, feeTier)
+            abi.encode(pendleMarket, pendleRouterStatic, swapDelay)
         );
     }
 }
