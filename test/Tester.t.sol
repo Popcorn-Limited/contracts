@@ -23,12 +23,14 @@ interface VaultRouter_I {
 }
 
 struct BatchSwapStep {
-    bytes32 poolId;
+    uint256 amount;
     uint256 assetInIndex;
     uint256 assetOutIndex;
-    uint256 amount;
+    bytes32 poolId;
     bytes userData;
 }
+
+interface IAsset {}
 
 contract Tester is Test {
     using stdJson for string;
@@ -47,7 +49,9 @@ contract Tester is Test {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/test/sample.json");
         string memory json = vm.readFile(path);
-        bytes memory transactionDetails = json.parseRaw(".[0].a");
+        bytes memory transactionDetails = json.parseRaw(
+            string.concat(".[", vm.toString(uint256(0)), "].a")
+        );
         uint256 a = abi.decode(transactionDetails, (uint256));
         emit log_uint(a);
 
@@ -56,14 +60,20 @@ contract Tester is Test {
         emit log_address(b[0]);
         emit log_address(b[1]);
 
-        transactionDetails = json.parseRaw(".[0].batchSwapStep");
-        BatchSwapStep memory swapStep = abi.decode(
+        transactionDetails = json.parseRaw(".[0].batchSwapSteps");
+        BatchSwapStep[] memory swapSteps = abi.decode(
             transactionDetails,
-            (BatchSwapStep)
+            (BatchSwapStep[])
         );
-        emit log_uint(swapStep.assetInIndex);
-        emit log_uint(swapStep.assetOutIndex);
-        emit log_bytes32(swapStep.poolId);
-        emit log_bytes32(json.readBytes32(".[0].batchSwapStep.poolId"));
+        emit log_uint(swapSteps[0].assetInIndex);
+        emit log_uint(swapSteps[1].assetOutIndex);
+
+        IAsset[] memory assets = abi.decode(
+            json.parseRaw(".[0].assets"),
+            (IAsset[])
+        );
+        emit log_address(address(assets[0]));
+
+        emit log_int(type(int).max);
     }
 }

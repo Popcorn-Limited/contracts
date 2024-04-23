@@ -1,12 +1,26 @@
 // SPDX-License-Identifier: GPL-3.0
-// Docgen-SOLC: 0.8.15
+// Docgen-SOLC: 0.8.25
 
-pragma solidity ^0.8.15;
+pragma solidity ^0.8.25;
 
-import {EnhancedTest} from "../../../utils/EnhancedTest.sol";
+import {Test} from "forge-std/Test.sol";
 import {IERC4626, IERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 
-contract PropertyTest is EnhancedTest {
+struct TestConfig {
+    address asset;
+    uint256 blockNumber;
+    uint256 defaultAmount;
+    uint256 depositDelta; // TODO -- should we add deposit / withdraw delta?
+    uint256 maxDeposit;
+    uint256 maxWithdraw;
+    uint256 minDeposit;
+    uint256 minWithdraw;
+    string network;
+    string testId;
+    uint256 withdrawDelta; // TODO -- should we add deposit / withdraw delta?
+}
+
+contract PropertyTest is Test {
     uint256 internal _delta_;
 
     address internal _asset_;

@@ -7,8 +7,8 @@ import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math} from "../B
 import {IwstETH} from "./IwstETH.sol";
 import {ILido} from "./ILido.sol";
 import {Math} from "openzeppelin-contracts/utils/math/Math.sol";
-import {IWETH} from "../../../interfaces/external/IWETH.sol";
-import {ICurveMetapool} from "../../../interfaces/external/curve/ICurveMetapool.sol";
+import {IWETH} from "../../interfaces/external/IWETH.sol";
+import {ICurveMetapool} from "../../interfaces/external/curve/ICurveMetapool.sol";
 import {ILendingPool, IAToken, IFlashLoanReceiver, IProtocolDataProvider, IPoolAddressesProvider} from "../aave/aaveV3/IAaveV3.sol";
 
 /// @title Leveraged wstETH yield adapter
@@ -53,29 +53,30 @@ contract LeveragedWstETHAdapter is BaseStrategy, IFlashLoanReceiver {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Initialize a new Lido Adapter.
-     * @param adapterInitData Encoded data for the base adapter initialization.
-     * @param _initData Encoded data for the adapter initialization.
-     * @dev `_slippage` - allowed slippage in 1e18
-     * @dev `_poolAddressesProvider` - aave Pool Addresses Provider contract address.
-     * @dev `_targetLTV` - The desired loan to value of the vault CDP.
-     * @dev `_maxLTV` - The max loan to value allowed before a automatic de-leverage
-     * @dev This function is called by the factory contract when deploying a new vault.
+     * @notice Initialize a new Strategy.
+     * @param asset_ The underlying asset used for deposit/withdraw and accounting
+     * @param owner_ Owner of the contract. Controls management functions.
+     * @param autoHarvest_ Controls if the harvest function gets called on deposit/withdrawal
+     * @param strategyInitData_ Encoded data for this specific strategy
      */
     function initialize(
         address asset_,
         address owner_,
         bool autoHarvest_,
-        bytes memory _initData
+        bytes memory strategyInitData_
     ) public initializer {
         __BaseStrategy_init(asset_, owner_, autoHarvest_);
 
         (
             address _poolAddressesProvider,
+            address _aaveDataProvider,
             uint256 _slippage,
             uint256 _targetLTV,
             uint256 _maxLTV
-        ) = abi.decode(_initData, (address, uint256, uint256, uint256));
+        ) = abi.decode(
+                strategyInitData_,
+                (address, address, uint256, uint256, uint256)
+            );
 
         address baseAsset = asset();
 
@@ -85,7 +86,7 @@ contract LeveragedWstETHAdapter is BaseStrategy, IFlashLoanReceiver {
         slippage = _slippage;
 
         // retrieve and set wstETH aToken, lending pool
-        (address _aToken, , ) = IProtocolDataProvider(aaveDataProvider)
+        (address _aToken, , ) = IProtocolDataProvider(_aaveDataProvider)
             .getReserveTokensAddresses(baseAsset);
 
         interestToken = IERC20(_aToken);
@@ -94,7 +95,7 @@ contract LeveragedWstETHAdapter is BaseStrategy, IFlashLoanReceiver {
 
         // retrieve and set WETH variable debt token
         (, , address _variableDebtToken) = IProtocolDataProvider(
-            aaveDataProvider
+            _aaveDataProvider
         ).getReserveTokensAddresses(address(weth));
 
         debtToken = IERC20(_variableDebtToken); // variable debt WETH token
@@ -117,9 +118,6 @@ contract LeveragedWstETHAdapter is BaseStrategy, IFlashLoanReceiver {
 
         // set efficiency mode
         lendingPool.setUserEMode(uint8(1));
-
-        // turn off auto harvest
-        autoHarvest = false;
     }
 
     receive() external payable {}
@@ -233,8 +231,10 @@ contract LeveragedWstETHAdapter is BaseStrategy, IFlashLoanReceiver {
     /// @notice repay part of the vault debt and withdraw wstETH
     function _protocolWithdraw(
         uint256 assets,
-        uint256 shares
+        uint256 shares,
+        address recipient
     ) internal override {
+        // TODO -- use recipient
         (, uint256 currentDebt, uint256 currentCollateral) = _getCurrentLTV();
         uint256 ethAssetsValue = IwstETH(asset()).getStETHByWstETH(assets);
 

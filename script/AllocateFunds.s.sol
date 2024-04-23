@@ -4,8 +4,6 @@ pragma solidity ^0.8.15;
 
 import {Script} from "forge-std/Script.sol";
 import {MultiStrategyVault, IERC4626, IERC20, Allocation} from "../src/vaults/MultiStrategyVault.sol";
-import {IPermissionRegistry, Permission} from "../src/interfaces/vault/IPermissionRegistry.sol";
-import {VaultController, IAdapter, VaultInitParams, VaultMetadata, IERC4626, IERC20} from "../src/vault/VaultController.sol";
 
 contract AllocateFunds is Script {
     Allocation[] internal allocations;

@@ -3,20 +3,30 @@
 
 pragma solidity ^0.8.25;
 
-import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math, IStrategy, IAdapter} from "../BaseStrategy.sol";
-import {IBalancerVault, SwapKind, IAsset, BatchSwapStep, FundManagement, JoinPoolRequest} from "../../../interfaces/external/balancer/IBalancerVault.sol";
+import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math} from "../BaseStrategy.sol";
+import {IBalancerVault, SwapKind, IAsset, BatchSwapStep, FundManagement, JoinPoolRequest} from "../../interfaces/external/balancer/IBalancerVault.sol";
 import {IMinter, IGauge} from "./IBalancer.sol";
 
+struct BalancerValues {
+    address balMinter;
+    bytes32 balPoolId;
+    address balVault;
+    address gauge;
+    address[] underlyings;
+}
+
 struct HarvestValue {
+    address baseAsset;
+    uint256 indexIn;
+    uint256 indexInUserData;
+    uint256 amountsInLen;
+}
+
+struct TradePath {
     BatchSwapStep[] swaps;
     IAsset[] assets;
     int256[] limits;
     uint256 minTradeAmount;
-    address baseAsset;
-    address[] underlyings;
-    uint256 indexIn;
-    uint256 amountsInLen;
-    bytes32 balPoolId;
 }
 
 /**
@@ -49,20 +59,20 @@ contract BalancerCompounder is BaseStrategy {
     error Disabled();
 
     /**
-     * @notice Initialize a new Balancer Adapter.
-     * @param adapterInitData Encoded data for the base adapter initialization.
-     * @param registry Endorsement Registry to check if the balancer adapter is endorsed.
-     * @param balancerInitData Encoded data for the balancer adapter initialization.
-     * @dev This function is called by the factory contract when deploying a new vault.
+     * @notice Initialize a new Strategy.
+     * @param asset_ The underlying asset used for deposit/withdraw and accounting
+     * @param owner_ Owner of the contract. Controls management functions.
+     * @param autoHarvest_ Controls if the harvest function gets called on deposit/withdrawal
+     * @param strategyInitData_ Encoded data for this specific strategy
      */
     function initialize(
         address asset_,
         address owner_,
         bool autoHarvest_,
-        bytes memory balancerInitData
+        bytes memory strategyInitData_
     ) external initializer {
         (address _gauge, address _balVault, address _balMinter) = abi.decode(
-            balancerInitData,
+            strategyInitData_,
             (address, address, address)
         );
 
@@ -125,19 +135,21 @@ contract BalancerCompounder is BaseStrategy {
     //////////////////////////////////////////////////////////////*/
 
     function _protocolDeposit(
-        uint256 amount,
+        uint256 assets,
         uint256
     ) internal virtual override {
-        gauge.deposit(amount);
+        gauge.deposit(assets);
     }
 
     function _protocolWithdraw(
-        uint256 amount,
-        uint256
+        uint256 assets,
+        uint256,
+        address recipient
     ) internal virtual override {
-        gauge.withdraw(amount, false);
+        gauge.withdraw(assets, false);
+        IERC20(asset()).safeTransfer(recipient, assets);
     }
-    
+
     /*//////////////////////////////////////////////////////////////
                             STRATEGY LOGIC
     //////////////////////////////////////////////////////////////*/

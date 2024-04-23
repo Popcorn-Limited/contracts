@@ -3,7 +3,7 @@
 
 pragma solidity ^0.8.25;
 
-import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math, IStrategy, IAdapter} from "../BaseStrategy.sol";
+import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math} from "../BaseStrategy.sol";
 import {IConvexBooster, IConvexRewards, IRewards} from "./IConvex.sol";
 import {ICurveLp, IGauge, ICurveRouter, CurveSwap, IMinter} from "../curve/ICurve.sol";
 
@@ -40,26 +40,25 @@ contract ConvexCompounder is BaseStrategy {
 
     error AssetMismatch();
 
-    /**
-     * @notice Initialize a new Convex Adapter.
-     * @param adapterInitData Encoded data for the base adapter initialization.
-     * @param registry The Convex Booster contract
-     * @param convexInitData Encoded data for the convex adapter initialization.
-     * @dev `_pid` - The poolId for lpToken.
-     * @dev This function is called by the factory contract when deploying a new vault.
+   /**
+     * @notice Initialize a new Strategy.
+     * @param asset_ The underlying asset used for deposit/withdraw and accounting
+     * @param owner_ Owner of the contract. Controls management functions.
+     * @param autoHarvest_ Controls if the harvest function gets called on deposit/withdrawal
+     * @param strategyInitData_ Encoded data for this specific strategy
      */
     function initialize(
         address asset_,
         address owner_,
         bool autoHarvest_,
-        bytes memory convexInitData
+        bytes memory strategyInitData_
     ) external initializer {
         (
             uint256 _pid,
             address _curvePool,
             address _curveLpToken,
             address _convexBooster
-        ) = abi.decode(convexInitData, (uint256, address, address, address));
+        ) = abi.decode(strategyInitData_, (uint256, address, address, address));
 
         (, , , address _convexRewards, , ) = IConvexBooster(_convexBooster)
             .poolInfo(_pid);
@@ -83,7 +82,7 @@ contract ConvexCompounder is BaseStrategy {
             IERC20Metadata(_curveLpToken).symbol()
         );
 
-        IERC20(_curveLpToken).approve(registry, type(uint256).max);
+        IERC20(_curveLpToken).approve(_convexBooster, type(uint256).max);
     }
 
     function name()
@@ -124,18 +123,23 @@ contract ConvexCompounder is BaseStrategy {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Deposit into Convex convexBooster contract.
-    function _protocolDeposit(uint256 amount, uint256) internal override {
-        convexBooster.deposit(pid, amount, true);
+    function _protocolDeposit(uint256 assets, uint256) internal override {
+        convexBooster.deposit(pid, assets, true);
     }
 
     /// @notice Withdraw from Convex convexRewards contract.
-    function _protocolWithdraw(uint256 amount, uint256) internal override {
+    function _protocolWithdraw(
+        uint256 assets,
+        uint256,
+        address recipient
+    ) internal override {
         /**
          * @dev No need to convert as Convex shares are 1:1 with Curve deposits.
-         * @param amount Amount of shares to withdraw.
+         * @param assets Amount of shares to withdraw.
          * @param claim Claim rewards on withdraw?
          */
-        convexRewards.withdrawAndUnwrap(amount, false);
+        convexRewards.withdrawAndUnwrap(assets, false);
+        IERC20(asset()).safeTransfer(recipient, assets);
     }
 
     /*//////////////////////////////////////////////////////////////

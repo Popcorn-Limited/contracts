@@ -29,18 +29,23 @@ contract CurveGaugeCompounder is BaseStrategy {
                             INITIALIZATION
     //////////////////////////////////////////////////////////////*/
 
-    error InvalidAsset();
-
+    /**
+     * @notice Initialize a new Strategy.
+     * @param asset_ The underlying asset used for deposit/withdraw and accounting
+     * @param owner_ Owner of the contract. Controls management functions.
+     * @param autoHarvest_ Controls if the harvest function gets called on deposit/withdrawal
+     * @param strategyInitData_ Encoded data for this specific strategy
+     */
     function initialize(
         address asset_,
         address owner_,
         bool autoHarvest_,
-        bytes memory curveInitData
+        bytes memory strategyInitData_
     ) external initializer {
         __BaseStrategy_init(asset_, owner_, autoHarvest_);
 
         (address _gauge, address _pool, address _minter) = abi.decode(
-            curveInitData,
+            strategyInitData_,
             (address, address, address)
         );
 
@@ -98,12 +103,17 @@ contract CurveGaugeCompounder is BaseStrategy {
                           INTERNAL HOOKS LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function _protocolDeposit(uint256 amount, uint256) internal override {
-        gauge.deposit(amount);
+    function _protocolDeposit(uint256 assets, uint256) internal override {
+        gauge.deposit(assets);
     }
 
-    function _protocolWithdraw(uint256 amount, uint256) internal override {
-        gauge.withdraw(amount);
+    function _protocolWithdraw(
+        uint256 assets,
+        uint256,
+        address recipient
+    ) internal override {
+        gauge.withdraw(assets);
+        IERC20(asset()).safeTransfer(recipient, assets);
     }
 
     /*//////////////////////////////////////////////////////////////

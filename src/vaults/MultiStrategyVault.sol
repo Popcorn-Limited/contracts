@@ -3,13 +3,12 @@
 
 pragma solidity ^0.8.25;
 
-import {ERC4626Upgradeable, IERC20Metadata, ERC20Upgradeable as ERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
+import {ERC4626Upgradeable, IERC20Metadata, ERC20Upgradeable as ERC20, IERC4626, IERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuardUpgradeable} from "openzeppelin-contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {PausableUpgradeable} from "openzeppelin-contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {Math} from "openzeppelin-contracts/utils/math/Math.sol";
 import {OwnedUpgradeable} from "../utils/OwnedUpgradeable.sol";
-import {IERC4626, IERC20} from "../interfaces/vault/IVault.sol";
 
 struct Allocation {
     uint256 index;
@@ -333,7 +332,7 @@ contract MultiStrategyVault is
     error InvalidIndex();
     error InvalidWithdrawalQueue();
     error NotPassedQuitPeriod(uint256 quitPeriod_);
-    
+
     function getStrategies() external view returns (IERC4626[] memory) {
         return strategies;
     }

@@ -31,18 +31,23 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy {
                             INITIALIZATION
     //////////////////////////////////////////////////////////////*/
 
-    error InvalidAsset();
-
+    /**
+     * @notice Initialize a new Strategy.
+     * @param asset_ The underlying asset used for deposit/withdraw and accounting
+     * @param owner_ Owner of the contract. Controls management functions.
+     * @param autoHarvest_ Controls if the harvest function gets called on deposit/withdrawal
+     * @param strategyInitData_ Encoded data for this specific strategy
+     */
     function initialize(
         address asset_,
         address owner_,
         bool autoHarvest_,
-        bytes memory curveInitData
+        bytes memory strategyInitData_
     ) external initializer {
         __BaseStrategy_init(asset_, owner_, autoHarvest_);
 
         (address _lpToken, address _gauge, int128 _indexIn) = abi.decode(
-            curveInitData,
+            strategyInitData_,
             (address, address, int128)
         );
 
@@ -105,15 +110,19 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy {
                           INTERNAL HOOKS LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function _protocolDeposit(uint256 amount, uint256) internal override {
+    function _protocolDeposit(uint256 assets, uint256) internal override {
         uint256[] memory amounts = new uint256[](nCoins);
-        amounts[uint256(uint128(indexIn))] = amount;
+        amounts[uint256(uint128(indexIn))] = assets;
 
         ICurveLp(lpToken).add_liquidity(amounts, 0);
         gauge.deposit(IERC20(lpToken).balanceOf(address(this)));
     }
 
-    function _protocolWithdraw(uint256, uint256 shares) internal override {
+    function _protocolWithdraw(
+        uint256 assets,
+        uint256 shares,
+        address recipient
+    ) internal override {
         uint256 lpWithdraw = shares.mulDiv(
             IERC20(address(gauge)).balanceOf(address(this)),
             totalSupply(),
@@ -123,6 +132,7 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy {
         gauge.withdraw(lpWithdraw);
 
         ICurveLp(lpToken).remove_liquidity_one_coin(lpWithdraw, indexIn, 0);
+        IERC20(asset()).safeTransfer(recipient, assets);
     }
 
     /*//////////////////////////////////////////////////////////////

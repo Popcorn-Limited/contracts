@@ -81,7 +81,7 @@ contract DeployStrategy is Script {
 
         vm.startBroadcast(deployerPrivateKey);
 
-        AuraCompounder strategy = new AuraCompounder();
+        BalancerCompounder strategy = new BalancerCompounder();
 
         strategy.initialize(
             asset,

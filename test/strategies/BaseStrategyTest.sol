@@ -3,31 +3,48 @@
 
 pragma solidity ^0.8.25;
 
-import {Test} from "forge-std/Test.sol";
+import {stdJson} from "forge-std/StdJson.sol";
+
 import {Clones} from "openzeppelin-contracts/proxy/Clones.sol";
 import {Math} from "openzeppelin-contracts/utils/math/Math.sol";
+import {IERC20} from "openzeppelin-contracts/interfaces/IERC20.sol";
+import {IERC20Metadata} from "openzeppelin-contracts/interfaces/IERC20Metadata.sol";
 
-import "../../src/vaults/SingleStrategyVault.sol";
-import {ITestConfigStorage, TestConfig} from "./interfaces/ITestConfigStorage.sol";
-import {IERC20Upgradeable as IERC20, IERC20MetadataUpgradeable as IERC20Metadata} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
-import {AdapterConfig, IBaseAdapter} from "../../src/base/interfaces/IBaseAdapter.sol";
+import {IBaseStrategy} from "../../src/interfaces/IBaseStrategy.sol";
+import {PropertyTest, TestConfig} from "./PropertyTest.prop.sol";
 
-abstract contract BaseStrategyTest is Test {
+abstract contract BaseStrategyTest is PropertyTest {
     using Math for uint256;
+    using stdJson for string;
 
-    ITestConfigStorage public testConfigStorage;
+    string internal path;
+    string internal fullPath;
+    string internal json;
 
-    TestConfig public testConfig;
+    TestConfig internal testConfig;
 
-    IBaseAdapter public strategy;
+    IBaseStrategy public strategy;
 
     address public bob = address(0x9999);
     address public alice = address(0x8888);
-    address public owner;
 
-    function _setUpBaseTest(uint256 configIndex) internal virtual {
-        _deployTestConfigStorage();
-        testConfig = testConfigStorage.getTestConfig(configIndex);
+    function _setUpBaseTest(
+        uint256 configIndex,
+        string memory path_
+    ) internal virtual {
+        // Read test config
+        path = path_;
+        fullPath = string.concat(vm.projectRoot(), path_);
+        json = vm.readFile(path);
+
+        testConfig = abi.decode(
+            json.parseRaw(
+                string.concat(".configs[", vm.toString(configIndex), "].base")
+            ),
+            (TestConfig)
+        );
+
+        // Setup fork environment
         testConfig.blockNumber > 0
             ? vm.createSelectFork(
                 vm.rpcUrl(testConfig.network),
@@ -35,25 +52,20 @@ abstract contract BaseStrategyTest is Test {
             )
             : vm.createSelectFork(vm.rpcUrl(testConfig.network));
 
-        // After forking we have to redeploy the test config storage.
-        // The contract doesn't exist on the fork.
-        _deployTestConfigStorage();
+        // Setup strategy
+        strategy = _setUpStrategy(json, vm.toString(configIndex), testConfig);
 
-        AdapterConfig memory adapterConfig = testConfigStorage.getAdapterConfig(
-            configIndex
-        );
-        owner = adapterConfig.owner;
+        // Setup PropertyTest
+        _vault_ = address(strategy);
+        _asset_ = testConfig.asset;
+        _delta_ = testConfig.depositDelta;
 
+        // Labelling
         vm.label(bob, "bob");
         vm.label(alice, "alice");
-        vm.label(owner, "owner");
-
-        strategy = _setUpStrategy(adapterConfig, owner);
-
-        vm.startPrank(owner);
-        strategy.addVault(bob);
-        strategy.addVault(alice);
-        vm.stopPrank();
+        vm.label(address(this), "owner");
+        vm.label(address(strategy), "strategy");
+        vm.label(testConfig.asset, "asset");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -62,14 +74,13 @@ abstract contract BaseStrategyTest is Test {
 
     /// @dev -- This MUST be overriden to setup a strategy
     function _setUpStrategy(
-        AdapterConfig memory adapterConfig,
-        address owner_
-    ) internal virtual returns (IBaseAdapter);
-
-    function _deployTestConfigStorage() internal virtual;
+        string memory json_,
+        string memory index_,
+        TestConfig memory testConfig_
+    ) internal virtual returns (IBaseStrategy);
 
     function _mintAsset(uint256 amount, address receiver) internal virtual {
-        deal(address(testConfig.asset), receiver, amount);
+        deal(testConfig.asset, receiver, amount);
     }
 
     function _mintAssetAndApproveForStrategy(
@@ -78,8 +89,10 @@ abstract contract BaseStrategyTest is Test {
     ) internal {
         _mintAsset(amount, receiver);
         vm.prank(receiver);
-        testConfig.asset.approve(address(strategy), amount);
+        IERC20(testConfig.asset).approve(address(strategy), amount);
     }
+
+    function _increasePricePerShare(uint256 amount) internal virtual {}
 
     /*//////////////////////////////////////////////////////////////
                           INITIALIZATION
@@ -102,212 +115,362 @@ abstract contract BaseStrategyTest is Test {
     function test__totalAssets() public virtual {}
 
     /*//////////////////////////////////////////////////////////////
+                          CONVERSION VIEWS
+    //////////////////////////////////////////////////////////////*/
+
+    function test__convertToShares() public virtual {
+        prop_convertToShares(bob, alice, testConfig.defaultAmount);
+    }
+
+    function test__convertToAssets() public virtual {
+        prop_convertToAssets(bob, alice, testConfig.defaultAmount);
+    }
+
+    /*//////////////////////////////////////////////////////////////
                           MAX VIEWS
     //////////////////////////////////////////////////////////////*/
 
-    /// NOTE: These Are just prop tests currently. Override tests here if the adapter has unique max-functions which override AdapterBase.sol
+    /// NOTE: These Are just prop tests currently. Override tests here if the strategy has unique max-functions which override BaseStrategy.sol
     function test__maxDeposit() public virtual {
-        assertEq(strategy.maxDeposit(), type(uint256).max);
+        assertEq(strategy.maxDeposit(bob), type(uint256).max);
 
         // We need to deposit smth since pause tries to burn rETH which it cant if balance is 0
         _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
         vm.prank(bob);
-        strategy.deposit(testConfig.defaultAmount);
+        strategy.deposit(testConfig.defaultAmount, bob);
 
-        vm.prank(owner);
+        vm.prank(address(this));
         strategy.pause();
 
-        assertEq(strategy.maxDeposit(), 0);
+        assertEq(strategy.maxDeposit(bob), 0);
     }
 
-    /// NOTE: These Are just prop tests currently. Override tests here if the adapter has unique max-functions which override AdapterBase.sol
-    function test__maxWithdraw() public virtual {
-        assertEq(strategy.maxWithdraw(), 0);
+    function test__maxMint() public virtual {
+        assertEq(strategy.maxMint(bob), type(uint256).max);
 
+        // We need to deposit smth since pause tries to burn rETH which it cant if balance is 0
         _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
         vm.prank(bob);
-        strategy.deposit(testConfig.defaultAmount);
+        strategy.deposit(testConfig.defaultAmount, bob);
 
-        assertApproxEqAbs(
-            strategy.maxWithdraw(),
-            testConfig.defaultAmount,
-            testConfig.depositDelta,
-            "pre pause"
-        );
-
-        vm.prank(owner);
+        vm.prank(address(this));
         strategy.pause();
 
-        assertApproxEqAbs(
-            strategy.maxWithdraw(),
-            testConfig.defaultAmount,
-            testConfig.withdrawDelta,
-            "post pause"
+        assertEq(strategy.maxMint(bob), 0);
+    }
+
+    function test__maxWithdraw() public virtual {
+        prop_maxWithdraw(bob);
+    }
+
+    function test__maxRedeem() public virtual {
+        prop_maxRedeem(bob);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                          PREVIEW VIEWS
+    //////////////////////////////////////////////////////////////*/
+
+    function test__previewDeposit(uint8 fuzzAmount) public virtual {
+        uint256 amount = bound(
+            fuzzAmount,
+            testConfig.minDeposit,
+            testConfig.maxDeposit
         );
+
+        _mintAsset(testConfig.maxDeposit, bob);
+        vm.prank(bob);
+        IERC20(testConfig.asset).approve(
+            address(strategy),
+            testConfig.maxDeposit
+        );
+
+        prop_previewDeposit(bob, bob, amount, testConfig.testId);
+    }
+
+    function test__previewMint(uint8 fuzzAmount) public virtual {
+        uint256 amount = bound(
+            fuzzAmount,
+            testConfig.minDeposit,
+            testConfig.maxDeposit
+        );
+
+        _mintAsset(testConfig.maxDeposit, bob);
+        vm.prank(bob);
+        IERC20(testConfig.asset).approve(
+            address(strategy),
+            testConfig.maxDeposit
+        );
+
+        prop_previewMint(bob, bob, amount, testConfig.testId);
+    }
+
+    function test__previewWithdraw(uint8 fuzzAmount) public virtual {
+        uint256 amount = bound(
+            fuzzAmount,
+            testConfig.minDeposit,
+            testConfig.maxDeposit
+        );
+
+        uint256 reqAssets = strategy.previewMint(
+            strategy.previewWithdraw(amount)
+        ) * 10;
+        _mintAssetAndApproveForStrategy(reqAssets, bob);
+        vm.prank(bob);
+        strategy.deposit(reqAssets, bob);
+
+        prop_previewWithdraw(bob, bob, bob, amount, testConfig.testId);
+    }
+
+    function test__previewRedeem(uint8 fuzzAmount) public virtual {
+        uint256 amount = bound(
+            fuzzAmount,
+            testConfig.minDeposit,
+            testConfig.maxDeposit
+        );
+
+        uint256 reqAssets = strategy.previewMint(amount) * 10;
+        _mintAssetAndApproveForStrategy(reqAssets, bob);
+        vm.prank(bob);
+        strategy.deposit(reqAssets, bob);
+
+        prop_previewRedeem(bob, bob, bob, amount, testConfig.testId);
     }
 
     /*//////////////////////////////////////////////////////////////
                     DEPOSIT/MINT/WITHDRAW/REDEEM
     //////////////////////////////////////////////////////////////*/
 
-    function test__deposit(uint256 fuzzAmount) public virtual {
-        uint len = testConfigStorage.getTestConfigLength();
+    function test__deposit(uint8 fuzzAmount) public virtual {
+        uint len = json.readUint(".length");
         for (uint i; i < len; i++) {
-            if (i > 0) _setUpBaseTest(i);
+            if (i > 0) _setUpBaseTest(i, path);
+
             uint256 amount = bound(
                 fuzzAmount,
                 testConfig.minDeposit,
                 testConfig.maxDeposit
             );
 
-            prop_deposit(bob, amount, testConfig.testId);
+            _mintAssetAndApproveForStrategy(amount, bob);
 
-            prop_deposit(alice, amount, testConfig.testId);
+            prop_deposit(bob, bob, amount, testConfig.testId);
+
+            _increasePricePerShare(testConfig.defaultAmount);
+
+            _mintAssetAndApproveForStrategy(amount, bob);
+            prop_deposit(bob, alice, amount, testConfig.testId);
         }
     }
 
-    function prop_deposit(
-        address caller,
-        uint256 assets,
-        string memory testPreFix
-    ) public virtual {
-        _mintAssetAndApproveForStrategy(assets, caller);
-
-        uint256 oldCallerAsset = IERC20(testConfig.asset).balanceOf(caller);
-        uint256 oldAllowance = IERC20(testConfig.asset).allowance(
-            caller,
-            address(strategy)
-        );
-        uint256 oldTotalAssets = strategy.totalAssets();
-
-        vm.prank(caller);
-        strategy.deposit(assets);
-
-        uint256 newCallerAsset = IERC20(testConfig.asset).balanceOf(caller);
-        uint256 newAllowance = IERC20(testConfig.asset).allowance(
-            caller,
-            address(strategy)
-        );
-        uint256 newTotalAssets = strategy.totalAssets();
-
-        assertApproxEqAbs(
-            newCallerAsset,
-            oldCallerAsset - assets,
-            testConfig.depositDelta,
-            string.concat("balance", testPreFix)
-        ); // NOTE: this may fail if the caller is a contract in which the asset is stored
-        if (oldAllowance != type(uint256).max)
-            assertApproxEqAbs(
-                newAllowance,
-                oldAllowance - assets,
-                testConfig.depositDelta,
-                string.concat("allowance", testPreFix)
-            );
-
-        assertApproxEqAbs(
-            newTotalAssets,
-            oldTotalAssets + assets,
-            testConfig.depositDelta,
-            string.concat("totalAssets", testPreFix)
-        );
+    function testFail__deposit_zero() public {
+        strategy.deposit(0, address(this));
     }
 
-    function testFail__deposit_paused() public virtual {
-        vm.prank(owner);
-        strategy.pause();
+    function test__mint(uint8 fuzzAmount) public virtual {
+        uint len = json.readUint(".length");
+        for (uint i; i < len; i++) {
+            if (i > 0) _setUpBaseTest(i, path);
 
-        _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
-
-        vm.prank(bob);
-        strategy.deposit(testConfig.defaultAmount);
-    }
-
-    // TODO - should we add a buffer here or make depositAmont = amount?
-    function test__withdraw(uint fuzzAmount) public virtual {
-        uint8 len = uint8(testConfigStorage.getTestConfigLength());
-        for (uint8 i; i < len; i++) {
-            if (i > 0) _setUpBaseTest(i);
             uint256 amount = bound(
                 fuzzAmount,
-                testConfig.minWithdraw,
-                testConfig.maxWithdraw
+                testConfig.minDeposit,
+                testConfig.maxDeposit
             );
-            // TODO: improve this so that depositAmount isn't always bigger than withdrawalAmount.
-            // This way we never cover the case where a user wants to withdraw all of thier assets.
-            //
-            // There should be 2 parameters `depositAmount` and `withdrawalAmount`.
-            // Using `vm.assume(depositAmount >= withdrawalAmount)` we can make sure that we always
-            // deposit atleast `withdrawalAmount`.
-            uint256 depositAmount = amount * 2;
 
-            _mintAssetAndApproveForStrategy(depositAmount, bob);
-            vm.prank(bob);
-            strategy.deposit(depositAmount);
+            _mintAssetAndApproveForStrategy(strategy.previewMint(amount), bob);
 
-            prop_withdraw(bob, alice, amount, testConfig.testId);
+            prop_mint(bob, bob, amount, testConfig.testId);
 
-            _mintAssetAndApproveForStrategy(depositAmount, alice);
-            vm.prank(alice);
-            strategy.deposit(depositAmount);
+            _increasePricePerShare(testConfig.defaultAmount);
 
-            prop_withdraw(alice, alice, amount, testConfig.testId);
+            _mintAssetAndApproveForStrategy(strategy.previewMint(amount), bob);
+
+            prop_mint(bob, alice, amount, testConfig.testId);
         }
     }
 
-    function prop_withdraw(
-        address caller,
-        address receiver,
-        uint256 assets,
-        string memory testPreFix
-    ) public virtual {
-        uint256 oldReceiverAsset = IERC20(testConfig.asset).balanceOf(receiver);
-        uint256 oldTotalAssets = strategy.totalAssets();
+    function testFail__mint_zero() public {
+        strategy.mint(0, address(this));
+    }
 
-        vm.prank(caller);
-        strategy.withdraw(assets, receiver);
+    function test__withdraw(uint8 fuzzAmount) public virtual {
+        uint len = json.readUint(".length");
+        for (uint i; i < len; i++) {
+            if (i > 0) _setUpBaseTest(i, path);
 
-        uint256 newReceiverAsset = IERC20(testConfig.asset).balanceOf(receiver);
-        uint256 newTotalAssets = strategy.totalAssets();
+            uint256 amount = bound(
+                fuzzAmount,
+                testConfig.minDeposit,
+                testConfig.maxDeposit
+            );
 
-        assertApproxEqAbs(
-            newReceiverAsset,
-            oldReceiverAsset + assets,
-            testConfig.withdrawDelta,
-            string.concat("balance", testPreFix)
-        ); // NOTE: this may fail if the receiver is a contract in which the asset is stored
-        assertApproxEqAbs(
-            newTotalAssets,
-            oldTotalAssets - assets,
-            testConfig.withdrawDelta,
-            string.concat("totalAssets", testPreFix)
+            uint256 reqAssets = strategy.previewMint(
+                strategy.previewWithdraw(amount)
+            );
+            _mintAssetAndApproveForStrategy(reqAssets, bob);
+            vm.prank(bob);
+            strategy.deposit(reqAssets, bob);
+
+            prop_withdraw(
+                bob,
+                bob,
+                strategy.maxWithdraw(bob),
+                testConfig.testId
+            );
+
+            _mintAssetAndApproveForStrategy(reqAssets, bob);
+            vm.prank(bob);
+            strategy.deposit(reqAssets, bob);
+
+            _increasePricePerShare(testConfig.defaultAmount);
+
+            vm.prank(bob);
+            strategy.approve(alice, type(uint256).max);
+
+            prop_withdraw(
+                alice,
+                bob,
+                strategy.maxWithdraw(bob),
+                testConfig.testId
+            );
+        }
+    }
+
+    function testFail__withdraw_zero() public {
+        strategy.withdraw(0, address(this), address(this));
+    }
+
+    function test__redeem(uint8 fuzzAmount) public virtual {
+        uint len = json.readUint(".length");
+        for (uint i; i < len; i++) {
+            if (i > 0) _setUpBaseTest(i, path);
+
+            uint256 amount = bound(
+                fuzzAmount,
+                testConfig.minDeposit,
+                testConfig.maxDeposit
+            );
+
+            uint256 reqAssets = strategy.previewMint(amount);
+            _mintAssetAndApproveForStrategy(reqAssets, bob);
+
+            vm.prank(bob);
+            strategy.deposit(reqAssets, bob);
+            prop_redeem(bob, bob, strategy.maxRedeem(bob), testConfig.testId);
+
+            _mintAssetAndApproveForStrategy(reqAssets, bob);
+            vm.prank(bob);
+            strategy.deposit(reqAssets, bob);
+
+            _increasePricePerShare(testConfig.defaultAmount);
+
+            vm.prank(bob);
+            strategy.approve(alice, type(uint256).max);
+            prop_redeem(alice, bob, strategy.maxRedeem(bob), testConfig.testId);
+        }
+    }
+
+    function testFail__redeem_zero() public {
+        strategy.redeem(0, address(this), address(this));
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                          ROUNDTRIP TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test__RT_deposit_redeem() public virtual {
+        _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
+
+        vm.startPrank(bob);
+        uint256 shares = strategy.deposit(testConfig.defaultAmount, bob);
+        uint256 assets = strategy.redeem(strategy.maxRedeem(bob), bob, bob);
+        vm.stopPrank();
+
+        // Pass the test if maxRedeem is smaller than deposit since round trips are impossible
+        if (strategy.maxRedeem(bob) == testConfig.defaultAmount) {
+            assertLe(assets, testConfig.defaultAmount, testConfig.testId);
+        }
+    }
+
+    function test__RT_deposit_withdraw() public virtual {
+        _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
+
+        vm.startPrank(bob);
+        uint256 shares1 = strategy.deposit(testConfig.defaultAmount, bob);
+        uint256 shares2 = strategy.withdraw(
+            strategy.maxWithdraw(bob),
+            bob,
+            bob
         );
+        vm.stopPrank();
+
+        // Pass the test if maxWithdraw is smaller than deposit since round trips are impossible
+        if (strategy.maxWithdraw(bob) == testConfig.defaultAmount) {
+            assertGe(shares2, shares1, testConfig.testId);
+        }
     }
 
-    // TODO - should we add a buffer here or make depositAmont = amount?
-    function test__withdraw_while_paused() public virtual {
-        uint256 depositAmount = testConfig.defaultAmount * 2;
-        _mintAssetAndApproveForStrategy(depositAmount, bob);
+    function test__RT_mint_withdraw() public virtual {
+        _mintAssetAndApproveForStrategy(
+            strategy.previewMint(testConfig.minDeposit),
+            bob
+        );
 
-        vm.prank(bob);
-        strategy.deposit(depositAmount);
+        vm.startPrank(bob);
+        uint256 assets = strategy.mint(testConfig.minDeposit, bob);
+        uint256 shares = strategy.withdraw(strategy.maxWithdraw(bob), bob, bob);
+        vm.stopPrank();
 
-        vm.prank(owner);
-        strategy.pause();
-
-        prop_withdraw(bob, alice, strategy.maxWithdraw(), testConfig.testId);
+        if (strategy.maxWithdraw(bob) == assets) {
+            assertGe(shares, testConfig.minDeposit, testConfig.testId);
+        }
     }
 
-    // TODO - should we add a buffer here or make depositAmont = amount?
-    function testFail__withdraw_nonVault() public virtual {
-        uint256 depositAmount = testConfig.defaultAmount * 2;
-        _mintAssetAndApproveForStrategy(depositAmount, bob);
+    function test__RT_mint_redeem() public virtual {
+        _mintAssetAndApproveForStrategy(
+            strategy.previewMint(testConfig.minDeposit),
+            bob
+        );
 
-        vm.prank(bob);
-        strategy.deposit(depositAmount);
+        vm.startPrank(bob);
+        uint256 assets1 = strategy.mint(testConfig.minDeposit, bob);
+        uint256 assets2 = strategy.redeem(strategy.maxRedeem(bob), bob, bob);
+        vm.stopPrank();
 
-        vm.prank(owner);
-        strategy.withdraw(testConfig.defaultAmount, owner);
+        if (strategy.maxRedeem(bob) == testConfig.minDeposit) {
+            assertLe(assets2, assets1, testConfig.testId);
+        }
     }
+
+    /*//////////////////////////////////////////////////////////////
+                        PERFORMANCE FEE
+    //////////////////////////////////////////////////////////////*/
+
+    event PerformanceFeeChanged(uint256 oldFee, uint256 newFee);
+
+    function test__setPerformanceFee() public virtual {
+        vm.expectEmit(false, false, false, true, address(strategy));
+        emit PerformanceFeeChanged(0, 1e16);
+        strategy.setPerformanceFee(1e16);
+
+        assertEq(strategy.performanceFee(), 1e16);
+    }
+
+    function testFail__setPerformanceFee_nonOwner() public virtual {
+        vm.prank(alice);
+        strategy.setPerformanceFee(1e16);
+    }
+
+    function testFail__setPerformanceFee_invalid_fee() public virtual {
+        strategy.setPerformanceFee(3e17);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            HARVEST
+    //////////////////////////////////////////////////////////////*/
+
+    function test__harvest() public virtual {}
 
     /*//////////////////////////////////////////////////////////////
                             PAUSING
@@ -317,11 +480,11 @@ abstract contract BaseStrategyTest is Test {
         _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
 
         vm.prank(bob);
-        strategy.deposit(testConfig.defaultAmount);
+        strategy.deposit(testConfig.defaultAmount, bob);
 
         uint256 oldTotalAssets = strategy.totalAssets();
 
-        vm.prank(owner);
+        vm.prank(address(this));
         strategy.pause();
 
         // We simply withdraw into the strategy
@@ -333,7 +496,7 @@ abstract contract BaseStrategyTest is Test {
             "totalAssets"
         );
         assertApproxEqAbs(
-            testConfig.asset.balanceOf(address(strategy)),
+            IERC20(testConfig.asset).balanceOf(address(strategy)),
             oldTotalAssets,
             testConfig.withdrawDelta,
             "asset balance"
@@ -349,14 +512,14 @@ abstract contract BaseStrategyTest is Test {
         _mintAssetAndApproveForStrategy(testConfig.defaultAmount * 3, bob);
 
         vm.prank(bob);
-        strategy.deposit(testConfig.defaultAmount * 3);
+        strategy.deposit(testConfig.defaultAmount * 3, bob);
 
         uint256 oldTotalAssets = strategy.totalAssets();
 
-        vm.prank(owner);
+        vm.prank(address(this));
         strategy.pause();
 
-        vm.prank(owner);
+        vm.prank(address(this));
         strategy.unpause();
 
         uint256 delta = testConfig.withdrawDelta > testConfig.depositDelta
@@ -372,7 +535,7 @@ abstract contract BaseStrategyTest is Test {
             "totalAssets"
         );
         assertApproxEqAbs(
-            testConfig.asset.balanceOf(address(strategy)),
+            IERC20(testConfig.asset).balanceOf(address(strategy)),
             0,
             delta,
             "asset balance"
@@ -380,7 +543,6 @@ abstract contract BaseStrategyTest is Test {
     }
 
     function testFail__unpause_nonOwner() public virtual {
-        vm.prank(owner);
         strategy.pause();
 
         vm.prank(alice);
@@ -388,9 +550,41 @@ abstract contract BaseStrategyTest is Test {
     }
 
     /*//////////////////////////////////////////////////////////////
-                              CLAIM
+                              PERMIT
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev OPTIONAL -- Implement this if the strategy utilizes `claim()`
-    function test__claim() public virtual {}
+    bytes32 constant PERMIT_TYPEHASH =
+        keccak256(
+            "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
+        );
+
+    function test__permit() public {
+        uint256 privateKey = 0xBEEF;
+        address owner = vm.addr(privateKey);
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            privateKey,
+            keccak256(
+                abi.encodePacked(
+                    "\x19\x01",
+                    strategy.DOMAIN_SEPARATOR(),
+                    keccak256(
+                        abi.encode(
+                            PERMIT_TYPEHASH,
+                            owner,
+                            address(0xCAFE),
+                            1e18,
+                            0,
+                            block.timestamp
+                        )
+                    )
+                )
+            )
+        );
+
+        strategy.permit(owner, address(0xCAFE), 1e18, block.timestamp, v, r, s);
+
+        assertEq(strategy.allowance(owner, address(0xCAFE)), 1e18, "allowance");
+        assertEq(strategy.nonces(owner), 1, "nonce");
+    }
 }

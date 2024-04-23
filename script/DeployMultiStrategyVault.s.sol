@@ -4,14 +4,9 @@ pragma solidity ^0.8.15;
 
 import {Script} from "forge-std/Script.sol";
 import {MultiStrategyVault, IERC4626, IERC20} from "../src/vaults/MultiStrategyVault.sol";
-import {IPermissionRegistry, Permission} from "../src/interfaces/vault/IPermissionRegistry.sol";
-import {VaultController, IAdapter, VaultInitParams, VaultMetadata} from "../src/vault/VaultController.sol";
 
 contract DeployMultiStrategyVault is Script {
     address deployer;
-
-    VaultController controller =
-        VaultController(0x7D51BABA56C2CA79e15eEc9ECc4E92d9c0a7dbeb);
 
     address feeRecipient = address(0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E);
 
@@ -44,17 +39,5 @@ contract DeployMultiStrategyVault is Script {
             );
 
         vm.stopBroadcast();
-    }
-
-    function setPermission(
-        address target,
-        bool endorsed,
-        bool rejected
-    ) public {
-        address[] memory targets = new address[](1);
-        Permission[] memory permissions = new Permission[](1);
-        targets[0] = target;
-        permissions[0] = Permission(endorsed, rejected);
-        controller.setPermissions(targets, permissions);
     }
 }

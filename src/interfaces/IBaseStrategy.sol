@@ -3,10 +3,10 @@
 
 pragma solidity ^0.8.25;
 
-import {IOwned} from "../IOwned.sol";
 import {IERC4626} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
-import {IPermit} from "../IPermit.sol";
-import {IPausable} from "../IPausable.sol";
+import {IOwned} from "./IOwned.sol";
+import {IPermit} from "./IPermit.sol";
+import {IPausable} from "./IPausable.sol";
 
 interface IBaseStrategy is IERC4626, IOwned, IPermit, IPausable {
     function setPerformanceFee(uint256 fee) external;

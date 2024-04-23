@@ -3,13 +3,12 @@
 
 pragma solidity ^0.8.25;
 
-import {ERC4626Upgradeable, IERC20Metadata, ERC20Upgradeable as ERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
+import {ERC4626Upgradeable, IERC20Metadata, ERC20Upgradeable as ERC20, IERC4626, IERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuardUpgradeable} from "openzeppelin-contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {PausableUpgradeable} from "openzeppelin-contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {Math} from "openzeppelin-contracts/utils/math/Math.sol";
 import {OwnedUpgradeable} from "../utils/OwnedUpgradeable.sol";
-import {IERC4626, IERC20} from "../interfaces/vault/IVault.sol";
 
 /**
  * @title   BaseStrategy
@@ -31,7 +30,7 @@ abstract contract BaseStrategy is
     using Math for uint256;
 
     /**
-     * @notice Initialize a new Adapter.
+     * @notice Initialize a new Strategy.
      * @param asset_ The underlying asset used for deposit/withdraw and accounting
      * @param owner_ Owner of the contract. Controls management functions.
      * @param autoHarvest_ Controls if the harvest function gets called on deposit/withdrawal
@@ -174,6 +173,8 @@ abstract contract BaseStrategy is
         uint256 shares
     ) public view virtual returns (uint256) {}
 
+    function rewardTokens() external view virtual returns (address[] memory) {}
+
     /*//////////////////////////////////////////////////////////////
                      DEPOSIT/WITHDRAWAL LIMIT LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -219,6 +220,11 @@ abstract contract BaseStrategy is
     /*//////////////////////////////////////////////////////////////
                             STRATEGY LOGIC
     //////////////////////////////////////////////////////////////*/
+
+    bool public autoHarvest;
+
+    event AutoHarvestToggled(bool oldState, bool newState);
+    event Harvested();
 
     function claim() public virtual returns (bool success) {
         // try auraRewards.getReward() {
@@ -299,7 +305,7 @@ abstract contract BaseStrategy is
 
     /// @notice Pause Deposits and withdraw all funds from the underlying protocol. Caller must be owner.
     function pause() external onlyOwner {
-        _protocolWithdraw(totalAssets(), totalSupply());
+        _protocolWithdraw(totalAssets(), totalSupply(), address(this));
         _pause();
     }
 

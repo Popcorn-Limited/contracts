@@ -97,7 +97,7 @@ contract DeployStrategy is Script {
         minTradeAmounts.push(0);
 
         // Set other values
-        baseAsset = address(0);
+        baseAsset = IERC20(address(0));
         indexIn = uint256(0);
         indexInUserData = uint256(0);
         amountsInLen = uint256(0);
@@ -118,16 +118,16 @@ contract DeployStrategy is Script {
             abi.encode(pid, balVault, auraBooster, balPoolId, underlyings)
         );
 
-        strategy.setHarvestValues(
-            swaps,
-            assets,
-            limits,
-            minTradeAmounts,
-            baseAsset,
-            indexIn,
-            indexInUserData,
-            amountsInLen
-        );
+        // strategy.setHarvestValues(
+        //     swaps,
+        //     assets,
+        //     limits,
+        //     minTradeAmounts,
+        //     baseAsset,
+        //     indexIn,
+        //     indexInUserData,
+        //     amountsInLen
+        // );
 
         vm.stopBroadcast();
     }

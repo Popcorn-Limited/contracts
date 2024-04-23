@@ -36,17 +36,17 @@ abstract contract GearboxLeverage is BaseStrategy {
     error CreditAccountLiquidatable();
 
     /**
-     * @notice Initialize a new Gearbox Passive Pool Adapter.
-     * @param adapterInitData Encoded data for the base adapter initialization.
-     * @param gearboxInitData Encoded data for the Lido adapter initialization.
-     * @dev `_pid` - The poolId for lpToken.
-     * @dev This function is called by the factory contract when deploying a new vault.
+     * @notice Initialize a new Strategy.
+     * @param asset_ The underlying asset used for deposit/withdraw and accounting
+     * @param owner_ Owner of the contract. Controls management functions.
+     * @param autoHarvest_ Controls if the harvest function gets called on deposit/withdrawal
+     * @param strategyInitData_ Encoded data for this specific strategy
      */
     function initialize(
         address asset_,
         address owner_,
         bool autoHarvest_,
-        bytes memory gearboxInitData
+        bytes memory strategyInitData_
     ) external initializer {
         __BaseStrategy_init(asset_, owner_, autoHarvest_);
 
@@ -54,7 +54,7 @@ abstract contract GearboxLeverage is BaseStrategy {
             address _creditFacade,
             address _creditManager,
             address _strategyAdapter
-        ) = abi.decode(gearboxInitData, (address, address, address));
+        ) = abi.decode(strategyInitData_, (address, address, address));
 
         strategyAdapter = _strategyAdapter;
         creditFacade = ICreditFacadeV3(_creditFacade);
@@ -143,7 +143,11 @@ abstract contract GearboxLeverage is BaseStrategy {
         creditFacade.multicall(creditAccount, calls);
     }
 
-    function _protocolWithdraw(uint256 assets, uint256) internal override {
+    function _protocolWithdraw(
+        uint256 assets,
+        uint256,
+        address recipient
+    ) internal override {
         if (_creditAccountIsLiquidatable()) {
             revert CreditAccountLiquidatable();
         }
@@ -153,7 +157,7 @@ abstract contract GearboxLeverage is BaseStrategy {
             target: address(creditFacade),
             callData: abi.encodeCall(
                 ICreditFacadeV3Multicall.withdrawCollateral,
-                (asset(), assets, address(this))
+                (asset(), assets, recipient)
             )
         });
 

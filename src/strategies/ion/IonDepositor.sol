@@ -32,34 +32,34 @@ contract IonDepositor is BaseStrategy {
     error DifferentAssets();
 
     /**
-     * @notice Initialize a new Ion Adapter.
-     * @param adapterInitData Encoded data for the base adapter initialization.
-     * @param ionInitData Encoded data for the base adapter initialization.
-     * @dev This function is called by the factory contract when deploying a new vault.
+     * @notice Initialize a new Strategy.
+     * @param asset_ The underlying asset used for deposit/withdraw and accounting
+     * @param owner_ Owner of the contract. Controls management functions.
+     * @param autoHarvest_ Controls if the harvest function gets called on deposit/withdrawal
+     * @param strategyInitData_ Encoded data for this specific strategy
      */
     function initialize(
         address asset_,
         address owner_,
         bool autoHarvest_,
-        bytes memory ionInitData
+        bytes memory strategyInitData_
     ) external initializer {
-        __BaseStrategy_init(asset_, owner_, autoHarvest_);
+        address _ionPool = abi.decode(strategyInitData_, (address));
 
-        address _asset = asset();
-        address _ionPool = abi.decode(ionInitData, (address));
-
-        if (IIonPool(_ionPool).underlying() != _asset) revert DifferentAssets();
+        if (IIonPool(_ionPool).underlying() != asset_) revert DifferentAssets();
 
         ionPool = IIonPool(_ionPool);
 
+        __BaseStrategy_init(asset_, owner_, autoHarvest_);
+
+        IERC20(asset_).approve(_ionPool, type(uint256).max);
+
         _name = string.concat(
             "VaultCraft IonDepositor ",
-            IERC20Metadata(_asset).name(),
+            IERC20Metadata(asset_).name(),
             " Adapter"
         );
-        _symbol = string.concat("vc-ion-", IERC20Metadata(_asset).symbol());
-
-        IERC20(_asset).approve(_ionPool, type(uint256).max);
+        _symbol = string.concat("vc-ion-", IERC20Metadata(asset_).symbol());
     }
 
     function name()
@@ -103,9 +103,10 @@ contract IonDepositor is BaseStrategy {
     /// @notice Withdraw from lending pool
     function _protocolWithdraw(
         uint256 assets,
-        uint256
+        uint256,
+        address recipient
     ) internal virtual override {
-        ionPool.withdraw(address(this), assets);
+        ionPool.withdraw(recipient, assets);
     }
 
     /*//////////////////////////////////////////////////////////////

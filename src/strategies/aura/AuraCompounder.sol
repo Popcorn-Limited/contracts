@@ -3,9 +3,35 @@
 
 pragma solidity ^0.8.25;
 
-import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math, IStrategy, IAdapter} from "../BaseStrategy.sol";
+import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math} from "../BaseStrategy.sol";
 import {IAuraBooster, IAuraRewards, IAuraStaking} from "./IAura.sol";
-import {IBalancerVault, SwapKind, IAsset, BatchSwapStep, FundManagement, JoinPoolRequest} from "../../../interfaces/external/balancer/IBalancerVault.sol";
+import {IBalancerVault, SwapKind, IAsset, BatchSwapStep, FundManagement, JoinPoolRequest} from "../../interfaces/external/balancer/IBalancerVault.sol";
+
+struct AuraValues {
+    address auraBooster;
+    bytes32 balPoolId;
+    address balVault;
+    uint256 pid;
+    address[] underlyings;
+}
+
+struct HarvestValues {
+    uint256 amountsInLen;
+    address baseAsset;
+    uint256 indexIn;
+    uint256 indexInUserData;
+}
+
+struct TradePath {
+    uint256[] amount;
+    uint256[] assetInIndex;
+    uint256[] assetOutIndex;
+    address[] assets;
+    int256[] limits;
+    uint256 minTradeAmount;
+    bytes32[] poolId;
+    bytes[] userData;
+}
 
 /**
  * @title  Aura Adapter
@@ -22,19 +48,9 @@ contract AuraCompounder is BaseStrategy {
     string internal _name;
     string internal _symbol;
 
-    /// @notice The Aura booster contract
-    IAuraBooster public auraBooster;
+    AuraValues internal auraValues;
 
-    /// @notice The reward contract for Aura gauge
     IAuraRewards public auraRewards;
-
-    /// @notice The pool ID
-    uint256 public pid;
-
-    address internal balVault;
-    bytes32 internal balPoolId;
-
-    address[] internal _rewardToken;
 
     /*//////////////////////////////////////////////////////////////
                             INITIALIZATION
@@ -43,56 +59,46 @@ contract AuraCompounder is BaseStrategy {
     error InvalidAsset();
 
     /**
-     * @notice Initialize a new Aura Adapter.
-     * @param adapterInitData Encoded data for the base adapter initialization.
-     * @param registry `_auraBooster` - The main Aura contract
-     * @param auraInitData aura specific init data
-     * @dev `_pid` - The poolId for lpToken.
-     * @dev This function is called by the factory contract when deploying a new vault.
+     * @notice Initialize a new Strategy.
+     * @param asset_ The underlying asset used for deposit/withdraw and accounting
+     * @param owner_ Owner of the contract. Controls management functions.
+     * @param autoHarvest_ Controls if the harvest function gets called on deposit/withdrawal
+     * @param strategyInitData_ Encoded data for this specific strategy
      */
     function initialize(
         address asset_,
         address owner_,
         bool autoHarvest_,
-        bytes memory auraInitData
+        bytes memory strategyInitData_
     ) external initializer {
+        AuraValues memory auraValues_ = abi.decode(
+            strategyInitData_,
+            (AuraValues)
+        );
+
+        auraValues = auraValues_;
+
+        (address balancerLpToken_, , , address auraRewards_, , ) = IAuraBooster(
+            auraValues_.auraBooster
+        ).poolInfo(auraValues_.pid);
+
+        auraRewards = IAuraRewards(auraRewards_);
+
+        if (balancerLpToken_ != asset_) revert InvalidAsset();
+
         __BaseStrategy_init(asset_, owner_, autoHarvest_);
 
-        (
-            uint256 _pid,
-            address _balVault,
-            address _auraBooster,
-            bytes32 _balPoolId,
-            address[] memory _underlyings
-        ) = abi.decode(
-                auraInitData,
-                (uint256, address, address, bytes32, address[])
-            );
-
-        auraBooster = IAuraBooster(_auraBooster);
-        pid = _pid;
-        balVault = _balVault;
-        balPoolId = _balPoolId;
-        underlyings = _underlyings;
-
-        (address balancerLpToken, , , address _auraRewards, , ) = auraBooster
-            .poolInfo(pid);
-
-        auraRewards = IAuraRewards(_auraRewards);
-
-        if (balancerLpToken != asset()) revert InvalidAsset();
+        IERC20(balancerLpToken_).approve(
+            auraValues_.auraBooster,
+            type(uint256).max
+        );
 
         _name = string.concat(
             "VaultCraft Aura ",
-            IERC20Metadata(asset()).name(),
+            IERC20Metadata(asset_).name(),
             " Adapter"
         );
-        _symbol = string.concat("vcAu-", IERC20Metadata(asset()).symbol());
-
-        IERC20(balancerLpToken).approve(
-            address(auraBooster),
-            type(uint256).max
-        );
+        _symbol = string.concat("vcAu-", IERC20Metadata(asset_).symbol());
     }
 
     function name()
@@ -125,19 +131,28 @@ contract AuraCompounder is BaseStrategy {
 
     /// @notice The token rewarded
     function rewardTokens() external view override returns (address[] memory) {
-        return _rewardToken;
+        return _rewardTokens;
     }
 
     /*//////////////////////////////////////////////////////////////
                           INTERNAL HOOKS LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function _protocolDeposit(uint256 amount, uint256) internal override {
-        auraBooster.deposit(pid, amount, true);
+    function _protocolDeposit(uint256 assets, uint256) internal override {
+        IAuraBooster(auraValues.auraBooster).deposit(
+            auraValues.pid,
+            assets,
+            true
+        );
     }
 
-    function _protocolWithdraw(uint256 amount, uint256) internal override {
-        auraRewards.withdrawAndUnwrap(amount, true);
+    function _protocolWithdraw(
+        uint256 assets,
+        uint256,
+        address recipient
+    ) internal override {
+        auraRewards.withdrawAndUnwrap(assets, true);
+        IERC20(asset()).safeTransfer(recipient, assets);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -160,113 +175,143 @@ contract AuraCompounder is BaseStrategy {
         claim();
 
         // Trade to base asset
-        uint256 len = _rewardToken.length;
-        for (uint256 i = 0; i < len; i++) {
-            uint256 rewardBal = IERC20(_rewardToken[i]).balanceOf(
-                address(this)
-            );
-            if (rewardBal >= minTradeAmounts[i]) {
-                swaps[_rewardToken[i]][0].amount = rewardBal;
-                IBalancerVault(balVault).batchSwap(
-                    SwapKind.GIVEN_IN,
-                    swaps[_rewardToken[i]],
-                    assets[_rewardToken[i]],
-                    FundManagement(
-                        address(this),
-                        false,
-                        payable(address(this)),
-                        false
-                    ),
-                    limits[_rewardToken[i]],
-                    block.timestamp
-                );
-            }
-        }
-        uint256 poolAmount = baseAsset.balanceOf(address(this));
-        if (poolAmount > 0) {
-            uint256[] memory amounts = new uint256[](underlyings.length);
-            amounts[indexIn] = poolAmount;
+        // uint256 len = _rewardTokens.length;
+        // for (uint256 i = 0; i < len; i++) {
+        //     uint256 rewardBal = IERC20(_rewardTokens[i]).balanceOf(
+        //         address(this)
+        //     );
+        //     if (rewardBal >= tradePaths[i].minTradeAmount) {
+        //         tradePaths[i].swaps[0].amount = rewardBal;
 
-            bytes memory userData;
-            if (underlyings.length != amountsInLen) {
-                uint256[] memory amountsIn = new uint256[](amountsInLen);
-                amountsIn[indexInUserData] = poolAmount;
-                userData = abi.encode(1, amountsIn, 0); // Exact In Enum, inAmounts, minOut
-            } else {
-                userData = abi.encode(1, amounts, 0); // Exact In Enum, inAmounts, minOut
-            }
+        //         IAsset[] memory balAssets = new IAsset[](
+        //             tradePaths[i].assets.length
+        //         );
 
-            // Pool base asset
-            IBalancerVault(balVault).joinPool(
-                balPoolId,
-                address(this),
-                address(this),
-                JoinPoolRequest(underlyings, amounts, userData, false)
-            );
+        //         IBalancerVault(auraValues.balVault).batchSwap(
+        //             SwapKind.GIVEN_IN,
+        //             tradePaths[i].swaps,
+        //             balAssets,
+        //             FundManagement(
+        //                 address(this),
+        //                 false,
+        //                 payable(address(this)),
+        //                 false
+        //             ),
+        //             tradePaths[i].limits,
+        //             block.timestamp
+        //         );
+        //     }
+        // }
+        // uint256 poolAmount = IERC20(harvestValues.baseAsset).balanceOf(
+        //     address(this)
+        // );
+        // if (poolAmount > 0) {
+        //     uint256[] memory amounts = new uint256[](
+        //         auraValues.underlyings.length
+        //     );
+        //     amounts[harvestValues.indexIn] = poolAmount;
 
-            // redeposit
-            _protocolDeposit(IERC20(asset()).balanceOf(address(this)), 0);
-        }
+        //     bytes memory userData;
+        //     if (auraValues.underlyings.length != harvestValues.amountsInLen) {
+        //         uint256[] memory amountsIn = new uint256[](
+        //             harvestValues.amountsInLen
+        //         );
+        //         amountsIn[harvestValues.indexInUserData] = poolAmount;
+        //         userData = abi.encode(1, amountsIn, 0); // Exact In Enum, inAmounts, minOut
+        //     } else {
+        //         userData = abi.encode(1, amounts, 0); // Exact In Enum, inAmounts, minOut
+        //     }
+
+        //     // Pool base asset
+        //     IBalancerVault(auraValues.balVault).joinPool(
+        //         auraValues.balPoolId,
+        //         address(this),
+        //         address(this),
+        //         JoinPoolRequest(
+        //             auraValues.underlyings,
+        //             amounts,
+        //             userData,
+        //             false
+        //         )
+        //     );
+
+        //     // redeposit
+        //     _protocolDeposit(IERC20(asset()).balanceOf(address(this)), 0);
+        // }
 
         emit Harvested();
     }
 
-    mapping(address => BatchSwapStep[]) internal swaps;
-    mapping(address => IAsset[]) internal assets;
-    mapping(address => int256[]) internal limits;
-    uint256[] internal minTradeAmounts;
-    IERC20 internal baseAsset;
-    address[] internal underlyings;
-    uint256 internal indexIn;
-    uint256 internal indexInUserData;
-    uint256 internal amountsInLen;
+    // mapping(address => BatchSwapStep[]) internal swaps;
+    // mapping(address => IAsset[]) internal assets;
+    // mapping(address => int256[]) internal limits;
+    // uint256[] internal minTradeAmounts;
+    // IERC20 internal baseAsset;
+    // uint256 internal indexIn;
+    // uint256 internal indexInUserData;
+    // uint256 internal amountsInLen;
+
+    HarvestValues internal harvestValues;
+    TradePath[] internal tradePaths;
+    address[] internal _rewardTokens;
 
     function setHarvestValues(
-        BatchSwapStep[][] calldata swaps_,
-        IAsset[][] calldata assets_,
-        int256[][] calldata limits_,
-        uint256[] calldata minTradeAmounts_,
-        IERC20 baseAsset_,
-        uint256 indexIn_,
-        uint256 indexInUserData_,
-        uint256 amountsInLen_
+        HarvestValues memory harvestValues_,
+        TradePath[] memory tradePaths_
     ) external onlyOwner {
-        delete _rewardToken;
-        for (uint i; i < assets_.length; ) {
-            _rewardToken.push(address(assets_[i][0]));
-            _setTradeData(swaps_[i], assets_[i], limits_[i]);
-            IERC20(address(assets_[i][0])).approve(balVault, type(uint).max);
+        // Remove old rewardToken
+        for (uint i; i < _rewardTokens.length; ) {
+            IERC20(_rewardTokens[0]).approve(auraValues.balVault, 0);
             unchecked {
                 ++i;
             }
         }
+        delete _rewardTokens;
 
-        if (address(baseAsset) != address(0)) {
-            baseAsset.approve(balVault, 0);
+        // Add new rewardToken
+        // for (uint i; i < tradePaths_.length; ) {
+        //     _rewardTokens.push(tradePaths_[i].assets[0]);
+        //     IERC20(tradePaths_[i].assets[0]).approve(
+        //         auraValues.balVault,
+        //         type(uint).max
+        //     );
+        //     unchecked {
+        //         ++i;
+        //     }
+        // }
+        
+        // Reset old base asset
+        if (harvestValues.baseAsset != address(0)) {
+            IERC20(harvestValues.baseAsset).approve(auraValues.balVault, 0);
         }
-        baseAsset_.approve(balVault, type(uint).max);
+        // approve and set new base asset
+        IERC20(harvestValues_.baseAsset).approve(
+            auraValues.balVault,
+            type(uint).max
+        );
+        harvestValues = harvestValues_;
 
-        minTradeAmounts = minTradeAmounts_;
-        baseAsset = baseAsset_;
-        indexIn = indexIn_;
-        indexInUserData = indexInUserData_;
-        amountsInLen = amountsInLen_;
+        //Set new trade paths
+        delete tradePaths;
+        for (uint i; i < tradePaths_.length; ) {
+            tradePaths.push(tradePaths_[i]);
+        }
     }
 
-    function _setTradeData(
-        BatchSwapStep[] memory swaps_,
-        IAsset[] memory assets_,
-        int256[] memory limits_
-    ) internal {
-        address key = address(assets_[0]);
-        delete swaps[key];
+    // function _setTradeData(
+    //     BatchSwapStep[] memory swaps_,
+    //     IAsset[] memory assets_,
+    //     int256[] memory limits_
+    // ) internal {
+    //     address key = address(assets_[0]);
+    //     delete swaps[key];
 
-        uint256 len = swaps_.length;
-        for (uint256 i; i < len; i++) {
-            swaps[key].push(swaps_[i]);
-        }
+    //     uint256 len = swaps_.length;
+    //     for (uint256 i; i < len; i++) {
+    //         swaps[key].push(swaps_[i]);
+    //     }
 
-        limits[key] = limits_;
-        assets[key] = assets_;
-    }
+    //     limits[key] = limits_;
+    //     assets[key] = assets_;
+    // }
 }
