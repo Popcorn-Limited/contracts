@@ -15,18 +15,25 @@ struct BalancerValues {
     address[] underlyings;
 }
 
-struct HarvestValue {
+struct HarvestValues {
+    uint256 amountsInLen;
     address baseAsset;
     uint256 indexIn;
     uint256 indexInUserData;
-    uint256 amountsInLen;
 }
 
-struct TradePath {
-    BatchSwapStep[] swaps;
+struct HarvestTradePath {
     IAsset[] assets;
     int256[] limits;
     uint256 minTradeAmount;
+    BatchSwapStep[] swaps;
+}
+
+struct TradePath {
+    IAsset[] assets;
+    int256[] limits;
+    uint256 minTradeAmount;
+    bytes swaps;
 }
 
 /**
@@ -44,12 +51,7 @@ contract BalancerCompounder is BaseStrategy {
     string internal _name;
     string internal _symbol;
 
-    IMinter public balMinter;
-    IBalancerVault public balVault;
-    IGauge public gauge;
-
-    address internal _rewardToken;
-    address[] internal _rewardTokens;
+    BalancerValues internal balancerValues;
 
     /*//////////////////////////////////////////////////////////////
                             INITIALIZATION
@@ -71,25 +73,18 @@ contract BalancerCompounder is BaseStrategy {
         bool autoHarvest_,
         bytes memory strategyInitData_
     ) external initializer {
-        (address _gauge, address _balVault, address _balMinter) = abi.decode(
+        BalancerValues memory balancerValues_ = abi.decode(
             strategyInitData_,
-            (address, address, address)
+            (BalancerValues)
         );
 
-        if (IGauge(_gauge).is_killed()) revert Disabled();
+        if (IGauge(balancerValues_.gauge).is_killed()) revert Disabled();
 
-        balMinter = IMinter(_balMinter);
-        balVault = IBalancerVault(_balVault);
-        gauge = IGauge(_gauge);
-
-        address rewardToken_ = balMinter.getBalancerToken();
-        _rewardToken = rewardToken_;
-        _rewardTokens.push(rewardToken_);
+        balancerValues = balancerValues_;
 
         __BaseStrategy_init(asset_, owner_, autoHarvest_);
 
-        IERC20(asset()).approve(_gauge, type(uint256).max);
-        IERC20(_rewardToken).approve(_balVault, type(uint256).max);
+        IERC20(asset_).approve(balancerValues_.gauge, type(uint256).max);
 
         _name = string.concat(
             "VaultCraft BalancerCompounder ",
@@ -122,7 +117,7 @@ contract BalancerCompounder is BaseStrategy {
     //////////////////////////////////////////////////////////////*/
 
     function _totalAssets() internal view override returns (uint256) {
-        return gauge.balanceOf(address(this));
+        return IGauge(balancerValues.gauge).balanceOf(address(this));
     }
 
     /// @notice The token rewarded
@@ -138,7 +133,7 @@ contract BalancerCompounder is BaseStrategy {
         uint256 assets,
         uint256
     ) internal virtual override {
-        gauge.deposit(assets);
+        IGauge(balancerValues.gauge).deposit(assets);
     }
 
     function _protocolWithdraw(
@@ -146,7 +141,7 @@ contract BalancerCompounder is BaseStrategy {
         uint256,
         address recipient
     ) internal virtual override {
-        gauge.withdraw(assets, false);
+        IGauge(balancerValues.gauge).withdraw(assets, false);
         IERC20(asset()).safeTransfer(recipient, assets);
     }
 
@@ -155,69 +150,89 @@ contract BalancerCompounder is BaseStrategy {
     //////////////////////////////////////////////////////////////*/
 
     function claim() public override returns (bool success) {
-        try balMinter.mint(address(gauge)) {
+        // Caching
+        BalancerValues memory balancerValues_ = balancerValues;
+
+        try IMinter(balancerValues_.balMinter).mint(balancerValues_.gauge) {
             success = true;
         } catch {}
     }
 
     /**
      * @notice Execute Strategy and take fees.
-     * @dev Delegatecall to strategy's harvest() function. All necessary data is passed via `strategyConfig`.
-     * @dev Delegatecall is used to in case any logic requires the adapters address as a msg.sender. (e.g. Synthetix staking)
      */
     function harvest() public override takeFees {
         claim();
 
-        HarvestValue memory harvestValue_ = harvestValue;
+        // Caching
+        BalancerValues memory balancerValues_ = balancerValues;
+        address[] memory rewardTokens_ = _rewardTokens;
+        HarvestValues memory harvestValues_ = harvestValues;
 
         // Trade to base asset
-        uint256 rewardBal = IERC20(_rewardToken).balanceOf(address(this));
-        if (rewardBal >= harvestValue_.minTradeAmount) {
-            harvestValue_.swaps[0].amount = rewardBal;
-            balVault.batchSwap(
-                SwapKind.GIVEN_IN,
-                harvestValue_.swaps,
-                harvestValue_.assets,
-                FundManagement(
-                    address(this),
-                    false,
-                    payable(address(this)),
-                    false
-                ),
-                harvestValue_.limits,
-                block.timestamp
+        uint256 len = rewardTokens_.length;
+        for (uint256 i = 0; i < len; i++) {
+            uint256 rewardBal = IERC20(rewardTokens_[i]).balanceOf(
+                address(this)
             );
-        }
 
-        uint256 poolAmount = IERC20(harvestValue_.baseAsset).balanceOf(
+            // More caching
+            TradePath memory tradePath = tradePaths[i];
+            if (rewardBal >= tradePath.minTradeAmount) {
+                // Decode since nested struct[] isnt allowed in storage
+                BatchSwapStep[] memory swaps = abi.decode(
+                    tradePath.swaps,
+                    (BatchSwapStep[])
+                );
+                // Use the actual rewardBal as the amount to sell
+                swaps[0].amount = rewardBal;
+
+                // Swap to base asset
+                IBalancerVault(balancerValues_.balVault).batchSwap(
+                    SwapKind.GIVEN_IN,
+                    swaps,
+                    tradePath.assets,
+                    FundManagement(
+                        address(this),
+                        false,
+                        payable(address(this)),
+                        false
+                    ),
+                    tradePath.limits,
+                    block.timestamp
+                );
+            }
+        }
+        // Get the required Lp Token
+        uint256 poolAmount = IERC20(harvestValues_.baseAsset).balanceOf(
             address(this)
         );
         if (poolAmount > 0) {
             uint256[] memory amounts = new uint256[](
-                harvestValue_.underlyings.length
+                balancerValues_.underlyings.length
             );
-            amounts[harvestValue_.indexIn] = poolAmount;
+            // Use the actual base asset balance to pool.
+            amounts[harvestValues_.indexIn] = poolAmount;
 
+            // Some pools need to be encoded with a different length array than the actual input amount array
             bytes memory userData;
-            if (
-                harvestValue_.underlyings.length != harvestValue_.amountsInLen
-            ) {
+            if (balancerValues_.underlyings.length != harvestValues_.amountsInLen) {
                 uint256[] memory amountsIn = new uint256[](
-                    harvestValue_.amountsInLen
+                    harvestValues_.amountsInLen
                 );
-                amountsIn[harvestValue_.indexIn] = poolAmount;
+                amountsIn[harvestValues_.indexInUserData] = poolAmount;
                 userData = abi.encode(1, amountsIn, 0); // Exact In Enum, inAmounts, minOut
             } else {
                 userData = abi.encode(1, amounts, 0); // Exact In Enum, inAmounts, minOut
             }
 
             // Pool base asset
-            balVault.joinPool(
-                harvestValue_.balPoolId,
+            IBalancerVault(balancerValues_.balVault).joinPool(
+                balancerValues_.balPoolId,
                 address(this),
                 address(this),
                 JoinPoolRequest(
-                    harvestValue_.underlyings,
+                    balancerValues_.underlyings,
                     amounts,
                     userData,
                     false
@@ -231,11 +246,60 @@ contract BalancerCompounder is BaseStrategy {
         emit Harvested();
     }
 
-    HarvestValue internal harvestValue;
+    HarvestValues internal harvestValues;
+    TradePath[] internal tradePaths;
+    address[] internal _rewardTokens;
 
     function setHarvestValues(
-        HarvestValue calldata harvestValue_
-    ) public onlyOwner {
-        harvestValue = harvestValue_;
+        HarvestValues memory harvestValues_,
+        HarvestTradePath[] memory tradePaths_
+    ) external onlyOwner {
+        // Remove old rewardToken
+        for (uint i; i < _rewardTokens.length; ) {
+            IERC20(_rewardTokens[0]).approve(balancerValues.balVault, 0);
+            unchecked {
+                ++i;
+            }
+        }
+        delete _rewardTokens;
+
+        // Add new rewardToken
+        for (uint i; i < tradePaths_.length; ) {
+            _rewardTokens.push(address(tradePaths_[i].assets[0]));
+            IERC20(address(tradePaths_[i].assets[0])).approve(
+                balancerValues.balVault,
+                type(uint).max
+            );
+            unchecked {
+                ++i;
+            }
+        }
+
+        // Reset old base asset
+        if (harvestValues.baseAsset != address(0)) {
+            IERC20(harvestValues.baseAsset).approve(balancerValues.balVault, 0);
+        }
+        // approve and set new base asset
+        IERC20(harvestValues_.baseAsset).approve(
+            balancerValues.balVault,
+            type(uint).max
+        );
+        harvestValues = harvestValues_;
+
+        //Set new trade paths
+        delete tradePaths;
+        for (uint i; i < tradePaths_.length; ) {
+            tradePaths.push(
+                TradePath({
+                    assets: tradePaths_[i].assets,
+                    limits: tradePaths_[i].limits,
+                    minTradeAmount: tradePaths_[i].minTradeAmount,
+                    swaps: abi.encode(tradePaths_[i].swaps)
+                })
+            );
+            unchecked {
+                ++i;
+            }
+        }
     }
 }

@@ -3,16 +3,16 @@
 
 pragma solidity ^0.8.25;
 
-import {AuraCompounder, IERC20, BatchSwapStep, IAsset, AuraValues, HarvestValues, HarvestTradePath, TradePath} from "../../../src/strategies/aura/AuraCompounder.sol";
+import {BalancerCompounder, IERC20, BatchSwapStep, IAsset, BalancerValues, HarvestValues, HarvestTradePath, TradePath} from "../../../src/strategies/balancer/BalancerCompounder.sol";
 import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson} from "../BaseStrategyTest.sol";
 
-contract AuraCompounderTest is BaseStrategyTest {
+contract BalancerCompounderTest is BaseStrategyTest {
     using stdJson for string;
 
     function setUp() public {
         _setUpBaseTest(
             0,
-            "./test/strategies/aura/AuraCompounderTestConfig.json"
+            "./test/strategies/balancer/BalancerCompounderTestConfig.json"
         );
     }
 
@@ -22,21 +22,21 @@ contract AuraCompounderTest is BaseStrategyTest {
         TestConfig memory testConfig_
     ) internal override returns (IBaseStrategy) {
         // Read strategy init values
-        AuraValues memory auraValues_ = abi.decode(
+        BalancerValues memory balancerValues_ = abi.decode(
             json_.parseRaw(
                 string.concat(".configs[", index_, "].specific.init")
             ),
-            (AuraValues)
+            (BalancerValues)
         );
 
         // Deploy Strategy
-        AuraCompounder strategy = new AuraCompounder();
+        BalancerCompounder strategy = new BalancerCompounder();
 
         strategy.initialize(
             testConfig_.asset,
             address(this),
             false,
-            abi.encode(auraValues_)
+            abi.encode(balancerValues_)
         );
 
         // Set Harvest values
@@ -74,7 +74,7 @@ contract AuraCompounderTest is BaseStrategyTest {
         );
 
         // Set harvest values
-        AuraCompounder(strategy).setHarvestValues(harvestValues_, tradePaths_);
+        BalancerCompounder(strategy).setHarvestValues(harvestValues_, tradePaths_);
     }
 
     // function _increasePricePerShare(uint256 amount) internal override {

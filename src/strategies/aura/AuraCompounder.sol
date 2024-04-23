@@ -222,7 +222,7 @@ contract AuraCompounder is BaseStrategy {
         );
         if (poolAmount > 0) {
             uint256[] memory amounts = new uint256[](
-                auraValues.underlyings.length
+                auraValues_.underlyings.length
             );
             // Use the actual base asset balance to pool.
             amounts[harvestValues_.indexIn] = poolAmount;
