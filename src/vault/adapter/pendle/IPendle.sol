@@ -114,6 +114,26 @@ interface IPendleRouter {
         returns (uint256 netTokenOut, uint256 netSyFee, uint256 netSyInterm);
 }
 
+interface IPendleRouterStatic {
+    function removeLiquiditySingleTokenStatic(
+        address market,
+        uint256 netLpToRemove,
+        address tokenOut
+    )
+        external
+        view
+        returns (
+            uint256 netTokenOut,
+            uint256 netSyFee,
+            uint256 priceImpact,
+            uint256 exchangeRateAfter,
+            uint256 netSyOut,
+            uint256 netSyFromBurn,
+            uint256 netPtFromBurn,
+            uint256 netSyFromSwap
+        );
+}
+
 interface IPendleMarket {
     // return pendle tokens of a market
     function readTokens()

@@ -54,14 +54,6 @@ contract PendleWstETHAdapter is PendleAdapter {
             "Only wstETH"
         );
     }
-    
-    function _toAssetRate() internal view override returns (uint256 rate) {
-        rate = super._toAssetRate();
-
-        // apply eth to wsteth ratio
-        uint256 ethRate = IwstETH(asset()).getWstETHByStETH(1 ether);
-        rate = rate.mulDiv(ethRate, 1e18, Math.Rounding.Floor);
-    }
 
     /*//////////////////////////////////////////////////////////////
                             HARVESGT LOGIC

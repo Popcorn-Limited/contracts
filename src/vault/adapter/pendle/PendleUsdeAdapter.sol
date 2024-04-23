@@ -126,11 +126,13 @@ contract PendleUSDeAdapter is PendleAdapter {
 
             // swap USDC for USDe on Curve 
             amount = IERC20(curveSwap.route[0]).balanceOf(address(this));
-            curveRouter.exchange(curveSwap.route, curveSwap.swapParams, amount, 0, curveSwap.pools);
 
-            // get all the base asset and add liquidity
-            amount = IERC20(asset()).balanceOf(address(this));
-            if (amount > 0) {
+            if(amount > 0) {
+                curveRouter.exchange(curveSwap.route, curveSwap.swapParams, amount, 0, curveSwap.pools);
+
+                // get all the base asset and add liquidity
+                amount = IERC20(asset()).balanceOf(address(this));
+
                 _protocolDeposit(amount, 0);
             }
 
