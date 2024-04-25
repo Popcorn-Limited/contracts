@@ -16,7 +16,7 @@ import {ILendingPool, IAToken, IFlashLoanReceiver, IProtocolDataProvider, IPoolA
 /// @notice ERC4626 wrapper for leveraging stETH yield
 /// @dev The strategy takes wstETH and deposits it into a lending protocol (aave).
 /// Then it borrows ETH, swap for wstETH and redeposits it
-contract LeveragedWstETHAdapter is BaseStrategy, IFlashLoanReceiver {
+contract WstETHLooper is BaseStrategy, IFlashLoanReceiver {
     // using FixedPointMathLib for uint256;
     using SafeERC20 for IERC20;
     using Math for uint256;
@@ -100,13 +100,6 @@ contract LeveragedWstETHAdapter is BaseStrategy, IFlashLoanReceiver {
 
         debtToken = IERC20(_variableDebtToken); // variable debt WETH token
 
-        _name = string.concat(
-            "VaultCraft Leveraged ",
-            IERC20Metadata(baseAsset).name(),
-            " Adapter"
-        );
-        _symbol = string.concat("vc-", IERC20Metadata(baseAsset).symbol());
-
         // approve aave router to pull wstETH
         IERC20(baseAsset).approve(address(lendingPool), type(uint256).max);
 
@@ -118,6 +111,13 @@ contract LeveragedWstETHAdapter is BaseStrategy, IFlashLoanReceiver {
 
         // set efficiency mode
         lendingPool.setUserEMode(uint8(1));
+
+        _name = string.concat(
+            "VaultCraft Leveraged ",
+            IERC20Metadata(baseAsset).name(),
+            " Adapter"
+        );
+        _symbol = string.concat("vc-", IERC20Metadata(baseAsset).symbol());
     }
 
     receive() external payable {}
