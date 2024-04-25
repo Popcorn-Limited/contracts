@@ -151,13 +151,8 @@ contract AuraCompounder is BaseStrategy {
         );
     }
 
-    function _protocolWithdraw(
-        uint256 assets,
-        uint256,
-        address recipient
-    ) internal override {
+    function _protocolWithdraw(uint256 assets, uint256) internal override {
         auraRewards.withdrawAndUnwrap(assets, true);
-        IERC20(asset()).safeTransfer(recipient, assets);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -191,7 +186,7 @@ contract AuraCompounder is BaseStrategy {
 
             // More caching
             TradePath memory tradePath = tradePaths[i];
-            if (rewardBal >= tradePath.minTradeAmount) {
+            if (rewardBal > 0 && rewardBal >= tradePath.minTradeAmount) {
                 // Decode since nested struct[] isnt allowed in storage
                 BatchSwapStep[] memory swaps = abi.decode(
                     tradePath.swaps,

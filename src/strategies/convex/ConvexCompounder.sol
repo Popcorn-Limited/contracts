@@ -40,7 +40,7 @@ contract ConvexCompounder is BaseStrategy {
 
     error AssetMismatch();
 
-   /**
+    /**
      * @notice Initialize a new Strategy.
      * @param asset_ The underlying asset used for deposit/withdraw and accounting
      * @param owner_ Owner of the contract. Controls management functions.
@@ -53,12 +53,10 @@ contract ConvexCompounder is BaseStrategy {
         bool autoHarvest_,
         bytes memory strategyInitData_
     ) external initializer {
-        (
-            uint256 _pid,
-            address _curvePool,
-            address _curveLpToken,
-            address _convexBooster
-        ) = abi.decode(strategyInitData_, (uint256, address, address, address));
+        (address _convexBooster, address _curvePool, uint256 _pid) = abi.decode(
+            strategyInitData_,
+            (address, address, uint256)
+        );
 
         (, , , address _convexRewards, , ) = IConvexBooster(_convexBooster)
             .poolInfo(_pid);
@@ -70,19 +68,14 @@ contract ConvexCompounder is BaseStrategy {
 
         __BaseStrategy_init(asset_, owner_, autoHarvest_);
 
-        if (_curveLpToken != asset()) revert AssetMismatch();
+        IERC20(asset_).approve(_convexBooster, type(uint256).max);
 
         _name = string.concat(
             "VaultCraft Convex ",
-            IERC20Metadata(_curveLpToken).name(),
+            IERC20Metadata(asset_).name(),
             " Adapter"
         );
-        _symbol = string.concat(
-            "vcCvx-",
-            IERC20Metadata(_curveLpToken).symbol()
-        );
-
-        IERC20(_curveLpToken).approve(_convexBooster, type(uint256).max);
+        _symbol = string.concat("vcCvx-", IERC20Metadata(asset_).symbol());
     }
 
     function name()
@@ -128,18 +121,13 @@ contract ConvexCompounder is BaseStrategy {
     }
 
     /// @notice Withdraw from Convex convexRewards contract.
-    function _protocolWithdraw(
-        uint256 assets,
-        uint256,
-        address recipient
-    ) internal override {
+    function _protocolWithdraw(uint256 assets, uint256) internal override {
         /**
          * @dev No need to convert as Convex shares are 1:1 with Curve deposits.
          * @param assets Amount of shares to withdraw.
          * @param claim Claim rewards on withdraw?
          */
         convexRewards.withdrawAndUnwrap(assets, false);
-        IERC20(asset()).safeTransfer(recipient, assets);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -165,8 +153,16 @@ contract ConvexCompounder is BaseStrategy {
         for (uint256 i = 0; i < rewLen; i++) {
             address rewardToken = _rewardTokens[i];
             amount = IERC20(rewardToken).balanceOf(address(this));
-            if (amount > minTradeAmounts[i]) {
-                _exchange(router_, swaps[rewardToken], amount);
+
+            if (amount > 0 && amount > minTradeAmounts[i]) {
+                CurveSwap memory swap = swaps[rewardToken];
+                router_.exchange(
+                    swap.route,
+                    swap.swapParams,
+                    amount,
+                    0,
+                    swap.pools
+                );
             }
         }
 
@@ -183,15 +179,6 @@ contract ConvexCompounder is BaseStrategy {
         }
 
         emit Harvested();
-    }
-
-    function _exchange(
-        ICurveRouter router,
-        CurveSwap memory swap,
-        uint256 amount
-    ) internal {
-        if (amount == 0) revert ZeroAmount();
-        router.exchange(swap.route, swap.swapParams, amount, 0, swap.pools);
     }
 
     address[] internal _rewardTokens;

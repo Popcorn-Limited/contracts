@@ -115,12 +115,8 @@ contract AaveV3Depositor is BaseStrategy {
     }
 
     /// @notice Withdraw from lending pool
-    function _protocolWithdraw(
-        uint256 assets,
-        uint256,
-        address recipient
-    ) internal override {
-        lendingPool.withdraw(asset(), assets, recipient);
+    function _protocolWithdraw(uint256 assets, uint256) internal override {
+        lendingPool.withdraw(asset(), assets, address(this));
     }
 
     /*//////////////////////////////////////////////////////////////

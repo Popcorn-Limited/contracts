@@ -124,6 +124,8 @@ abstract contract BaseStrategy is
             _spendAllowance(owner, caller, shares);
         }
 
+        if (!paused()) _protocolWithdraw(assets, shares);
+
         // If _asset is ERC-777, `transfer` can trigger a reentrancy AFTER the transfer happens through the
         // `tokensReceived` hook. On the other hand, the `tokensToSend` hook, that is triggered before the transfer,
         // calls the vault, which is assumed not malicious.
@@ -132,11 +134,7 @@ abstract contract BaseStrategy is
         // shares are burned and after the assets are transferred, which is a valid state.
         _burn(owner, shares);
 
-        if (paused()) {
-            IERC20(asset()).safeTransfer(receiver, assets);
-        } else {
-            _protocolWithdraw(assets, shares, receiver);
-        }
+        IERC20(asset()).safeTransfer(receiver, assets);
 
         if (autoHarvest) harvest();
 
@@ -211,8 +209,7 @@ abstract contract BaseStrategy is
     /// @notice Withdraw from the underlying protocol.
     function _protocolWithdraw(
         uint256 assets,
-        uint256 shares,
-        address recipient
+        uint256 shares
     ) internal virtual {
         // OPTIONAL - convertIntoUnderlyingShares(assets,shares)
     }
@@ -305,7 +302,7 @@ abstract contract BaseStrategy is
 
     /// @notice Pause Deposits and withdraw all funds from the underlying protocol. Caller must be owner.
     function pause() external onlyOwner {
-        _protocolWithdraw(totalAssets(), totalSupply(), address(this));
+        _protocolWithdraw(totalAssets(), totalSupply());
         _pause();
     }
 

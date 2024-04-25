@@ -22,10 +22,10 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy {
 
     address public lpToken;
     IGauge public gauge;
-    int128 internal indexIn;
-    uint256 internal nCoins;
+    int128 public indexIn;
+    uint256 public nCoins;
 
-    uint256 internal discountBps;
+    uint256 public discountBps;
 
     /*//////////////////////////////////////////////////////////////
                             INITIALIZATION
@@ -44,8 +44,6 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy {
         bool autoHarvest_,
         bytes memory strategyInitData_
     ) external initializer {
-        __BaseStrategy_init(asset_, owner_, autoHarvest_);
-
         (address _lpToken, address _gauge, int128 _indexIn) = abi.decode(
             strategyInitData_,
             (address, address, int128)
@@ -56,15 +54,17 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy {
         indexIn = _indexIn;
         nCoins = ICurveLp(_lpToken).N_COINS();
 
+        __BaseStrategy_init(asset_, owner_, autoHarvest_);
+
+        IERC20(_lpToken).approve(_gauge, type(uint256).max);
+        IERC20(asset()).approve(_lpToken, type(uint256).max);
+
         _name = string.concat(
             "VaultCraft CurveGaugeSingleAssetCompounder ",
             IERC20Metadata(asset()).name(),
             " Adapter"
         );
         _symbol = string.concat("vc-sccrv-", IERC20Metadata(asset()).symbol());
-
-        IERC20(_lpToken).approve(_gauge, type(uint256).max);
-        IERC20(asset()).approve(_lpToken, type(uint256).max);
     }
 
     function name()
@@ -120,8 +120,7 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy {
 
     function _protocolWithdraw(
         uint256 assets,
-        uint256 shares,
-        address recipient
+        uint256 shares
     ) internal override {
         uint256 lpWithdraw = shares.mulDiv(
             IERC20(address(gauge)).balanceOf(address(this)),
@@ -132,7 +131,6 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy {
         gauge.withdraw(lpWithdraw);
 
         ICurveLp(lpToken).remove_liquidity_one_coin(lpWithdraw, indexIn, 0);
-        IERC20(asset()).safeTransfer(recipient, assets);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -158,8 +156,16 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy {
         for (uint256 i = 0; i < rewLen; i++) {
             address rewardToken = _rewardTokens[i];
             amount = IERC20(rewardToken).balanceOf(address(this));
-            if (amount > minTradeAmounts[i]) {
-                _exchange(router_, swaps[rewardToken], amount);
+
+            if (amount > 0 && amount > minTradeAmounts[i]) {
+                CurveSwap memory swap = swaps[rewardToken];
+                router_.exchange(
+                    swap.route,
+                    swap.swapParams,
+                    amount,
+                    0,
+                    swap.pools
+                );
             }
         }
 
@@ -167,15 +173,6 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy {
         if (depositAmount > 0) _protocolDeposit(depositAmount, 0);
 
         emit Harvested();
-    }
-
-    function _exchange(
-        ICurveRouter router,
-        CurveSwap memory swap,
-        uint256 amount
-    ) internal {
-        if (amount == 0) revert ZeroAmount();
-        router.exchange(swap.route, swap.swapParams, amount, 0, swap.pools);
     }
 
     address[] internal _rewardTokens;

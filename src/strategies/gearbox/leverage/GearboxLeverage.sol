@@ -143,11 +143,7 @@ abstract contract GearboxLeverage is BaseStrategy {
         creditFacade.multicall(creditAccount, calls);
     }
 
-    function _protocolWithdraw(
-        uint256 assets,
-        uint256,
-        address recipient
-    ) internal override {
+    function _protocolWithdraw(uint256 assets, uint256) internal override {
         if (_creditAccountIsLiquidatable()) {
             revert CreditAccountLiquidatable();
         }
@@ -157,7 +153,7 @@ abstract contract GearboxLeverage is BaseStrategy {
             target: address(creditFacade),
             callData: abi.encodeCall(
                 ICreditFacadeV3Multicall.withdrawCollateral,
-                (asset(), assets, recipient)
+                (asset(), assets, address(this))
             )
         });
 

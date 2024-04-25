@@ -42,8 +42,6 @@ contract CurveGaugeCompounder is BaseStrategy {
         bool autoHarvest_,
         bytes memory strategyInitData_
     ) external initializer {
-        __BaseStrategy_init(asset_, owner_, autoHarvest_);
-
         (address _gauge, address _pool, address _minter) = abi.decode(
             strategyInitData_,
             (address, address, address)
@@ -55,14 +53,16 @@ contract CurveGaugeCompounder is BaseStrategy {
 
         nCoins = pool.N_COINS();
 
+        __BaseStrategy_init(asset_, owner_, autoHarvest_);
+
+        IERC20(asset()).approve(_gauge, type(uint256).max);
+
         _name = string.concat(
             "VaultCraft CurveGaugeCompounder ",
             IERC20Metadata(asset()).name(),
             " Adapter"
         );
         _symbol = string.concat("vc-sccrv-", IERC20Metadata(asset()).symbol());
-
-        IERC20(asset()).approve(_gauge, type(uint256).max);
     }
 
     function name()
@@ -107,13 +107,8 @@ contract CurveGaugeCompounder is BaseStrategy {
         gauge.deposit(assets);
     }
 
-    function _protocolWithdraw(
-        uint256 assets,
-        uint256,
-        address recipient
-    ) internal override {
+    function _protocolWithdraw(uint256 assets, uint256) internal override {
         gauge.withdraw(assets);
-        IERC20(asset()).safeTransfer(recipient, assets);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -141,8 +136,16 @@ contract CurveGaugeCompounder is BaseStrategy {
         for (uint256 i = 0; i < rewLen; i++) {
             address rewardToken = _rewardTokens[i];
             amount = IERC20(rewardToken).balanceOf(address(this));
-            if (amount > minTradeAmounts[i]) {
-                _exchange(router_, swaps[rewardToken], amount);
+
+            if (amount > 0 && amount > minTradeAmounts[i]) {
+                CurveSwap memory swap = swaps[rewardToken];
+                router_.exchange(
+                    swap.route,
+                    swap.swapParams,
+                    amount,
+                    0,
+                    swap.pools
+                );
             }
         }
 
@@ -158,15 +161,6 @@ contract CurveGaugeCompounder is BaseStrategy {
         }
 
         emit Harvested();
-    }
-
-    function _exchange(
-        ICurveRouter router,
-        CurveSwap memory swap,
-        uint256 amount
-    ) internal {
-        if (amount == 0) revert ZeroAmount();
-        router.exchange(swap.route, swap.swapParams, amount, 0, swap.pools);
     }
 
     address[] internal _rewardTokens;

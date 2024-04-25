@@ -231,10 +231,8 @@ contract LeveragedWstETHAdapter is BaseStrategy, IFlashLoanReceiver {
     /// @notice repay part of the vault debt and withdraw wstETH
     function _protocolWithdraw(
         uint256 assets,
-        uint256 shares,
-        address recipient
+        uint256 shares
     ) internal override {
-        // TODO -- use recipient
         (, uint256 currentDebt, uint256 currentCollateral) = _getCurrentLTV();
         uint256 ethAssetsValue = IwstETH(asset()).getStETHByWstETH(assets);
 

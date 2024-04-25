@@ -138,11 +138,9 @@ contract BalancerCompounder is BaseStrategy {
 
     function _protocolWithdraw(
         uint256 assets,
-        uint256,
-        address recipient
+        uint256
     ) internal virtual override {
         IGauge(balancerValues.gauge).withdraw(assets, false);
-        IERC20(asset()).safeTransfer(recipient, assets);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -178,7 +176,7 @@ contract BalancerCompounder is BaseStrategy {
 
             // More caching
             TradePath memory tradePath = tradePaths[i];
-            if (rewardBal >= tradePath.minTradeAmount) {
+            if (rewardBal > 0 && rewardBal >= tradePath.minTradeAmount) {
                 // Decode since nested struct[] isnt allowed in storage
                 BatchSwapStep[] memory swaps = abi.decode(
                     tradePath.swaps,
@@ -216,7 +214,10 @@ contract BalancerCompounder is BaseStrategy {
 
             // Some pools need to be encoded with a different length array than the actual input amount array
             bytes memory userData;
-            if (balancerValues_.underlyings.length != harvestValues_.amountsInLen) {
+            if (
+                balancerValues_.underlyings.length !=
+                harvestValues_.amountsInLen
+            ) {
                 uint256[] memory amountsIn = new uint256[](
                     harvestValues_.amountsInLen
                 );

@@ -103,10 +103,9 @@ contract IonDepositor is BaseStrategy {
     /// @notice Withdraw from lending pool
     function _protocolWithdraw(
         uint256 assets,
-        uint256,
-        address recipient
+        uint256
     ) internal virtual override {
-        ionPool.withdraw(recipient, assets);
+        ionPool.withdraw(address(this), assets);
     }
 
     /*//////////////////////////////////////////////////////////////
