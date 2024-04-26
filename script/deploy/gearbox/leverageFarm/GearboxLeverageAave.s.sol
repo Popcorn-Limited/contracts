@@ -30,13 +30,12 @@ contract DeployStrategy is Script {
 
         // Read strategy init values
         GearboxValues memory gearboxValues = abi.decode(
-                        json.parseRaw(".strategyInit"),
-
+            json.parseRaw(".strategyInit"),
             (GearboxValues)
         );
 
         strategy.initialize(
-             json.readAddress(".baseInit.asset"),
+            json.readAddress(".baseInit.asset"),
             json.readAddress(".baseInit.owner"),
             json.readBool(".baseInit.autoHarvest"),
             abi.encode(

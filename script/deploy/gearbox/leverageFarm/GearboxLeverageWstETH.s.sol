@@ -15,7 +15,7 @@ struct GearboxValues {
     address strategyAdapter;
 }
 
-contract GearboxLeverageFarmWstETHTest is Script {
+contract DeployStrategy is Script {
     using stdJson for string;
     function run() public {
         string memory json = vm.readFile(

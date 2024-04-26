@@ -16,7 +16,7 @@ struct LooperValues {
     uint256 targetLTV;
 }
 
-contract WstETHLooperTest is Script {
+contract DeployStrategy is Script {
     using stdJson for string;
 
     IERC20 wstETH;

@@ -16,7 +16,7 @@ struct GearboxValues {
     address strategyAdapter;
 }
 
-contract GearboxLeverageFarmCurveTest is Script {
+contract DeployStrategy is Script {
     using stdJson for string;
     function run() public {
 

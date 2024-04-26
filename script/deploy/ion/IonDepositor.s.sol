@@ -8,7 +8,7 @@ import {stdJson} from "forge-std/StdJson.sol";
 
 import {IonDepositor, SafeERC20, IERC20} from "../../../src/strategies/ion/IonDepositor.sol";
 
-contract IonDepositorTest is Script {
+contract DeployStrategy is Script {
     using stdJson for string;
 
     function run() public {
