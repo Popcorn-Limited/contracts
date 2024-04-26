@@ -1,0 +1,10 @@
+{
+  "baseInit": {
+    "asset": "",
+    "owner": "",
+    "autoHarvest": false
+  },
+  "strategyInit": {
+    "ionPool": "0x0000000000eaEbd95dAfcA37A39fd09745739b78"
+  }
+}

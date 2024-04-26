@@ -1,0 +1,14 @@
+{
+  "baseInit": {
+    "asset": "",
+    "owner": "",
+    "autoHarvest": false
+  },
+  "strategyInit": {
+    "aaveDataProvider": "0xFc21d6d146E6086B8359705C8b28512a983db0cb",
+    "maxLTV": 850000000000000000,
+    "poolAddressesProvider": "0x02C3eA4e34C0cBd694D2adFa2c690EECbC1793eE",
+    "slippage": 1000000000000000,
+    "targetLTV": 800000000000000000
+  }
+}
