@@ -3,11 +3,11 @@
 // (c) Gearbox Foundation, 2023
 pragma solidity ^0.8.25;
 
-import { MultiCall } from "../../IGearboxV3.sol";
-import { GearboxLeverage } from "../../GearboxLeverage.sol";
+import { MultiCall } from "../IGearboxV3.sol";
+import { GearboxLeverageFarm } from "../GearboxLeverageFarm.sol";
 import { IAsset, IBalancerV2VaultAdapter } from "../IGearboxStrategyAdapter.sol";
 
-contract GearboxLeverage_BalancerV2 is GearboxLeverage {
+contract GearboxLeverageFarmBalancerV2 is GearboxLeverageFarm {
 
     function _gearboxStrategyDeposit(bytes memory data) internal override {
         (

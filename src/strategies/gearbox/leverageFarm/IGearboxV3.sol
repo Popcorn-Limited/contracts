@@ -3,6 +3,11 @@
 
 pragma solidity ^0.8.25;
 
+import {IBaseStrategy} from "../../../interfaces/IBaseStrategy.sol";
+
+interface ILeverageAdapter is IBaseStrategy {
+    function adjustLeverage(uint256 amount, bytes memory data) external;
+}
 
 enum AllowanceAction {
     FORBID,
@@ -395,27 +400,27 @@ interface ICreditManagerV3 {
     ) external view returns (uint256 total, uint256 twv);
 
     function calcDebtAndCollateral(
-        address creditAccount, CollateralCalcTask task
-    )
-    external
-    view
-    returns (CollateralDebtData memory cdd);
+        address creditAccount,
+        CollateralCalcTask task
+    ) external view returns (CollateralDebtData memory cdd);
 
     function calcCreditAccountHealthFactor(
         address creditAccount
     ) external view returns (uint256 hf); // health factory of 1 means liquiditation
 
-    function creditAccountInfo(address creditAccount)
-    external
-    view
-    returns (
-        uint256 debt,
-        uint256 cumulativeIndexLastUpdate,
-        uint128 cumulativeQuotaInterest,
-        uint128 quotaFees,
-        uint256 enabledTokensMask,
-        uint16 flags,
-        uint64 lastDebtUpdate,
-        address borrower
-    );
+    function creditAccountInfo(
+        address creditAccount
+    )
+        external
+        view
+        returns (
+            uint256 debt,
+            uint256 cumulativeIndexLastUpdate,
+            uint128 cumulativeQuotaInterest,
+            uint128 quotaFees,
+            uint256 enabledTokensMask,
+            uint16 flags,
+            uint64 lastDebtUpdate,
+            address borrower
+        );
 }

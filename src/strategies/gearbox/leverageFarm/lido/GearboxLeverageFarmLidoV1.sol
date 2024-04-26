@@ -2,11 +2,11 @@
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023
 pragma solidity ^0.8.25;
-import { MultiCall } from "../../IGearboxV3.sol";
+import { MultiCall } from "../IGearboxV3.sol";
 import { ILidoV1Adapter } from "../IGearboxStrategyAdapter.sol";
-import { GearboxLeverage } from "../../GearboxLeverage.sol";
+import { GearboxLeverageFarm } from "../GearboxLeverageFarm.sol";
 
-contract GearboxLeverage_LidoV1 is GearboxLeverage {
+contract GearboxLeverageFarmLidoV1 is GearboxLeverageFarm {
     function _gearboxStrategyDeposit(bytes memory data) internal override {
         (uint256 amount) = abi.decode(data, (uint256));
 

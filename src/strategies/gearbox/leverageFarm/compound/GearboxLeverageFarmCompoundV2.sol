@@ -2,33 +2,31 @@
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023
 pragma solidity ^0.8.25;
+import { MultiCall } from "../IGearboxV3.sol";
+import { GearboxLeverageFarm } from "../GearboxLeverageFarm.sol";
+import { ICompoundV2_CTokenAdapter } from "../IGearboxStrategyAdapter.sol";
 
-import { MultiCall } from "../../IGearboxV3.sol";
-import { IwstETHV1Adapter } from "../IGearboxStrategyAdapter.sol";
-import { GearboxLeverage } from "../../GearboxLeverage.sol";
+contract GearboxLeverageFarmCompoundV2 is GearboxLeverageFarm {
 
-contract GearboxLeverage_WstETHV1 is GearboxLeverage {
     function _gearboxStrategyDeposit(bytes memory data) internal override {
-        (uint256 amount) = abi.decode(data, (uint256));
+        (uint256 mintAmount) = abi.decode(data, (uint256));
 
         MultiCall[] memory calls = new MultiCall[](1);
         calls[0] = MultiCall({
             target: strategyAdapter,
-            callData: abi.encodeCall(IwstETHV1Adapter.wrap, (amount))
+            callData: abi.encodeCall(ICompoundV2_CTokenAdapter.mint, (mintAmount))
         });
-
         creditFacade.multicall(creditAccount, calls);
     }
 
     function _gearboxStrategyWithdraw(bytes memory data) internal override {
-        (uint256 amount) = abi.decode(data, (uint256));
+        (uint256 redeemTokens) = abi.decode(data, (uint256));
 
         MultiCall[] memory calls = new MultiCall[](1);
         calls[0] = MultiCall({
             target: strategyAdapter,
-            callData: abi.encodeCall(IwstETHV1Adapter.unwrap, (amount))
+            callData: abi.encodeCall(ICompoundV2_CTokenAdapter.redeem, (redeemTokens))
         });
-
         creditFacade.multicall(creditAccount, calls);
     }
 }

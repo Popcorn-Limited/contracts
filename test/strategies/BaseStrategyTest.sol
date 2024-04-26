@@ -383,7 +383,7 @@ abstract contract BaseStrategyTest is PropertyTest {
         _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
 
         vm.startPrank(bob);
-        uint256 shares = strategy.deposit(testConfig.defaultAmount, bob);
+        strategy.deposit(testConfig.defaultAmount, bob);
         uint256 assets = strategy.redeem(strategy.maxRedeem(bob), bob, bob);
         vm.stopPrank();
 

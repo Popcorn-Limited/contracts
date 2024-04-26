@@ -2,32 +2,30 @@
 // Gearbox Protocol. Generalized leverage for DeFi protocols
 // (c) Gearbox Foundation, 2023
 pragma solidity ^0.8.25;
-import { MultiCall } from "../../IGearboxV3.sol";
-import { GearboxLeverage } from "../../GearboxLeverage.sol";
+import { MultiCall } from "../IGearboxV3.sol";
+import { GearboxLeverageFarm } from "../GearboxLeverageFarm.sol";
 
-contract GearboxLeverage_CurveV1 is GearboxLeverage{
-
+contract GearboxLeverageFarmYearnV2 is GearboxLeverageFarm {
     function _gearboxStrategyDeposit(bytes memory data) internal override {
-        (uint256 amount, uint256 i, uint256 minAmount) = abi.decode(data, (uint256, uint256, uint256));
+        (uint256 amount) = abi.decode(data, (uint256));
+
         MultiCall[] memory calls = new MultiCall[](1);
         calls[0] = MultiCall({
             target: strategyAdapter,
-            callData: abi.encodeWithSignature("add_liquidity_one_coin(uint256,uint256,uint256)", amount, i, minAmount)
+            callData: abi.encodeWithSignature("deposit(uint256)", amount)
         });
 
         creditFacade.multicall(creditAccount, calls);
     }
 
     function _gearboxStrategyWithdraw(bytes memory data) internal override {
-        (uint256 token_amount, int128 i, uint256 min_amount) = abi.decode(data, (uint256, int128, uint256));
+        (uint256 maxShares) = abi.decode(data, (uint256));
+
         MultiCall[] memory calls = new MultiCall[](1);
         calls[0] = MultiCall({
             target: strategyAdapter,
-            callData: abi.encodeWithSignature(
-                "remove_liquidity_one_coin(uint256,int128,uint256)", token_amount, i, min_amount
-            )
+            callData: abi.encodeWithSignature("withdraw(uint256)", maxShares)
         });
-
         creditFacade.multicall(creditAccount, calls);
     }
 }

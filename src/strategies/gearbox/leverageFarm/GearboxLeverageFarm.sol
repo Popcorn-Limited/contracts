@@ -13,7 +13,7 @@ import {ICreditFacadeV3, ICreditManagerV3, MultiCall, ICreditFacadeV3Multicall, 
  * An ERC4626 compliant Wrapper for https://github.com/Gearbox-protocol/core-v2/blob/main/contracts/pool/PoolService.sol.
  * Allows wrapping Passive pools.
  */
-abstract contract GearboxLeverage is BaseStrategy {
+abstract contract GearboxLeverageFarm is BaseStrategy {
     using SafeERC20 for IERC20;
 
     string internal _name;
@@ -24,9 +24,6 @@ abstract contract GearboxLeverage is BaseStrategy {
     address public strategyAdapter;
     ICreditFacadeV3 public creditFacade;
     ICreditManagerV3 public creditManager;
-
-    address public constant YEARN_USDC_ADAPTER =
-        0x2fA039b014FF3167472a1DA127212634E7a57564;
 
     /*//////////////////////////////////////////////////////////////
                                 INITIALIZATION
@@ -48,8 +45,6 @@ abstract contract GearboxLeverage is BaseStrategy {
         bool autoHarvest_,
         bytes memory strategyInitData_
     ) external initializer {
-        __BaseStrategy_init(asset_, owner_, autoHarvest_);
-
         (
             address _creditFacade,
             address _creditManager,
@@ -65,16 +60,9 @@ abstract contract GearboxLeverage is BaseStrategy {
             0
         );
 
-        (
-            uint256 debt,
-            uint256 cumulativeIndexLastUpdate,
-            uint128 cumulativeQuotaInterest,
-            uint128 quotaFees,
-            uint256 enabledTokensMask,
-            uint16 flags,
-            uint64 lastDebtUpdate,
-            address borrower
-        ) = creditManager.creditAccountInfo(creditAccount);
+        __BaseStrategy_init(asset_, owner_, autoHarvest_);
+
+        IERC20(asset()).approve(_creditManager, type(uint256).max);
 
         _name = string.concat(
             "VaultCraft GearboxLeverage ",
@@ -82,8 +70,6 @@ abstract contract GearboxLeverage is BaseStrategy {
             " Adapter"
         );
         _symbol = string.concat("vc-gl-", IERC20Metadata(asset()).symbol());
-
-        IERC20(asset()).approve(_creditManager, type(uint256).max);
     }
 
     function name()
@@ -167,6 +153,7 @@ abstract contract GearboxLeverage is BaseStrategy {
     /*//////////////////////////////////////////////////////////////
                           HARVEST LOGIC
     //////////////////////////////////////////////////////////////*/
+    
     function adjustLeverage(
         uint256 amount,
         bytes memory data

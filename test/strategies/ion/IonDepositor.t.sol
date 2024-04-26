@@ -12,11 +12,6 @@ import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson} from "../BaseStrat
 contract IonDepositorTest is BaseStrategyTest {
     using stdJson for string;
 
-    IIonPool public ionPool;
-    IWhitelist public whitelist;
-
-    address public ionOwner;
-
     function setUp() public {
         _setUpBaseTest(0, "./test/strategies/ion/IonDepositorTestConfig.json");
     }

@@ -189,7 +189,7 @@ contract WstETHLooper is BaseStrategy, IFlashLoanReceiver {
 
     // this is triggered after the flash loan is given, ie contract has loaned assets at this point
     function executeOperation(
-        address[] calldata assets,
+        address[] calldata,
         uint256[] calldata amounts,
         uint256[] calldata premiums,
         address initiator,
@@ -229,10 +229,7 @@ contract WstETHLooper is BaseStrategy, IFlashLoanReceiver {
     }
 
     /// @notice repay part of the vault debt and withdraw wstETH
-    function _protocolWithdraw(
-        uint256 assets,
-        uint256 shares
-    ) internal override {
+    function _protocolWithdraw(uint256 assets, uint256) internal override {
         (, uint256 currentDebt, uint256 currentCollateral) = _getCurrentLTV();
         uint256 ethAssetsValue = IwstETH(asset()).getStETHByWstETH(assets);
 
@@ -384,8 +381,8 @@ contract WstETHLooper is BaseStrategy, IFlashLoanReceiver {
     function _swapToWETH(
         uint256 amount,
         uint256 minAmount,
-        address asset,
-        bool isFullWithdraw
+        address,
+        bool
     ) internal returns (uint256 amountWETHReceived) {
         amountWETHReceived = StableSwapSTETH.exchange(
             STETHID,
