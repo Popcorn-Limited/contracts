@@ -2,7 +2,7 @@
   "scripts": {
     "fees:move": "forge script ./script/MoveFees.s.sol --rpc-url https://eth-mainnet.g.alchemy.com/v2/KsuP431uPWKR3KFb-K_0MT1jcwpUnjAg --broadcast",
     "allocateFunds": "forge script ./script/AllocateFunds.s.sol --rpc-url https://arb-mainnet.g.alchemy.com/v2/KsuP431uPWKR3KFb-K_0MT1jcwpUnjAg --broadcast",
-    "deploy:vault": "forge script ./script/DeployVault.s.sol --rpc-url https://eth-mainnet.g.alchemy.com/v2/KsuP431uPWKR3KFb-K_0MT1jcwpUnjAg --broadcast",
+    "deploy:vault": "forge script ./script/deploy/DeployMultiStrategyVault.s.sol --rpc-url https://eth-mainnet.g.alchemy.com/v2/KsuP431uPWKR3KFb-K_0MT1jcwpUnjAg --broadcast",
     "deploy:AaveV3Depositor": "forge script ./script/deploy/aave/AaveV3Depositor.s.sol:DeployStrategy --rpc-url https://eth-mainnet.g.alchemy.com/v2/KsuP431uPWKR3KFb-K_0MT1jcwpUnjAg --broadcast",
     "deploy:AuraCompounder": "forge script ./script/deploy/aura/AuraCompounder.s.sol:DeployStrategy --rpc-url https://eth-mainnet.g.alchemy.com/v2/KsuP431uPWKR3KFb-K_0MT1jcwpUnjAg --broadcast",
     "deploy:BalancerCompounder": "forge script ./script/deploy/balancer/BalancerCompounder.s.sol:DeployStrategy --rpc-url https://eth-mainnet.g.alchemy.com/v2/KsuP431uPWKR3KFb-K_0MT1jcwpUnjAg --broadcast",
