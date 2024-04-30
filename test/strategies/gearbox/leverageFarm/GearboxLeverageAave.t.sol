@@ -78,7 +78,7 @@ contract GearboxLeverageFarmAaveTest is BaseStrategyTest {
         strategy.deposit(testConfig.defaultAmount, bob);
 
         ILeverageAdapter(address(strategy)).adjustLeverage(
-            1,
+            testConfig.defaultAmount,
             abi.encode(testConfig.asset, testConfig.defaultAmount)
         );
     }

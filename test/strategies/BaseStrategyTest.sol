@@ -80,13 +80,25 @@ abstract contract BaseStrategyTest is PropertyTest {
     ) internal virtual returns (IBaseStrategy);
 
     function _mintAsset(uint256 amount, address receiver) internal virtual {
-        deal(testConfig.asset, receiver, amount);
+        // USDC on mainnet cant be dealt (find(StdStorage): Slot(s) not found) therefore we transfer from a whale
+        if (
+            block.chainid == 1 &&
+            testConfig.asset == 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48
+        ) {
+            vm.prank(0x4B16c5dE96EB2117bBE5fd171E4d203624B014aa);
+            IERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48).transfer(
+                receiver,
+                amount
+            );
+        } else {
+            deal(testConfig.asset, receiver, amount);
+        }
     }
 
     function _mintAssetAndApproveForStrategy(
         uint256 amount,
         address receiver
-    ) internal {
+    ) internal virtual {
         _mintAsset(amount, receiver);
         vm.prank(receiver);
         IERC20(testConfig.asset).approve(address(strategy), amount);

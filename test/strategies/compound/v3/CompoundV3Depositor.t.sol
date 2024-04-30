@@ -6,7 +6,7 @@ pragma solidity ^0.8.25;
 import {CompoundV3Depositor, IERC20} from "../../../../src/strategies/compound/v3/CompoundV3Depositor.sol";
 import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson} from "../../BaseStrategyTest.sol";
 
-contract AaveV3DepositorTest is BaseStrategyTest {
+contract CompoundV3DepositorTest is BaseStrategyTest {
     using stdJson for string;
 
     function setUp() public {
@@ -41,10 +41,6 @@ contract AaveV3DepositorTest is BaseStrategyTest {
         address cToken = address(
             CompoundV3Depositor(address(strategy)).cToken()
         );
-        deal(
-            testConfig.asset,
-            cToken,
-            IERC20(testConfig.asset).balanceOf(cToken) + amount
-        );
+        _mintAsset(IERC20(testConfig.asset).balanceOf(cToken) + amount, cToken);
     }
 }

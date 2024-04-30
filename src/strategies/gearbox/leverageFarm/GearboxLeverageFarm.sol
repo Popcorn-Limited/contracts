@@ -153,7 +153,7 @@ abstract contract GearboxLeverageFarm is BaseStrategy {
     /*//////////////////////////////////////////////////////////////
                           HARVEST LOGIC
     //////////////////////////////////////////////////////////////*/
-    
+
     function adjustLeverage(
         uint256 amount,
         bytes memory data
@@ -162,15 +162,20 @@ abstract contract GearboxLeverageFarm is BaseStrategy {
             uint256 currentLeverageRatio,
             CollateralDebtData memory collateralDebtData
         ) = _calculateLeverageRatio();
+
         uint256 currentCollateral = collateralDebtData.totalValue;
         uint256 currentDebt = collateralDebtData.debt;
+        uint256 targetLeverageRatio_ = targetLeverageRatio;
 
-        if (currentLeverageRatio > targetLeverageRatio) {
+        if (currentLeverageRatio > targetLeverageRatio_) {
             if (
+                currentDebt > amount &&
+                currentCollateral > amount &&
                 Math.ceilDiv(
                     (currentDebt - amount),
                     (currentCollateral - amount)
-                ) < targetLeverageRatio
+                ) <
+                targetLeverageRatio_
             ) {
                 _gearboxStrategyWithdraw(data);
                 _reduceLeverage(amount);
@@ -199,10 +204,12 @@ abstract contract GearboxLeverageFarm is BaseStrategy {
     {
         CollateralDebtData memory collateralDebtData = _getCreditAccountData();
         return (
-            Math.ceilDiv(
-                collateralDebtData.debt,
-                collateralDebtData.totalValue
-            ),
+            collateralDebtData.totalValue == 0
+                ? 0
+                : Math.ceilDiv(
+                    collateralDebtData.debt,
+                    collateralDebtData.totalValue
+                ),
             collateralDebtData
         );
     }

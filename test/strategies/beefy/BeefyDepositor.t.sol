@@ -6,7 +6,7 @@ pragma solidity ^0.8.25;
 import {BeefyDepositor, IERC20} from "../../../src/strategies/beefy/BeefyDepositor.sol";
 import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson} from "../BaseStrategyTest.sol";
 
-contract AaveV3DepositorTest is BaseStrategyTest {
+contract BeefyDepositorTest is BaseStrategyTest {
     using stdJson for string;
 
     function setUp() public {
