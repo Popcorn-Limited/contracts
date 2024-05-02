@@ -11,6 +11,15 @@ import {IWETH} from "../../interfaces/external/IWETH.sol";
 import {ICurveMetapool} from "../../interfaces/external/curve/ICurveMetapool.sol";
 import {ILendingPool, IAToken, IFlashLoanReceiver, IProtocolDataProvider, IPoolAddressesProvider} from "../aave/aaveV3/IAaveV3.sol";
 
+struct LooperInitValues {
+    address aaveDataProvider;
+    uint256 maxLTV;
+    address poolAddressesProvider;
+    uint256 slippage;
+    uint256 targetLTV;
+    address variableDebtToken;
+}
+
 /// @title Leveraged wstETH yield adapter
 /// @author Andrea Di Nenno
 /// @notice ERC4626 wrapper for leveraging stETH yield
@@ -65,43 +74,32 @@ contract WstETHLooper is BaseStrategy, IFlashLoanReceiver {
         bool autoHarvest_,
         bytes memory strategyInitData_
     ) public initializer {
-        __BaseStrategy_init(asset_, owner_, autoHarvest_);
+        LooperInitValues memory initValues = abi.decode(
+            strategyInitData_,
+            (LooperInitValues)
+        );
 
-        (
-            address _poolAddressesProvider,
-            address _aaveDataProvider,
-            uint256 _slippage,
-            uint256 _targetLTV,
-            uint256 _maxLTV
-        ) = abi.decode(
-                strategyInitData_,
-                (address, address, uint256, uint256, uint256)
-            );
+        targetLTV = initValues.targetLTV;
+        maxLTV = initValues.maxLTV;
 
-        address baseAsset = asset();
-
-        targetLTV = _targetLTV;
-        maxLTV = _maxLTV;
-
-        slippage = _slippage;
+        slippage = initValues.slippage;
 
         // retrieve and set wstETH aToken, lending pool
-        (address _aToken, , ) = IProtocolDataProvider(_aaveDataProvider)
-            .getReserveTokensAddresses(baseAsset);
+        (address _aToken, , ) = IProtocolDataProvider(
+            initValues.aaveDataProvider
+        ).getReserveTokensAddresses(asset_);
 
         interestToken = IERC20(_aToken);
         lendingPool = ILendingPool(IAToken(_aToken).POOL());
-        poolAddressesProvider = IPoolAddressesProvider(_poolAddressesProvider);
+        poolAddressesProvider = IPoolAddressesProvider(
+            initValues.poolAddressesProvider
+        );
+        debtToken = IERC20(initValues.variableDebtToken); // variable debt WETH token
 
-        // retrieve and set WETH variable debt token
-        (, , address _variableDebtToken) = IProtocolDataProvider(
-            _aaveDataProvider
-        ).getReserveTokensAddresses(address(weth));
-
-        debtToken = IERC20(_variableDebtToken); // variable debt WETH token
+        __BaseStrategy_init(asset_, owner_, autoHarvest_);
 
         // approve aave router to pull wstETH
-        IERC20(baseAsset).approve(address(lendingPool), type(uint256).max);
+        IERC20(asset_).approve(address(lendingPool), type(uint256).max);
 
         // approve aave pool to pull WETH as part of a flash loan
         IERC20(address(weth)).approve(address(lendingPool), type(uint256).max);
@@ -114,10 +112,10 @@ contract WstETHLooper is BaseStrategy, IFlashLoanReceiver {
 
         _name = string.concat(
             "VaultCraft Leveraged ",
-            IERC20Metadata(baseAsset).name(),
+            IERC20Metadata(asset_).name(),
             " Adapter"
         );
-        _symbol = string.concat("vc-", IERC20Metadata(baseAsset).symbol());
+        _symbol = string.concat("vc-", IERC20Metadata(asset_).symbol());
     }
 
     receive() external payable {}

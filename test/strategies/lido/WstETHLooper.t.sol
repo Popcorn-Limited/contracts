@@ -3,16 +3,8 @@
 
 pragma solidity ^0.8.25;
 
-import {WstETHLooper, IERC20, IwstETH, ILendingPool} from "../../../src/strategies/lido/WstETHLooper.sol";
+import {WstETHLooper, LooperInitValues, IERC20, IwstETH, ILendingPool} from "../../../src/strategies/lido/WstETHLooper.sol";
 import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson, Math} from "../BaseStrategyTest.sol";
-
-struct LooperValues {
-    address aaveDataProvider;
-    uint256 maxLTV;
-    address poolAddressProvider;
-    uint256 slippage;
-    uint256 targetLTV;
-}
 
 contract WstETHLooperTest is BaseStrategyTest {
     using stdJson for string;
@@ -31,11 +23,11 @@ contract WstETHLooperTest is BaseStrategyTest {
         TestConfig memory testConfig_
     ) internal override returns (IBaseStrategy) {
         // Read strategy init values
-        LooperValues memory looperValues = abi.decode(
+        LooperInitValues memory looperInitValues = abi.decode(
             json_.parseRaw(
                 string.concat(".configs[", index_, "].specific.init")
             ),
-            (LooperValues)
+            (LooperInitValues)
         );
 
         // Deploy Strategy
@@ -45,13 +37,7 @@ contract WstETHLooperTest is BaseStrategyTest {
             testConfig_.asset,
             address(this),
             false,
-            abi.encode(
-                looperValues.poolAddressProvider,
-                looperValues.aaveDataProvider,
-                looperValues.slippage,
-                looperValues.targetLTV,
-                looperValues.maxLTV
-            )
+            abi.encode(looperInitValues)
         );
 
         wstETH = IERC20(testConfig_.asset);
