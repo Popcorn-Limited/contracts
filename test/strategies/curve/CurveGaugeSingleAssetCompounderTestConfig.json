@@ -6,14 +6,13 @@
         "asset": "0x17FC002b466eEc40DaE837Fc4bE5c67993ddBd6F",
         "blockNumber": 176205000,
         "defaultAmount": 1000000000000000000,
-        "depositDelta": 0,
+        "delta": 10,
         "maxDeposit": 1000000000000000000000,
         "maxWithdraw": 1000000000000000000000,
         "minDeposit": 1000000000000000,
         "minWithdraw": 1000000000000000,
         "network": "arbitrum",
-        "testId": "CurveGaugeSingleAssetCompounder",
-        "withdrawDelta": 0
+        "testId": "CurveGaugeSingleAssetCompounder"
       },
       "specific": {
         "init": {

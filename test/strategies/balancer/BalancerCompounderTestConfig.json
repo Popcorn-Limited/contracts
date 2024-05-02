@@ -6,14 +6,13 @@
         "asset": "0xE7e2c68d3b13d905BBb636709cF4DfD21076b9D2",
         "blockNumber": 0,
         "defaultAmount": 1000000000000000000,
-        "depositDelta": 0,
+        "delta": 10,
         "maxDeposit": 1000000000000000000000,
         "maxWithdraw": 1000000000000000000000,
         "minDeposit": 1000000000000000,
         "minWithdraw": 1000000000000000,
         "network": "mainnet",
-        "testId": "BalancerCompounder",
-        "withdrawDelta": 0
+        "testId": "BalancerCompounder"
       },
       "specific": {
         "init": {

@@ -10,14 +10,13 @@ struct TestConfig {
     address asset;
     uint256 blockNumber;
     uint256 defaultAmount;
-    uint256 depositDelta; // TODO -- should we add deposit / withdraw delta?
+    uint256 delta;
     uint256 maxDeposit;
     uint256 maxWithdraw;
     uint256 minDeposit;
     uint256 minWithdraw;
     string network;
     string testId;
-    uint256 withdrawDelta; // TODO -- should we add deposit / withdraw delta?
 }
 
 contract PropertyTest is Test {

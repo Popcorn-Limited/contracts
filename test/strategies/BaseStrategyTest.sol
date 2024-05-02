@@ -58,7 +58,7 @@ abstract contract BaseStrategyTest is PropertyTest {
         // Setup PropertyTest
         _vault_ = address(strategy);
         _asset_ = testConfig.asset;
-        _delta_ = testConfig.depositDelta;
+        _delta_ = testConfig.delta;
 
         // Labelling
         vm.label(bob, "bob");
@@ -504,13 +504,13 @@ abstract contract BaseStrategyTest is PropertyTest {
         assertApproxEqAbs(
             oldTotalAssets,
             strategy.totalAssets(),
-            testConfig.withdrawDelta,
+            testConfig.delta,
             "totalAssets"
         );
         assertApproxEqAbs(
             IERC20(testConfig.asset).balanceOf(address(strategy)),
             oldTotalAssets,
-            testConfig.withdrawDelta,
+            testConfig.delta,
             "asset balance"
         );
     }
@@ -534,22 +534,18 @@ abstract contract BaseStrategyTest is PropertyTest {
         vm.prank(address(this));
         strategy.unpause();
 
-        uint256 delta = testConfig.withdrawDelta > testConfig.depositDelta
-            ? testConfig.withdrawDelta
-            : testConfig.depositDelta;
-
         // We simply deposit back into the external protocol
         // TotalAssets shouldnt change significantly besides some slippage or rounding errors
         assertApproxEqAbs(
             oldTotalAssets,
             strategy.totalAssets(),
-            delta * 3,
+            testConfig.delta * 3,
             "totalAssets"
         );
         assertApproxEqAbs(
             IERC20(testConfig.asset).balanceOf(address(strategy)),
             0,
-            delta,
+            testConfig.delta,
             "asset balance"
         );
     }

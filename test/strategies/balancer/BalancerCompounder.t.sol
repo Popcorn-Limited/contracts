@@ -74,7 +74,10 @@ contract BalancerCompounderTest is BaseStrategyTest {
         );
 
         // Set harvest values
-        BalancerCompounder(strategy).setHarvestValues(harvestValues_, tradePaths_);
+        BalancerCompounder(strategy).setHarvestValues(
+            harvestValues_,
+            tradePaths_
+        );
     }
 
     // function _increasePricePerShare(uint256 amount) internal override {
@@ -98,9 +101,9 @@ contract BalancerCompounderTest is BaseStrategyTest {
 
         uint256 oldTa = strategy.totalAssets();
 
-        vm.roll(block.number + 100);
-        vm.warp(block.timestamp + 1500);
-
+        vm.roll(block.number + 100000_000);
+        vm.warp(block.timestamp + 1500000_000);
+        
         strategy.harvest();
 
         assertGt(strategy.totalAssets(), oldTa);
