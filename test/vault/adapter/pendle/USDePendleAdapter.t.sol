@@ -5,16 +5,19 @@ pragma solidity ^0.8.15;
 
 import {Test} from "forge-std/Test.sol";
 
-import {PendleUSDeAdapter, CurveSwap, BalancerRewardTokenData, Math, IERC20, IERC20Metadata} from "../../../../src/vault/adapter/pendle/PendleUSDeAdapter.sol";
+import {PendleAdapterBalancerCurveHarvest, CurveSwap, BalancerRewardTokenData, Math, IERC20, IERC20Metadata} from "../../../../src/vault/adapter/pendle/PendleAdapterBalancerCurveHarvest.sol";
 import {IPendleRouter, IPendleMarket, IPendleSYToken} from "../../../../src/vault/adapter/pendle/IPendle.sol";
 import {PendleTestConfigStorage, PendleTestConfig} from "./PendleTestConfigStorage.sol";
 import {AbstractAdapterTest, ITestConfigStorage, IAdapter} from "../abstract/AbstractAdapterTest.sol";
-import "forge-std/console.sol";
 
 contract USDePendleAdapterTest is AbstractAdapterTest {
     using Math for uint256;
 
     IPendleRouter pendleRouter = IPendleRouter(0x00000000005BBB0EF59571E58418F9a4357b68A0);
+
+    address balancerRouter = address(0xBA12222222228d8Ba445958a75a0704d566BF2C8);
+
+    address curveRouter = address(0xF0d4c12A5768D806021F80a262B4d39d26C58b8D);
     
     IPendleSYToken synToken;
     address pendleMarket;
@@ -24,13 +27,13 @@ contract USDePendleAdapterTest is AbstractAdapterTest {
     address USDe = address(0x4c9EDD5852cd905f086C759E8383e09bff1E68B3);
     address pendleRouterStatic;
 
-    PendleUSDeAdapter adapterContract;
+    PendleAdapterBalancerCurveHarvest adapterContract;
 
     uint256 swapDelay; 
     
     function setUp() public {
         // uint256 forkId = vm.createSelectFork(vm.rpcUrl("mainnet"), 19410160);
-        uint256 forkId = vm.createSelectFork(vm.rpcUrl("mainnet"), 19566661);
+        uint256 forkId = vm.createSelectFork(vm.rpcUrl("mainnet"), 19567661);
         vm.selectFork(forkId);
 
         testConfigStorage = ITestConfigStorage(
@@ -64,7 +67,7 @@ contract USDePendleAdapterTest is AbstractAdapterTest {
 
         setUpBaseTest(
             IERC20(_asset),
-            address(new PendleUSDeAdapter()),
+            address(new PendleAdapterBalancerCurveHarvest()),
             address(pendleRouter),
             6e16,
             "Pendle ",
@@ -80,7 +83,7 @@ contract USDePendleAdapterTest is AbstractAdapterTest {
             abi.encode(pendleMarket, _pendleRouterStatic, _swapDelay)
         );
 
-        adapterContract = PendleUSDeAdapter(payable(address(adapter)));
+        adapterContract = PendleAdapterBalancerCurveHarvest(payable(address(adapter)));
 
         defaultAmount = 10 ** IERC20Metadata(address(asset)).decimals();
         minFuzz = 1e16;
@@ -148,7 +151,6 @@ contract USDePendleAdapterTest is AbstractAdapterTest {
         // Deposit smth so withdraw on pause is not 0
         _mintAsset(amount, address(this));
         asset.approve(address(adapter), amount);
-        console.log(amount);
         adapter.deposit(amount, address(this));
         adapter.pause();
         assertEq(adapter.maxDeposit(bob), 0);
@@ -320,7 +322,7 @@ contract USDePendleAdapterTest is AbstractAdapterTest {
         CurveSwap memory curveSwap = CurveSwap(route, swapParams, curvePools);
 
         // set harvest data
-        adapterContract.setHarvestData(rewData, curveSwap);
+        adapterContract.setHarvestData(balancerRouter, curveRouter, rewData, curveSwap);
 
         vm.roll(block.number + 1_000);
         vm.warp(block.timestamp + 15_000);

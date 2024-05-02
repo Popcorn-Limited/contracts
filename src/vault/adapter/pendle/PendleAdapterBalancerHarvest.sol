@@ -4,7 +4,7 @@
 pragma solidity ^0.8.15;
 
 import {AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20, Math, IStrategy, IAdapter, IERC4626} from "../abstracts/AdapterBase.sol";
-import {IPendleRouter, IwstETH, IPendleMarket, IPendleSYToken, IPendleOracle, ApproxParams, LimitOrderData, TokenInput, TokenOutput, SwapData} from "./IPendle.sol";
+import {IPendleRouter, IPendleMarket, IPendleSYToken, IPendleOracle, ApproxParams, LimitOrderData, TokenInput, TokenOutput, SwapData} from "./IPendle.sol";
 import {PendleAdapter} from "./PendleAdapter.sol";
 import {IBalancerRouter, SingleSwap, FundManagement, SwapKind} from "./IBalancer.sol";
 
@@ -14,7 +14,6 @@ import {IBalancerRouter, SingleSwap, FundManagement, SwapKind} from "./IBalancer
  * @notice  ERC4626 wrapper for Pendle protocol
  *
  * An ERC4626 compliant Wrapper for Pendle Protocol.
- * Only with wstETH base asset
  */
 
 struct BalancerRewardTokenData {
@@ -23,21 +22,20 @@ struct BalancerRewardTokenData {
     uint256 minTradeAmount; //min amount of reward tokens to execute swaps
 }
 
-contract PendleWstETHAdapter is PendleAdapter {
+contract PendleAdapterBalancerHarvest is PendleAdapter {
     using SafeERC20 for IERC20;
     using Math for uint256;
 
-    BalancerRewardTokenData[] rewardTokensData; // ordered as in _rewardTokens
-
-    IBalancerRouter public constant balancerRouter =
-        IBalancerRouter(address(0xBA12222222228d8Ba445958a75a0704d566BF2C8));
+    IBalancerRouter public balancerRouter;
+    
+    BalancerRewardTokenData[] internal rewardTokensData; // ordered as in _rewardTokens
 
     /*//////////////////////////////////////////////////////////////
                             INITIALIZATION
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Initialize a new generic wstETH Pendle Adapter.
+     * @notice Initialize a new generic Pendle Adapter with harvesting via Balancer.
      * @param adapterInitData Encoded data for the base adapter initialization.
      * @dev This function is called by the factory contract when deploying a new vault.
      */
@@ -47,12 +45,6 @@ contract PendleWstETHAdapter is PendleAdapter {
         bytes memory pendleInitData
     ) external override(PendleAdapter) initializer {
         __PendleBase_init(adapterInitData, _pendleRouter, pendleInitData);
-
-        address baseAsset = asset();
-        require(
-            baseAsset == 0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0,
-            "Only wstETH"
-        );
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -60,14 +52,17 @@ contract PendleWstETHAdapter is PendleAdapter {
     //////////////////////////////////////////////////////////////*/
 
     function setHarvestData(
+        address _balancerRouter,
         BalancerRewardTokenData[] memory rewData
     ) external onlyOwner {
         uint256 len = rewData.length;
         require(len == _rewardTokens.length, "Invalid length");
 
+        balancerRouter = IBalancerRouter(_balancerRouter);
+
         for (uint256 i = 0; i < len; i++) {
             rewardTokensData.push(rewData[i]);
-            _approveSwapTokens(rewData[i].pathAddresses, address(balancerRouter));
+            _approveSwapTokens(rewData[i].pathAddresses, _balancerRouter);
         }
     }
 

@@ -4,7 +4,7 @@
 pragma solidity ^0.8.15;
 
 import {AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20, Math, IStrategy, IAdapter, IERC4626} from "../abstracts/AdapterBase.sol";
-import {IPendleMarket, IUSDeSYToken} from "./IPendle.sol";
+import {IPendleMarket} from "./IPendle.sol";
 import {PendleAdapter} from "./PendleAdapter.sol";
 import {IBalancerRouter, SingleSwap, FundManagement, SwapKind} from "./IBalancer.sol";
 import {ICurveRouter, CurveSwap} from "../curve/ICurve.sol";
@@ -15,7 +15,7 @@ import {ICurveRouter, CurveSwap} from "../curve/ICurve.sol";
  * @notice  ERC4626 wrapper for Pendle protocol
  *
  * An ERC4626 compliant Wrapper for Pendle Protocol.
- * Only with USDe base asset
+ * Implements harvest func that swaps via balancer and curve
  */
 
 struct BalancerRewardTokenData {
@@ -24,27 +24,22 @@ struct BalancerRewardTokenData {
     uint256 minTradeAmount; //min amount of reward tokens to execute swaps
 }
 
-contract PendleUSDeAdapter is PendleAdapter {
+contract PendleAdapterBalancerCurveHarvest is PendleAdapter {
     using SafeERC20 for IERC20;
     using Math for uint256;
 
     BalancerRewardTokenData[] internal rewardTokensData; // ordered as in _rewardTokens
-    CurveSwap internal curveSwap; // to swap to USDe
+    CurveSwap internal curveSwap; // to swap to vault asset
 
-    IBalancerRouter public constant balancerRouter =
-        IBalancerRouter(address(0xBA12222222228d8Ba445958a75a0704d566BF2C8));
-
-    ICurveRouter public constant curveRouter = 
-        ICurveRouter(address(0xF0d4c12A5768D806021F80a262B4d39d26C58b8D));
-
-    IUSDeSYToken SYToken; 
+    IBalancerRouter public balancerRouter;
+    ICurveRouter public curveRouter;
 
     /*//////////////////////////////////////////////////////////////
                             INITIALIZATION
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Initialize a new generic wstETH Pendle Adapter.
+     * @notice Initialize a new Pendle Adapter with harvesting via Balancer and Curve.
      * @param adapterInitData Encoded data for the base adapter initialization.
      * @dev This function is called by the factory contract when deploying a new vault.
      */
@@ -54,20 +49,6 @@ contract PendleUSDeAdapter is PendleAdapter {
         bytes memory pendleInitData
     ) external override(PendleAdapter) initializer {
         __PendleBase_init(adapterInitData, _pendleRouter, pendleInitData);
-
-        address baseAsset = asset();
-        require(
-            baseAsset == 0x4c9EDD5852cd905f086C759E8383e09bff1E68B3,
-            "Only USDe"
-        );
-
-        (address pendleSYToken, , ) = IPendleMarket(pendleMarket).readTokens();
-        SYToken = IUSDeSYToken(pendleSYToken);
-    }
-
-    /// @notice USDe market has a supply cap
-    function maxDeposit(address) public view override returns (uint256) {
-        return SYToken.supplyCap() - SYToken.totalSupply();
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -75,24 +56,29 @@ contract PendleUSDeAdapter is PendleAdapter {
     //////////////////////////////////////////////////////////////*/
 
     function setHarvestData(
+        address _balancerRouter,
+        address _curveRouter,
         BalancerRewardTokenData[] memory rewData,
         CurveSwap memory _curveSwap
     ) external onlyOwner {
         uint256 len = rewData.length;
         require(len == _rewardTokens.length, "Invalid length");
 
+        balancerRouter = IBalancerRouter(_balancerRouter);
+        curveRouter = ICurveRouter(_curveRouter);
+
         // approve balancer
         for (uint256 i = 0; i < len; i++) {
             rewardTokensData.push(rewData[i]);
-            _approveSwapTokens(rewData[i].pathAddresses, address(balancerRouter));
+            _approveSwapTokens(rewData[i].pathAddresses, _balancerRouter);
         }
 
         // approve curve
         curveSwap = _curveSwap;
         address toApprove = curveSwap.route[0];
 
-        IERC20(toApprove).approve(address(curveRouter), 0);
-        IERC20(toApprove).approve(address(curveRouter), type(uint256).max);
+        IERC20(toApprove).approve(_curveRouter, 0);
+        IERC20(toApprove).approve(_curveRouter, type(uint256).max);
     }
 
     /**
@@ -105,7 +91,7 @@ contract PendleUSDeAdapter is PendleAdapter {
             uint256 amount;
             uint256 rewLen = _rewardTokens.length;
 
-            // swap each reward token to USDC
+            // swap each reward token to same base asset
             for (uint256 i = 0; i < rewLen; i++) {
                 address rewardToken = _rewardTokens[i];
                 amount = IERC20(rewardToken).balanceOf(address(this));
@@ -124,7 +110,7 @@ contract PendleUSDeAdapter is PendleAdapter {
                 }
             }
 
-            // swap USDC for USDe on Curve 
+            // swap base asset for vault asset on Curve 
             amount = IERC20(curveSwap.route[0]).balanceOf(address(this));
 
             if(amount > 0) {

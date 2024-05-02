@@ -4,7 +4,7 @@
 pragma solidity ^0.8.15;
 
 import {AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20, Math, IStrategy, IAdapter, IERC4626} from "../abstracts/AdapterBase.sol";
-import {IPendleRouter, IPendleRouterStatic, IPendleMarket, IPendleSYToken, ApproxParams, LimitOrderData, TokenInput, TokenOutput, SwapData} from "./IPendle.sol";
+import {IPendleRouter, IPendleRouterStatic, IPendleMarket, IPendleSYToken, ISYTokenV3, ApproxParams, LimitOrderData, TokenInput, TokenOutput, SwapData} from "./IPendle.sol";
 import {WithRewards, IWithRewards} from "../abstracts/WithRewards.sol";
 
 /**
@@ -23,7 +23,7 @@ contract PendleAdapter is AdapterBase, WithRewards {
 
     IPendleRouter public pendleRouter;
     IPendleRouterStatic public pendleRouterStatic;
-    
+    address public pendleSYToken;
     address public pendleMarket;
     uint256 public swapDelay;
 
@@ -79,7 +79,7 @@ contract PendleAdapter is AdapterBase, WithRewards {
 
         pendleRouterStatic = IPendleRouterStatic(_pendleRouterStat);
 
-        (address pendleSYToken, , ) = IPendleMarket(pendleMarket).readTokens();
+        (pendleSYToken, , ) = IPendleMarket(pendleMarket).readTokens();
 
         // make sure base asset and market are compatible
         _validateAsset(pendleSYToken, baseAsset);
@@ -115,6 +115,15 @@ contract PendleAdapter is AdapterBase, WithRewards {
     /*//////////////////////////////////////////////////////////////
                             ACCOUNTING LOGIC
     //////////////////////////////////////////////////////////////*/
+    
+    /// @notice Some pendle markets may have a supply cap, some not
+    function maxDeposit(address who) public view override returns (uint256) {
+        try ISYTokenV3(pendleSYToken).supplyCap() returns (uint256 supplyCap) {
+            return supplyCap - ISYTokenV3(pendleSYToken).totalSupply();
+        } catch {
+            return super.maxDeposit(who);
+        }
+    }
 
     function _totalAssets() internal view override returns (uint256 t) {
         uint256 lpBalance = IERC20(pendleMarket).balanceOf(address(this));
@@ -192,7 +201,6 @@ contract PendleAdapter is AdapterBase, WithRewards {
             address(0),
             swapData
         );
-
         pendleRouter.addLiquiditySingleToken(
             address(this),
             pendleMarket,

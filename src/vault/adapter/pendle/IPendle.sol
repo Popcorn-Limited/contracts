@@ -160,7 +160,7 @@ interface IPendleSYToken {
     function totalSupply() external view returns (uint256);
 }
 
-interface IUSDeSYToken is IPendleSYToken {
+interface ISYTokenV3 is IPendleSYToken {
     // returns all tokens that can mint this SY token
     function supplyCap() external view returns (uint256);
 }
@@ -194,11 +194,4 @@ interface IPendleOracle {
         address market,
         uint32 duration
     ) external view returns (bool increaseCardinalityRequired, uint16 cardinalityRequired, bool oldestObservationSatisfied);
-}
-
-interface IwstETH {
-    // Returns amount of wstETH for a given amount of stETH
-    function getWstETHByStETH(
-        uint256 _stETHAmount
-    ) external view returns (uint256);
 }

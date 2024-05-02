@@ -5,7 +5,7 @@ pragma solidity ^0.8.15;
 
 import {Test} from "forge-std/Test.sol";
 
-import {PendleWstETHAdapter, BalancerRewardTokenData, IPendleRouter, IPendleMarket, IPendleSYToken, Math, IERC20, IERC20Metadata} from "../../../../src/vault/adapter/pendle/PendleWstETHAdapter.sol";
+import {PendleAdapterBalancerHarvest, BalancerRewardTokenData, IPendleRouter, IPendleMarket, IPendleSYToken, Math, IERC20, IERC20Metadata} from "../../../../src/vault/adapter/pendle/PendleAdapterBalancerHarvest.sol";
 import {PendleTestConfigStorage, PendleTestConfig} from "./PendleTestConfigStorage.sol";
 import {AbstractAdapterTest, ITestConfigStorage, IAdapter} from "../abstract/AbstractAdapterTest.sol";
 
@@ -13,14 +13,15 @@ contract wstETHPendleAdapterTest is AbstractAdapterTest {
     using Math for uint256;
 
     IPendleRouter pendleRouter = IPendleRouter(0x00000000005BBB0EF59571E58418F9a4357b68A0);
-    
+    address balancerRouter = address(0xBA12222222228d8Ba445958a75a0704d566BF2C8);
+
     IPendleSYToken synToken;
     address pendleMarket;
     address pendleToken = address(0x808507121B80c02388fAd14726482e061B8da827);
     address WETH = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
     address pendleRouterStatic; 
 
-    PendleWstETHAdapter adapterContract;
+    PendleAdapterBalancerHarvest adapterContract;
 
     uint256 swapDelay; 
 
@@ -59,7 +60,7 @@ contract wstETHPendleAdapterTest is AbstractAdapterTest {
         
         setUpBaseTest(
             IERC20(_asset),
-            address(new PendleWstETHAdapter()),
+            address(new PendleAdapterBalancerHarvest()),
             address(pendleRouter),
             1e18,
             "Pendle ",
@@ -75,7 +76,7 @@ contract wstETHPendleAdapterTest is AbstractAdapterTest {
             abi.encode(pendleMarket, _pendleRouterStatic, _swapDelay)
         );
 
-        adapterContract = PendleWstETHAdapter(payable(address(adapter)));
+        adapterContract = PendleAdapterBalancerHarvest(payable(address(adapter)));
 
         defaultAmount = 10 ** IERC20Metadata(address(asset)).decimals();
         raise = defaultAmount * 100;
@@ -265,7 +266,7 @@ contract wstETHPendleAdapterTest is AbstractAdapterTest {
         rewData[0].pathAddresses[2] = adapter.asset();
 
         // set harvest data
-        adapterContract.setHarvestData(rewData);
+        adapterContract.setHarvestData(balancerRouter, rewData);
 
         vm.roll(block.number + 1_000_000);
         vm.warp(block.timestamp + 15_000_000);
