@@ -62,7 +62,9 @@ contract PendleAdapterBalancerCurveHarvest is PendleAdapter {
         CurveSwap memory _curveSwap
     ) external onlyOwner {
         uint256 len = rewData.length;
-        require(len == _rewardTokens.length, "Invalid length");
+        address[] memory rewTokens = _getRewardTokens();
+
+        require(len == rewTokens.length, "Invalid length");
 
         balancerRouter = IBalancerRouter(_balancerRouter);
         curveRouter = ICurveRouter(_curveRouter);
@@ -89,11 +91,12 @@ contract PendleAdapterBalancerCurveHarvest is PendleAdapter {
             claim();
 
             uint256 amount;
-            uint256 rewLen = _rewardTokens.length;
+            address[] memory rewTokens = _getRewardTokens();
+            uint256 rewLen = rewTokens.length;
 
             // swap each reward token to same base asset
             for (uint256 i = 0; i < rewLen; i++) {
-                address rewardToken = _rewardTokens[i];
+                address rewardToken = rewTokens[i];
                 amount = IERC20(rewardToken).balanceOf(address(this));
 
                 BalancerRewardTokenData memory rewData = rewardTokensData[i];

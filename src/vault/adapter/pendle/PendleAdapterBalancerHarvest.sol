@@ -14,6 +14,7 @@ import {IBalancerRouter, SingleSwap, FundManagement, SwapKind} from "./IBalancer
  * @notice  ERC4626 wrapper for Pendle protocol
  *
  * An ERC4626 compliant Wrapper for Pendle Protocol.
+ * Implements harvest func that swaps via balancer
  */
 
 struct BalancerRewardTokenData {
@@ -56,7 +57,9 @@ contract PendleAdapterBalancerHarvest is PendleAdapter {
         BalancerRewardTokenData[] memory rewData
     ) external onlyOwner {
         uint256 len = rewData.length;
-        require(len == _rewardTokens.length, "Invalid length");
+        address[] memory rewTokens = _getRewardTokens();
+
+        require(len == rewTokens.length, "Invalid length");
 
         balancerRouter = IBalancerRouter(_balancerRouter);
 
@@ -73,12 +76,13 @@ contract PendleAdapterBalancerHarvest is PendleAdapter {
         if ((lastHarvest + harvestCooldown) < block.timestamp) {
             claim();
 
-            uint256 amount;
-            uint256 rewLen = _rewardTokens.length;
+            uint256 amount;            
+            address[] memory rewTokens = _getRewardTokens();
+            uint256 rewLen = rewTokens.length;
 
             // swap each reward token to the vault asset
             for (uint256 i = 0; i < rewLen; i++) {
-                address rewardToken = _rewardTokens[i];
+                address rewardToken = rewTokens[i];
                 amount = IERC20(rewardToken).balanceOf(address(this));
 
                 BalancerRewardTokenData memory rewData = rewardTokensData[i];

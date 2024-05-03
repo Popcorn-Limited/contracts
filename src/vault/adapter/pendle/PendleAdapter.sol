@@ -68,11 +68,7 @@ contract PendleAdapter is AdapterBase, WithRewards {
         pendleRouter = IPendleRouter(_pendleRouter);
         address _pendleRouterStat;
 
-        (
-            pendleMarket,
-            _pendleRouterStat,
-            swapDelay
-        ) = abi.decode(
+        (pendleMarket, _pendleRouterStat, swapDelay) = abi.decode(
             pendleInitData,
             (address, address, uint256)
         );
@@ -89,9 +85,6 @@ contract PendleAdapter is AdapterBase, WithRewards {
 
         // approve LP token for withdrawal
         IERC20(pendleMarket).approve(_pendleRouter, type(uint256).max);
-
-        // get reward tokens
-        _rewardTokens = IPendleMarket(pendleMarket).getRewardTokens();
     }
 
     function name()
@@ -115,7 +108,6 @@ contract PendleAdapter is AdapterBase, WithRewards {
     /*//////////////////////////////////////////////////////////////
                             ACCOUNTING LOGIC
     //////////////////////////////////////////////////////////////*/
-    
     /// @notice Some pendle markets may have a supply cap, some not
     function maxDeposit(address who) public view override returns (uint256) {
         try ISYTokenV3(pendleSYToken).supplyCap() returns (uint256 supplyCap) {
@@ -128,15 +120,16 @@ contract PendleAdapter is AdapterBase, WithRewards {
     function _totalAssets() internal view override returns (uint256 t) {
         uint256 lpBalance = IERC20(pendleMarket).balanceOf(address(this));
         address asset = asset();
-        
+
         if (lpBalance == 0) {
             t = 0;
         } else {
-            (t ,,,,,,,) = pendleRouterStatic.removeLiquiditySingleTokenStatic(
-                pendleMarket,
-                lpBalance,
-                asset
-            );
+            (t, , , , , , , ) = pendleRouterStatic
+                .removeLiquiditySingleTokenStatic(
+                    pendleMarket,
+                    lpBalance,
+                    asset
+                );
         }
 
         // floating amount
@@ -154,11 +147,10 @@ contract PendleAdapter is AdapterBase, WithRewards {
     /*//////////////////////////////////////////////////////////////
                             REWARDS LOGIC
     //////////////////////////////////////////////////////////////*/
-    address[] _rewardTokens;
 
-    /// @notice The token rewarded from the convex reward contract
+    /// @notice The token rewarded from the pendle market
     function rewardTokens() external view override returns (address[] memory) {
-        return _rewardTokens;
+        return _getRewardTokens();
     }
 
     /// @notice Claim liquidity mining rewards given that it's active
@@ -277,6 +269,10 @@ contract PendleAdapter is AdapterBase, WithRewards {
         }
 
         if (!isValidMarket) revert InvalidAsset();
+    }
+
+    function _getRewardTokens() internal view returns (address[] memory){
+        return IPendleMarket(pendleMarket).getRewardTokens();
     }
 
     /*//////////////////////////////////////////////////////////////
