@@ -23,11 +23,19 @@ interface VaultRouter_I {
 }
 
 struct BatchSwapStep {
-    uint256 amount;
+    bytes32 poolId;
     uint256 assetInIndex;
     uint256 assetOutIndex;
-    bytes32 poolId;
+    uint256 amount;
     bytes userData;
+}
+
+struct FixedAddressArray {
+    address[11] fixed_;
+}
+
+struct FixedUintArray {
+    uint256[5] swapParams;
 }
 
 interface IAsset {}
@@ -49,31 +57,34 @@ contract Tester is Test {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/test/sample.json");
         string memory json = vm.readFile(path);
-        bytes memory transactionDetails = json.parseRaw(
-            string.concat(".[", vm.toString(uint256(0)), "].a")
+
+        BatchSwapStep memory step = abi.decode(
+            json.parseRaw(".[0].step"),
+            (BatchSwapStep)
         );
-        uint256 a = abi.decode(transactionDetails, (uint256));
-        emit log_uint(a);
 
-        transactionDetails = json.parseRaw(".[0].b");
-        address[] memory b = abi.decode(transactionDetails, (address[]));
-        emit log_address(b[0]);
-        emit log_address(b[1]);
+        emit log_uint(step.amount);
+        emit log_uint(step.assetInIndex);
+        emit log_bytes32(step.poolId);
 
-        transactionDetails = json.parseRaw(".[0].batchSwapSteps");
-        BatchSwapStep[] memory swapSteps = abi.decode(
-            transactionDetails,
-            (BatchSwapStep[])
-        );
-        emit log_uint(swapSteps[0].assetInIndex);
-        emit log_uint(swapSteps[1].assetOutIndex);
+        address[] memory route = json.readAddressArray(".[0].curveSwap.route");
+        address[11] memory route2;
+        for (uint i; i < 11; i++) {
+            route2[i] = route[i];
+        }
 
-        IAsset[] memory assets = abi.decode(
-            json.parseRaw(".[0].assets"),
-            (IAsset[])
-        );
-        emit log_address(address(assets[0]));
+        uint256[5][5] memory swapParams;
+        for (uint i; i < 5; i++) {
+            uint256[] memory params = json.readUintArray(
+                string.concat(".[0].curveSwap.swapParams[", vm.toString(i), "]")
+            );
+            for (uint n; n < 5; n++) {
+                swapParams[i][n] = params[n];
+            }
+        }
 
-        emit log_int(type(int).max);
+        emit log_address(route2[2]);
+        emit log_uint(swapParams[0][0]);
+        emit log_uint(swapParams[3][2]);
     }
 }

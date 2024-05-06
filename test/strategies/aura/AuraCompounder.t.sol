@@ -77,14 +77,14 @@ contract AuraCompounderTest is BaseStrategyTest {
         AuraCompounder(strategy).setHarvestValues(harvestValues_, tradePaths_);
     }
 
-    // function _increasePricePerShare(uint256 amount) internal override {
-    //     address aToken = address(AaveV3Depositor(address(strategy)).aToken());
-    //     deal(
-    //         testConfig.asset,
-    //         aToken,
-    //         IERC20(testConfig.asset).balanceOf(aToken) + amount
-    //     );
-    // }
+    function _increasePricePerShare(uint256 amount) internal override {
+        // address aToken = address(AaveV3Depositor(address(strategy)).aToken());
+        // deal(
+        //     testConfig.asset,
+        //     aToken,
+        //     IERC20(testConfig.asset).balanceOf(aToken) + amount
+        // );
+    }
 
     /*//////////////////////////////////////////////////////////////
                                 HARVEST

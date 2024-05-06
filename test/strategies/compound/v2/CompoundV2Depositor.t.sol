@@ -50,4 +50,39 @@ contract CompoundV2DepositorTest is BaseStrategyTest {
             IERC20(testConfig.asset).balanceOf(cToken) + amount
         );
     }
+
+    /*//////////////////////////////////////////////////////////////
+                            OVERRIDEN TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    // @dev Slippage on unpausing is higher than the delta for all other interactions
+    function test__unpause() public override {
+        _mintAssetAndApproveForStrategy(testConfig.defaultAmount * 3, bob);
+
+        vm.prank(bob);
+        strategy.deposit(testConfig.defaultAmount * 3, bob);
+
+        uint256 oldTotalAssets = strategy.totalAssets();
+
+        vm.prank(address(this));
+        strategy.pause();
+
+        vm.prank(address(this));
+        strategy.unpause();
+
+        // We simply deposit back into the external protocol
+        // TotalAssets shouldnt change significantly besides some slippage or rounding errors
+        assertApproxEqAbs(
+            oldTotalAssets,
+            strategy.totalAssets(),
+            1e8 * 3,
+            "totalAssets"
+        );
+        assertApproxEqAbs(
+            IERC20(testConfig.asset).balanceOf(address(strategy)),
+            0,
+            testConfig.delta,
+            "asset balance"
+        );
+    }
 }

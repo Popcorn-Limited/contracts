@@ -10,10 +10,10 @@ enum SwapKind {
 interface IAsset {}
 
 struct BatchSwapStep {
-    uint256 amount;
+    bytes32 poolId;
     uint256 assetInIndex;
     uint256 assetOutIndex;
-    bytes32 poolId;
+    uint256 amount;
     bytes userData;
 }
 

@@ -101,12 +101,73 @@ contract ConvexCompounderTest is BaseStrategyTest {
             (address[])
         );
 
-        CurveSwap[] memory swaps_ = abi.decode(
-            json_.parseRaw(
-                string.concat(".configs[", index_, "].specific.harvest.swaps")
-            ),
-            (CurveSwap[])
+        //Construct CurveSwap structs
+        uint256 swapLen = json_.readUint(
+            string.concat(
+                ".configs[",
+                index_,
+                "].specific.harvest.swaps.length"
+            )
         );
+
+        CurveSwap[] memory swaps_ = new CurveSwap[](swapLen);
+        for (uint i; i < swapLen; i++) {
+            // Read route and convert dynamic into fixed size array
+            address[] memory route_ = json_.readAddressArray(
+                string.concat(
+                    ".configs[",
+                    index_,
+                    "].specific.harvest.swaps.structs[",
+                    vm.toString(i),
+                    "].route"
+                )
+            );
+            address[11] memory route;
+            for (uint n; n < 11; n++) {
+                route[n] = route_[n];
+            }
+
+            // Read swapParams and convert dynamic into fixed size array
+            uint256[5][5] memory swapParams;
+            for (uint n = 0; n < 5; n++) {
+                uint256[] memory swapParams_ = json_.readUintArray(
+                    string.concat(
+                        ".configs[",
+                        index_,
+                        "].specific.harvest.swaps.structs[",
+                        vm.toString(i),
+                        "].swapParams[",
+                        vm.toString(n),
+                        "]"
+                    )
+                );
+                for (uint y; y < 5; y++) {
+                    swapParams[n][y] = swapParams_[y];
+                }
+            }
+
+            // Read pools and convert dynamic into fixed size array
+            address[] memory pools_ = json_.readAddressArray(
+                string.concat(
+                    ".configs[",
+                    index_,
+                    "].specific.harvest.swaps.structs[",
+                    vm.toString(i),
+                    "].pools"
+                )
+            );
+            address[5] memory pools;
+            for (uint n = 0; n < 5; n++) {
+                pools[n] = pools_[n];
+            }
+            
+            // Construct the struct
+            swaps_[i] = CurveSwap({
+                route: route,
+                swapParams: swapParams,
+                pools: pools
+            });
+        }
 
         // Set harvest values
         ConvexCompounder(strategy).setHarvestValues(
@@ -133,17 +194,12 @@ contract ConvexCompounderTest is BaseStrategyTest {
 
     function test__harvest() public override {
         _mintAssetAndApproveForStrategy(10000e18, bob);
-
         vm.prank(bob);
         strategy.deposit(10000e18, bob);
-
         uint256 oldTa = strategy.totalAssets();
-
-        vm.roll(block.number + 100);
-        vm.warp(block.timestamp + 1500);
-
+        vm.roll(block.number + 10000);
+        vm.warp(block.timestamp + 150000);
         strategy.harvest();
-
         assertGt(strategy.totalAssets(), oldTa);
     }
 

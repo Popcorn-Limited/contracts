@@ -3,7 +3,7 @@
 
 pragma solidity ^0.8.25;
 
-import {BeefyDepositor, IERC20} from "../../../src/strategies/beefy/BeefyDepositor.sol";
+import {BeefyDepositor, IBeefyVault, IERC20} from "../../../src/strategies/beefy/BeefyDepositor.sol";
 import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson} from "../BaseStrategyTest.sol";
 
 contract BeefyDepositorTest is BaseStrategyTest {
@@ -29,15 +29,22 @@ contract BeefyDepositorTest is BaseStrategyTest {
             false,
             abi.encode(
                 json_.readAddress(
-                    string.concat(
-                        ".configs[",
-                        index_,
-                        "].specific.beefyVault"
-                    )
+                    string.concat(".configs[", index_, "].specific.beefyVault")
                 )
             )
         );
 
         return IBaseStrategy(address(strategy));
+    }
+
+    function _increasePricePerShare(uint256 amount) internal override {
+        IBeefyVault beefyVault = BeefyDepositor(address(strategy)).beefyVault();
+
+        deal(
+            testConfig.asset,
+            address(beefyVault),
+            IERC20(testConfig.asset).balanceOf(address(beefyVault)) + amount
+        );
+        beefyVault.earn();
     }
 }

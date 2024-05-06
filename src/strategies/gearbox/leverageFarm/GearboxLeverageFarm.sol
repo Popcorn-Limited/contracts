@@ -98,21 +98,6 @@ abstract contract GearboxLeverageFarm is BaseStrategy {
     }
 
     /*//////////////////////////////////////////////////////////////
-                    DEPOSIT/WITHDRAWAL LIMIT LOGIC
-    //////////////////////////////////////////////////////////////*/
-    function maxDeposit(address) public view override returns (uint256) {
-        return type(uint256).max;
-    }
-
-    function maxWithdraw(address owner) public view override returns (uint256) {
-        return convertToAssets(balanceOf(owner));
-    }
-
-    function maxRedeem(address owner) public view override returns (uint256) {
-        return balanceOf(owner);
-    }
-
-    /*//////////////////////////////////////////////////////////////
                           INTERNAL HOOKS LOGIC
     //////////////////////////////////////////////////////////////*/
 

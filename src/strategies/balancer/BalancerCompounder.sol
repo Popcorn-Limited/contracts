@@ -156,6 +156,8 @@ contract BalancerCompounder is BaseStrategy {
         } catch {}
     }
 
+    event log_uint(uint);
+
     /**
      * @notice Execute Strategy and take fees.
      */
@@ -173,6 +175,8 @@ contract BalancerCompounder is BaseStrategy {
             uint256 rewardBal = IERC20(rewardTokens_[i]).balanceOf(
                 address(this)
             );
+
+            emit log_uint(rewardBal);
 
             // More caching
             TradePath memory tradePath = tradePaths[i];

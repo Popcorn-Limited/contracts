@@ -83,7 +83,7 @@ interface ICurveRouter {
 }
 
 struct CurveSwap {
-    address[5] pools;
     address[11] route;
     uint256[5][5] swapParams;
+    address[5] pools;
 }

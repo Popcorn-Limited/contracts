@@ -35,11 +35,11 @@
         "minTradeAmount": 10000000000000000000,
         "swaps": [
           {
-            "amount": 0,
-            "assetInIndex": 0,
-            "assetOutIndex": 1,
-            "poolId": "0x5c6ee304399dbdb9c8ef030ab642b10820db8f56000200000000000000000014",
-            "userData": ""
+            "a-poolId": "0x5c6ee304399dbdb9c8ef030ab642b10820db8f56000200000000000000000014",
+            "b-assetInIndex": 0,
+            "c-assetOutIndex": 1,
+            "d-amount": 0,
+            "e-userData": ""
           }
         ]
       }

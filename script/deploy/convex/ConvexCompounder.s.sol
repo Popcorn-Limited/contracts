@@ -63,10 +63,63 @@ contract DeployStrategy is Script {
             (address[])
         );
 
-        CurveSwap[] memory swaps_ = abi.decode(
-            json.parseRaw(".harvest.swaps"),
-            (CurveSwap[])
+        //Construct CurveSwap structs
+        uint256 swapLen = json.readUint(
+            string.concat(".harvest.swaps.length")
         );
+
+        CurveSwap[] memory swaps_ = new CurveSwap[](swapLen);
+        for (uint i; i < swapLen; i++) {
+            // Read route and convert dynamic into fixed size array
+            address[] memory route_ = json.readAddressArray(
+                string.concat(
+                    ".harvest.harvest.swaps.structs[",
+                    vm.toString(i),
+                    "].route"
+                )
+            );
+            address[11] memory route;
+            for (uint n; n < 11; n++) {
+                route[n] = route_[n];
+            }
+
+            // Read swapParams and convert dynamic into fixed size array
+            uint256[5][5] memory swapParams;
+            for (uint n = 0; n < 5; n++) {
+                uint256[] memory swapParams_ = json.readUintArray(
+                    string.concat(
+                        "harvest.swaps.structs[",
+                        vm.toString(i),
+                        "].swapParams[",
+                        vm.toString(n),
+                        "]"
+                    )
+                );
+                for (uint y; y < 5; y++) {
+                    swapParams[n][y] = swapParams_[y];
+                }
+            }
+
+            // Read pools and convert dynamic into fixed size array
+            address[] memory pools_ = json.readAddressArray(
+                string.concat(
+                    "harvest.swaps.structs[",
+                    vm.toString(i),
+                    "].pools"
+                )
+            );
+            address[5] memory pools;
+            for (uint n = 0; n < 5; n++) {
+                pools[n] = pools_[n];
+            }
+
+            // Construct the struct
+            swaps_[i] = CurveSwap({
+                route: route,
+                swapParams: swapParams,
+                pools: pools
+            });
+        }
 
         // Set harvest values
         strategy.setHarvestValues(
