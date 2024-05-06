@@ -98,6 +98,22 @@ contract CurveGaugeCompounderTest is BaseStrategyTest {
         );
 
         //Construct CurveSwap structs
+        CurveSwap[] memory swaps_ = _getCurveSwaps(json_, index_);
+
+        // Set harvest values
+        CurveGaugeCompounder(strategy).setHarvestValues(
+            curveRouter_,
+            rewardTokens_,
+            minTradeAmounts_,
+            swaps_,
+            indexIn_
+        );
+    }
+
+    function _getCurveSwaps(
+        string memory json_,
+        string memory index_
+    ) internal returns (CurveSwap[] memory) {
         uint256 swapLen = json_.readUint(
             string.concat(
                 ".configs[",
@@ -164,15 +180,7 @@ contract CurveGaugeCompounderTest is BaseStrategyTest {
                 pools: pools
             });
         }
-
-        // Set harvest values
-        CurveGaugeCompounder(strategy).setHarvestValues(
-            curveRouter_,
-            rewardTokens_,
-            minTradeAmounts_,
-            swaps_,
-            indexIn_
-        );
+        return swaps_;
     }
 
     // function _increasePricePerShare(uint256 amount) internal override {

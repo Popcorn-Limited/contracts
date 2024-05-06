@@ -91,6 +91,33 @@ contract CurveGaugeSingleAssetCompounderTest is BaseStrategyTest {
         );
 
         //Construct CurveSwap structs
+        CurveSwap[] memory swaps_ = _getCurveSwaps(json_, index_);
+
+        uint256 discountBps_ = abi.decode(
+            json_.parseRaw(
+                string.concat(
+                    ".configs[",
+                    index_,
+                    "].specific.harvest.discountBps"
+                )
+            ),
+            (uint256)
+        );
+
+        // Set harvest values
+        CurveGaugeSingleAssetCompounder(strategy).setHarvestValues(
+            curveRouter_,
+            rewardTokens_,
+            minTradeAmounts_,
+            swaps_,
+            discountBps_
+        );
+    }
+
+    function _getCurveSwaps(
+        string memory json_,
+        string memory index_
+    ) internal returns (CurveSwap[] memory) {
         uint256 swapLen = json_.readUint(
             string.concat(
                 ".configs[",
@@ -157,26 +184,7 @@ contract CurveGaugeSingleAssetCompounderTest is BaseStrategyTest {
                 pools: pools
             });
         }
-
-        uint256 discountBps_ = abi.decode(
-            json_.parseRaw(
-                string.concat(
-                    ".configs[",
-                    index_,
-                    "].specific.harvest.discountBps"
-                )
-            ),
-            (uint256)
-        );
-
-        // Set harvest values
-        CurveGaugeSingleAssetCompounder(strategy).setHarvestValues(
-            curveRouter_,
-            rewardTokens_,
-            minTradeAmounts_,
-            swaps_,
-            discountBps_
-        );
+        return swaps_;
     }
 
     // function _increasePricePerShare(uint256 amount) internal override {
@@ -187,6 +195,10 @@ contract CurveGaugeSingleAssetCompounderTest is BaseStrategyTest {
     //         IERC20(testConfig.asset).balanceOf(aToken) + amount
     //     );
     // }
+
+    /*//////////////////////////////////////////////////////////////
+                            OVERRIDEN TESTS
+    //////////////////////////////////////////////////////////////*/
 
     function test__withdraw(uint8 fuzzAmount) public override {
         uint len = json.readUint(".length");
@@ -252,6 +264,65 @@ contract CurveGaugeSingleAssetCompounderTest is BaseStrategyTest {
         }
     }
 
+    // NOTE - Slippage here is higher than the usual delta
+    function test__pause() public override {
+        _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
+
+        vm.prank(bob);
+        strategy.deposit(testConfig.defaultAmount, bob);
+
+        uint256 oldTotalAssets = strategy.totalAssets();
+
+        vm.prank(address(this));
+        strategy.pause();
+
+        // We simply withdraw into the strategy
+        // TotalSupply and Assets dont change
+        assertApproxEqAbs(
+            oldTotalAssets,
+            strategy.totalAssets(),
+            5.4e16,
+            "totalAssets"
+        );
+        assertApproxEqAbs(
+            IERC20(testConfig.asset).balanceOf(address(strategy)),
+            oldTotalAssets,
+            5.4e16,
+            "asset balance"
+        );
+    }
+
+    // NOTE - Slippage here is higher than the usual delta
+    function test__unpause() public override {
+        _mintAssetAndApproveForStrategy(testConfig.defaultAmount * 3, bob);
+
+        vm.prank(bob);
+        strategy.deposit(testConfig.defaultAmount * 3, bob);
+
+        uint256 oldTotalAssets = strategy.totalAssets();
+
+        vm.prank(address(this));
+        strategy.pause();
+
+        vm.prank(address(this));
+        strategy.unpause();
+
+        // We simply deposit back into the external protocol
+        // TotalAssets shouldnt change significantly besides some slippage or rounding errors
+        assertApproxEqAbs(
+            oldTotalAssets,
+            strategy.totalAssets(),
+            2e14,
+            "totalAssets"
+        );
+        assertApproxEqAbs(
+            IERC20(testConfig.asset).balanceOf(address(strategy)),
+            0,
+            testConfig.delta,
+            "asset balance"
+        );
+    }
+
     /*//////////////////////////////////////////////////////////////
                                 HARVEST
     //////////////////////////////////////////////////////////////*/
@@ -264,8 +335,7 @@ contract CurveGaugeSingleAssetCompounderTest is BaseStrategyTest {
 
         uint256 oldTa = strategy.totalAssets();
 
-        vm.roll(block.number + 100);
-        vm.warp(block.timestamp + 1500);
+        vm.warp(block.timestamp + 150_000);
 
         strategy.harvest();
 

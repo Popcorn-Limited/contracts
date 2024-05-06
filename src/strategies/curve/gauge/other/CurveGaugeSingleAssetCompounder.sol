@@ -144,6 +144,8 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy {
         } catch {}
     }
 
+    event log_uint(uint);
+
     /**
      * @notice Claim rewards and compound them into the vault
      */
@@ -156,6 +158,7 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy {
         for (uint256 i = 0; i < rewLen; i++) {
             address rewardToken = _rewardTokens[i];
             amount = IERC20(rewardToken).balanceOf(address(this));
+            emit log_uint(amount);
 
             if (amount > 0 && amount > minTradeAmounts[i]) {
                 CurveSwap memory swap = swaps[rewardToken];
