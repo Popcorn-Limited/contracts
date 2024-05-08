@@ -13,7 +13,7 @@ import {AbstractAdapterTest, ITestConfigStorage, IAdapter} from "../abstract/Abs
 contract USDePendleAdapterTest is AbstractAdapterTest {
     using Math for uint256;
 
-    IPendleRouter pendleRouter = IPendleRouter(0x00000000005BBB0EF59571E58418F9a4357b68A0);
+    IPendleRouter pendleRouter = IPendleRouter(0x888888888889758F76e7103c6CbF23ABbF58F946);
 
     address balancerRouter = address(0xBA12222222228d8Ba445958a75a0704d566BF2C8);
 
@@ -33,7 +33,7 @@ contract USDePendleAdapterTest is AbstractAdapterTest {
     
     function setUp() public {
         // uint256 forkId = vm.createSelectFork(vm.rpcUrl("mainnet"), 19410160);
-        uint256 forkId = vm.createSelectFork(vm.rpcUrl("mainnet"), 19567661);
+        uint256 forkId = vm.createSelectFork(vm.rpcUrl("mainnet"), 19823003);
         vm.selectFork(forkId);
 
         testConfigStorage = ITestConfigStorage(

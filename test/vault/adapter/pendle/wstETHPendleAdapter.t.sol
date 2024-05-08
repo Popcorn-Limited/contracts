@@ -12,7 +12,7 @@ import {AbstractAdapterTest, ITestConfigStorage, IAdapter} from "../abstract/Abs
 contract wstETHPendleAdapterTest is AbstractAdapterTest {
     using Math for uint256;
 
-    IPendleRouter pendleRouter = IPendleRouter(0x00000000005BBB0EF59571E58418F9a4357b68A0);
+    IPendleRouter pendleRouter = IPendleRouter(0x888888888889758F76e7103c6CbF23ABbF58F946);
     address balancerRouter = address(0xBA12222222228d8Ba445958a75a0704d566BF2C8);
 
     IPendleSYToken synToken;
@@ -26,7 +26,7 @@ contract wstETHPendleAdapterTest is AbstractAdapterTest {
     uint256 swapDelay; 
 
     function setUp() public {
-        uint256 forkId = vm.createSelectFork(vm.rpcUrl("mainnet"), 19639567);
+        uint256 forkId = vm.createSelectFork(vm.rpcUrl("mainnet"), 19823003);
         vm.selectFork(forkId);
 
         testConfigStorage = ITestConfigStorage(
