@@ -1,0 +1,56 @@
+{
+    "totalAssets": {
+        "numCommands": 1,
+        "stateLen": 1,
+        "commands": [
+            {
+                "command": {
+                    "signature": "balanceOf(address)",
+                    "target": "0x79579633029a61963eDfbA1C0BE22498b6e0D33D"
+                },
+                "inputIds":  [
+                    {
+                        "isDynamicArray": false,
+                        "index": 0
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 255
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 255
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 255
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 255
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 255
+                    }
+                ],
+                "outputId": {
+                    "isDynamicOutput": false,
+                    "index": 1
+                }
+            }
+        ],
+        "state": [
+            "0x"
+        ]
+    },
+    "deposit": {
+
+    }, 
+    "withdraw": {
+
+    },
+    "harvest": {
+
+    }
+}
