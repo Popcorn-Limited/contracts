@@ -44,13 +44,13 @@ contract ConvexCompounder is BaseStrategy {
      * @notice Initialize a new Strategy.
      * @param asset_ The underlying asset used for deposit/withdraw and accounting
      * @param owner_ Owner of the contract. Controls management functions.
-     * @param autoHarvest_ Controls if the harvest function gets called on deposit/withdrawal
+     * @param autoDeposit_ Controls if `protocolDeposit` gets called on deposit
      * @param strategyInitData_ Encoded data for this specific strategy
      */
     function initialize(
         address asset_,
         address owner_,
-        bool autoHarvest_,
+        bool autoDeposit_,
         bytes memory strategyInitData_
     ) external initializer {
         (address _convexBooster, address _curvePool, uint256 _pid) = abi.decode(
@@ -66,7 +66,7 @@ contract ConvexCompounder is BaseStrategy {
         pid = _pid;
         nCoins = ICurveLp(_curvePool).N_COINS();
 
-        __BaseStrategy_init(asset_, owner_, autoHarvest_);
+        __BaseStrategy_init(asset_, owner_, autoDeposit_);
 
         IERC20(asset_).approve(_convexBooster, type(uint256).max);
 
@@ -116,7 +116,11 @@ contract ConvexCompounder is BaseStrategy {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Deposit into Convex convexBooster contract.
-    function _protocolDeposit(uint256 assets, uint256) internal override {
+    function _protocolDeposit(
+        uint256 assets,
+        uint256,
+        bytes memory
+    ) internal override {
         convexBooster.deposit(pid, assets, true);
     }
 
@@ -135,7 +139,7 @@ contract ConvexCompounder is BaseStrategy {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Claim liquidity mining rewards given that it's active
-    function claim() public override returns (bool success) {
+    function claim() internal override returns (bool success) {
         try convexRewards.getReward(address(this), true) {
             success = true;
         } catch {}
@@ -144,7 +148,7 @@ contract ConvexCompounder is BaseStrategy {
     /**
      * @notice Claim rewards and compound them into the vault
      */
-    function harvest() public override  {
+    function harvest(bytes memory data) external override onlyKeeperOrOwner {
         claim();
 
         ICurveRouter router_ = curveRouter;

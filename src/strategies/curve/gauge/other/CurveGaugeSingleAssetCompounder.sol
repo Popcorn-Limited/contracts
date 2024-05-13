@@ -35,13 +35,13 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy {
      * @notice Initialize a new Strategy.
      * @param asset_ The underlying asset used for deposit/withdraw and accounting
      * @param owner_ Owner of the contract. Controls management functions.
-     * @param autoHarvest_ Controls if the harvest function gets called on deposit/withdrawal
+     * @param autoDeposit_ Controls if `protocolDeposit` gets called on deposit
      * @param strategyInitData_ Encoded data for this specific strategy
      */
     function initialize(
         address asset_,
         address owner_,
-        bool autoHarvest_,
+        bool autoDeposit_,
         bytes memory strategyInitData_
     ) external initializer {
         (address _lpToken, address _gauge, int128 _indexIn) = abi.decode(
@@ -54,7 +54,7 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy {
         indexIn = _indexIn;
         nCoins = ICurveLp(_lpToken).N_COINS();
 
-        __BaseStrategy_init(asset_, owner_, autoHarvest_);
+        __BaseStrategy_init(asset_, owner_, autoDeposit_);
 
         IERC20(_lpToken).approve(_gauge, type(uint256).max);
         IERC20(asset()).approve(_lpToken, type(uint256).max);
@@ -110,11 +110,18 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy {
                           INTERNAL HOOKS LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function _protocolDeposit(uint256 assets, uint256) internal override {
+    function _protocolDeposit(
+        uint256 assets,
+        uint256,
+        bytes memory data
+    ) internal override {
         uint256[] memory amounts = new uint256[](nCoins);
         amounts[uint256(uint128(indexIn))] = assets;
 
-        ICurveLp(lpToken).add_liquidity(amounts, 0);
+        ICurveLp(lpToken).add_liquidity(
+            amounts,
+            data.length > 0 ? abi.decode(data, (uint256)) : 0
+        );
         gauge.deposit(IERC20(lpToken).balanceOf(address(this)));
     }
 
@@ -138,7 +145,7 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Claim rewards from the gauge
-    function claim() public override returns (bool success) {
+    function claim() internal override returns (bool success) {
         try gauge.claim_rewards() {
             success = true;
         } catch {}
@@ -149,7 +156,7 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy {
     /**
      * @notice Claim rewards and compound them into the vault
      */
-    function harvest() public override  {
+    function harvest(bytes memory data) external override onlyKeeperOrOwner {
         claim();
 
         ICurveRouter router_ = curveRouter;
