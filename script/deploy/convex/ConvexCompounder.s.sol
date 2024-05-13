@@ -43,35 +43,55 @@ contract DeployStrategy is Script {
             )
         );
 
+        // Set Harvest values
+        _setHarvestValues(json, address(strategy));
+    }
+
+    function _setHarvestValues(string memory json_, address strategy) internal {
+        // Read harvest values
         address curveRouter_ = abi.decode(
-            json.parseRaw(".harvest.curveRouter"),
+            json_.parseRaw(".harvest.curveRouter"),
             (address)
         );
 
         int128 indexIn_ = abi.decode(
-            json.parseRaw(".harvest.indexIn"),
+            json_.parseRaw(".harvest.indexIn"),
             (int128)
         );
 
         uint256[] memory minTradeAmounts_ = abi.decode(
-            json.parseRaw(".harvest.minTradeAmounts"),
+            json_.parseRaw(".harvest.minTradeAmounts"),
             (uint256[])
         );
 
         address[] memory rewardTokens_ = abi.decode(
-            json.parseRaw(".harvest.rewardTokens"),
+            json_.parseRaw(".harvest.rewardTokens"),
             (address[])
         );
 
         //Construct CurveSwap structs
-        uint256 swapLen = json.readUint(
-            string.concat(".harvest.swaps.length")
+        CurveSwap[] memory swaps_ = _getCurveSwaps(json_);
+
+        // Set harvest values
+        ConvexCompounder(strategy).setHarvestValues(
+            curveRouter_,
+            rewardTokens_,
+            minTradeAmounts_,
+            swaps_,
+            indexIn_
         );
+    }
+
+    function _getCurveSwaps(
+        string memory json_
+    ) internal returns (CurveSwap[] memory) {
+        //Construct CurveSwap structs
+        uint256 swapLen = json_.readUint(string.concat(".harvest.swaps.length"));
 
         CurveSwap[] memory swaps_ = new CurveSwap[](swapLen);
         for (uint i; i < swapLen; i++) {
             // Read route and convert dynamic into fixed size array
-            address[] memory route_ = json.readAddressArray(
+            address[] memory route_ = json_.readAddressArray(
                 string.concat(
                     ".harvest.harvest.swaps.structs[",
                     vm.toString(i),
@@ -86,7 +106,7 @@ contract DeployStrategy is Script {
             // Read swapParams and convert dynamic into fixed size array
             uint256[5][5] memory swapParams;
             for (uint n = 0; n < 5; n++) {
-                uint256[] memory swapParams_ = json.readUintArray(
+                uint256[] memory swapParams_ = json_.readUintArray(
                     string.concat(
                         "harvest.swaps.structs[",
                         vm.toString(i),
@@ -101,7 +121,7 @@ contract DeployStrategy is Script {
             }
 
             // Read pools and convert dynamic into fixed size array
-            address[] memory pools_ = json.readAddressArray(
+            address[] memory pools_ = json_.readAddressArray(
                 string.concat(
                     "harvest.swaps.structs[",
                     vm.toString(i),
@@ -120,14 +140,6 @@ contract DeployStrategy is Script {
                 pools: pools
             });
         }
-
-        // Set harvest values
-        strategy.setHarvestValues(
-            curveRouter_,
-            rewardTokens_,
-            minTradeAmounts_,
-            swaps_,
-            indexIn_
-        );
+        return swaps_;
     }
 }

@@ -144,7 +144,7 @@ contract ConvexCompounder is BaseStrategy {
     /**
      * @notice Claim rewards and compound them into the vault
      */
-    function harvest() public override takeFees {
+    function harvest() public override  {
         claim();
 
         ICurveRouter router_ = curveRouter;

@@ -44,7 +44,6 @@ abstract contract BaseStrategy is
         __Pausable_init();
         __ERC4626_init(IERC20Metadata(asset_));
 
-        highWaterMark = convertToAssets(1e18);
         autoHarvest = autoHarvest_;
 
         INITIAL_CHAIN_ID = block.chainid;
@@ -83,7 +82,7 @@ abstract contract BaseStrategy is
         address receiver,
         uint256 assets,
         uint256 shares
-    ) internal override nonReentrant takeFees {
+    ) internal override nonReentrant {
         if (shares == 0 || assets == 0) revert ZeroAmount();
 
         // If _asset is ERC-777, `transferFrom` can trigger a reentrancy BEFORE the transfer happens through the
@@ -118,7 +117,7 @@ abstract contract BaseStrategy is
         address owner,
         uint256 assets,
         uint256 shares
-    ) internal override nonReentrant takeFees {
+    ) internal override nonReentrant {
         if (shares == 0 || assets == 0) revert ZeroAmount();
         if (caller != owner) {
             _spendAllowance(owner, caller, shares);
@@ -229,71 +228,11 @@ abstract contract BaseStrategy is
         // } catch {}
     }
 
-    function harvest() public virtual takeFees {}
+    function harvest() public virtual {}
 
     function toggleAutoHarvest() external onlyOwner {
         emit AutoHarvestToggled(autoHarvest, !autoHarvest);
         autoHarvest = !autoHarvest;
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                            FEE LOGIC
-    //////////////////////////////////////////////////////////////*/
-
-    uint256 public performanceFee;
-    uint256 public highWaterMark;
-
-    address public constant FEE_RECIPIENT =
-        address(0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E);
-
-    event PerformanceFeeChanged(uint256 oldFee, uint256 newFee);
-
-    error InvalidPerformanceFee(uint256 fee);
-
-    /**
-     * @notice Performance fee that has accrued since last fee harvest.
-     * @return Accrued performance fee in underlying `asset` token.
-     * @dev Performance fee is based on a high water mark value. If vault share value has increased above the
-     *   HWM in a fee period, issue fee shares to the vault equal to the performance fee.
-     */
-    function accruedPerformanceFee() public view returns (uint256) {
-        uint256 highWaterMark_ = highWaterMark;
-        uint256 shareValue = convertToAssets(1e18);
-        uint256 performanceFee_ = performanceFee;
-
-        return
-            performanceFee_ > 0 && shareValue > highWaterMark_
-                ? performanceFee_.mulDiv(
-                    (shareValue - highWaterMark_) * totalSupply(),
-                    1e36,
-                    Math.Rounding.Floor
-                )
-                : 0;
-    }
-
-    /**
-     * @notice Set a new performance fee for this adapter. Caller must be owner.
-     * @param newFee performance fee in 1e18.
-     * @dev Fees can be 0 but never more than 2e17 (1e18 = 100%, 1e14 = 1 BPS)
-     */
-    function setPerformanceFee(uint256 newFee) public onlyOwner {
-        // Dont take more than 20% performanceFee
-        if (newFee > 2e17) revert InvalidPerformanceFee(newFee);
-
-        emit PerformanceFeeChanged(performanceFee, newFee);
-
-        performanceFee = newFee;
-    }
-
-    /// @notice Collect performance fees and update asset checkpoint.
-    modifier takeFees() {
-        _;
-        uint256 fee = accruedPerformanceFee();
-        uint256 shareValue = convertToAssets(1e18);
-
-        if (shareValue > highWaterMark) highWaterMark = shareValue;
-
-        if (fee > 0) _mint(FEE_RECIPIENT, convertToShares(fee));
     }
 
     /*//////////////////////////////////////////////////////////////

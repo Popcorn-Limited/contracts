@@ -456,29 +456,6 @@ abstract contract BaseStrategyTest is PropertyTest {
     }
 
     /*//////////////////////////////////////////////////////////////
-                        PERFORMANCE FEE
-    //////////////////////////////////////////////////////////////*/
-
-    event PerformanceFeeChanged(uint256 oldFee, uint256 newFee);
-
-    function test__setPerformanceFee() public virtual {
-        vm.expectEmit(false, false, false, true, address(strategy));
-        emit PerformanceFeeChanged(0, 1e16);
-        strategy.setPerformanceFee(1e16);
-
-        assertEq(strategy.performanceFee(), 1e16);
-    }
-
-    function testFail__setPerformanceFee_nonOwner() public virtual {
-        vm.prank(alice);
-        strategy.setPerformanceFee(1e16);
-    }
-
-    function testFail__setPerformanceFee_invalid_fee() public virtual {
-        strategy.setPerformanceFee(3e17);
-    }
-
-    /*//////////////////////////////////////////////////////////////
                             HARVEST
     //////////////////////////////////////////////////////////////*/
 

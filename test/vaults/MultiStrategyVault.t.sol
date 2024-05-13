@@ -822,6 +822,29 @@ contract MultiStrategyVaultTest is Test {
     }
 
     /*//////////////////////////////////////////////////////////////
+                        PERFORMANCE FEE
+    //////////////////////////////////////////////////////////////*/
+
+    event PerformanceFeeChanged(uint256 oldFee, uint256 newFee);
+
+    function test__setPerformanceFee() public {
+        vm.expectEmit(false, false, false, true, address(vault));
+        emit PerformanceFeeChanged(0, 1e16);
+        vault.setPerformanceFee(1e16);
+
+        assertEq(vault.performanceFee(), 1e16);
+    }
+
+    function testFail__setPerformanceFee_nonOwner() public {
+        vm.prank(alice);
+        vault.setPerformanceFee(1e16);
+    }
+
+    function testFail__setPerformanceFee_invalid_fee() public {
+        vault.setPerformanceFee(3e17);
+    }
+
+    /*//////////////////////////////////////////////////////////////
                           SET DEPOSIT LIMIT
     //////////////////////////////////////////////////////////////*/
 

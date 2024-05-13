@@ -417,7 +417,7 @@ contract WstETHLooper is BaseStrategy, IFlashLoanReceiver {
     }
 
     // amount of WETH to borrow OR amount of WETH to repay (converted into wstETH amount internally)
-    function adjustLeverage() public takeFees {
+    function adjustLeverage() public  {
         // get vault current leverage : debt/collateral
         (
             uint256 currentLTV,
