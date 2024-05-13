@@ -144,12 +144,11 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy {
         } catch {}
     }
 
-    event log_uint(uint);
 
     /**
      * @notice Claim rewards and compound them into the vault
      */
-    function harvest() public override takeFees {
+    function harvest() public override {
         claim();
 
         ICurveRouter router_ = curveRouter;
@@ -158,7 +157,6 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy {
         for (uint256 i = 0; i < rewLen; i++) {
             address rewardToken = _rewardTokens[i];
             amount = IERC20(rewardToken).balanceOf(address(this));
-            emit log_uint(amount);
 
             if (amount > 0 && amount > minTradeAmounts[i]) {
                 CurveSwap memory swap = swaps[rewardToken];
@@ -190,27 +188,10 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy {
     function setHarvestValues(
         address curveRouter_,
         address[] memory rewardTokens_,
-        uint256[] memory minTradeAmounts_, // must be ordered like rewardTokens_
         CurveSwap[] memory swaps_, // must be ordered like rewardTokens_
         uint256 discountBps_
     ) public onlyOwner {
-        curveRouter = ICurveRouter(curveRouter_);
 
-        uint256 rewardTokenLen = _rewardTokens.length;
-        if (rewardTokenLen > 0) {
-            // void approvals
-            for (uint256 i = 0; i < rewardTokenLen; i++) {
-                IERC20(_rewardTokens[i]).approve(curveRouter_, 0);
-            }
-        }
-
-        for (uint256 i = 0; i < rewardTokens_.length; i++) {
-            IERC20(rewardTokens_[i]).approve(curveRouter_, type(uint256).max);
-            swaps[rewardTokens_[i]] = swaps_[i];
-        }
-
-        _rewardTokens = rewardTokens_;
-        minTradeAmounts = minTradeAmounts_;
         discountBps = discountBps_;
     }
 }

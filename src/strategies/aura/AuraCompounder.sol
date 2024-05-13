@@ -169,7 +169,7 @@ contract AuraCompounder is BaseStrategy {
     /**
      * @notice Execute Strategy and take fees.
      */
-    function harvest() public override takeFees {
+    function harvest() public override {
         claim();
 
         // Caching

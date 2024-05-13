@@ -44,9 +44,6 @@ abstract contract BaseStrategy is
         __Pausable_init();
         __ERC4626_init(IERC20Metadata(asset_));
 
-        highWaterMark = convertToAssets(1e18);
-        autoHarvest = autoHarvest_;
-
         INITIAL_CHAIN_ID = block.chainid;
         INITIAL_DOMAIN_SEPARATOR = computeDomainSeparator();
     }
@@ -83,7 +80,7 @@ abstract contract BaseStrategy is
         address receiver,
         uint256 assets,
         uint256 shares
-    ) internal override nonReentrant takeFees {
+    ) internal override nonReentrant {
         if (shares == 0 || assets == 0) revert ZeroAmount();
 
         // If _asset is ERC-777, `transferFrom` can trigger a reentrancy BEFORE the transfer happens through the
@@ -104,8 +101,6 @@ abstract contract BaseStrategy is
 
         _mint(receiver, shares);
 
-        if (autoHarvest) harvest();
-
         emit Deposit(caller, receiver, assets, shares);
     }
 
@@ -118,7 +113,7 @@ abstract contract BaseStrategy is
         address owner,
         uint256 assets,
         uint256 shares
-    ) internal override nonReentrant takeFees {
+    ) internal override nonReentrant {
         if (shares == 0 || assets == 0) revert ZeroAmount();
         if (caller != owner) {
             _spendAllowance(owner, caller, shares);
@@ -135,8 +130,6 @@ abstract contract BaseStrategy is
         _burn(owner, shares);
 
         IERC20(asset()).safeTransfer(receiver, assets);
-
-        if (autoHarvest) harvest();
 
         emit Withdraw(caller, receiver, owner, assets, shares);
     }
@@ -218,9 +211,6 @@ abstract contract BaseStrategy is
                             STRATEGY LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    bool public autoHarvest;
-
-    event AutoHarvestToggled(bool oldState, bool newState);
     event Harvested();
 
     function claim() public virtual returns (bool success) {
@@ -231,69 +221,33 @@ abstract contract BaseStrategy is
 
     function harvest() public virtual takeFees {}
 
-    function toggleAutoHarvest() external onlyOwner {
-        emit AutoHarvestToggled(autoHarvest, !autoHarvest);
-        autoHarvest = !autoHarvest;
-    }
+    // function pushFunds(uint256 assets, bytes data) external onlyKeeperOrOwner {
+    //     _protocolDeposit(assets, convertToShares(assets), data);
+    // }
+
+    // function pullFunds(uint256 assets, bytes data) external onlyKeeperOrOwner {
+    //     _protocolWithdraw(assets, convertToShares(assets), data);
+    // }
 
     /*//////////////////////////////////////////////////////////////
-                            FEE LOGIC
+                            STRATEGY LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    uint256 public performanceFee;
-    uint256 public highWaterMark;
+    address keeper;
 
-    address public constant FEE_RECIPIENT =
-        address(0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E);
+    event KeeperChanged(address prev, address curr);
 
-    event PerformanceFeeChanged(uint256 oldFee, uint256 newFee);
+    error NotKeeperNorOwner();
 
-    error InvalidPerformanceFee(uint256 fee);
-
-    /**
-     * @notice Performance fee that has accrued since last fee harvest.
-     * @return Accrued performance fee in underlying `asset` token.
-     * @dev Performance fee is based on a high water mark value. If vault share value has increased above the
-     *   HWM in a fee period, issue fee shares to the vault equal to the performance fee.
-     */
-    function accruedPerformanceFee() public view returns (uint256) {
-        uint256 highWaterMark_ = highWaterMark;
-        uint256 shareValue = convertToAssets(1e18);
-        uint256 performanceFee_ = performanceFee;
-
-        return
-            performanceFee_ > 0 && shareValue > highWaterMark_
-                ? performanceFee_.mulDiv(
-                    (shareValue - highWaterMark_) * totalSupply(),
-                    1e36,
-                    Math.Rounding.Floor
-                )
-                : 0;
+    function setKeeper(address keeper_) external onlyOwner {
+        emit KeeperChanged(keeper, keeper_);
+        keeper = keeper_;
     }
 
-    /**
-     * @notice Set a new performance fee for this adapter. Caller must be owner.
-     * @param newFee performance fee in 1e18.
-     * @dev Fees can be 0 but never more than 2e17 (1e18 = 100%, 1e14 = 1 BPS)
-     */
-    function setPerformanceFee(uint256 newFee) public onlyOwner {
-        // Dont take more than 20% performanceFee
-        if (newFee > 2e17) revert InvalidPerformanceFee(newFee);
-
-        emit PerformanceFeeChanged(performanceFee, newFee);
-
-        performanceFee = newFee;
-    }
-
-    /// @notice Collect performance fees and update asset checkpoint.
-    modifier takeFees() {
+    modifier onlyKeeperOrOwner() {
+        if (msg.sender != owner || msg.sender != keeper)
+            revert NotKeeperNorOwner();
         _;
-        uint256 fee = accruedPerformanceFee();
-        uint256 shareValue = convertToAssets(1e18);
-
-        if (shareValue > highWaterMark) highWaterMark = shareValue;
-
-        if (fee > 0) _mint(FEE_RECIPIENT, convertToShares(fee));
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -301,14 +255,14 @@ abstract contract BaseStrategy is
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Pause Deposits and withdraw all funds from the underlying protocol. Caller must be owner.
-    function pause() external onlyOwner {
-        _protocolWithdraw(totalAssets(), totalSupply());
+    function pause() external virtual onlyOwner {
+        _protocolWithdraw(totalAssets(), totalSupply(), bytes(""));
         _pause();
     }
 
     /// @notice Unpause Deposits and deposit all funds into the underlying protocol. Caller must be owner.
-    function unpause() external onlyOwner {
-        _protocolDeposit(totalAssets(), totalSupply());
+    function unpause() external virtual onlyOwner {
+        _protocolDeposit(totalAssets(), totalSupply(), bytes(""));
         _unpause();
     }
 

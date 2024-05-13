@@ -144,49 +144,22 @@ contract ConvexCompounder is BaseStrategy {
     /**
      * @notice Claim rewards and compound them into the vault
      */
-    function harvest() public override takeFees {
+    function harvest() public override {
         claim();
 
-        ICurveRouter router_ = curveRouter;
-        uint256 amount;
-        uint256 rewLen = _rewardTokens.length;
-        for (uint256 i = 0; i < rewLen; i++) {
-            address rewardToken = _rewardTokens[i];
-            amount = IERC20(rewardToken).balanceOf(address(this));
+        _sellRewards();
 
-            if (amount > 0 && amount > minTradeAmounts[i]) {
-                CurveSwap memory swap = swaps[rewardToken];
-                router_.exchange(
-                    swap.route,
-                    swap.swapParams,
-                    amount,
-                    0,
-                    swap.pools
-                );
-            }
-        }
-
-        amount = IERC20(depositAsset).balanceOf(address(this));
+        uint256 amount = IERC20(depositAsset).balanceOf(address(this));
         if (amount > 0) {
-            uint256[] memory amounts = new uint256[](nCoins);
-            amounts[uint256(uint128(indexIn))] = amount;
-
             address asset_ = asset();
 
-            ICurveLp(asset_).add_liquidity(amounts, 0);
+            CurveTradeLibrary.addLiquidity(asset_, nCoins, indexIn, amount, 0);
 
             _protocolDeposit(IERC20(asset_).balanceOf(address(this)), 0);
         }
 
         emit Harvested();
     }
-
-    address[] internal _rewardTokens;
-    uint256[] public minTradeAmounts; // ordered as in rewardsTokens()
-
-    ICurveRouter public curveRouter;
-
-    mapping(address => CurveSwap) internal swaps; // to swap reward token to baseAsset
 
     address public depositAsset;
     int128 public indexIn;
@@ -219,22 +192,5 @@ contract ConvexCompounder is BaseStrategy {
 
         _rewardTokens = rewardTokens_;
         minTradeAmounts = minTradeAmounts_;
-    }
-
-    function _approveSwapTokens(
-        address[] memory rewardTokens_,
-        address curveRouter_
-    ) internal {
-        uint256 rewardTokenLen = _rewardTokens.length;
-        if (rewardTokenLen > 0) {
-            // void approvals
-            for (uint256 i = 0; i < rewardTokenLen; i++) {
-                IERC20(_rewardTokens[i]).approve(curveRouter_, 0);
-            }
-        }
-
-        for (uint256 i = 0; i < rewardTokens_.length; i++) {
-            IERC20(rewardTokens_[i]).approve(curveRouter_, type(uint256).max);
-        }
     }
 }
