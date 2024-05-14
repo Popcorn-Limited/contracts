@@ -119,6 +119,8 @@ contract CurveGaugeCompounder is BaseStrategy {
                             STRATEGY LOGIC
     //////////////////////////////////////////////////////////////*/
 
+    error CompoundFailed();
+
     /// @notice Claim rewards from the gauge
     function claim() internal override returns (bool success) {
         try gauge.claim_rewards() {
@@ -141,7 +143,7 @@ contract CurveGaugeCompounder is BaseStrategy {
             address rewardToken = _rewardTokens[i];
             amount = IERC20(rewardToken).balanceOf(address(this));
 
-            if (amount > 0 && amount > minTradeAmounts[i]) {
+            if (amount > 0) {
                 CurveSwap memory swap = swaps[rewardToken];
                 router_.exchange(
                     swap.route,
@@ -160,15 +162,17 @@ contract CurveGaugeCompounder is BaseStrategy {
 
             ICurveLp(pool).add_liquidity(amounts, 0);
 
-            address asset_ = asset();
-            _protocolDeposit(IERC20(asset_).balanceOf(address(this)), 0);
-        }
+            uint256 minOut = abi.decode(data, (uint256));
 
+            amount = IERC20(asset()).balanceOf(address(this));
+            if (amount < minOut) revert CompoundFailed();
+
+            _protocolDeposit(amount, 0, bytes(""));
+        }
         emit Harvested();
     }
 
     address[] internal _rewardTokens;
-    uint256[] public minTradeAmounts; // ordered as in rewardsTokens()
 
     ICurveRouter public curveRouter;
 
@@ -182,7 +186,6 @@ contract CurveGaugeCompounder is BaseStrategy {
     function setHarvestValues(
         address curveRouter_,
         address[] memory rewardTokens_,
-        uint256[] memory minTradeAmounts_, // must be ordered like rewardTokens_
         CurveSwap[] memory swaps_, // must be ordered like rewardTokens_
         int128 indexIn_
     ) public onlyOwner {
@@ -204,7 +207,6 @@ contract CurveGaugeCompounder is BaseStrategy {
         indexIn = indexIn_;
 
         _rewardTokens = rewardTokens_;
-        minTradeAmounts = minTradeAmounts_;
     }
 
     function _approveSwapTokens(

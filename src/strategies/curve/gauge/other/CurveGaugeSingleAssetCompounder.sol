@@ -144,14 +144,14 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy {
                             STRATEGY LOGIC
     //////////////////////////////////////////////////////////////*/
 
+    error CompoundFailed();
+
     /// @notice Claim rewards from the gauge
     function claim() internal override returns (bool success) {
         try gauge.claim_rewards() {
             success = true;
         } catch {}
     }
-
-    event log_uint(uint);
 
     /**
      * @notice Claim rewards and compound them into the vault
@@ -165,9 +165,8 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy {
         for (uint256 i = 0; i < rewLen; i++) {
             address rewardToken = _rewardTokens[i];
             amount = IERC20(rewardToken).balanceOf(address(this));
-            emit log_uint(amount);
 
-            if (amount > 0 && amount > minTradeAmounts[i]) {
+            if (amount > 0) {
                 CurveSwap memory swap = swaps[rewardToken];
                 router_.exchange(
                     swap.route,
@@ -179,14 +178,20 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy {
             }
         }
 
-        uint256 depositAmount = IERC20(asset()).balanceOf(address(this));
-        if (depositAmount > 0) _protocolDeposit(depositAmount, 0);
+        (uint256 minOut, bytes memory depositData) = abi.decode(
+            data,
+            (uint256, bytes)
+        );
+
+        amount = IERC20(asset()).balanceOf(address(this));
+        if (amount < minOut) revert CompoundFailed();
+
+        _protocolDeposit(amount, 0, depositData);
 
         emit Harvested();
     }
 
     address[] internal _rewardTokens;
-    uint256[] public minTradeAmounts; // ordered as in rewardsTokens()
 
     ICurveRouter public curveRouter;
 
@@ -197,7 +202,6 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy {
     function setHarvestValues(
         address curveRouter_,
         address[] memory rewardTokens_,
-        uint256[] memory minTradeAmounts_, // must be ordered like rewardTokens_
         CurveSwap[] memory swaps_, // must be ordered like rewardTokens_
         uint256 discountBps_
     ) public onlyOwner {
@@ -217,7 +221,6 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy {
         }
 
         _rewardTokens = rewardTokens_;
-        minTradeAmounts = minTradeAmounts_;
         discountBps = discountBps_;
     }
 }

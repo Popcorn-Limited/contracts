@@ -288,7 +288,7 @@ contract WstETHLooper is BaseStrategy, IFlashLoanReceiver {
         require(sent, "Fail to send eth to wstETH");
 
         // deposit wstETH into lending protocol
-        _protocolDeposit(wstETHAmount, 0);
+        _protocolDeposit(wstETHAmount, 0, bytes(""));
     }
 
     // reduce leverage by withdrawing wstETH, swapping to ETH repaying ETH debt

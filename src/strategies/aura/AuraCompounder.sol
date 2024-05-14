@@ -25,14 +25,12 @@ struct HarvestValues {
 struct HarvestTradePath {
     IAsset[] assets;
     int256[] limits;
-    uint256 minTradeAmount;
     BatchSwapStep[] swaps;
 }
 
 struct TradePath {
     IAsset[] assets;
     int256[] limits;
-    uint256 minTradeAmount;
     bytes swaps;
 }
 
@@ -163,6 +161,8 @@ contract AuraCompounder is BaseStrategy {
                             STRATEGY LOGIC
     //////////////////////////////////////////////////////////////*/
 
+    error CompoundFailed();
+
     /// @notice Claim rewards from the aura
     function claim() internal override returns (bool success) {
         try auraRewards.getReward() {
@@ -251,8 +251,13 @@ contract AuraCompounder is BaseStrategy {
                 )
             );
 
+            uint256 minOut = abi.decode(data, (uint256));
+
+            amount = IERC20(asset()).balanceOf(address(this));
+            if (amount < minOut) revert CompoundFailed();
+
             // redeposit
-            _protocolDeposit(IERC20(asset()).balanceOf(address(this)), 0);
+            _protocolDeposit(amount, 0, bytes(""));
         }
 
         emit Harvested();
@@ -305,7 +310,6 @@ contract AuraCompounder is BaseStrategy {
                 TradePath({
                     assets: tradePaths_[i].assets,
                     limits: tradePaths_[i].limits,
-                    minTradeAmount: tradePaths_[i].minTradeAmount,
                     swaps: abi.encode(tradePaths_[i].swaps)
                 })
             );
