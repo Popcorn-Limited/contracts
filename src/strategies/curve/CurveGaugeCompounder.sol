@@ -137,7 +137,11 @@ contract CurveGaugeCompounder is BaseStrategy, BaseCurveLpCompounder {
 
         sellRewardsForLpTokenViaCurve(address(pool), asset(), nCoins, data);
 
-        _protocolDeposit(amount, 0, bytes(""));
+        _protocolDeposit(
+            IERC20(asset()).balanceOf(address(this)),
+            0,
+            bytes("")
+        );
 
         emit Harvested();
     }

@@ -165,10 +165,8 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy, BaseCurveCompounder {
 
         sellRewardsViaCurve();
 
-        amount = IERC20(asset()).balanceOf(address(this));
-
         // Slippage protection will be done here via `data` as the `minOut` of the `add_liquidity`-call
-        _protocolDeposit(amount, 0, data);
+        _protocolDeposit(IERC20(asset()).balanceOf(address(this)), 0, data);
 
         emit Harvested();
     }
