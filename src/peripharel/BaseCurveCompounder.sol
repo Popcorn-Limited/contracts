@@ -4,7 +4,7 @@
 pragma solidity ^0.8.25;
 
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
-import {ICurveLp, IGauge, ICurveRouter, CurveSwap, IMinter} from "../strategies/curve/ICurve.sol";
+import {ICurveRouter, CurveSwap} from "../strategies/curve/ICurve.sol";
 import {CurveTradeLibrary} from "./CurveTradeLibrary.sol";
 
 abstract contract BaseCurveCompounder {
@@ -13,28 +13,31 @@ abstract contract BaseCurveCompounder {
     address[] internal _rewardTokens;
     CurveSwap[] internal swaps; // Must be ordered like `_rewardTokens`
 
-    function _sellRewards() internal {
+    function sellRewardsViaCurve() internal {
         // caching
         ICurveRouter router = curveRouter;
-        address[] memory sellTokens = _rewardTokens;
         CurveSwap[] memory sellSwaps = swaps;
 
         uint256 amount;
-        uint256 rewLen = sellTokens.length;
-        for (uint256 i = 0; i < rewLen; i++) {
-            amount = IERC20(sellTokens[i]).balanceOf(address(this));
+        uint256 rewLen = sellSwaps.length;
+        for (uint256 i = 0; i < rewLen; ) {
+            amount = IERC20(sellSwaps[i].route[0]).balanceOf(address(this));
 
             if (amount > 0) {
                 CurveTradeLibrary.trade(router, sellSwaps[i], amount, 0);
             }
+
+            unchecked {
+                ++i;
+            }
         }
     }
 
-    function _setTradeValues(
+    function setCurveTradeValues(
         address newRouter,
-        address[] memory newRewardTokens,
-        CurveSwap[] memory newSwaps // must be ordered like `newRewardTokens`
+        CurveSwap[] memory newSwaps
     ) internal {
+        // Remove old rewardToken allowance
         uint256 rewardTokenLen = _rewardTokens.length;
         if (rewardTokenLen > 0) {
             // caching
@@ -42,26 +45,35 @@ abstract contract BaseCurveCompounder {
             address memory oldRewardTokens = _rewardTokens;
 
             // void approvals
-            for (uint256 i = 0; i < rewardTokenLen; i++) {
+            for (uint256 i = 0; i < rewardTokenLen; ) {
                 IERC20(oldRewardTokens[i]).approve(oldRouter, 0);
+
+                unchecked {
+                    ++i;
+                }
             }
         }
 
+        // delete old state
+        delete _rewardTokens;
         delete swaps;
-        rewardTokenLen = newRewardTokens.length;
-        for (uint256 i = 0; i < rewardTokenLen; i++) {
-            IERC20(newRewardTokens[i]).approve(newRouter, type(uint256).max);
+
+        // Add new allowance + state
+        address newRewardToken;
+        rewardTokenLen = newSwaps.length;
+        for (uint256 i = 0; i < rewardTokenLen; ) {
+            newRewardToken = newSwaps[i].route[0];
+
+            IERC20(newRewardToken).approve(newRouter, type(uint256).max);
+
+            _rewardTokens.push(newRewardToken);
             swaps.push(newSwaps[i]);
+
+            unchecked {
+                ++i;
+            }
         }
 
-        _rewardTokens = newRewardTokens;
         curveRouter = ICurveRouter(newRouter);
     }
-
-    function _approveSwapTokens(
-        address[] memory oldRewardTokens,
-        address[] memory newRewardTokens,
-        address oldRouter,
-        address newRouter
-    ) internal {}
 }

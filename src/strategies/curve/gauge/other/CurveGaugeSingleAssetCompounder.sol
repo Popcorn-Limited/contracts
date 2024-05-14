@@ -118,10 +118,12 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy {
         uint256[] memory amounts = new uint256[](nCoins);
         amounts[uint256(uint128(indexIn))] = assets;
 
+        // Add slippage protection if the call comes from a authorised source
         ICurveLp(lpToken).add_liquidity(
             amounts,
             data.length > 0 ? abi.decode(data, (uint256)) : 0
         );
+
         gauge.deposit(IERC20(lpToken).balanceOf(address(this)));
     }
 
@@ -144,8 +146,6 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy {
                             STRATEGY LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    error CompoundFailed();
-
     /// @notice Claim rewards from the gauge
     function claim() internal override returns (bool success) {
         try gauge.claim_rewards() {
@@ -159,52 +159,23 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy {
     function harvest(bytes memory data) external override onlyKeeperOrOwner {
         claim();
 
-        ICurveRouter router_ = curveRouter;
-        uint256 amount;
-        uint256 rewLen = _rewardTokens.length;
-        for (uint256 i = 0; i < rewLen; i++) {
-            address rewardToken = _rewardTokens[i];
-            amount = IERC20(rewardToken).balanceOf(address(this));
-
-            if (amount > 0) {
-                CurveSwap memory swap = swaps[rewardToken];
-                router_.exchange(
-                    swap.route,
-                    swap.swapParams,
-                    amount,
-                    0,
-                    swap.pools
-                );
-            }
-        }
-
-        (uint256 minOut, bytes memory depositData) = abi.decode(
-            data,
-            (uint256, bytes)
-        );
+        sellRewardsViaCurve();
 
         amount = IERC20(asset()).balanceOf(address(this));
-        if (amount < minOut) revert CompoundFailed();
 
-        _protocolDeposit(amount, 0, depositData);
+        // Slippage protection will be done here via `data` as the `minOut` of the `add_liquidity`-call
+        _protocolDeposit(amount, 0, data);
 
         emit Harvested();
     }
 
-    address[] internal _rewardTokens;
-
-    ICurveRouter public curveRouter;
-
-    mapping(address => CurveSwap) internal swaps; // to swap reward token to baseAsset
-
-    error InvalidHarvestValues();
-
     function setHarvestValues(
-        address curveRouter_,
-        address[] memory rewardTokens_,
-        CurveSwap[] memory swaps_, // must be ordered like rewardTokens_
+        address newRouter,
+        address[] memory newRewardTokens,
+        CurveSwap[] memory newSwaps, // must be ordered like `newRewardTokens`
         uint256 discountBps_
-    ) public onlyOwner {
+    ) external onlyOwner {
+        setCurveTradeValues(newRouter, newRewardTokens, newSwaps);
 
         discountBps = discountBps_;
     }

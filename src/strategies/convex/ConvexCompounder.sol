@@ -5,7 +5,7 @@ pragma solidity ^0.8.25;
 
 import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math} from "../BaseStrategy.sol";
 import {IConvexBooster, IConvexRewards, IRewards} from "./IConvex.sol";
-import {ICurveLp, IGauge, ICurveRouter, CurveSwap, IMinter} from "../curve/ICurve.sol";
+import {BaseCurveCompounder, CurveTradeLibrary, ICurveLp, ICurveRouter, CurveSwap} from "../../peripheral/BaseCurveCompounder.sol";
 
 /**
  * @title   Convex Compounder Adapter
@@ -16,7 +16,7 @@ import {ICurveLp, IGauge, ICurveRouter, CurveSwap, IMinter} from "../curve/ICurv
  * Allows wrapping Convex Vaults with or without an active convexBooster.
  * Compounds rewards into the vault underlying.
  */
-contract ConvexCompounder is BaseStrategy {
+contract ConvexCompounder is BaseStrategy, BaseCurveCompounder {
     using SafeERC20 for IERC20;
     using Math for uint256;
 
@@ -141,6 +141,9 @@ contract ConvexCompounder is BaseStrategy {
                             STRATEGY LOGIC
     //////////////////////////////////////////////////////////////*/
 
+    address internal depositAsset;
+    int128 internal indexIn;
+
     error CompoundFailed();
 
     /// @notice Claim liquidity mining rewards given that it's active
@@ -156,51 +159,43 @@ contract ConvexCompounder is BaseStrategy {
     function harvest(bytes memory data) external override onlyKeeperOrOwner {
         claim();
 
-        _sellRewards();
+        sellRewardsViaCurve();
 
         uint256 amount = IERC20(depositAsset).balanceOf(address(this));
-        if (amount > 0) {
-            address asset_ = asset();
 
-            CurveTradeLibrary.addLiquidity(asset_, nCoins, indexIn, amount, 0);
+        CurveTradeLibrary.addLiquidity(
+            address(pool),
+            nCoins,
+            indexIn,
+            amount,
+            0
+        );
 
-            amount = IERC20(asset()).balanceOf(address(this));
-            if (amount < minOut) revert CompoundFailed();
+        amount = IERC20(asset()).balanceOf(address(this));
+        uint256 minOut = abi.decode(data, (uint256));
+        if (amount < minOut) revert CompoundFailed();
 
-            _protocolDeposit(amount, 0, bytes(""));
-        }
+        _protocolDeposit(amount, 0, bytes(""));
 
         emit Harvested();
     }
 
-    address public depositAsset;
-    int128 public indexIn;
-
-    error InvalidHarvestValues();
-
     function setHarvestValues(
-        address curveRouter_,
-        address[] memory rewardTokens_,
-        CurveSwap[] memory swaps_, // must be ordered like rewardTokens_
+        address newRouter,
+        address[] memory newRewardTokens,
+        CurveSwap[] memory newSwaps, // must be ordered like `newRewardTokens`
         int128 indexIn_
-    ) public onlyOwner {
-        curveRouter = ICurveRouter(curveRouter_);
+    ) external onlyOwner {
+        setCurveTradeValues(newRouter, newRewardTokens, newSwaps);
 
-        _approveSwapTokens(rewardTokens_, curveRouter_);
-        for (uint256 i = 0; i < rewardTokens_.length; i++) {
-            swaps[rewardTokens_[i]] = swaps_[i];
-        }
-
+        // caching
         address asset_ = asset();
-        address depositAsset_ = ICurveLp(asset_).coins(
-            uint256(uint128(indexIn_))
-        );
+
+        address depositAsset_ = pool.coins(uint256(uint128(indexIn_)));
         if (depositAsset != address(0)) IERC20(depositAsset).approve(asset_, 0);
         IERC20(depositAsset_).approve(asset_, type(uint256).max);
 
         depositAsset = depositAsset_;
         indexIn = indexIn_;
-
-        _rewardTokens = rewardTokens_;
     }
 }
