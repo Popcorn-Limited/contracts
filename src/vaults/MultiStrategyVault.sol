@@ -109,6 +109,7 @@ contract MultiStrategyVault is
         // Set other state variables
         quitPeriod = 3 days;
         depositLimit = depositLimit_;
+        highWaterMark = convertToAssets(1e18);
 
         _name = string.concat(
             "VaultCraft ",

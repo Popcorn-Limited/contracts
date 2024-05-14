@@ -9,14 +9,6 @@ import {IPermit} from "./IPermit.sol";
 import {IPausable} from "./IPausable.sol";
 
 interface IBaseStrategy is IERC4626, IOwned, IPermit, IPausable {
-    function setPerformanceFee(uint256 fee) external;
-
-    function performanceFee() external view returns (uint256);
-
-    function highWaterMark() external view returns (uint256);
-
-    function accruedPerformanceFee() external view returns (uint256);
-
     function harvest() external;
 
     function toggleAutoHarvest() external;
@@ -32,7 +24,7 @@ interface IBaseStrategy is IERC4626, IOwned, IPermit, IPausable {
     function initialize(
         address asset_,
         address owner_,
-        bool autoHarvest_,
+        bool autoDeposit_,
         bytes memory adapterData_
     ) external;
 

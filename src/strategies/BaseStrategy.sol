@@ -33,16 +33,18 @@ abstract contract BaseStrategy is
      * @notice Initialize a new Strategy.
      * @param asset_ The underlying asset used for deposit/withdraw and accounting
      * @param owner_ Owner of the contract. Controls management functions.
-     * @param autoHarvest_ Controls if the harvest function gets called on deposit/withdrawal
+     * @param autoDeposit_ Controls if `protocolDeposit` gets called on deposit
      */
     function __BaseStrategy_init(
         address asset_,
         address owner_,
-        bool autoHarvest_
+        bool autoDeposit_
     ) internal onlyInitializing {
         __Owned_init(owner_);
         __Pausable_init();
         __ERC4626_init(IERC20Metadata(asset_));
+
+        autoDeposit = autoDeposit_;
 
         INITIAL_CHAIN_ID = block.chainid;
         INITIAL_DOMAIN_SEPARATOR = computeDomainSeparator();
@@ -97,7 +99,7 @@ abstract contract BaseStrategy is
             assets
         );
 
-        _protocolDeposit(assets, shares);
+        if (autoDeposit) _protocolDeposit(assets, shares, bytes(""));
 
         _mint(receiver, shares);
 
@@ -142,11 +144,9 @@ abstract contract BaseStrategy is
      * @notice Total amount of underlying `asset` token managed by adapter.
      * @dev Return assets held by adapter if paused.
      */
-    function totalAssets() public view override returns (uint256) {
-        return
-            paused()
-                ? IERC20(asset()).balanceOf(address(this))
-                : _totalAssets();
+    function totalAssets() public view override returns (uint256 ta) {
+        ta = IERC20(asset()).balanceOf(address(this));
+        if (!paused()) ta += _totalAssets();
     }
 
     /**
@@ -195,7 +195,11 @@ abstract contract BaseStrategy is
     //////////////////////////////////////////////////////////////*/
 
     /// @notice deposit into the underlying protocol.
-    function _protocolDeposit(uint256 assets, uint256 shares) internal virtual {
+    function _protocolDeposit(
+        uint256 assets,
+        uint256 shares,
+        bytes memory data
+    ) internal virtual {
         // OPTIONAL - convertIntoUnderlyingShares(assets,shares)
     }
 
@@ -211,33 +215,34 @@ abstract contract BaseStrategy is
                             STRATEGY LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    event Harvested();
+    bool public autoDeposit;
+    address public keeper;
 
-    function claim() public virtual returns (bool success) {
+    event AutoDepositToggled(bool oldState, bool newState);
+    event Harvested();
+    event KeeperChanged(address prev, address curr);
+
+    error NotKeeperNorOwner();
+
+    function claim() internal virtual returns (bool success) {
         // try auraRewards.getReward() {
         //     success = true;
         // } catch {}
     }
 
-    function harvest() public virtual takeFees {}
+    function harvest(bytes memory data) external virtual onlyKeeperOrOwner {}
 
-    // function pushFunds(uint256 assets, bytes data) external onlyKeeperOrOwner {
-    //     _protocolDeposit(assets, convertToShares(assets), data);
-    // }
+    function pushFunds(
+        uint256 assets,
+        bytes memory data
+    ) external virtual onlyKeeperOrOwner {
+        _protocolDeposit(assets, convertToShares(assets), data);
+    }
 
-    // function pullFunds(uint256 assets, bytes data) external onlyKeeperOrOwner {
-    //     _protocolWithdraw(assets, convertToShares(assets), data);
-    // }
-
-    /*//////////////////////////////////////////////////////////////
-                            STRATEGY LOGIC
-    //////////////////////////////////////////////////////////////*/
-
-    address keeper;
-
-    event KeeperChanged(address prev, address curr);
-
-    error NotKeeperNorOwner();
+    function toggleAutoDeposit() external onlyOwner {
+        emit AutoDepositToggled(autoDeposit, !autoDeposit);
+        autoDeposit = !autoDeposit;
+    }
 
     function setKeeper(address keeper_) external onlyOwner {
         emit KeeperChanged(keeper, keeper_);

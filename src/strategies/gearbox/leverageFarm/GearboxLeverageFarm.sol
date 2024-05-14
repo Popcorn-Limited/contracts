@@ -36,13 +36,13 @@ abstract contract GearboxLeverageFarm is BaseStrategy {
      * @notice Initialize a new Strategy.
      * @param asset_ The underlying asset used for deposit/withdraw and accounting
      * @param owner_ Owner of the contract. Controls management functions.
-     * @param autoHarvest_ Controls if the harvest function gets called on deposit/withdrawal
+     * @param autoDeposit_ Controls if `protocolDeposit` gets called on deposit
      * @param strategyInitData_ Encoded data for this specific strategy
      */
     function initialize(
         address asset_,
         address owner_,
-        bool autoHarvest_,
+        bool autoDeposit_,
         bytes memory strategyInitData_
     ) external initializer {
         (
@@ -60,7 +60,7 @@ abstract contract GearboxLeverageFarm is BaseStrategy {
             0
         );
 
-        __BaseStrategy_init(asset_, owner_, autoHarvest_);
+        __BaseStrategy_init(asset_, owner_, autoDeposit_);
 
         IERC20(asset()).approve(_creditManager, type(uint256).max);
 
@@ -93,6 +93,7 @@ abstract contract GearboxLeverageFarm is BaseStrategy {
     /*//////////////////////////////////////////////////////////////
                           ACCOUNTING LOGIC
     //////////////////////////////////////////////////////////////*/
+
     function _totalAssets() internal view override returns (uint256) {
         return IERC20(asset()).balanceOf(creditAccount); //_getCreditAccountData().totalValue;
     }
@@ -101,7 +102,11 @@ abstract contract GearboxLeverageFarm is BaseStrategy {
                           INTERNAL HOOKS LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function _protocolDeposit(uint256 assets, uint256) internal override {
+    function _protocolDeposit(
+        uint256 assets,
+        uint256,
+        bytes memory
+    ) internal override {
         MultiCall[] memory calls = new MultiCall[](1);
         calls[0] = MultiCall({
             target: address(creditFacade),
