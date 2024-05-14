@@ -16,12 +16,15 @@ import {ICurveGauge} from "../interfaces/external/curve/ICurveGauge.sol";
 contract VaultRouter {
     using SafeERC20 for IERC20;
 
+    error SlippageTooHigh();
+
     constructor() {}
 
     function depositAndStake(
         IERC4626 vault,
         ICurveGauge gauge,
         uint256 assetAmount,
+        uint256 minOut,
         address receiver
     ) external {
         IERC20 asset = IERC20(vault.asset());
@@ -29,6 +32,8 @@ contract VaultRouter {
         asset.approve(address(vault), assetAmount);
 
         uint256 shares = vault.deposit(assetAmount, address(this));
+
+        if (shares < minOut) revert SlippageTooHigh();
 
         vault.approve(address(gauge), shares);
         gauge.deposit(shares, receiver);
@@ -38,12 +43,19 @@ contract VaultRouter {
         IERC4626 vault,
         ICurveGauge gauge,
         uint256 burnAmount,
+        uint256 minOut,
         address receiver
     ) external {
-        IERC20(address(gauge)).safeTransferFrom(msg.sender, address(this), burnAmount);
+        IERC20(address(gauge)).safeTransferFrom(
+            msg.sender,
+            address(this),
+            burnAmount
+        );
 
         gauge.withdraw(burnAmount);
 
-        vault.redeem(burnAmount, receiver, address(this));
+        uint256 assets = vault.redeem(burnAmount, receiver, address(this));
+
+        if (assets < minOut) revert SlippageTooHigh();
     }
 }

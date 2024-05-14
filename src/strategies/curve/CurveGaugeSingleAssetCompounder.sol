@@ -101,14 +101,63 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy, BaseCurveCompounder {
         uint256 lpBal = IERC20(address(gauge)).balanceOf(address(this));
         return
             lpBal > 0
-                ? (((ICurveLp(lpToken).get_virtual_price() * lpBal) / 1e18) *
-                    (10_000 - discountBps)) / 10_000
+                ? ((ICurveLp(lpToken).get_virtual_price() * lpBal) / 1e18)
                 : 0;
     }
 
     /// @notice The token rewarded from the convex reward contract
     function rewardTokens() external view override returns (address[] memory) {
         return _rewardTokens;
+    }
+
+    function previewDeposit(
+        uint256 assets
+    ) public view override returns (uint256) {
+        return
+            _convertToShares(
+                assets.mulDiv(
+                    10_000 - depositSlippage,
+                    10_000,
+                    Math.Rounding.Floor
+                ),
+                Math.Rounding.Floor
+            );
+    }
+
+    function previewMint(
+        uint256 shares
+    ) public view override returns (uint256) {
+        return
+            _convertToAssets(shares, Math.Rounding.Ceil).mulDiv(
+                10_000 - depositSlippage,
+                10_000,
+                Math.Rounding.Floor
+            );
+    }
+
+    function previewWithdraw(
+        uint256 assets
+    ) public view override returns (uint256) {
+        return
+            _convertToShares(
+                assets.mulDiv(
+                    10_000,
+                    10_000 - depositSlippage,
+                    Math.Rounding.Ceil
+                ),
+                Math.Rounding.Ceil
+            );
+    }
+
+    function previewRedeem(
+        uint256 shares
+    ) public view override returns (uint256) {
+        return
+            _convertToAssets(shares, Math.Rounding.Floor).mulDiv(
+                10_000,
+                10_000 - depositSlippage,
+                Math.Rounding.Ceil
+            );
     }
 
     /*//////////////////////////////////////////////////////////////
