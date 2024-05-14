@@ -13,6 +13,7 @@ import {stdJson} from "forge-std/StdJson.sol";
 import "forge-std/console.sol";
 
 struct Command {
+    uint256 commandType; // 0 delegateCall, 1 call, 2 static call, 3 call with value
     string signature;
     address target;
 }
@@ -37,8 +38,17 @@ contract WeirollAdapterTest is AbstractAdapterTest {
 
     bytes[] claimStates = new bytes[](17);
 
+    string jsonConfig;
+
     function setUp() public {
         vm.createSelectFork(vm.rpcUrl("mainnet"), 19262400);
+
+        jsonConfig = vm.readFile(
+            string.concat(
+                vm.projectRoot(),
+                "/test/vault/adapter/abstract/WeirollAdapterConfig.json" // TODO PATH var
+            )
+        );
 
         testConfigStorage = ITestConfigStorage(
             address(new ConvexTestConfigStorage())
@@ -282,13 +292,13 @@ contract WeirollAdapterTest is AbstractAdapterTest {
         assertGt(totAssetsAfter, totAssetsBefore);
     }
 
-    function _getCommandInputs(string memory key, string memory json) internal returns (InputIndex[6] memory inputs) {
+    function _getCommandInputs(string memory key) internal returns (InputIndex[6] memory inputs) {
         for (uint256 i=0; i<6; i++) {
-            bool isDynamic = json.readBool(
+            bool isDynamic = jsonConfig.readBool(
                 string.concat(key, "inputIds[", vm.toString(i), "].isDynamicArray")
             );
 
-            uint256 ind = json.readUint(
+            uint256 ind = jsonConfig.readUint(
                 string.concat(key, "inputIds[", vm.toString(i), "].index")
             );
 
@@ -296,15 +306,15 @@ contract WeirollAdapterTest is AbstractAdapterTest {
         }
     }
 
-    function _getCommandOutput(string memory key, string memory json) internal returns (OutputIndex memory output) {
-        bool isDynamic = json.readBool(string.concat(key, "outputId.isDynamicOutput"));
-        uint256 ind = json.readUint(string.concat(key, "outputId.index"));
+    function _getCommandOutput(string memory key) internal returns (OutputIndex memory output) {
+        bool isDynamic = jsonConfig.readBool(string.concat(key, "outputId.isDynamicOutput"));
+        uint256 ind = jsonConfig.readUint(string.concat(key, "outputId.index"));
 
         output = OutputIndex(isDynamic, uint8(ind));
     }
 
-    function _getCommandsFromJson(string memory key, string memory json) internal returns (bytes32[] memory comms) {
-        uint256 numCommands = json.readUint(string.concat(".", key, ".numCommands"));
+    function _getCommandsFromJson(string memory key) internal returns (bytes32[] memory comms) {
+        uint256 numCommands = jsonConfig.readUint(string.concat(".", key, ".numCommands"));
 
         comms = new bytes32[](numCommands);
 
@@ -312,85 +322,59 @@ contract WeirollAdapterTest is AbstractAdapterTest {
             string memory k = string.concat(".", key, ".commands[", vm.toString(i), "].");
 
             Command memory command = abi.decode(
-                json.parseRaw(string.concat(k, "command")),
+                jsonConfig.parseRaw(string.concat(k, "command")),
                 (Command)
             );
 
-            InputIndex[6] memory inputs = _getCommandInputs(k, json);
-            OutputIndex memory output = _getCommandOutput(k, json);
+            InputIndex[6] memory inputs = _getCommandInputs(k);
+            OutputIndex memory output = _getCommandOutput(k);
 
-            comms[i] = encoder.encodeCommand(command.signature, 2, inputs, output, command.target);
+            comms[i] = encoder.encodeCommand(command.signature, uint8(command.commandType), inputs, output, command.target);
         }
     }
 
-    function _encodeCommandState(string memory key, string memory json) internal returns (bytes[] memory states) {
-        uint256 len = json.readUint(string.concat(".", key, ".stateLen"));
+    function _encodeCommandState(string memory key) internal returns (bytes[] memory states) {
+        uint256 len = jsonConfig.readUint(string.concat(".", key, ".stateLen"));
         states = new bytes[](len);
 
         for(uint256 i=0; i<len; i++) {
-            bytes memory s = json.readBytes(string.concat(".", key, ".state[", vm.toString(i), "]"));
-            console.logBytes(s);
+            string memory t = jsonConfig.readString(string.concat(".", key, ".state[", vm.toString(i), "].type"));
 
-            if(keccak256(s) == keccak256(hex"")) {
-                states[i] = abi.encode(address(adapter));
-            } else {
-                states[i] = s;
+            bytes32 ty = keccak256(abi.encode(t));
+
+            string memory valueKey = string.concat(".", key, ".state[", vm.toString(i), "].value");
+
+            if(ty == keccak256(abi.encode("bytes"))) {
+                bytes memory v = jsonConfig.readBytes(valueKey);
+                
+                if(keccak256(v) == keccak256(hex"")) {
+                    states[i] = abi.encode(address(adapter));
+                } else {
+                    states[i] = v;
+                }
+            } else if (ty == keccak256(abi.encode("uint"))) {
+                uint256 v = jsonConfig.readUint(valueKey);
+                states[i] = abi.encode(v);
+            } else if (ty == keccak256(abi.encode("bool"))) {
+                bool v = jsonConfig.readBool(valueKey);
+                states[i] = abi.encode(v);
             }
         }
     }
 
     function _totalAssetsCommand() internal returns (bytes32[] memory comm, bytes[] memory states) {
-        string memory json = vm.readFile(
-            string.concat(
-                vm.projectRoot(),
-                "/test/vault/adapter/abstract/WeirollAdapterConfig.json"
-            )
-        );
-
-        comm = _getCommandsFromJson("totalAssets", json);
-        states = _encodeCommandState("totalAssets", json);
+        comm = _getCommandsFromJson("totalAssets");
+        states = _encodeCommandState("totalAssets");
     }
 
     function _depositCommand() internal returns (bytes32[] memory comm, bytes[] memory states) {
-        InputIndex[6] memory inputs;
-        inputs[0] = InputIndex(false, 2); 
-        inputs[1] = InputIndex(false, 0); 
-        inputs[2] = InputIndex(false, 3);
-        inputs[3] = InputIndex(false, 255);
-        inputs[4] = InputIndex(false, 255);
-        inputs[5] = InputIndex(false, 255);
-       
-        OutputIndex memory output = OutputIndex(false,255);
-
-        address target = address(convexBooster);
-        
-        comm = new bytes32[](1);
-        comm[0] = encoder.encodeCommand("deposit(uint256,uint256,bool)", 1, inputs, output, target); // DEPOSIT BOOSTER
-        
-        states = new bytes[](2); 
-        states[0] = abi.encode(pid);
-        states[1] = abi.encode(true);
+        comm = _getCommandsFromJson("deposit");
+        states = _encodeCommandState("deposit");
     }
 
     function _withdrawCommand() internal returns (bytes32[] memory comm, bytes[] memory states) {
-        InputIndex[6] memory inputs;
-        inputs[0] = InputIndex(false, 0); 
-        inputs[1] = InputIndex(false, 1); 
-        inputs[2] = InputIndex(false, 255);
-        inputs[3] = InputIndex(false, 255);
-        inputs[4] = InputIndex(false, 255);
-        inputs[5] = InputIndex(false, 255);
-
-        OutputIndex memory output = OutputIndex(false,0);
-        output = OutputIndex(false, 255);
-
-        address target = rewardPool;
-
-        comm = new bytes32[](1);
-        comm[0] =  encoder.encodeCommand("withdrawAndUnwrap(uint256,bool)", 1, inputs, output, target);
-        
-        states = new bytes[](1);
-        states[0] = abi.encode(false);
+        comm = _getCommandsFromJson("withdraw");
+        states = _encodeCommandState("withdraw");
     }
 
     function _claimCommand() internal returns (bytes32 comm) {

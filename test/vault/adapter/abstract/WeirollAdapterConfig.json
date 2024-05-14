@@ -5,6 +5,7 @@
         "commands": [
             {
                 "command": {
+                    "commandType": 2,
                     "signature": "balanceOf(address)",
                     "target": "0x79579633029a61963eDfbA1C0BE22498b6e0D33D"
                 },
@@ -41,16 +42,494 @@
             }
         ],
         "state": [
-            "0x"
+            {
+                "type": "bytes",
+                "value": "0x"
+            }
         ]
     },
     "deposit": {
-
+        "numCommands": 1,
+        "stateLen": 2,
+        "commands": [
+            {
+                "command": {
+                    "commandType": 1,
+                    "signature": "deposit(uint256,uint256,bool)",
+                    "target": "0xF403C135812408BFbE8713b5A23a04b3D48AAE31"
+                },
+                "inputIds":  [
+                    {
+                        "isDynamicArray": false,
+                        "index": 2
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 0
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 3
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 255
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 255
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 255
+                    }
+                ],
+                "outputId": {
+                    "isDynamicOutput": false,
+                    "index": 255
+                }
+            }
+        ],
+        "state": [
+            {
+                "type": "uint",
+                "value": 289
+            },
+            {
+                "type": "bool",
+                "value": true
+            }
+        ]
     }, 
     "withdraw": {
-
+        "numCommands": 1,
+        "stateLen": 1,
+        "commands": [
+            {
+                "command": {
+                    "commandType": 1,
+                    "signature": "withdrawAndUnwrap(uint256,bool)",
+                    "target": "0x79579633029a61963eDfbA1C0BE22498b6e0D33D"
+                },
+                "inputIds":  [
+                    {
+                        "isDynamicArray": false,
+                        "index": 0
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 1
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 255
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 255
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 255
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 255
+                    }
+                ],
+                "outputId": {
+                    "isDynamicOutput": false,
+                    "index": 255
+                }
+            }
+        ],
+        "state": [
+            {
+                "type": "bool",
+                "value": false
+            }
+        ]
     },
     "harvest": {
-
+        "numCommands": 11,
+        "stateLen": 17,
+        "commands": [
+            {
+                "command": {
+                    "commandType": 1,
+                    "signature": "getReward(address,bool)",
+                    "target": "0x79579633029a61963eDfbA1C0BE22498b6e0D33D"
+                },
+                "inputIds":  [
+                    {
+                        "isDynamicArray": false,
+                        "index": 0
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 1
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 255
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 255
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 255
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 255
+                    }
+                ],
+                "outputId": {
+                    "isDynamicOutput": false,
+                    "index": 255
+                }
+            },
+            {
+                "command": {
+                    "commandType": 2,
+                    "signature": "balanceOf(address)",
+                    "target": "0xD533a949740bb3306d119CC777fa900bA034cd52"
+                },
+                "inputIds":  [
+                    {
+                        "isDynamicArray": false,
+                        "index": 0
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 255
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 255
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 255
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 255
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 255
+                    }
+                ],
+                "outputId": {
+                    "isDynamicOutput": false,
+                    "index": 2
+                }
+            },
+            {
+                "command": {
+                    "commandType": 2,
+                    "signature": "balanceOf(address)",
+                    "target": "0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B"
+                },
+                "inputIds":  [
+                    {
+                        "isDynamicArray": false,
+                        "index": 0
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 255
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 255
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 255
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 255
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 255
+                    }
+                ],
+                "outputId": {
+                    "isDynamicOutput": false,
+                    "index": 3
+                }
+            },
+            {
+                "command": {
+                    "commandType": 1,
+                    "signature": "approve(address,uint256)",
+                    "target": "0xD533a949740bb3306d119CC777fa900bA034cd52"
+                },
+                "inputIds":  [
+                    {
+                        "isDynamicArray": false,
+                        "index": 4
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 2
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 255
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 255
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 255
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 255
+                    }
+                ],
+                "outputId": {
+                    "isDynamicOutput": false,
+                    "index": 255
+                }
+            },
+            {
+                "command": {
+                    "commandType": 1,
+                    "signature": "approve(address,uint256)",
+                    "target": "0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B"
+                },
+                "inputIds":  [
+                    {
+                        "isDynamicArray": false,
+                        "index": 4
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 2
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 255
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 255
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 255
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 255
+                    }
+                ],
+                "outputId": {
+                    "isDynamicOutput": false,
+                    "index": 255
+                }
+            },
+            {
+                "command": {
+                    "commandType": 1,
+                    "signature": "exchange(address[11],uint256[5][5],uint256,uint256,address[5])",
+                    "target": "0xF0d4c12A5768D806021F80a262B4d39d26C58b8D"
+                },
+                "inputIds":  [
+                    {
+                        "isDynamicArray": false,
+                        "index": 5
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 6
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 2
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 7
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 8
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 255
+                    }
+                ],
+                "outputId": {
+                    "isDynamicOutput": false,
+                    "index": 255
+                }
+            },
+            {
+                "command": {
+                    "commandType": 1,
+                    "signature": "exchange(address[11],uint256[5][5],uint256,uint256,address[5])",
+                    "target": "0xF0d4c12A5768D806021F80a262B4d39d26C58b8D"
+                },
+                "inputIds":  [
+                    {
+                        "isDynamicArray": false,
+                        "index": 9
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 10
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 3
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 11
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 12
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 255
+                    }
+                ],
+                "outputId": {
+                    "isDynamicOutput": false,
+                    "index": 255
+                }
+            },
+            {
+                "command": {
+                    "commandType": 2,
+                    "signature": "balanceOf(address)",
+                    "target": "0xD533a949740bb3306d119CC777fa900bA034cd52"
+                },
+                "inputIds":  [
+                    {
+                        "isDynamicArray": false,
+                        "index": 0
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 255
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 255
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 255
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 255
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 255
+                    }
+                ],
+                "outputId": {
+                    "isDynamicOutput": false,
+                    "index": 14
+                }
+            },
+            {
+                "command": {
+                    "commandType": 1,
+                    "signature": "approve(address,uint256)",
+                    "target": "0xf939E0A03FB07F59A73314E73794Be0E57ac1b4E"
+                },
+                "inputIds":  [
+                    {
+                        "isDynamicArray": false,
+                        "index": 13
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 14
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 255
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 255
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 255
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 255
+                    }
+                ],
+                "outputId": {
+                    "isDynamicOutput": false,
+                    "index": 255
+                }
+            },
+            {
+                "command": {
+                    "commandType": 1,
+                    "signature": "add_liquidity(uint256[],uint256)",
+                    "target": "0x625E92624Bc2D88619ACCc1788365A69767f6200"
+                },
+                "inputIds":  [
+                    {
+                        "isDynamicArray": true,
+                        "index": 14
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 14
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 255
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 255
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 255
+                    },
+                    {
+                        "isDynamicArray": false,
+                        "index": 255
+                    }
+                ],
+                "outputId": {
+                    "isDynamicOutput": false,
+                    "index": 255
+                }
+            }
+        ],
+        "state": [
+            {
+                "type": "bool",
+                "value": false
+            }
+        ]
     }
 }
