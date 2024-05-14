@@ -5,6 +5,7 @@ pragma solidity ^0.8.25;
 
 import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math} from "../../../BaseStrategy.sol";
 import {ICurveLp, IGauge, ICurveRouter, CurveSwap} from "./IArbCurve.sol";
+import {BaseCurveCompounder, CurveTradeLibrary} from "../../../../peripheral/BaseCurveCompounder.sol";
 
 /**
  * @title   Curve Child Gauge Adapter
@@ -13,7 +14,7 @@ import {ICurveLp, IGauge, ICurveRouter, CurveSwap} from "./IArbCurve.sol";
  * An ERC4626 compliant Wrapper for https://github.com/curvefi/curve-xchain-factory/blob/master/contracts/implementations/ChildGauge.vy.
  * Allows wrapping Curve Child Gauge Vaults.
  */
-contract CurveGaugeSingleAssetCompounder is BaseStrategy {
+contract CurveGaugeSingleAssetCompounder is BaseStrategy, BaseCurveCompounder {
     using SafeERC20 for IERC20;
     using Math for uint256;
 
@@ -21,7 +22,10 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy {
     string internal _symbol;
 
     address public lpToken;
+    address public pool;
+
     IGauge public gauge;
+
     int128 public indexIn;
     uint256 public nCoins;
 
@@ -44,13 +48,14 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy {
         bool autoDeposit_,
         bytes memory strategyInitData_
     ) external initializer {
-        (address _lpToken, address _gauge, int128 _indexIn) = abi.decode(
-            strategyInitData_,
-            (address, address, int128)
-        );
+        (address _lpToken, address _pool, address _gauge, int128 _indexIn) = abi
+            .decode(strategyInitData_, (address, address, address, int128));
 
         lpToken = _lpToken;
+        pool = _pool;
+
         gauge = IGauge(_gauge);
+
         indexIn = _indexIn;
         nCoins = ICurveLp(_lpToken).N_COINS();
 
@@ -115,12 +120,11 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy {
         uint256,
         bytes memory data
     ) internal override {
-        uint256[] memory amounts = new uint256[](nCoins);
-        amounts[uint256(uint128(indexIn))] = assets;
-
-        // Add slippage protection if the call comes from a authorised source
-        ICurveLp(lpToken).add_liquidity(
-            amounts,
+        CurveTradeLibrary.addLiquidity(
+            pool,
+            nCoins,
+            uint256(uint128(indexIn)),
+            assets,
             data.length > 0 ? abi.decode(data, (uint256)) : 0
         );
 

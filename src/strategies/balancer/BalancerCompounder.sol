@@ -5,16 +5,7 @@ pragma solidity ^0.8.25;
 
 import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math} from "../BaseStrategy.sol";
 import {IMinter, IGauge} from "./IBalancer.sol";
-import {BaseBalancerCompounder, BalancerTradeLibrary, IBalancerVault, IAsset, BatchSwapStep, TradePath} from "../../peripheral/BaseCurveCompounder.sol";
-
-struct HarvestValues {
-    bytes32 poolId;
-    address depositAsset;
-    address[] underlyings;
-    uint256 amountsInLen;
-    uint256 indexIn;
-    uint256 indexInUserData;
-}
+import {BaseBalancerLpCompounder, HarvestValues, TradePath} from "../../peripheral/BaseBalancerLpCompounder.sol";
 
 /**
  * @title  Aura Adapter
@@ -24,7 +15,7 @@ struct HarvestValues {
  * An ERC4626 compliant Wrapper for https://github.com/sushiswap/sushiswap/blob/archieve/canary/contracts/Aura.sol.
  * Allows wrapping Aura Vaults.
  */
-contract BalancerCompounder is BaseStrategy, BaseBalancerCompounder {
+contract BalancerCompounder is BaseStrategy, BaseBalancerLpCompounder {
     using SafeERC20 for IERC20;
     using Math for uint256;
 
@@ -130,42 +121,16 @@ contract BalancerCompounder is BaseStrategy, BaseBalancerCompounder {
                             STRATEGY LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    HarvestValues internal harvestValues;
-
-    error CompoundFailed();
-
     function claim() internal override returns (bool success) {
         try minter.mint(address(gauge)) {
             success = true;
         } catch {}
     }
 
-    /**
-     * @notice Execute Strategy and take fees.
-     */
     function harvest(bytes memory data) external override onlyKeeperOrOwner {
         claim();
 
-        sellRewardsViaBalancer();
-
-        // caching
-        HarvestValues memory harvestValues_ = harvestValues;
-
-        uint256 amount = IERC20(harvestValues_.depositAsset).balanceOf(address(this));
-
-        BalancerTradeLibrary.addLiquidity(
-            balancerVault,
-            harvestValues_.poolId,
-            harvestValues_.underlyings,
-            harvestValues_.amountsInLen,
-            harvestValues_.indexIn,
-            harvestValues_.indexInUserData,
-            amount
-        );
-
-        amount = IERC20(asset()).balanceOf(address(this));
-        uint256 minOut = abi.decode(data, (uint256));
-        if (amount < minOut) revert CompoundFailed();
+        sellRewardsForLpTokenViaBalancer(data);
 
         _protocolDeposit(amount, 0, bytes(""));
 
@@ -177,21 +142,10 @@ contract BalancerCompounder is BaseStrategy, BaseBalancerCompounder {
         TradePath[] memory newTradePaths,
         HarvestValues memory harvestValues_
     ) external onlyOwner {
-        setBalancerTradeValues();
-
-        // Reset old base asset
-        if (harvestValues.depositAsset != address(0)) {
-            IERC20(harvestValues.depositAsset).approve(
-                address(balancerVault),
-                0
-            );
-        }
-        // approve and set new base asset
-        IERC20(harvestValues_.depositAsset).approve(
+        setBalancerLpCompounderValues(
             newBalancerVault,
-            type(uint).max
+            newTradePaths,
+            harvestValues_
         );
-
-        harvestValues = harvestValues_;
     }
 }

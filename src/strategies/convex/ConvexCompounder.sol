@@ -5,7 +5,7 @@ pragma solidity ^0.8.25;
 
 import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math} from "../BaseStrategy.sol";
 import {IConvexBooster, IConvexRewards, IRewards} from "./IConvex.sol";
-import {BaseCurveCompounder, CurveTradeLibrary, ICurveLp, ICurveRouter, CurveSwap} from "../../peripheral/BaseCurveCompounder.sol";
+import {BaseCurveLpCompounder} from "../../peripheral/BaseCurveLpCompounder.sol";
 
 /**
  * @title   Convex Compounder Adapter
@@ -16,7 +16,7 @@ import {BaseCurveCompounder, CurveTradeLibrary, ICurveLp, ICurveRouter, CurveSwa
  * Allows wrapping Convex Vaults with or without an active convexBooster.
  * Compounds rewards into the vault underlying.
  */
-contract ConvexCompounder is BaseStrategy, BaseCurveCompounder {
+contract ConvexCompounder is BaseStrategy, BaseCurveLpCompounder {
     using SafeERC20 for IERC20;
     using Math for uint256;
 
@@ -161,19 +161,7 @@ contract ConvexCompounder is BaseStrategy, BaseCurveCompounder {
 
         sellRewardsViaCurve();
 
-        uint256 amount = IERC20(depositAsset).balanceOf(address(this));
-
-        CurveTradeLibrary.addLiquidity(
-            address(pool),
-            nCoins,
-            indexIn,
-            amount,
-            0
-        );
-
-        amount = IERC20(asset()).balanceOf(address(this));
-        uint256 minOut = abi.decode(data, (uint256));
-        if (amount < minOut) revert CompoundFailed();
+        sellRewardsForLpTokenViaCurve(address(pool), asset(), nCoins, data);
 
         _protocolDeposit(amount, 0, bytes(""));
 
@@ -186,16 +174,11 @@ contract ConvexCompounder is BaseStrategy, BaseCurveCompounder {
         CurveSwap[] memory newSwaps, // must be ordered like `newRewardTokens`
         int128 indexIn_
     ) external onlyOwner {
-        setCurveTradeValues(newRouter, newRewardTokens, newSwaps);
-
-        // caching
-        address asset_ = asset();
-
-        address depositAsset_ = pool.coins(uint256(uint128(indexIn_)));
-        if (depositAsset != address(0)) IERC20(depositAsset).approve(asset_, 0);
-        IERC20(depositAsset_).approve(asset_, type(uint256).max);
-
-        depositAsset = depositAsset_;
-        indexIn = indexIn_;
+        setCurveLpCompounderValues(
+            newRouter,
+            newRewardTokens,
+            newSwaps,
+            indexIn_
+        );
     }
 }
