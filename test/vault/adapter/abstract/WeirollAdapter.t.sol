@@ -10,7 +10,6 @@ import {MockStrategyClaimer} from "../../../utils/mocks/MockStrategyClaimer.sol"
 import {WeirollUniversalAdapter, VmCommand} from "../../../../src/vault/adapter/weiroll/WeirollAdapter.sol";
 import {WeirollUtils, InputIndex, OutputIndex} from "../../../../src/vault/adapter/weiroll/WeirollUtils.sol";
 import {stdJson} from "forge-std/StdJson.sol";
-import "forge-std/console.sol";
 
 struct Command {
     uint256 commandType; // 0 delegateCall, 1 call, 2 static call, 3 call with value
@@ -108,20 +107,11 @@ contract WeirollAdapterTest is AbstractAdapterTest {
 
         // ---------------------------------------------- 
         // ENCODE HARVEST
-        _addHarvestState();
-
         bytes32[] memory claimComms = new bytes32[](11);
-        claimComms[0] =  _claimCommand(); // claim rewards
-        claimComms[1] = _getCRVBalanceCommand(); // get balance CRV - write at state[2]
-        claimComms[2] = _getCVXBalanceCommand(); // get balance CVX - write at state[3]
-        claimComms[3] = _approveCRVCommand();  // APPROVE CVX TO BE TRADED BY CURVE ROUTER 
-        claimComms[4] = _approveCVXCommand(); // APPROVE CRV TO BE TRADED BY CURVE ROUTER
-        claimComms[5] = _swapCRVCommand(); // swap crv
-        claimComms[6] = _swapCVXCommand(); // swap cvx
-        claimComms[7] = _getCRVUSDBalanceCommand(); // get crv usd balance - write at state[14]
-        claimComms[8] = _approveCRVUSDCommand();
-        claimComms[9] = _updateStateCommand(); // update parameter on the state array for next command
-        claimComms[10] = s();
+        bytes32[] memory claimedComms = new bytes32[](11);
+
+        (claimComms, claimStates) = _harvestCommand();
+        _updateStateCommand();
 
         // ---------------------------------------------- 
         // ENCODE ALL COMMANDS 
@@ -326,10 +316,14 @@ contract WeirollAdapterTest is AbstractAdapterTest {
                 (Command)
             );
 
-            InputIndex[6] memory inputs = _getCommandInputs(k);
-            OutputIndex memory output = _getCommandOutput(k);
+            if(command.commandType == 14) {
+                comms[i] = encoder.UPDATE_STATE_COMMAND();
+            } else {
+                InputIndex[6] memory inputs = _getCommandInputs(k);
+                OutputIndex memory output = _getCommandOutput(k);
 
-            comms[i] = encoder.encodeCommand(command.signature, uint8(command.commandType), inputs, output, command.target);
+                comms[i] = encoder.encodeCommand(command.signature, uint8(command.commandType), inputs, output, command.target);
+            }
         }
     }
 
@@ -355,9 +349,28 @@ contract WeirollAdapterTest is AbstractAdapterTest {
             } else if (ty == keccak256(abi.encode("uint"))) {
                 uint256 v = jsonConfig.readUint(valueKey);
                 states[i] = abi.encode(v);
+            } else if (ty == keccak256(abi.encode("uint[][]"))) {
+                uint256 numRows = jsonConfig.readUint(string.concat(".", key, ".state[", vm.toString(i), "].numRows"));
+
+                for(uint256 j=0; j<numRows; j++) {
+                    // .value[j]
+                    string memory rowKey = string.concat(valueKey, "[", vm.toString(j), "]");
+                    uint256[] memory rowValue = jsonConfig.readUintArray(rowKey);
+                    // concat encoded rows
+                    states[i] = abi.encodePacked(states[i], rowValue);
+                }   
             } else if (ty == keccak256(abi.encode("bool"))) {
                 bool v = jsonConfig.readBool(valueKey);
                 states[i] = abi.encode(v);
+            } else if (ty == keccak256(abi.encode("address"))) {
+                address v = jsonConfig.readAddress(valueKey);
+                states[i] = abi.encode(v);
+            } else if (ty == keccak256(abi.encode("address[]"))) {
+                address[] memory v = jsonConfig.readAddressArray(valueKey);
+                bool isFixedSize = jsonConfig.readBool(string.concat(".", key, ".state[", vm.toString(i), "].fixedSize"));
+                
+                // encode either as dynamic array or as fixed size
+                states[i] = isFixedSize ? abi.encodePacked(v) : abi.encode(v);
             }
         }
     }
@@ -376,221 +389,10 @@ contract WeirollAdapterTest is AbstractAdapterTest {
         comm = _getCommandsFromJson("withdraw");
         states = _encodeCommandState("withdraw");
     }
-
-    function _claimCommand() internal returns (bytes32 comm) {
-        InputIndex[6] memory inputs;
-        inputs[0] = InputIndex(false, 0);
-        inputs[1] = InputIndex(false, 1);
-        inputs[2] = InputIndex(false, 255);
-        inputs[3] = InputIndex(false, 255);
-        inputs[4] = InputIndex(false, 255);
-        inputs[5] = InputIndex(false, 255);
-
-        OutputIndex memory output = OutputIndex(false,255);
-        
-        comm = encoder.encodeCommand("getReward(address,bool)", 1, inputs, output, address(0x79579633029a61963eDfbA1C0BE22498b6e0D33D));
-    }
-
-    function _getCRVBalanceCommand() internal returns (bytes32 comm) {
-        InputIndex[6] memory inputs;
-        inputs[0] = InputIndex(false, 0);
-        inputs[1] = InputIndex(false, 255);
-        inputs[2] = InputIndex(false, 255);
-        inputs[3] = InputIndex(false, 255);
-        inputs[4] = InputIndex(false, 255);
-        inputs[5] = InputIndex(false, 255);
-
-        OutputIndex memory output = OutputIndex(false,2);
-
-        comm = encoder.encodeCommand("balanceOf(address)", 2, inputs, output, crv);
-    }
-
-    function _getCVXBalanceCommand() internal returns (bytes32 comm) {
-        InputIndex[6] memory inputs;
-        inputs[0] = InputIndex(false, 0);
-        inputs[1] = InputIndex(false, 255);
-        inputs[2] = InputIndex(false, 255);
-        inputs[3] = InputIndex(false, 255);
-        inputs[4] = InputIndex(false, 255);
-        inputs[5] = InputIndex(false, 255);
-
-        OutputIndex memory output = OutputIndex(false,3);
-        
-        comm = encoder.encodeCommand("balanceOf(address)", 2, inputs, output, cvx);
-    }
-
-    function _getCRVUSDBalanceCommand() internal returns (bytes32 comm) {
-        InputIndex[6] memory inputs;
-        inputs[0] = InputIndex(false, 0);
-        inputs[1] = InputIndex(false, 255);
-        inputs[2] = InputIndex(false, 255);
-        inputs[3] = InputIndex(false, 255);
-        inputs[4] = InputIndex(false, 255);
-        inputs[5] = InputIndex(false, 255);
-
-        OutputIndex memory output = OutputIndex(false,14);
-        
-        comm = encoder.encodeCommand("balanceOf(address)", 2, inputs, output, baseAsset);
-    }
-
-
-    function _approveCRVCommand() internal returns (bytes32 comm) {
-        InputIndex[6] memory inputs;
-        inputs[0] = InputIndex(false, 4); // address(router)
-        inputs[1] = InputIndex(false, 2); // amount is writtem at state slot 2 as output
-        inputs[2] = InputIndex(false, 255);
-        inputs[3] = InputIndex(false, 255);
-        inputs[4] = InputIndex(false, 255);
-        inputs[5] = InputIndex(false, 255);
-
-        OutputIndex memory output = OutputIndex(false,255);
-
-        comm = encoder.encodeCommand("approve(address,uint256)", 1, inputs, output, crv);
-    }
-
-    function _approveCVXCommand() internal returns (bytes32 comm) {
-        InputIndex[6] memory inputs;
-        inputs[0] = InputIndex(false, 4); // address(router)
-        inputs[1] = InputIndex(false, 3); // amount is writtem at state slot 2 as output
-        inputs[2] = InputIndex(false, 255);
-        inputs[3] = InputIndex(false, 255);
-        inputs[4] = InputIndex(false, 255);
-        inputs[5] = InputIndex(false, 255);
-
-        OutputIndex memory output = OutputIndex(false,255);
-        
-        comm = encoder.encodeCommand("approve(address,uint256)", 1, inputs, output, cvx);
-    }
-
-    function _approveCRVUSDCommand() internal returns (bytes32 comm) {
-        InputIndex[6] memory inputs;
-        inputs[0] = InputIndex(false, 13); // address crv usd TODO remove
-        inputs[1] = InputIndex(false, 14);
-        inputs[2] = InputIndex(false, 255);
-        inputs[3] = InputIndex(false, 255);
-        inputs[4] = InputIndex(false, 255);
-        inputs[5] = InputIndex(false, 255);
-
-        OutputIndex memory output = OutputIndex(false,255);
-        
-        comm = encoder.encodeCommand("approve(address,uint256)", 1, inputs, output, baseAsset);
-    }
-
-
-    function _addHarvestState() internal {
-        // CRV swap
-        address[11] memory rewardRoute = [
-            crv, // crv
-            0x4eBdF703948ddCEA3B11f675B4D1Fba9d2414A14, // triCRV pool
-            baseAsset, // crvUSD
-            address(0),
-            address(0),
-            address(0),
-            address(0),
-            address(0),
-            address(0),
-            address(0),
-            address(0)
-        ];
-        address[5] memory pools = [
-            address(0x4eBdF703948ddCEA3B11f675B4D1Fba9d2414A14),
-            address(0),
-            address(0),
-            address(0),
-            address(0)
-        ];
-
-        uint256[5][5] memory swapParams0;
-        swapParams0[0] = [uint256(2), 0, 1, 1, 2];
-
-        // add states
-        claimStates[0] = abi.encode(address(adapter)); 
-        claimStates[1] = abi.encode(true);
-        claimStates[2] = abi.encode(0); // leave empty for balanceOf crv output
-        claimStates[3] = abi.encode(0); // leave empty for balanceOf cvx output
-        claimStates[4] = abi.encode(address(router)); 
-        claimStates[5] = abi.encode(rewardRoute);
-        claimStates[6] = abi.encode(swapParams0);
-        claimStates[7] = abi.encode(0);
-        claimStates[8] = abi.encode(pools);
-
-        // CVX swap
-        rewardRoute = [
-            cvx, // cvx
-            0xB576491F1E6e5E62f1d8F26062Ee822B40B0E0d4, // triCRV pool
-            0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE, // weth
-            0x4eBdF703948ddCEA3B11f675B4D1Fba9d2414A14,
-            baseAsset,
-            address(0),
-            address(0),
-            address(0),
-            address(0),
-            address(0),
-            address(0)
-        ];
-
-        swapParams0[0] = [uint256(1), 0, 1, 2, 2]; // crvIndex, wethIndex, exchange, irrelevant, irrelevant
-        swapParams0[1] = [uint256(1), 0, 1, 3, 3]; // crvIndex, wethIndex, exchange, irrelevant, irrelevant
-
-        pools = [
-            address(0xB576491F1E6e5E62f1d8F26062Ee822B40B0E0d4),
-            address(0x4eBdF703948ddCEA3B11f675B4D1Fba9d2414A14),
-            address(0),
-            address(0),
-            address(0)
-        ];
-
-        claimStates[9] = abi.encode(rewardRoute);
-        claimStates[10] = abi.encode(swapParams0);
-        claimStates[11] = abi.encode(0);
-        claimStates[12] = abi.encode(pools);
-        claimStates[13] = abi.encode(address(asset));
-        
-        claimStates[15] = abi.encode(0);
-    }
-
-    function _swapCRVCommand() internal returns (bytes32 comm) {
-        InputIndex[6] memory inputs;
-        inputs[0] = InputIndex(false, 5);
-        inputs[1] = InputIndex(false, 6); 
-        inputs[2] = InputIndex(false, 2);
-        inputs[3] = InputIndex(false, 7);
-        inputs[4] = InputIndex(false, 8);
-        inputs[5] = InputIndex(false, 255);
-        
-        OutputIndex memory output = OutputIndex(false,255);
-
-        address target = router;
-
-        comm = encoder.encodeCommand(
-            "exchange(address[11],uint256[5][5],uint256,uint256,address[5])", 
-            1, 
-            inputs, 
-            output, 
-            target
-        );
-    }
-
-    function _swapCVXCommand() internal returns (bytes32 comm) {
-        InputIndex[6] memory inputs;
-        inputs[0] = InputIndex(false, 9);
-        inputs[1] = InputIndex(false, 10); 
-        inputs[2] = InputIndex(false, 3);
-        inputs[3] = InputIndex(false, 11);
-        inputs[4] = InputIndex(false, 12);
-        inputs[5] = InputIndex(false, 255);
-        
-        OutputIndex memory output = OutputIndex(false,255);
-
-        address target = router;
-
-        comm = encoder.encodeCommand(
-            "exchange(address[11],uint256[5][5],uint256,uint256,address[5])", 
-            1, 
-            inputs, 
-            output, 
-            target
-        );
+    
+    function _harvestCommand() internal returns (bytes32[] memory comm, bytes[] memory states) {
+        comm = _getCommandsFromJson("harvest");
+        states = _encodeCommandState("harvest");
     }
 
     function _updateStateCommand() internal returns (bytes32 comm) {
@@ -604,27 +406,5 @@ contract WeirollAdapterTest is AbstractAdapterTest {
         claimStates[claimStates.length - 1] = abi.encode(updateIndices, true, overwriteIndex);
         
         comm = encoder.UPDATE_STATE_COMMAND();
-    }
-
-    function s() internal returns (bytes32 comm) {
-        InputIndex[6] memory inputs;
-        inputs[0] = InputIndex(true, 14);
-        inputs[1] = InputIndex(false, 15); 
-        inputs[2] = InputIndex(false, 255);
-        inputs[3] = InputIndex(false, 255);
-        inputs[4] = InputIndex(false, 255);
-        inputs[5] = InputIndex(false, 255);
-        
-        OutputIndex memory output = OutputIndex(false,255);
-
-        address target = address(asset);
-
-        comm = encoder.encodeCommand(
-            "add_liquidity(uint256[],uint256)", 
-            1, 
-            inputs, 
-            output, 
-            target
-        );
     }
 }
