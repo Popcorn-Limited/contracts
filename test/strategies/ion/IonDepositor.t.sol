@@ -50,7 +50,7 @@ contract IonDepositorTest is BaseStrategyTest {
         strategy.initialize(
             testConfig_.asset,
             address(this),
-            false,
+            true,
             abi.encode(address(ionPool))
         );
 

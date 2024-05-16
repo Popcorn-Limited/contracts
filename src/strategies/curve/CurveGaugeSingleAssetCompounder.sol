@@ -3,9 +3,9 @@
 
 pragma solidity ^0.8.25;
 
-import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math} from "../../../BaseStrategy.sol";
-import {ICurveLp, IGauge, ICurveRouter, CurveSwap, IMinter} from "../../ICurve.sol";
-import {BaseCurveCompounder, CurveTradeLibrary} from "../../../../peripheral/BaseCurveCompounder.sol";
+import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math} from "../BaseStrategy.sol";
+import {ICurveLp, IGauge, ICurveRouter, CurveSwap, IMinter} from "./ICurve.sol";
+import {BaseCurveCompounder, CurveTradeLibrary} from "../../peripheral/BaseCurveCompounder.sol";
 
 /**
  * @title   Curve Child Gauge Adapter
@@ -30,6 +30,9 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy, BaseCurveCompounder {
     uint256 public nCoins;
 
     uint256 public discountBps;
+
+    uint256 public depositSlippage;
+    uint256 public withdrawSlippage;
 
     /*//////////////////////////////////////////////////////////////
                             INITIALIZATION
@@ -222,11 +225,10 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy, BaseCurveCompounder {
 
     function setHarvestValues(
         address newRouter,
-        address[] memory newRewardTokens,
-        CurveSwap[] memory newSwaps, // must be ordered like `newRewardTokens`
+        CurveSwap[] memory newSwaps,
         uint256 discountBps_
     ) external onlyOwner {
-        setCurveTradeValues(newRouter, newRewardTokens, newSwaps);
+        setCurveTradeValues(newRouter, newSwaps);
 
         discountBps = discountBps_;
     }

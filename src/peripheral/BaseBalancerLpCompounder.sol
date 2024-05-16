@@ -7,12 +7,12 @@ import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {BaseBalancerCompounder, BalancerTradeLibrary, TradePath} from "./BaseBalancerCompounder.sol";
 
 struct HarvestValues {
-    bytes32 poolId;
-    address depositAsset;
-    address[] underlyings;
     uint256 amountsInLen;
+    address depositAsset;
     uint256 indexIn;
     uint256 indexInUserData;
+    bytes32 poolId;
+    address[] underlyings;
 }
 
 abstract contract BaseBalancerLpCompounder is BaseBalancerCompounder {

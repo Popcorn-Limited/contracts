@@ -36,7 +36,7 @@ contract WstETHLooperTest is BaseStrategyTest {
         strategy.initialize(
             testConfig_.asset,
             address(this),
-            false,
+            true,
             abi.encode(looperInitValues)
         );
 
@@ -331,8 +331,7 @@ contract WstETHLooperTest is BaseStrategyTest {
         // LTV should be 0
         assertEq(WstETHLooper(payable(address(strategy))).getLTV(), 0);
 
-        strategy.harvest();
-
+               strategy.harvest(abi.encode(uint256(0)));
         // LTV should be at target now
         assertEq(
             WstETHLooper(payable(address(strategy))).targetLTV(),

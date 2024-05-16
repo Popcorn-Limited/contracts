@@ -5,7 +5,7 @@ pragma solidity ^0.8.25;
 
 import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math} from "../BaseStrategy.sol";
 import {IConvexBooster, IConvexRewards, IRewards} from "./IConvex.sol";
-import {BaseCurveLpCompounder} from "../../peripheral/BaseCurveLpCompounder.sol";
+import {BaseCurveLpCompounder, CurveSwap, ICurveLp} from "../../peripheral/BaseCurveLpCompounder.sol";
 
 /**
  * @title   Convex Compounder Adapter
@@ -141,11 +141,6 @@ contract ConvexCompounder is BaseStrategy, BaseCurveLpCompounder {
                             STRATEGY LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    address internal depositAsset;
-    int128 internal indexIn;
-
-    error CompoundFailed();
-
     /// @notice Claim liquidity mining rewards given that it's active
     function claim() internal override returns (bool success) {
         try convexRewards.getReward(address(this), true) {
@@ -174,14 +169,13 @@ contract ConvexCompounder is BaseStrategy, BaseCurveLpCompounder {
 
     function setHarvestValues(
         address newRouter,
-        address[] memory newRewardTokens,
-        CurveSwap[] memory newSwaps, // must be ordered like `newRewardTokens`
+        CurveSwap[] memory newSwaps,
         int128 indexIn_
     ) external onlyOwner {
         setCurveLpCompounderValues(
             newRouter,
-            newRewardTokens,
             newSwaps,
+            address(pool),
             indexIn_
         );
     }

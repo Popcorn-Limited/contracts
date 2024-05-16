@@ -41,7 +41,7 @@ contract ConvexCompounderTest is BaseStrategyTest {
         strategy.initialize(
             testConfig_.asset,
             address(this),
-            false,
+            true,
             abi.encode(
                 convexInit.convexBooster,
                 convexInit.curvePool,
@@ -79,36 +79,12 @@ contract ConvexCompounderTest is BaseStrategyTest {
             (int128)
         );
 
-        uint256[] memory minTradeAmounts_ = abi.decode(
-            json_.parseRaw(
-                string.concat(
-                    ".configs[",
-                    index_,
-                    "].specific.harvest.minTradeAmounts"
-                )
-            ),
-            (uint256[])
-        );
-
-        address[] memory rewardTokens_ = abi.decode(
-            json_.parseRaw(
-                string.concat(
-                    ".configs[",
-                    index_,
-                    "].specific.harvest.rewardTokens"
-                )
-            ),
-            (address[])
-        );
-
         //Construct CurveSwap structs
         CurveSwap[] memory swaps_ = _getCurveSwaps(json_, index_);
 
         // Set harvest values
         ConvexCompounder(strategy).setHarvestValues(
             curveRouter_,
-            rewardTokens_,
-            minTradeAmounts_,
             swaps_,
             indexIn_
         );
@@ -207,8 +183,7 @@ contract ConvexCompounderTest is BaseStrategyTest {
         uint256 oldTa = strategy.totalAssets();
         vm.roll(block.number + 10000);
         vm.warp(block.timestamp + 150000);
-        strategy.harvest();
-        assertGt(strategy.totalAssets(), oldTa);
+               strategy.harvest(abi.encode(uint256(0)));        assertGt(strategy.totalAssets(), oldTa);
     }
 
     function test__harvest_no_rewards() public {
@@ -219,8 +194,7 @@ contract ConvexCompounderTest is BaseStrategyTest {
 
         uint256 oldTa = strategy.totalAssets();
 
-        strategy.harvest();
-
+               strategy.harvest(abi.encode(uint256(0)));
         assertEq(strategy.totalAssets(), oldTa);
     }
 }

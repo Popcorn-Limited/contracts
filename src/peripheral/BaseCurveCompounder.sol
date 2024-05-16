@@ -4,7 +4,7 @@
 pragma solidity ^0.8.25;
 
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
-import {ICurveRouter, CurveSwap} from "../strategies/curve/ICurve.sol";
+import {ICurveRouter, CurveSwap, ICurveLp} from "../strategies/curve/ICurve.sol";
 import {CurveTradeLibrary} from "./CurveTradeLibrary.sol";
 
 abstract contract BaseCurveCompounder {
@@ -42,7 +42,7 @@ abstract contract BaseCurveCompounder {
         if (rewardTokenLen > 0) {
             // caching
             address oldRouter = address(curveRouter);
-            address memory oldRewardTokens = _rewardTokens;
+            address[] memory oldRewardTokens = _rewardTokens;
 
             // void approvals
             for (uint256 i = 0; i < rewardTokenLen; ) {

@@ -51,7 +51,7 @@ contract AuraCompounder is BaseStrategy, BaseBalancerLpCompounder {
         );
 
         (address balancerLpToken_, , , address auraRewards_, , ) = IAuraBooster(
-            auraValues_.auraBooster
+            auraBooster_
         ).poolInfo(auraPoolId_);
 
         auraRewards = IAuraRewards(auraRewards_);
@@ -135,9 +135,16 @@ contract AuraCompounder is BaseStrategy, BaseBalancerLpCompounder {
     function harvest(bytes memory data) external override onlyKeeperOrOwner {
         claim();
 
-        sellRewardsForLpTokenViaBalancer(data);
+        // caching
+        address asset_ = asset();
 
-        _protocolDeposit(amount, 0, bytes(""));
+        sellRewardsForLpTokenViaBalancer(asset_, data);
+
+        _protocolDeposit(
+            IERC20(asset_).balanceOf(address(this)),
+            0,
+            bytes("")
+        );
 
         emit Harvested();
     }

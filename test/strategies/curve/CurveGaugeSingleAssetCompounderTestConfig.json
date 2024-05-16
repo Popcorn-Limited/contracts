@@ -18,12 +18,11 @@
         "init": {
           "gauge": "0x059E0db6BF882f5fe680dc5409C7adeB99753736",
           "indexIn": 1,
-          "lpToken": "0x2FE7AE43591E534C256A1594D326e5779E302Ff4"
+          "lpToken": "0x2FE7AE43591E534C256A1594D326e5779E302Ff4",
+          "pool": "0x2FE7AE43591E534C256A1594D326e5779E302Ff4"
         },
         "harvest": {
           "curveRouter": "0xF0d4c12A5768D806021F80a262B4d39d26C58b8D",
-          "rewardTokens": ["0x912CE59144191C1204E64559FE8253a0e49E6548"],
-          "minTradeAmounts": [1000000000000000000],
           "swaps": {
             "length": 1,
             "structs": [

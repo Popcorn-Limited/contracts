@@ -3,7 +3,7 @@
 
 pragma solidity ^0.8.25;
 
-import {CurveGaugeCompounder, IERC20, CurveSwap} from "../../../src/strategies/curve/gauge/mainnet/CurveGaugeCompounder.sol";
+import {CurveGaugeCompounder, IERC20, CurveSwap} from "../../../src/strategies/curve/CurveGaugeCompounder.sol";
 import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson} from "../BaseStrategyTest.sol";
 
 struct CurveGaugeInit {
@@ -41,7 +41,7 @@ contract CurveGaugeCompounderTest is BaseStrategyTest {
         strategy.initialize(
             testConfig_.asset,
             address(this),
-            false,
+            true,
             abi.encode(curveInit.gauge, curveInit.pool, curveInit.minter)
         );
 
@@ -75,36 +75,12 @@ contract CurveGaugeCompounderTest is BaseStrategyTest {
             (int128)
         );
 
-        uint256[] memory minTradeAmounts_ = abi.decode(
-            json_.parseRaw(
-                string.concat(
-                    ".configs[",
-                    index_,
-                    "].specific.harvest.minTradeAmounts"
-                )
-            ),
-            (uint256[])
-        );
-
-        address[] memory rewardTokens_ = abi.decode(
-            json_.parseRaw(
-                string.concat(
-                    ".configs[",
-                    index_,
-                    "].specific.harvest.rewardTokens"
-                )
-            ),
-            (address[])
-        );
-
         //Construct CurveSwap structs
         CurveSwap[] memory swaps_ = _getCurveSwaps(json_, index_);
 
         // Set harvest values
         CurveGaugeCompounder(strategy).setHarvestValues(
             curveRouter_,
-            rewardTokens_,
-            minTradeAmounts_,
             swaps_,
             indexIn_
         );
@@ -207,8 +183,7 @@ contract CurveGaugeCompounderTest is BaseStrategyTest {
         vm.roll(block.number + 100);
         vm.warp(block.timestamp + 1500);
 
-        strategy.harvest();
-
+               strategy.harvest(abi.encode(uint256(0)));
         assertGt(strategy.totalAssets(), oldTa);
     }
 
@@ -220,8 +195,7 @@ contract CurveGaugeCompounderTest is BaseStrategyTest {
 
         uint256 oldTa = strategy.totalAssets();
 
-        strategy.harvest();
-
+               strategy.harvest(abi.encode(uint256(0)));
         assertEq(strategy.totalAssets(), oldTa);
     }
 }

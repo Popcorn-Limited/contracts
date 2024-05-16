@@ -9,17 +9,7 @@ import {IPermit} from "./IPermit.sol";
 import {IPausable} from "./IPausable.sol";
 
 interface IBaseStrategy is IERC4626, IOwned, IPermit, IPausable {
-    function harvest() external;
-
-    function toggleAutoHarvest() external;
-
-    function autoHarvest() external view returns (bool);
-
-    function lastHarvest() external view returns (uint256);
-
-    function harvestCooldown() external view returns (uint256);
-
-    function setHarvestCooldown(uint256 harvestCooldown) external;
+    function harvest(bytes memory data) external;
 
     function initialize(
         address asset_,

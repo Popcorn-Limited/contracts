@@ -24,7 +24,7 @@ abstract contract BaseBalancerCompounder {
         TradePath[] memory sellPaths = tradePaths;
 
         uint256 amount;
-        uint256 rewLen = sellTokens.length;
+        uint256 rewLen = sellPaths.length;
         for (uint256 i = 0; i < rewLen; ) {
             amount = IERC20(address(sellPaths[i].assets[0])).balanceOf(
                 address(this)
@@ -61,7 +61,7 @@ abstract contract BaseBalancerCompounder {
         if (rewardTokenLen > 0) {
             // caching
             address oldBalancerVault = address(balancerVault);
-            address memory oldRewardTokens = _rewardTokens;
+            address[] memory oldRewardTokens = _rewardTokens;
 
             // void approvals
             for (uint256 i = 0; i < rewardTokenLen; ) {

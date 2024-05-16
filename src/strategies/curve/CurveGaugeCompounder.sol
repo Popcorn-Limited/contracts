@@ -3,9 +3,9 @@
 
 pragma solidity ^0.8.25;
 
-import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math} from "../../../BaseStrategy.sol";
-import {ICurveLp, IGauge, ICurveRouter, CurveSwap, IMinter} from "../../ICurve.sol";
-import {BaseCurveLpCompounder} from "../../../../peripheral/BaseCurveLpCompounder.sol";
+import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math} from "../BaseStrategy.sol";
+import {ICurveLp, IGauge, ICurveRouter, CurveSwap, IMinter} from "./ICurve.sol";
+import {BaseCurveLpCompounder} from "../../peripheral/BaseCurveLpCompounder.sol";
 
 /**
  * @title   Curve Child Gauge Adapter
@@ -148,14 +148,13 @@ contract CurveGaugeCompounder is BaseStrategy, BaseCurveLpCompounder {
 
     function setHarvestValues(
         address newRouter,
-        address[] memory newRewardTokens,
-        CurveSwap[] memory newSwaps, // must be ordered like `newRewardTokens`
+        CurveSwap[] memory newSwaps,
         int128 indexIn_
     ) external onlyOwner {
         setCurveLpCompounderValues(
             newRouter,
-            newRewardTokens,
             newSwaps,
+            address(pool),
             indexIn_
         );
     }

@@ -26,7 +26,7 @@ contract BeefyDepositorTest is BaseStrategyTest {
         strategy.initialize(
             testConfig_.asset,
             address(this),
-            false,
+            true,
             abi.encode(
                 json_.readAddress(
                     string.concat(".configs[", index_, "].specific.beefyVault")

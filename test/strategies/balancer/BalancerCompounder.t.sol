@@ -3,7 +3,8 @@
 
 pragma solidity ^0.8.25;
 
-import {BalancerCompounder, IERC20, BatchSwapStep, IAsset, BalancerValues, HarvestValues, HarvestTradePath, TradePath} from "../../../src/strategies/balancer/BalancerCompounder.sol";
+import {BalancerCompounder, IERC20, HarvestValues, TradePath} from "../../../src/strategies/balancer/BalancerCompounder.sol";
+import {IAsset, BatchSwapStep} from "../../../src/interfaces/external/balancer/IBalancerVault.sol";
 import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson} from "../BaseStrategyTest.sol";
 
 contract BalancerCompounderTest is BaseStrategyTest {
@@ -22,11 +23,12 @@ contract BalancerCompounderTest is BaseStrategyTest {
         TestConfig memory testConfig_
     ) internal override returns (IBaseStrategy) {
         // Read strategy init values
-        BalancerValues memory balancerValues_ = abi.decode(
-            json_.parseRaw(
-                string.concat(".configs[", index_, "].specific.init")
-            ),
-            (BalancerValues)
+        address minter = json_.readAddress(
+            string.concat(".configs[", index_, "].specific.init.minter")
+        );
+
+        address gauge = json_.readAddress(
+            string.concat(".configs[", index_, "].specific.init.gauge")
         );
 
         // Deploy Strategy
@@ -35,8 +37,8 @@ contract BalancerCompounderTest is BaseStrategyTest {
         strategy.initialize(
             testConfig_.asset,
             address(this),
-            false,
-            abi.encode(balancerValues_)
+            true,
+            abi.encode(minter, gauge)
         );
 
         // Set Harvest values
@@ -51,6 +53,14 @@ contract BalancerCompounderTest is BaseStrategyTest {
         address strategy
     ) internal {
         // Read harvest values
+        address balancerVault_ = json_.readAddress(
+            string.concat(
+                ".configs[",
+                index_,
+                "].specific.harvest.balancerVault"
+            )
+        );
+
         HarvestValues memory harvestValues_ = abi.decode(
             json_.parseRaw(
                 string.concat(
@@ -62,22 +72,76 @@ contract BalancerCompounderTest is BaseStrategyTest {
             (HarvestValues)
         );
 
-        HarvestTradePath[] memory tradePaths_ = abi.decode(
-            json_.parseRaw(
-                string.concat(
-                    ".configs[",
-                    index_,
-                    "].specific.harvest.tradePaths"
-                )
-            ),
-            (HarvestTradePath[])
-        );
+        TradePath[] memory tradePaths_ = _getTradePaths(json_, index_);
 
         // Set harvest values
         BalancerCompounder(strategy).setHarvestValues(
-            harvestValues_,
-            tradePaths_
+            balancerVault_,
+            tradePaths_,
+            harvestValues_
         );
+    }
+
+    function _getTradePaths(
+        string memory json_,
+        string memory index_
+    ) internal returns (TradePath[] memory) {
+        uint256 swapLen = json_.readUint(
+            string.concat(
+                ".configs[",
+                index_,
+                "].specific.harvest.tradePaths.length"
+            )
+        );
+
+        TradePath[] memory tradePaths_ = new TradePath[](swapLen);
+        for (uint i; i < swapLen; i++) {
+            // Read route and convert dynamic into fixed size array
+            address[] memory assetAddresses = json_.readAddressArray(
+                string.concat(
+                    ".configs[",
+                    index_,
+                    "].specific.harvest.tradePaths.structs[",
+                    vm.toString(i),
+                    "].assets"
+                )
+            );
+            IAsset[] memory assets = new IAsset[](assetAddresses.length);
+            for (uint n; n < assetAddresses.length; n++) {
+                assets[n] = IAsset(assetAddresses[n]);
+            }
+
+            int256[] memory limits = json_.readIntArray(
+                string.concat(
+                    ".configs[",
+                    index_,
+                    "].specific.harvest.tradePaths.structs[",
+                    vm.toString(i),
+                    "].limits"
+                )
+            );
+
+            BatchSwapStep[] memory swapSteps = abi.decode(
+                json_.parseRaw(
+                    string.concat(
+                        ".configs[",
+                        index_,
+                        "].specific.harvest.tradePaths.structs[",
+                        vm.toString(i),
+                        "].swaps"
+                    )
+                ),
+                (BatchSwapStep[])
+            );
+
+            tradePaths_[i] = TradePath({
+                assets: assets,
+                limits: limits,
+                swaps: abi.encode(swapSteps)
+            });
+        }
+
+        return tradePaths_;
     }
 
     // function _increasePricePerShare(uint256 amount) internal override {
@@ -103,8 +167,8 @@ contract BalancerCompounderTest is BaseStrategyTest {
 
     //     vm.roll(block.number + 1000000);
     //     vm.warp(block.timestamp + 15000000);
-        
-    //     strategy.harvest();
+
+    //            strategy.harvest(abi.encode(uint256(0)));
 
     //     assertGt(strategy.totalAssets(), oldTa);
     // }
@@ -117,7 +181,7 @@ contract BalancerCompounderTest is BaseStrategyTest {
 
     //     uint256 oldTa = strategy.totalAssets();
 
-    //     strategy.harvest();
+    //            strategy.harvest(abi.encode(uint256(0)));
 
     //     assertEq(strategy.totalAssets(), oldTa);
     // }

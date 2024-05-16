@@ -41,7 +41,7 @@ contract GearboxLeverageFarmConvexBoosterTest is BaseStrategyTest {
         strategy.initialize(
             testConfig_.asset,
             address(this),
-            false,
+            true,
             abi.encode(
                 gearboxValues.creditFacade,
                 gearboxValues.creditManager,

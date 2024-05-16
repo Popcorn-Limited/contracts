@@ -4,7 +4,7 @@
 pragma solidity ^0.8.25;
 
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
-import {BaseCurveCompounder} from "./BaseCurveCompounder.sol";
+import {BaseCurveCompounder, CurveTradeLibrary, CurveSwap, ICurveLp} from "./BaseCurveCompounder.sol";
 
 abstract contract BaseCurveLpCompounder is BaseCurveCompounder {
     address internal depositAsset;
@@ -13,7 +13,7 @@ abstract contract BaseCurveLpCompounder is BaseCurveCompounder {
     error CompoundFailed();
 
     function sellRewardsForLpTokenViaCurve(
-        address pool,
+        address poolAddress,
         address vaultAsset,
         uint256 nCoins,
         bytes memory data
@@ -23,9 +23,9 @@ abstract contract BaseCurveLpCompounder is BaseCurveCompounder {
         uint256 amount = IERC20(depositAsset).balanceOf(address(this));
 
         CurveTradeLibrary.addLiquidity(
-            address(pool),
+            poolAddress,
             nCoins,
-            indexIn,
+            uint256(uint128(indexIn)),
             amount,
             0
         );
@@ -37,18 +37,18 @@ abstract contract BaseCurveLpCompounder is BaseCurveCompounder {
 
     function setCurveLpCompounderValues(
         address newRouter,
-        address[] memory newRewardTokens,
-        CurveSwap[] memory newSwaps, // must be ordered like `newRewardTokens`
+        CurveSwap[] memory newSwaps,
+        address poolAddress,
         int128 indexIn_
     ) internal {
-        setCurveTradeValues(newRouter, newRewardTokens, newSwaps);
+        setCurveTradeValues(newRouter, newSwaps);
 
-        // caching
-        address asset_ = asset();
-
-        address depositAsset_ = pool.coins(uint256(uint128(indexIn_)));
-        if (depositAsset != address(0)) IERC20(depositAsset).approve(asset_, 0);
-        IERC20(depositAsset_).approve(asset_, type(uint256).max);
+        address depositAsset_ = ICurveLp(poolAddress).coins(
+            uint256(uint128(indexIn_))
+        );
+        if (depositAsset != address(0))
+            IERC20(depositAsset).approve(poolAddress, 0);
+        IERC20(depositAsset_).approve(poolAddress, type(uint256).max);
 
         depositAsset = depositAsset_;
         indexIn = indexIn_;
