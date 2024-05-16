@@ -99,7 +99,7 @@ contract CurveGaugeSingleAssetCompounderTest is BaseStrategyTest {
     function _getCurveSwaps(
         string memory json_,
         string memory index_
-    ) internal returns (CurveSwap[] memory) {
+    ) internal pure returns (CurveSwap[] memory) {
         uint256 swapLen = json_.readUint(
             string.concat(
                 ".configs[",

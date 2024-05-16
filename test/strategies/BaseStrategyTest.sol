@@ -456,10 +456,45 @@ abstract contract BaseStrategyTest is PropertyTest {
     }
 
     /*//////////////////////////////////////////////////////////////
+                            AUTODEPOSIT
+    //////////////////////////////////////////////////////////////*/
+
+    function test__toggleAutoDeposit() public virtual {
+        bool prevAutoDeposit = strategy.autoDeposit();
+        assertTrue(prevAutoDeposit);
+
+        strategy.toggleAutoDeposit();
+
+        assertEq(strategy.autoDeposit(), false);
+    }
+
+    function testFail__toggleAutoDeposit_nonOwner() public virtual {
+        vm.prank(alice);
+        strategy.toggleAutoDeposit();
+    }
+
+    // TODO -- Add tests
+
+    /*//////////////////////////////////////////////////////////////
                             HARVEST
     //////////////////////////////////////////////////////////////*/
 
     function test__harvest() public virtual {}
+
+    /*//////////////////////////////////////////////////////////////
+                            KEEPER
+    //////////////////////////////////////////////////////////////*/
+
+    function test__setKeeper() public virtual {
+        strategy.setKeeper(bob);
+
+        assertEq(strategy.keeper(), bob);
+    }
+
+    function testFail__setKeeper_nonOwner() public virtual {
+        vm.prank(alice);
+        strategy.setKeeper(alice);
+    }
 
     /*//////////////////////////////////////////////////////////////
                             PAUSING

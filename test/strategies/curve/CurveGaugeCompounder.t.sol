@@ -89,7 +89,7 @@ contract CurveGaugeCompounderTest is BaseStrategyTest {
     function _getCurveSwaps(
         string memory json_,
         string memory index_
-    ) internal returns (CurveSwap[] memory) {
+    ) internal pure returns (CurveSwap[] memory) {
         uint256 swapLen = json_.readUint(
             string.concat(
                 ".configs[",
@@ -183,7 +183,7 @@ contract CurveGaugeCompounderTest is BaseStrategyTest {
         vm.roll(block.number + 100);
         vm.warp(block.timestamp + 1500);
 
-               strategy.harvest(abi.encode(uint256(0)));
+        strategy.harvest(abi.encode(uint256(0)));
         assertGt(strategy.totalAssets(), oldTa);
     }
 
@@ -195,7 +195,7 @@ contract CurveGaugeCompounderTest is BaseStrategyTest {
 
         uint256 oldTa = strategy.totalAssets();
 
-               strategy.harvest(abi.encode(uint256(0)));
+        strategy.harvest(abi.encode(uint256(0)));
         assertEq(strategy.totalAssets(), oldTa);
     }
 }

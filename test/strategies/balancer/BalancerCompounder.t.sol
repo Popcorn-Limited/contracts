@@ -85,7 +85,7 @@ contract BalancerCompounderTest is BaseStrategyTest {
     function _getTradePaths(
         string memory json_,
         string memory index_
-    ) internal returns (TradePath[] memory) {
+    ) internal pure returns (TradePath[] memory) {
         uint256 swapLen = json_.readUint(
             string.concat(
                 ".configs[",

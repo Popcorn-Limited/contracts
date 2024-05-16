@@ -414,7 +414,7 @@ contract WstETHLooper is BaseStrategy, IFlashLoanReceiver {
                           MANAGEMENT LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function harvest(bytes memory data) external override onlyKeeperOrOwner {
+    function harvest(bytes memory) external override onlyKeeperOrOwner {
         adjustLeverage();
 
         emit Harvested();

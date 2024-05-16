@@ -183,10 +183,7 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy, BaseCurveCompounder {
         gauge.deposit(IERC20(lpToken).balanceOf(address(this)));
     }
 
-    function _protocolWithdraw(
-        uint256 assets,
-        uint256 shares
-    ) internal override {
+    function _protocolWithdraw(uint256, uint256 shares) internal override {
         uint256 lpWithdraw = shares.mulDiv(
             IERC20(address(gauge)).balanceOf(address(this)),
             totalSupply(),

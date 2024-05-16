@@ -21,4 +21,21 @@ interface IBaseStrategy is IERC4626, IOwned, IPermit, IPausable {
     function decimals() external view returns (uint8);
 
     function decimalOffset() external view returns (uint8);
+
+    function setKeeper(address keeper) external;
+
+    function keeper() external view returns (address);
+
+    function toggleAutoDeposit() external;
+
+    function autoDeposit() external view returns (bool);
+
+    function pushFunds(uint256 assets, bytes memory data) external;
+
+    function rewardTokens() external view returns (address[] memory);
+
+    function convertToUnderlyingShares(
+        uint256 assets,
+        uint256 shares
+    ) external view returns (uint256);
 }
