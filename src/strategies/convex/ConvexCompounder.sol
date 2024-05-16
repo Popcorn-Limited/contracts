@@ -34,6 +34,8 @@ contract ConvexCompounder is BaseStrategy {
     /// @notice The Convex convexRewards.
     IConvexRewards public convexRewards;
 
+    ICurveLp public pool;
+
     /*//////////////////////////////////////////////////////////////
                             INITIALIZATION
     //////////////////////////////////////////////////////////////*/
@@ -44,13 +46,13 @@ contract ConvexCompounder is BaseStrategy {
      * @notice Initialize a new Strategy.
      * @param asset_ The underlying asset used for deposit/withdraw and accounting
      * @param owner_ Owner of the contract. Controls management functions.
-     * @param autoHarvest_ Controls if the harvest function gets called on deposit/withdrawal
+     * @param autoDeposit_ Controls if `protocolDeposit` gets called on deposit
      * @param strategyInitData_ Encoded data for this specific strategy
      */
     function initialize(
         address asset_,
         address owner_,
-        bool autoHarvest_,
+        bool autoDeposit_,
         bytes memory strategyInitData_
     ) external initializer {
         (address _convexBooster, address _curvePool, uint256 _pid) = abi.decode(
@@ -65,8 +67,9 @@ contract ConvexCompounder is BaseStrategy {
         convexRewards = IConvexRewards(_convexRewards);
         pid = _pid;
         nCoins = ICurveLp(_curvePool).N_COINS();
+        pool = ICurveLp(_curvePool);
 
-        __BaseStrategy_init(asset_, owner_, autoHarvest_);
+        __BaseStrategy_init(asset_, owner_, autoDeposit_);
 
         IERC20(asset_).approve(_convexBooster, type(uint256).max);
 
@@ -116,7 +119,11 @@ contract ConvexCompounder is BaseStrategy {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Deposit into Convex convexBooster contract.
-    function _protocolDeposit(uint256 assets, uint256) internal override {
+    function _protocolDeposit(
+        uint256 assets,
+        uint256,
+        bytes memory
+    ) internal override {
         convexBooster.deposit(pid, assets, true);
     }
 
@@ -134,8 +141,10 @@ contract ConvexCompounder is BaseStrategy {
                             STRATEGY LOGIC
     //////////////////////////////////////////////////////////////*/
 
+    error CompoundFailed();
+
     /// @notice Claim liquidity mining rewards given that it's active
-    function claim() public override returns (bool success) {
+    function claim() internal override returns (bool success) {
         try convexRewards.getReward(address(this), true) {
             success = true;
         } catch {}
@@ -144,7 +153,7 @@ contract ConvexCompounder is BaseStrategy {
     /**
      * @notice Claim rewards and compound them into the vault
      */
-    function harvest() public override  {
+    function harvest(bytes memory data) external override onlyKeeperOrOwner {
         claim();
 
         ICurveRouter router_ = curveRouter;
@@ -154,7 +163,7 @@ contract ConvexCompounder is BaseStrategy {
             address rewardToken = _rewardTokens[i];
             amount = IERC20(rewardToken).balanceOf(address(this));
 
-            if (amount > 0 && amount > minTradeAmounts[i]) {
+            if (amount > 0) {
                 CurveSwap memory swap = swaps[rewardToken];
                 router_.exchange(
                     swap.route,
@@ -171,18 +180,20 @@ contract ConvexCompounder is BaseStrategy {
             uint256[] memory amounts = new uint256[](nCoins);
             amounts[uint256(uint128(indexIn))] = amount;
 
-            address asset_ = asset();
+            ICurveLp(pool).add_liquidity(amounts, 0);
 
-            ICurveLp(asset_).add_liquidity(amounts, 0);
+            uint256 minOut = abi.decode(data, (uint256));
 
-            _protocolDeposit(IERC20(asset_).balanceOf(address(this)), 0);
+            amount = IERC20(asset()).balanceOf(address(this));
+            if (amount < minOut) revert CompoundFailed();
+
+            _protocolDeposit(amount, 0, bytes(""));
         }
 
         emit Harvested();
     }
 
     address[] internal _rewardTokens;
-    uint256[] public minTradeAmounts; // ordered as in rewardsTokens()
 
     ICurveRouter public curveRouter;
 
@@ -196,7 +207,6 @@ contract ConvexCompounder is BaseStrategy {
     function setHarvestValues(
         address curveRouter_,
         address[] memory rewardTokens_,
-        uint256[] memory minTradeAmounts_, // must be ordered like rewardTokens_
         CurveSwap[] memory swaps_, // must be ordered like rewardTokens_
         int128 indexIn_
     ) public onlyOwner {
@@ -218,7 +228,6 @@ contract ConvexCompounder is BaseStrategy {
         indexIn = indexIn_;
 
         _rewardTokens = rewardTokens_;
-        minTradeAmounts = minTradeAmounts_;
     }
 
     function _approveSwapTokens(

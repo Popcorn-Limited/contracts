@@ -29,20 +29,20 @@ contract CompoundV3Depositor is BaseStrategy {
      * @notice Initialize a new Strategy.
      * @param asset_ The underlying asset used for deposit/withdraw and accounting
      * @param owner_ Owner of the contract. Controls management functions.
-     * @param autoHarvest_ Controls if the harvest function gets called on deposit/withdrawal
+     * @param autoDeposit_ Controls if `protocolDeposit` gets called on deposit
      * @param strategyInitData_ Encoded data for this specific strategy
      */
     function initialize(
         address asset_,
         address owner_,
-        bool autoHarvest_,
+        bool autoDeposit_,
         bytes memory strategyInitData_
     ) external initializer {
         address cToken_ = abi.decode(strategyInitData_, (address));
 
         cToken = ICToken(cToken_);
 
-        __BaseStrategy_init(asset_, owner_, autoHarvest_);
+        __BaseStrategy_init(asset_, owner_, autoDeposit_);
 
         IERC20(asset_).approve(cToken_, type(uint256).max);
 
@@ -84,7 +84,11 @@ contract CompoundV3Depositor is BaseStrategy {
                           INTERNAL HOOKS LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function _protocolDeposit(uint256 assets, uint256) internal override {
+    function _protocolDeposit(
+        uint256 assets,
+        uint256,
+        bytes memory
+    ) internal override {
         cToken.supply(asset(), assets);
     }
 
