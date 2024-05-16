@@ -260,13 +260,13 @@ abstract contract BaseStrategy is
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Pause Deposits and withdraw all funds from the underlying protocol. Caller must be owner.
-    function pause() external onlyOwner {
-        _protocolWithdraw(totalAssets(), totalSupply());
+    function pause() external virtual onlyOwner {
+        _protocolWithdraw(totalAssets(), totalSupply(), bytes(""));
         _pause();
     }
 
     /// @notice Unpause Deposits and deposit all funds into the underlying protocol. Caller must be owner.
-    function unpause() external onlyOwner {
+    function unpause() external virtual onlyOwner {
         _protocolDeposit(totalAssets(), totalSupply(), bytes(""));
         _unpause();
     }

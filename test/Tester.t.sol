@@ -54,37 +54,7 @@ contract Tester is Test {
     }
 
     function testA() public {
-        string memory root = vm.projectRoot();
-        string memory path = string.concat(root, "/test/sample.json");
-        string memory json = vm.readFile(path);
-
-        BatchSwapStep memory step = abi.decode(
-            json.parseRaw(".[0].step"),
-            (BatchSwapStep)
-        );
-
-        emit log_uint(step.amount);
-        emit log_uint(step.assetInIndex);
-        emit log_bytes32(step.poolId);
-
-        address[] memory route = json.readAddressArray(".[0].curveSwap.route");
-        address[11] memory route2;
-        for (uint i; i < 11; i++) {
-            route2[i] = route[i];
-        }
-
-        uint256[5][5] memory swapParams;
-        for (uint i; i < 5; i++) {
-            uint256[] memory params = json.readUintArray(
-                string.concat(".[0].curveSwap.swapParams[", vm.toString(i), "]")
-            );
-            for (uint n; n < 5; n++) {
-                swapParams[i][n] = params[n];
-            }
-        }
-
-        emit log_address(route2[2]);
-        emit log_uint(swapParams[0][0]);
-        emit log_uint(swapParams[3][2]);
+        emit log_uint(bytes("").length);
+        emit log_address(abi.decode(abi.encode(""), (address)));
     }
 }
