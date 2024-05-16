@@ -250,7 +250,7 @@ abstract contract BaseStrategy is
     }
 
     modifier onlyKeeperOrOwner() {
-        if (msg.sender != owner || msg.sender != keeper)
+        if (msg.sender != owner && msg.sender != keeper)
             revert NotKeeperNorOwner();
         _;
     }

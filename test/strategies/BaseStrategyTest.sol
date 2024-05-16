@@ -481,6 +481,11 @@ abstract contract BaseStrategyTest is PropertyTest {
 
     function test__harvest() public virtual {}
 
+    function testFail__harvest_nonOwnerNorKeeper() public virtual {
+        vm.prank(alice);
+        strategy.harvest(bytes(""));
+    }
+
     /*//////////////////////////////////////////////////////////////
                             KEEPER
     //////////////////////////////////////////////////////////////*/
