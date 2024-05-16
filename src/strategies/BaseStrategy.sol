@@ -120,7 +120,8 @@ abstract contract BaseStrategy is
         if (caller != owner) {
             _spendAllowance(owner, caller, shares);
         }
-
+        
+        // TODO -- add float calc
         if (!paused()) _protocolWithdraw(assets, shares);
 
         // If _asset is ERC-777, `transfer` can trigger a reentrancy AFTER the transfer happens through the

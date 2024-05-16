@@ -473,7 +473,171 @@ abstract contract BaseStrategyTest is PropertyTest {
         strategy.toggleAutoDeposit();
     }
 
-    // TODO -- Add tests
+    function test__deposit_autoDeposit_off() public virtual {
+        strategy.toggleAutoDeposit();
+        _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
+
+        vm.prank(bob);
+        strategy.deposit(testConfig.defaultAmount, bob);
+
+        assertEq(strategy.totalAssets(), testConfig.defaultAmount, "ta");
+        assertEq(strategy.totalSupply(), testConfig.defaultAmount, "ts");
+        assertEq(
+            strategy.balanceOf(bob),
+            testConfig.defaultAmount,
+            "share bal"
+        );
+        assertEq(
+            IERC20(_asset_).balanceOf(address(strategy)),
+            testConfig.defaultAmount,
+            "strategy asset bal"
+        );
+    }
+
+    function test__mint_autoDeposit_off() public virtual {
+        strategy.toggleAutoDeposit();
+        _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
+
+        vm.prank(bob);
+        strategy.deposit(testConfig.defaultAmount, bob);
+
+        assertEq(strategy.totalAssets(), testConfig.defaultAmount, "ta");
+        assertEq(strategy.totalSupply(), testConfig.defaultAmount, "ts");
+        assertEq(
+            strategy.balanceOf(bob),
+            testConfig.defaultAmount,
+            "share bal"
+        );
+        assertEq(
+            IERC20(_asset_).balanceOf(address(strategy)),
+            testConfig.defaultAmount,
+            "strategy asset bal"
+        );
+    }
+
+    function test__withdraw_autoDeposit_off() public virtual {
+        strategy.toggleAutoDeposit();
+        _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
+
+        vm.prank(bob);
+        strategy.deposit(testConfig.defaultAmount, bob);
+
+        vm.prank(bob);
+        strategy.withdraw(testConfig.defaultAmount, bob, bob);
+
+        assertEq(strategy.totalAssets(), 0, "ta");
+        assertEq(strategy.totalSupply(), 0, "ts");
+        assertEq(strategy.balanceOf(bob), 0, "share bal");
+        assertEq(
+            IERC20(_asset_).balanceOf(bob),
+            testConfig.defaultAmount,
+            "asset bal"
+        );
+        assertEq(
+            IERC20(_asset_).balanceOf(address(strategy)),
+            0,
+            "strategy asset bal"
+        );
+    }
+
+    function test__redeem_autoDeposit_off() public virtual {
+        strategy.toggleAutoDeposit();
+        _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
+
+        vm.prank(bob);
+        strategy.deposit(testConfig.defaultAmount, bob);
+
+        vm.prank(bob);
+        strategy.redeem(testConfig.defaultAmount, bob, bob);
+
+        assertEq(strategy.totalAssets(), 0, "ta");
+        assertEq(strategy.totalSupply(), 0, "ts");
+        assertEq(strategy.balanceOf(bob), 0, "share bal");
+        assertEq(
+            IERC20(_asset_).balanceOf(bob),
+            testConfig.defaultAmount,
+            "asset bal"
+        );
+        assertEq(
+            IERC20(_asset_).balanceOf(address(strategy)),
+            0,
+            "strategy asset bal"
+        );
+    }
+
+    /// @dev Partially withdraw assets directly from strategy and the underlying protocol
+    function test__withdraw_autoDeposit_partial() public virtual {
+        strategy.toggleAutoDeposit();
+        _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
+
+        vm.prank(bob);
+        strategy.deposit(testConfig.defaultAmount, bob);
+
+        // Push half the funds into the underlying protocol
+        strategy.pushFunds(testConfig.defaultAmount / 2, data);
+
+        // Redeem 2/3 of deposit
+        vm.prank(bob);
+        strategy.withdraw((testConfig.defaultAmount / 3) * 2, bob, bob);
+
+        assertEq(strategy.totalAssets(), testConfig.defaultAmount / 3, "ta");
+        assertEq(strategy.totalSupply(), testConfig.defaultAmount / 3, "ts");
+        assertEq(
+            strategy.balanceOf(bob),
+            testConfig.defaultAmount / 3,
+            "share bal"
+        );
+        assertEq(
+            IERC20(_asset_).balanceOf(bob),
+            (testConfig.defaultAmount / 3) * 2,
+            "asset bal"
+        );
+        assertEq(
+            IERC20(_asset_).balanceOf(address(strategy)),
+            0,
+            "strategy asset bal"
+        );
+    }
+
+    /// @dev Partially withdraw assets directly from strategy and the underlying protocol
+    function test__redeem_autoDeposit_partial() public virtual {
+        strategy.toggleAutoDeposit();
+        _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
+
+        vm.prank(bob);
+        strategy.deposit(testConfig.defaultAmount, bob);
+
+        // Push half the funds into the underlying protocol
+        strategy.pushFunds(testConfig.defaultAmount / 2, data);
+
+        // Redeem 2/3 of deposit
+        vm.prank(bob);
+        strategy.redeem((testConfig.defaultAmount / 3) * 2, bob, bob);
+
+        assertEq(strategy.totalAssets(), testConfig.defaultAmount / 3, "ta");
+        assertEq(strategy.totalSupply(), testConfig.defaultAmount / 3, "ts");
+        assertEq(
+            strategy.balanceOf(bob),
+            testConfig.defaultAmount / 3,
+            "share bal"
+        );
+        assertEq(
+            IERC20(_asset_).balanceOf(bob),
+            (testConfig.defaultAmount / 3) * 2,
+            "asset bal"
+        );
+        assertEq(
+            IERC20(_asset_).balanceOf(address(strategy)),
+            0,
+            "strategy asset bal"
+        );
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            PUSH FUNDS
+    //////////////////////////////////////////////////////////////*/
+
+    // TODO -- add tests
 
     /*//////////////////////////////////////////////////////////////
                             HARVEST
