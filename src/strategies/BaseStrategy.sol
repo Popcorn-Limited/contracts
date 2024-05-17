@@ -120,9 +120,12 @@ abstract contract BaseStrategy is
         if (caller != owner) {
             _spendAllowance(owner, caller, shares);
         }
-        
-        // TODO -- add float calc
-        if (!paused()) _protocolWithdraw(assets, shares);
+
+        if (!paused()) {
+            uint256 missing = assets - IERC20(asset()).balanceOf(address(this));
+            if (missing > 0)
+                _protocolWithdraw(missing, convertToShares(missing));
+        }
 
         // If _asset is ERC-777, `transfer` can trigger a reentrancy AFTER the transfer happens through the
         // `tokensReceived` hook. On the other hand, the `tokensToSend` hook, that is triggered before the transfer,

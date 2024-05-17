@@ -157,32 +157,48 @@ contract BalancerCompounderTest is BaseStrategyTest {
                                 HARVEST
     //////////////////////////////////////////////////////////////*/
 
-    // function test__harvest() public override {
-    //     _mintAssetAndApproveForStrategy(10000e18, bob);
+    function test__harvest() public override {
+        _mintAssetAndApproveForStrategy(10000e18, bob);
 
-    //     vm.prank(bob);
-    //     strategy.deposit(10000e18, bob);
+        vm.prank(bob);
+        strategy.deposit(10000e18, bob);
 
-    //     uint256 oldTa = strategy.totalAssets();
+        uint256 oldTa = strategy.totalAssets();
 
-    //     vm.roll(block.number + 1000000);
-    //     vm.warp(block.timestamp + 15000000);
+        vm.roll(block.number + 100);
+        vm.warp(block.timestamp + 1500);
 
-    //            strategy.harvest(abi.encode(uint256(0)));
+        strategy.harvest(abi.encode(uint256(0)));
 
-    //     assertGt(strategy.totalAssets(), oldTa);
-    // }
+        assertGt(strategy.totalAssets(), oldTa);
+    }
 
-    // function test__harvest_no_rewards() public {
-    //     _mintAssetAndApproveForStrategy(100e18, bob);
+    function testFail__harvest_slippage_too_high() public {
+        _mintAssetAndApproveForStrategy(10000e18, bob);
 
-    //     vm.prank(bob);
-    //     strategy.deposit(100e18, bob);
+        vm.prank(bob);
+        strategy.deposit(10000e18, bob);
 
-    //     uint256 oldTa = strategy.totalAssets();
+        uint256 oldTa = strategy.totalAssets();
 
-    //            strategy.harvest(abi.encode(uint256(0)));
+        vm.roll(block.number + 100);
+        vm.warp(block.timestamp + 1500);
 
-    //     assertEq(strategy.totalAssets(), oldTa);
-    // }
+        strategy.harvest(abi.encode(uint256(1e18)));
+
+        assertGt(strategy.totalAssets(), oldTa);
+    }
+
+    function testFail__harvest_no_rewards() public {
+        _mintAssetAndApproveForStrategy(100e18, bob);
+
+        vm.prank(bob);
+        strategy.deposit(100e18, bob);
+
+        uint256 oldTa = strategy.totalAssets();
+
+        strategy.harvest(abi.encode(uint256(1e18)));
+
+        assertEq(strategy.totalAssets(), oldTa);
+    }
 }

@@ -117,7 +117,13 @@ abstract contract BaseStrategyTest is PropertyTest {
      *      - specific protocol or strategy config are verified in the registry.
      *      - correct allowance amounts are approved
      */
-    function test__initialization() public virtual {}
+    function test__initialization() public virtual {
+        assertEq(strategy.asset(), testConfig.asset);
+        assertEq(
+            strategy.decimals(),
+            IERC20Metadata(testConfig.asset).decimals()
+        );
+    }
 
     /*//////////////////////////////////////////////////////////////
                           TOTAL ASSETS
@@ -573,33 +579,46 @@ abstract contract BaseStrategyTest is PropertyTest {
         vm.prank(bob);
         strategy.deposit(testConfig.defaultAmount, bob);
 
-        // Push half the funds into the underlying protocol
-        strategy.pushFunds(testConfig.defaultAmount / 2, data);
+        // Push 40% the funds into the underlying protocol
+        strategy.pushFunds((testConfig.defaultAmount / 5) * 2, bytes(""));
 
-        // Redeem 2/3 of deposit
+        // Withdraw 80% of deposit
         vm.prank(bob);
-        strategy.withdraw((testConfig.defaultAmount / 3) * 2, bob, bob);
+        strategy.withdraw((testConfig.defaultAmount / 5) * 4, bob, bob);
 
-        assertEq(strategy.totalAssets(), testConfig.defaultAmount / 3, "ta");
-        assertEq(strategy.totalSupply(), testConfig.defaultAmount / 3, "ts");
-        assertEq(
+        assertApproxEqAbs(
+            strategy.totalAssets(),
+            testConfig.defaultAmount / 5,
+            _delta_,
+            "ta"
+        );
+        assertApproxEqAbs(
+            strategy.totalSupply(),
+            testConfig.defaultAmount / 5,
+            _delta_,
+            "ts"
+        );
+        assertApproxEqAbs(
             strategy.balanceOf(bob),
-            testConfig.defaultAmount / 3,
+            testConfig.defaultAmount / 5,
+            _delta_,
             "share bal"
         );
-        assertEq(
+        assertApproxEqAbs(
             IERC20(_asset_).balanceOf(bob),
-            (testConfig.defaultAmount / 3) * 2,
+            (testConfig.defaultAmount / 5) * 4,
+            _delta_,
             "asset bal"
         );
-        assertEq(
+        assertApproxEqAbs(
             IERC20(_asset_).balanceOf(address(strategy)),
             0,
+            _delta_,
             "strategy asset bal"
         );
     }
 
-    /// @dev Partially withdraw assets directly from strategy and the underlying protocol
+    /// @dev Partially redeem assets directly from strategy and the underlying protocol
     function test__redeem_autoDeposit_partial() public virtual {
         strategy.toggleAutoDeposit();
         _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
@@ -607,28 +626,41 @@ abstract contract BaseStrategyTest is PropertyTest {
         vm.prank(bob);
         strategy.deposit(testConfig.defaultAmount, bob);
 
-        // Push half the funds into the underlying protocol
-        strategy.pushFunds(testConfig.defaultAmount / 2, data);
+        // Push 40% the funds into the underlying protocol
+        strategy.pushFunds((testConfig.defaultAmount / 5) * 2, bytes(""));
 
-        // Redeem 2/3 of deposit
+        // Redeem 80% of deposit
         vm.prank(bob);
-        strategy.redeem((testConfig.defaultAmount / 3) * 2, bob, bob);
+        strategy.redeem((testConfig.defaultAmount / 5) * 4, bob, bob);
 
-        assertEq(strategy.totalAssets(), testConfig.defaultAmount / 3, "ta");
-        assertEq(strategy.totalSupply(), testConfig.defaultAmount / 3, "ts");
-        assertEq(
+        assertApproxEqAbs(
+            strategy.totalAssets(),
+            testConfig.defaultAmount / 5,
+            _delta_,
+            "ta"
+        );
+        assertApproxEqAbs(
+            strategy.totalSupply(),
+            testConfig.defaultAmount / 5,
+            _delta_,
+            "ts"
+        );
+        assertApproxEqAbs(
             strategy.balanceOf(bob),
-            testConfig.defaultAmount / 3,
+            testConfig.defaultAmount / 5,
+            _delta_,
             "share bal"
         );
-        assertEq(
+        assertApproxEqAbs(
             IERC20(_asset_).balanceOf(bob),
-            (testConfig.defaultAmount / 3) * 2,
+            (testConfig.defaultAmount / 5) * 4,
+            _delta_,
             "asset bal"
         );
-        assertEq(
+        assertApproxEqAbs(
             IERC20(_asset_).balanceOf(address(strategy)),
             0,
+            _delta_,
             "strategy asset bal"
         );
     }

@@ -184,10 +184,25 @@ contract CurveGaugeCompounderTest is BaseStrategyTest {
         vm.warp(block.timestamp + 1500);
 
         strategy.harvest(abi.encode(uint256(0)));
+
         assertGt(strategy.totalAssets(), oldTa);
     }
 
-    function test__harvest_no_rewards() public {
+    function testFail__harvest_slippage_too_high() public {
+        vm.prank(bob);
+        strategy.deposit(10000e18, bob);
+
+        uint256 oldTa = strategy.totalAssets();
+
+        vm.roll(block.number + 100);
+        vm.warp(block.timestamp + 1500);
+
+        strategy.harvest(abi.encode(uint256(59771501687525484)));
+
+        assertGt(strategy.totalAssets(), oldTa);
+    }
+
+    function testFail__harvest_no_rewards() public {
         _mintAssetAndApproveForStrategy(100e18, bob);
 
         vm.prank(bob);
@@ -195,7 +210,8 @@ contract CurveGaugeCompounderTest is BaseStrategyTest {
 
         uint256 oldTa = strategy.totalAssets();
 
-        strategy.harvest(abi.encode(uint256(0)));
+        strategy.harvest(abi.encode(uint256(1e18)));
+        
         assertEq(strategy.totalAssets(), oldTa);
     }
 }

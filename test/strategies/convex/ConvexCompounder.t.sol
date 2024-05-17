@@ -181,12 +181,30 @@ contract ConvexCompounderTest is BaseStrategyTest {
         vm.prank(bob);
         strategy.deposit(10000e18, bob);
         uint256 oldTa = strategy.totalAssets();
+
         vm.roll(block.number + 10000);
         vm.warp(block.timestamp + 150000);
-               strategy.harvest(abi.encode(uint256(0)));        assertGt(strategy.totalAssets(), oldTa);
+
+        strategy.harvest(abi.encode(uint256(0)));
+
+        assertGt(strategy.totalAssets(), oldTa);
     }
 
-    function test__harvest_no_rewards() public {
+    function testFail__harvest_slippage_too_high() public {
+        _mintAssetAndApproveForStrategy(10000e18, bob);
+        vm.prank(bob);
+        strategy.deposit(10000e18, bob);
+        uint256 oldTa = strategy.totalAssets();
+
+        vm.roll(block.number + 10000);
+        vm.warp(block.timestamp + 150000);
+
+        strategy.harvest(abi.encode(uint256(9621364723006598847)));
+
+        assertGt(strategy.totalAssets(), oldTa);
+    }
+
+    function testFail__harvest_no_rewards() public {
         _mintAssetAndApproveForStrategy(100e18, bob);
 
         vm.prank(bob);
@@ -194,7 +212,8 @@ contract ConvexCompounderTest is BaseStrategyTest {
 
         uint256 oldTa = strategy.totalAssets();
 
-               strategy.harvest(abi.encode(uint256(0)));
+        strategy.harvest(abi.encode(uint256(10e18)));
+
         assertEq(strategy.totalAssets(), oldTa);
     }
 }

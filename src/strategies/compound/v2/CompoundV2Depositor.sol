@@ -88,21 +88,6 @@ contract CompoundV2Depositor is BaseStrategy {
         return LibCompound.viewUnderlyingBalanceOf(cToken, address(this));
     }
 
-    function convertToUnderlyingShares(
-        uint256,
-        uint256 shares
-    ) public view override returns (uint256) {
-        uint256 supply = totalSupply();
-        return
-            supply == 0
-                ? shares
-                : shares.mulDiv(
-                    cToken.balanceOf(address(this)),
-                    supply,
-                    Math.Rounding.Ceil
-                );
-    }
-
     /*//////////////////////////////////////////////////////////////
                           INTERNAL HOOKS LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -117,7 +102,7 @@ contract CompoundV2Depositor is BaseStrategy {
     }
 
     /// @notice Withdraw from lending pool
-    function _protocolWithdraw(uint256, uint256 shares) internal override {
-        cToken.redeem(convertToUnderlyingShares(0, shares));
+    function _protocolWithdraw(uint256 assets, uint256) internal override {
+        cToken.redeemUnderlying(assets);
     }
 }
