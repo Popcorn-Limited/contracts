@@ -1,7 +1,7 @@
 {
     "totalAssets": {
         "numCommands": 1,
-        "stateLen": 1,
+        "stateLen": 0,
         "commands": [
             {
                 "command": {
@@ -41,12 +41,7 @@
                 }
             }
         ],
-        "state": [
-            {
-                "type": "bytes",
-                "value": "0x"
-            }
-        ]
+        "state": []
     },
     "deposit": {
         "numCommands": 1,
@@ -152,7 +147,7 @@
     },
     "harvest": {
         "numCommands": 11,
-        "stateLen": 17,
+        "stateLen": 16,
         "commands": [
             {
                 "command": {
@@ -533,10 +528,6 @@
             }
         ],
         "state": [
-            {
-                "type": "bytes",
-                "value": "0x"
-            },
             {
                 "type": "bool",
                 "value": true

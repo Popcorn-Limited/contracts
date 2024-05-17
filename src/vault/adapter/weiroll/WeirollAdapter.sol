@@ -164,7 +164,9 @@ contract WeirollUniversalAdapter is AdapterBase, VM {
         for(uint i=0; i<cT.length; i++) {
             totalAssetsCommands.commands.push(cT[i]);
         }
-        // push passed args - usually none
+
+        totalAssetsCommands.states.push(abi.encode(address(this))); // address this always at state 0
+
         for(uint i=0; i<sT.length; i++) {
             totalAssetsCommands.states.push(sT[i]);
         }
@@ -174,6 +176,8 @@ contract WeirollUniversalAdapter is AdapterBase, VM {
         for(uint i=0; i<cH.length; i++) {
             harvestCommands.commands.push(cH[i]);
         }
+
+        harvestCommands.states.push(abi.encode(address(this))); // address this always at state 0
         for(uint i=0; i<sH.length; i++) {
             harvestCommands.states.push(sH[i]);
         }

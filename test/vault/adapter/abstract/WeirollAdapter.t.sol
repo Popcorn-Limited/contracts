@@ -8,18 +8,13 @@ import {ConvexTestConfigStorage, ConvexTestConfig} from "../convex/ConvexTestCon
 import {AbstractAdapterTest, ITestConfigStorage, IAdapter} from "../abstract/AbstractAdapterTest.sol";
 import {MockStrategyClaimer} from "../../../utils/mocks/MockStrategyClaimer.sol";
 import {WeirollUniversalAdapter, VmCommand} from "../../../../src/vault/adapter/weiroll/WeirollAdapter.sol";
-import {WeirollUtils, InputIndex, OutputIndex} from "../../../../src/vault/adapter/weiroll/WeirollUtils.sol";
+import {WeirollBuilder} from "../../../../src/vault/adapter/weiroll/WeirollUtils.sol";
 import {stdJson} from "forge-std/StdJson.sol";
-
-struct Command {
-    uint256 commandType; // 0 delegateCall, 1 call, 2 static call, 3 call with value
-    string signature;
-    address target;
-}
 
 contract WeirollAdapterTest is AbstractAdapterTest {
     using Math for uint256;
     using stdJson for string;
+    using WeirollBuilder for string;
 
     IConvexBooster convexBooster =
         IConvexBooster(0xF403C135812408BFbE8713b5A23a04b3D48AAE31);
@@ -27,15 +22,11 @@ contract WeirollAdapterTest is AbstractAdapterTest {
     address rewardPool = address(0x79579633029a61963eDfbA1C0BE22498b6e0D33D);
 
     uint256 pid;
-    WeirollUniversalAdapter adapterContract;
-    WeirollUtils encoder;
 
     address crv = address(0xD533a949740bb3306d119CC777fa900bA034cd52);
     address cvx = address(0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B);
     address baseAsset = address(0xf939E0A03FB07F59A73314E73794Be0E57ac1b4E); //crvUSD
     address router = address(0xF0d4c12A5768D806021F80a262B4d39d26C58b8D);
-
-    bytes[] claimStates = new bytes[](17);
 
     string jsonConfig;
 
@@ -45,7 +36,7 @@ contract WeirollAdapterTest is AbstractAdapterTest {
         jsonConfig = vm.readFile(
             string.concat(
                 vm.projectRoot(),
-                "/test/vault/adapter/abstract/WeirollAdapterConfig.json" // TODO PATH var
+                "/test/vault/adapter/abstract/ConvexCompounderConfig.json" // TODO PATH var
             )
         );
 
@@ -84,34 +75,45 @@ contract WeirollAdapterTest is AbstractAdapterTest {
         vm.label(address(asset), "asset");
         vm.label(address(this), "test");
 
-        encoder = new WeirollUtils();
+        uint256 stateLen;
+        uint256 commandLen;
 
         // ENCODE TOTAL ASSET 
-        bytes32[] memory tComm = new bytes32[](1);
-        bytes[] memory tStates = new bytes[](1);
-
-        (tComm, tStates) = _totalAssetsCommand();
+        (commandLen, stateLen) = jsonConfig.getCommandAndStateLength("totalAssets");
+        bytes32[] memory tComm = new bytes32[](commandLen);
+        bytes[] memory tStates = new bytes[](stateLen);
+        (tComm, tStates) = jsonConfig.getCommandsAndState("totalAssets");
 
         // ---------------------------------------------- 
-        // ENCODE DEPOSIT         
-        bytes32[] memory depCommands = new bytes32[](1);
-        bytes[] memory depStates = new bytes[](2);
-
-        (depCommands, depStates) = _depositCommand();
+        // ENCODE DEPOSIT
+        (commandLen, stateLen) = jsonConfig.getCommandAndStateLength("deposit");         
+        bytes32[] memory depCommands = new bytes32[](commandLen);
+        bytes[] memory depStates = new bytes[](stateLen);
+        (depCommands, depStates) = jsonConfig.getCommandsAndState("deposit");
 
         // ---------------------------------------------- 
         // ENCODE WITHDRAW 
-        bytes32[] memory wCommands = new bytes32[](1);
-        bytes[] memory wStates = new bytes[](1);
-        (wCommands, wStates) = _withdrawCommand();
+        (commandLen, stateLen) = jsonConfig.getCommandAndStateLength("withdraw");         
+        bytes32[] memory wCommands = new bytes32[](commandLen);
+        bytes[] memory wStates = new bytes[](stateLen);
+        (wCommands, wStates) = jsonConfig.getCommandsAndState("withdraw");
 
         // ---------------------------------------------- 
         // ENCODE HARVEST
-        bytes32[] memory claimComms = new bytes32[](11);
-        bytes32[] memory claimedComms = new bytes32[](11);
+        (commandLen, stateLen) = jsonConfig.getCommandAndStateLength("harvest");      
+        bytes32[] memory claimComms = new bytes32[](commandLen);
+        bytes[] memory claimStates = new bytes[](stateLen);   
+        (claimComms, claimStates) = jsonConfig.getCommandsAndState("harvest");
 
-        (claimComms, claimStates) = _harvestCommand();
-        _updateStateCommand();
+        // TODO this needs to be encoded as well in the json
+        // add info on how to update state on last state slot 
+        uint8[] memory updateIndices = new uint8[](2);
+        updateIndices[0] = 15; // 
+        updateIndices[1] = 14; // update state[14] value
+        
+        uint8 overwriteIndex = 14; // overwrite the new value to state[14]
+
+        claimStates[claimStates.length - 1] = abi.encode(updateIndices, true, overwriteIndex);
 
         // ---------------------------------------------- 
         // ENCODE ALL COMMANDS 
@@ -122,8 +124,6 @@ contract WeirollAdapterTest is AbstractAdapterTest {
             externalRegistry,
             commands
         );
-
-        adapterContract = WeirollUniversalAdapter(address(adapter));
 
         adapter.toggleAutoHarvest();
     }
@@ -236,7 +236,7 @@ contract WeirollAdapterTest is AbstractAdapterTest {
         vm.stopPrank();
 
         // get data before
-        uint256 totAssetsBefore = adapterContract.totalAssets();
+        uint256 totAssetsBefore = adapter.totalAssets();
         uint256 bobBalBefore = asset.balanceOf(bob);
 
         // EXECUTE WITHDRAW        
@@ -244,7 +244,7 @@ contract WeirollAdapterTest is AbstractAdapterTest {
         adapter.withdraw(amountWith, bob, bob);
 
         // get data after 
-        uint256 totAssetsAfter = adapterContract.totalAssets();
+        uint256 totAssetsAfter = adapter.totalAssets();
         uint256 bobBalAfter = asset.balanceOf(bob);
 
         // assertions
@@ -280,131 +280,5 @@ contract WeirollAdapterTest is AbstractAdapterTest {
 
         // total assets has increased
         assertGt(totAssetsAfter, totAssetsBefore);
-    }
-
-    function _getCommandInputs(string memory key) internal returns (InputIndex[6] memory inputs) {
-        for (uint256 i=0; i<6; i++) {
-            bool isDynamic = jsonConfig.readBool(
-                string.concat(key, "inputIds[", vm.toString(i), "].isDynamicArray")
-            );
-
-            uint256 ind = jsonConfig.readUint(
-                string.concat(key, "inputIds[", vm.toString(i), "].index")
-            );
-
-            inputs[i] = InputIndex(isDynamic, uint8(ind));
-        }
-    }
-
-    function _getCommandOutput(string memory key) internal returns (OutputIndex memory output) {
-        bool isDynamic = jsonConfig.readBool(string.concat(key, "outputId.isDynamicOutput"));
-        uint256 ind = jsonConfig.readUint(string.concat(key, "outputId.index"));
-
-        output = OutputIndex(isDynamic, uint8(ind));
-    }
-
-    function _getCommandsFromJson(string memory key) internal returns (bytes32[] memory comms) {
-        uint256 numCommands = jsonConfig.readUint(string.concat(".", key, ".numCommands"));
-
-        comms = new bytes32[](numCommands);
-
-        for(uint256 i=0; i<numCommands; i++) {
-            string memory k = string.concat(".", key, ".commands[", vm.toString(i), "].");
-
-            Command memory command = abi.decode(
-                jsonConfig.parseRaw(string.concat(k, "command")),
-                (Command)
-            );
-
-            if(command.commandType == 14) {
-                comms[i] = encoder.UPDATE_STATE_COMMAND();
-            } else {
-                InputIndex[6] memory inputs = _getCommandInputs(k);
-                OutputIndex memory output = _getCommandOutput(k);
-
-                comms[i] = encoder.encodeCommand(command.signature, uint8(command.commandType), inputs, output, command.target);
-            }
-        }
-    }
-
-    function _encodeCommandState(string memory key) internal returns (bytes[] memory states) {
-        uint256 len = jsonConfig.readUint(string.concat(".", key, ".stateLen"));
-        states = new bytes[](len);
-
-        for(uint256 i=0; i<len; i++) {
-            string memory t = jsonConfig.readString(string.concat(".", key, ".state[", vm.toString(i), "].type"));
-
-            bytes32 ty = keccak256(abi.encode(t));
-
-            string memory valueKey = string.concat(".", key, ".state[", vm.toString(i), "].value");
-
-            if(ty == keccak256(abi.encode("bytes"))) {
-                bytes memory v = jsonConfig.readBytes(valueKey);
-                
-                if(keccak256(v) == keccak256(hex"")) {
-                    states[i] = abi.encode(address(adapter));
-                } else {
-                    states[i] = v;
-                }
-            } else if (ty == keccak256(abi.encode("uint"))) {
-                uint256 v = jsonConfig.readUint(valueKey);
-                states[i] = abi.encode(v);
-            } else if (ty == keccak256(abi.encode("uint[][]"))) {
-                uint256 numRows = jsonConfig.readUint(string.concat(".", key, ".state[", vm.toString(i), "].numRows"));
-
-                for(uint256 j=0; j<numRows; j++) {
-                    // .value[j]
-                    string memory rowKey = string.concat(valueKey, "[", vm.toString(j), "]");
-                    uint256[] memory rowValue = jsonConfig.readUintArray(rowKey);
-                    // concat encoded rows
-                    states[i] = abi.encodePacked(states[i], rowValue);
-                }   
-            } else if (ty == keccak256(abi.encode("bool"))) {
-                bool v = jsonConfig.readBool(valueKey);
-                states[i] = abi.encode(v);
-            } else if (ty == keccak256(abi.encode("address"))) {
-                address v = jsonConfig.readAddress(valueKey);
-                states[i] = abi.encode(v);
-            } else if (ty == keccak256(abi.encode("address[]"))) {
-                address[] memory v = jsonConfig.readAddressArray(valueKey);
-                bool isFixedSize = jsonConfig.readBool(string.concat(".", key, ".state[", vm.toString(i), "].fixedSize"));
-                
-                // encode either as dynamic array or as fixed size
-                states[i] = isFixedSize ? abi.encodePacked(v) : abi.encode(v);
-            }
-        }
-    }
-
-    function _totalAssetsCommand() internal returns (bytes32[] memory comm, bytes[] memory states) {
-        comm = _getCommandsFromJson("totalAssets");
-        states = _encodeCommandState("totalAssets");
-    }
-
-    function _depositCommand() internal returns (bytes32[] memory comm, bytes[] memory states) {
-        comm = _getCommandsFromJson("deposit");
-        states = _encodeCommandState("deposit");
-    }
-
-    function _withdrawCommand() internal returns (bytes32[] memory comm, bytes[] memory states) {
-        comm = _getCommandsFromJson("withdraw");
-        states = _encodeCommandState("withdraw");
-    }
-    
-    function _harvestCommand() internal returns (bytes32[] memory comm, bytes[] memory states) {
-        comm = _getCommandsFromJson("harvest");
-        states = _encodeCommandState("harvest");
-    }
-
-    function _updateStateCommand() internal returns (bytes32 comm) {
-        // add info on how to update state on last state slot 
-        uint8[] memory updateIndices = new uint8[](2);
-        updateIndices[0] = 15; // 
-        updateIndices[1] = 14; // update state[14] value
-        
-        uint8 overwriteIndex = 14; // overwrite the new value to state[14]
-
-        claimStates[claimStates.length - 1] = abi.encode(updateIndices, true, overwriteIndex);
-        
-        comm = encoder.UPDATE_STATE_COMMAND();
     }
 }
