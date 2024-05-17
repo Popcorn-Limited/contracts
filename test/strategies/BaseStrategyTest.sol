@@ -669,7 +669,32 @@ abstract contract BaseStrategyTest is PropertyTest {
                             PUSH FUNDS
     //////////////////////////////////////////////////////////////*/
 
-    // TODO -- add tests
+    function test__pushFunds() public virtual {
+        strategy.toggleAutoDeposit();
+        _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
+
+        vm.prank(bob);
+        strategy.deposit(testConfig.defaultAmount, bob);
+
+        uint256 oldTa = strategy.totalAssets();
+        uint256 oldTs = strategy.totalSupply();
+
+        strategy.pushFunds(testConfig.defaultAmount, bytes(""));
+
+        assertApproxEqAbs(strategy.totalAssets(), oldTa, _delta_, "ta");
+        assertApproxEqAbs(strategy.totalSupply(), oldTs, _delta_, "ts");
+        assertApproxEqAbs(
+            IERC20(_asset_).balanceOf(address(strategy)),
+            0,
+            _delta_,
+            "strategy asset bal"
+        );
+    }
+
+    function testFail__pushFunds_nonOwnerNorKeeper() public virtual {
+        vm.prank(alice);
+        strategy.pushFunds(uint256(1e18), bytes(""));
+    }
 
     /*//////////////////////////////////////////////////////////////
                             HARVEST
