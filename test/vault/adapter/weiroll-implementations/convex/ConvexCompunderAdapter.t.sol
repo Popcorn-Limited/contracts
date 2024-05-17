@@ -3,32 +3,32 @@ pragma solidity ^0.8.15;
 
 import {Test} from "forge-std/Test.sol";
 
-import {ConvexAdapter, SafeERC20, IERC20, IERC20Metadata, Math, IConvexBooster, IConvexRewards, IWithRewards, IStrategy} from "../../../../src/vault/adapter/convex/ConvexAdapter.sol";
-import {ConvexTestConfigStorage, ConvexTestConfig} from "../convex/ConvexTestConfigStorage.sol";
-import {AbstractAdapterTest, ITestConfigStorage, IAdapter} from "../abstract/AbstractAdapterTest.sol";
-import {MockStrategyClaimer} from "../../../utils/mocks/MockStrategyClaimer.sol";
-import {WeirollUniversalAdapter, VmCommand} from "../../../../src/vault/adapter/weiroll/WeirollAdapter.sol";
-import {WeirollBuilder} from "../../../../src/vault/adapter/weiroll/WeirollUtils.sol";
+import {ConvexAdapter, SafeERC20, IERC20, IERC20Metadata, Math, IConvexBooster, IConvexRewards, IWithRewards, IStrategy} from "../../../../../src/vault/adapter/convex/ConvexAdapter.sol";
+import {ConvexTestConfigStorage, ConvexTestConfig} from "../../convex/ConvexTestConfigStorage.sol";
+import {AbstractAdapterTest, ITestConfigStorage, IAdapter} from "../../abstract/AbstractAdapterTest.sol";
+import {MockStrategyClaimer} from "../../../../utils/mocks/MockStrategyClaimer.sol";
+import {WeirollUniversalAdapter, VmCommand} from "../../../../../src/vault/adapter/weiroll/WeirollAdapter.sol";
+import {WeirollBuilder} from "../../../../../src/vault/adapter/weiroll/WeirollUtils.sol";
 import {stdJson} from "forge-std/StdJson.sol";
+import "forge-std/console.sol";
 
 contract WeirollAdapterTest is AbstractAdapterTest {
     using Math for uint256;
     using stdJson for string;
     using WeirollBuilder for string;
 
-    IConvexBooster convexBooster =
-        IConvexBooster(0xF403C135812408BFbE8713b5A23a04b3D48AAE31);
+    address extRegistryToApprove = address(0xF403C135812408BFbE8713b5A23a04b3D48AAE31); // convex booster
+
     IConvexRewards convexRewards;
     address rewardPool = address(0x79579633029a61963eDfbA1C0BE22498b6e0D33D);
-
-    uint256 pid;
 
     address crv = address(0xD533a949740bb3306d119CC777fa900bA034cd52);
     address cvx = address(0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B);
     address baseAsset = address(0xf939E0A03FB07F59A73314E73794Be0E57ac1b4E); //crvUSD
-    address router = address(0xF0d4c12A5768D806021F80a262B4d39d26C58b8D);
+    address assetAddr = address(0x625E92624Bc2D88619ACCc1788365A69767f6200); // crvUSD lp token
 
     string jsonConfig;
+    string jsonPath = "/test/vault/adapter/weiroll-implementations/convex/ConvexCompounderConfig.json";
 
     function setUp() public {
         vm.createSelectFork(vm.rpcUrl("mainnet"), 19262400);
@@ -36,7 +36,7 @@ contract WeirollAdapterTest is AbstractAdapterTest {
         jsonConfig = vm.readFile(
             string.concat(
                 vm.projectRoot(),
-                "/test/vault/adapter/abstract/ConvexCompounderConfig.json" // TODO PATH var
+                jsonPath
             )
         );
 
@@ -52,17 +52,12 @@ contract WeirollAdapterTest is AbstractAdapterTest {
     }
 
     function _setUpTest(bytes memory testConfig) internal {
-        uint256 _pid = abi.decode(testConfig, (uint256));
-
-        pid = _pid;
-        (address _asset, , , , , ) = convexBooster
-            .poolInfo(pid);
         // convexRewards = IConvexRewards(_convexRewards);
 
         setUpBaseTest(
-            IERC20(_asset),
+            IERC20(assetAddr),
             address(new WeirollUniversalAdapter()),
-            address(convexBooster),
+            extRegistryToApprove,
             10,
             "Convex",
             true
@@ -70,7 +65,7 @@ contract WeirollAdapterTest is AbstractAdapterTest {
         
         vm.prank(address(this));
 
-        vm.label(address(convexBooster), "convexBooster");
+        vm.label(extRegistryToApprove, "convexBooster");
         // vm.label(address(convexRewards), "convexRewards");
         vm.label(address(asset), "asset");
         vm.label(address(this), "test");
@@ -164,7 +159,7 @@ contract WeirollAdapterTest is AbstractAdapterTest {
         );
 
         assertEq(
-            asset.allowance(address(adapter), address(convexBooster)),
+            asset.allowance(address(adapter), extRegistryToApprove),
             type(uint256).max,
             "allowance"
         );
