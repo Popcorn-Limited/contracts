@@ -196,7 +196,7 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
         address initiator,
         bytes calldata params
     ) external override returns (bool) {
-        if (initiator != address(this) && msg.sender != address(lendingPool))
+        if (initiator != address(this) || msg.sender != address(lendingPool))
             revert NotFlashLoan();
 
         (bool isWithdraw, bool isFullWithdraw, uint256 assetsToWithdraw) = abi

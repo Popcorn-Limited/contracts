@@ -320,16 +320,20 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
         assertEq(adapterContract.slippage(), newSlippage);
     }
 
-    function testFail_invalid_flashLoan() public {
+    function test_invalid_flashLoan() public {
         address[] memory assets = new address[](1);
         uint256[] memory amounts = new uint256[](1);
         uint256[] memory premiums = new uint256[](1);
 
+        // reverts with invalid msg.sender and valid initiator
+        vm.expectRevert(LeveragedWstETHAdapter.NotFlashLoan.selector);
         vm.prank(bob);
-        adapterContract.executeOperation(assets,amounts,premiums,bob, "");
+        adapterContract.executeOperation(assets,amounts,premiums,address(adapter), "");
 
-        vm.prank(address(adapter));
-        adapterContract.executeOperation(assets,amounts,premiums,bob, "");
+        // reverts with invalid initiator and valid msg.sender
+        vm.expectRevert(LeveragedWstETHAdapter.NotFlashLoan.selector);
+        vm.prank(address(lendingPool));
+        adapterContract.executeOperation(assets,amounts,premiums,address(bob), "");
     }
 
     function test__harvest() public override {
