@@ -146,8 +146,8 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
     //////////////////////////////////////////////////////////////*/
 
     function _totalAssets() internal view override returns (uint256) {
-        uint256 debt = IwstETH(asset()).getWstETHByStETH(
-            getstETHAmount(debtToken.balanceOf(address(this)))
+        uint256 debt = ILido(stETH).getSharesByPooledEth(
+            debtToken.balanceOf(address(this))
         ); // wstETH DEBT
         uint256 collateral = interestToken.balanceOf(address(this)); // wstETH collateral
 
@@ -281,8 +281,8 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
         weth.withdraw(borrowAmount);
 
         // get amount of wstETH the vault receives
-        uint256 wstETHAmount = IwstETH(wstETH).getWstETHByStETH(
-            getstETHAmount(borrowAmount + ethDust)
+        uint256 wstETHAmount = ILido(stETH).getSharesByPooledEth(
+            borrowAmount + ethDust
         );
 
         // stake borrowed eth and receive wstETH
@@ -302,9 +302,9 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
     ) internal {
         address asset = asset();
 
-        // get flash loan amount of wstETH
-        uint256 flashLoanWstETHAmount = IwstETH(asset).getWstETHByStETH(
-            getstETHAmount(flashLoanDebt)
+        // get flash loan amount converted in wstETH
+        uint256 flashLoanWstETHAmount = ILido(stETH).getSharesByPooledEth(
+            flashLoanDebt
         );
 
         // get slippage buffer for swapping with flashLoanDebt as minAmountOut
@@ -347,7 +347,7 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
         ); // converted into ETH (stETH) amount;
 
         (debt == 0 || collateral == 0) ? loanToValue = 0 : loanToValue = debt
-            .mulDiv(1e18, collateral, Math.Rounding.Floor);
+            .mulDiv(1e18, collateral, Math.Rounding.Ceil);
     }
 
     // borrow WETH from lending protocol

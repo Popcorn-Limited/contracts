@@ -181,8 +181,13 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
         // LTV is non zero now
         assertGt(adapterContract.getLTV(), 0);
 
-        // LTV is at target
-        assertEq(adapterContract.targetLTV(), adapterContract.getLTV());
+        // LTV is at target - or 1 wei delta for approximation up of ltv
+        assertApproxEqAbs(
+            adapterContract.targetLTV(), 
+            adapterContract.getLTV(),
+            1,
+            string.concat("ltv != expected", baseTestId)
+        );
     }
 
     function test_leverageDown() public {
@@ -350,7 +355,12 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
         adapter.harvest();
 
         // LTV should be at target now
-        assertEq(adapterContract.targetLTV(), adapterContract.getLTV());
+        assertApproxEqAbs(
+            adapterContract.targetLTV(), 
+            adapterContract.getLTV(),
+            1,
+            string.concat("ltv != expected", baseTestId)    
+        );
     }
 
     function test__disable_auto_harvest() public override {
