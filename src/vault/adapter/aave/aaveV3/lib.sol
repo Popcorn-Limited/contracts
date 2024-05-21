@@ -60,6 +60,14 @@ library DataTypes {
     uint128 isolationModeTotalDebt;
   }
 
+  struct EModeData {
+      uint16 maxLTV;
+      uint16 liqThreshold;
+      uint16 liqBonus;
+      address priceSource;
+      string label; 
+  }
+
   struct ReserveConfigurationMap {
     //bit 0-15: LTV
     //bit 16-31: Liq. threshold

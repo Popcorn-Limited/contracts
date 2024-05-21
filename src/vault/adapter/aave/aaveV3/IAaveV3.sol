@@ -101,6 +101,13 @@ interface ILendingPool {
 
   function setUserEMode(uint8 category) external;
 
+  function getEModeCategoryData(uint8 id) external 
+    returns (
+      DataTypes.EModeData memory emodeData
+    );
+
+  function getUserEMode(address user) external returns (uint256);
+
   /**
    * @dev Returns the state and configuration of the reserve
    * @param asset The address of the underlying asset of the reserve

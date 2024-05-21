@@ -9,7 +9,7 @@ import {ILido} from "./ILido.sol";
 import {Math} from "openzeppelin-contracts/utils/math/Math.sol";
 import {IWETH} from "../../../interfaces/external/IWETH.sol";
 import {ICurveMetapool} from "../../../interfaces/external/curve/ICurveMetapool.sol";
-import {ILendingPool, IAToken, IFlashLoanReceiver, IProtocolDataProvider, IPoolAddressesProvider} from "../aave/aaveV3/IAaveV3.sol";
+import {ILendingPool, IAToken, IFlashLoanReceiver, IProtocolDataProvider, IPoolAddressesProvider, DataTypes} from "../aave/aaveV3/IAaveV3.sol";
 
 /// @title Leveraged wstETH yield adapter
 /// @author Andrea Di Nenno
@@ -47,6 +47,7 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
     uint256 public maxLTV; // max ltv the vault can reach
 
     error DifferentAssets(address asset, address underlying);
+    error InvalidLTV(uint256 targetLTV, uint256 maxLTV, uint256 protocolLTV);
 
     /*//////////////////////////////////////////////////////////////
                                 INITIALIZATION
@@ -78,17 +79,25 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
 
         address baseAsset = asset();
 
-        targetLTV = _targetLTV;
-        maxLTV = _maxLTV;
-
-        slippage = _slippage;
-
         // retrieve and set wstETH aToken, lending pool
         (address _aToken, , ) = IProtocolDataProvider(aaveDataProvider)
             .getReserveTokensAddresses(baseAsset);
 
         interestToken = IERC20(_aToken);
         lendingPool = ILendingPool(IAToken(_aToken).POOL());
+
+        // set efficiency mode - ETH correlated
+        lendingPool.setUserEMode(uint8(1));
+
+        // get protocol LTV
+        DataTypes.EModeData memory emodeData = lendingPool.getEModeCategoryData(uint8(1));
+
+        // check ltv init values are correct
+        _verifyLTV(_targetLTV, _maxLTV, emodeData.maxLTV);
+
+        targetLTV = _targetLTV;
+        maxLTV = _maxLTV;
+
         poolAddressesProvider = IPoolAddressesProvider(_poolAddressesProvider);
 
         // retrieve and set WETH variable debt token
@@ -114,11 +123,11 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
         // approve curve router to pull stETH for swapping
         IERC20(stETH).approve(address(StableSwapSTETH), type(uint256).max);
 
-        // set efficiency mode 
-        lendingPool.setUserEMode(uint8(1));
-
         // turn off auto harvest
         autoHarvest = false;
+
+        // set slippage
+        slippage = _slippage;
     }
 
     receive() external payable {}
@@ -353,6 +362,13 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
             .mulDiv(1e18, collateral, Math.Rounding.Ceil);
     }
 
+    // reverts if targetLTV < maxLTV < protocolLTV is not satisfied
+    function _verifyLTV(uint256 targetLTV, uint256 maxLTV, uint16 protocolLTV) internal view {
+        uint256 _protocolLTV = uint256(protocolLTV) * 1e14; // make it 18 decimals to compare
+        if(targetLTV >= maxLTV) revert InvalidLTV(targetLTV, maxLTV, _protocolLTV);
+        if(maxLTV >= _protocolLTV) revert InvalidLTV(targetLTV, maxLTV, _protocolLTV);
+    }
+
     // borrow WETH from lending protocol
     // interestRateMode = 2 -> flash loan eth and deposit into cdp, don't repay
     // interestRateMode = 0 -> flash loan eth to repay cdp, have to repay flash loan at the end
@@ -466,6 +482,11 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
         uint256 targetLTV_,
         uint256 maxLTV_
     ) external onlyOwner {
+        DataTypes.EModeData memory emodeData = lendingPool.getEModeCategoryData(uint8(1));
+
+        // reverts if targetLTV < maxLTV < protocolLTV is not satisfied
+        _verifyLTV(targetLTV_, maxLTV_, emodeData.maxLTV);
+
         targetLTV = targetLTV_;
         maxLTV = maxLTV_;
 

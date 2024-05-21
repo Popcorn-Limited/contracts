@@ -78,6 +78,9 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
 
         adapterContract = LeveragedWstETHAdapter(payable(address(adapter)));
 
+        uint256 actualVaultMode = lendingPool.getUserEMode(address(adapter));
+        assertEq(actualVaultMode, 1);
+
         deal(address(asset), address(this), 1);
         IERC20(asset).approve(address(adapter), 1);
         adapterContract.setUserUseReserveAsCollateral(1);
@@ -314,6 +317,26 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
 
         assertLt(awstETH.balanceOf(address(adapter)), oldABalance);
         assertLt(adapterContract.getLTV(), oldLTV);
+    }
+
+    function test_setLeverageValues_invalidInputs() public {
+        // protocolLTV < targetLTV < maxLTV
+        vm.expectRevert(abi.encodeWithSelector(
+            LeveragedWstETHAdapter.InvalidLTV.selector,
+            3e18,
+            4e18,
+            9e17
+        ));
+        adapterContract.setLeverageValues(3e18, 4e18);
+
+        // maxLTV < targetLTV < protocolLTV
+        vm.expectRevert(abi.encodeWithSelector(
+            LeveragedWstETHAdapter.InvalidLTV.selector,
+            4e17,
+            3e17,
+            9e17
+        ));
+        adapterContract.setLeverageValues(4e17, 3e17);
     }
 
     function test_setSlippage() public {
