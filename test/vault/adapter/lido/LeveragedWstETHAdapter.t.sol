@@ -492,8 +492,6 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
         vm.prank(bob);
         adapter.deposit(100e18, bob);
 
-        vm.warp(block.timestamp + 12);
-
         // LTV should be 0
         assertEq(adapterContract.getLTV(), 0);
 

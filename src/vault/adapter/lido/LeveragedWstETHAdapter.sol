@@ -422,12 +422,10 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
     //////////////////////////////////////////////////////////////*/
 
     function harvest() public override {
-        if ((lastHarvest + harvestCooldown) < block.timestamp) {
-                adjustLeverage();
+        adjustLeverage();
 
-                lastHarvest = block.timestamp;
-                emit Harvested();
-        }
+        lastHarvest = block.timestamp;
+        emit Harvested();
     }
 
     // amount of WETH to borrow OR amount of WETH to repay (converted into wstETH amount internally)
