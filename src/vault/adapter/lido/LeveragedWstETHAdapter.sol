@@ -3,7 +3,7 @@
 
 pragma solidity ^0.8.15;
 
-import {AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20, Math, IStrategy, IAdapter} from "../abstracts/AdapterBase.sol";
+import {AdapterBase, IERC20, IERC20Metadata, SafeERC20, ERC20, Math} from "../abstracts/AdapterBase.sol";
 import {IwstETH} from "./IwstETH.sol";
 import {ILido} from "./ILido.sol";
 import {Math} from "openzeppelin-contracts/utils/math/Math.sol";
@@ -46,7 +46,6 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
     uint256 public targetLTV; // in 18 decimals - 1e17 being 0.1%
     uint256 public maxLTV; // max ltv the vault can reach
 
-    error DifferentAssets(address asset, address underlying);
     error InvalidLTV(uint256 targetLTV, uint256 maxLTV, uint256 protocolLTV);
 
     /*//////////////////////////////////////////////////////////////
