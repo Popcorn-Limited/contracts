@@ -161,6 +161,9 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
                 1e18,
                 Math.Rounding.Ceil
             );
+
+            if(slippageDebt >= total) return 0;
+
             total -= slippageDebt;
         }
         return total;
@@ -395,21 +398,6 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
             minAmount
         );
         weth.deposit{value: minAmount}(); // wrap precise amount of eth for flash loan repayment
-    }
-
-    // returns steth/eth ratio
-    function getstETHAmount(
-        uint256 ethAmount
-    ) internal view returns (uint256 stETHAmount) {
-        // ratio = stETh totSupply / total protocol owned ETH
-        ILido stETHImpl = ILido(stETH);
-        uint256 ratio = stETHImpl.totalSupply().mulDiv(
-            1e18,
-            stETHImpl.getTotalPooledEther(),
-            Math.Rounding.Floor
-        );
-
-        stETHAmount = ratio.mulDiv(ethAmount, 1e18, Math.Rounding.Floor);
     }
 
     /*//////////////////////////////////////////////////////////////
