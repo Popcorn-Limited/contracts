@@ -10,7 +10,6 @@ import {Math} from "openzeppelin-contracts/utils/math/Math.sol";
 import {IWETH} from "../../../interfaces/external/IWETH.sol";
 import {ICurveMetapool} from "../../../interfaces/external/curve/ICurveMetapool.sol";
 import {ILendingPool, IAToken, IFlashLoanReceiver, IProtocolDataProvider, IPoolAddressesProvider, DataTypes} from "../aave/aaveV3/IAaveV3.sol";
-import "forge-std/console.sol";
 
 /// @title Leveraged wstETH yield adapter
 /// @author Andrea Di Nenno
@@ -293,14 +292,14 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
             weth.withdraw(borrowAmount);
         }
 
-        // get amount of wstETH the vault receives
-        uint256 wstETHAmount = ILido(stETH).getSharesByPooledEth(
-            depositAmount
-        );
-
         // stake borrowed eth and receive wstETH
         (bool sent, ) = wstETH.call{value: depositAmount}("");
         require(sent, "Fail to send eth to wstETH");
+        
+        // get wstETH balance after staking
+        // may include eventual wstETH dust held by contract somehow
+        // in that case it will just add more collateral
+        uint256 wstETHAmount = IERC20(wstETH).balanceOf(address(this));
 
         // deposit wstETH into lending protocol
         _protocolDeposit(wstETHAmount, 0);

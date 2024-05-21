@@ -142,6 +142,46 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
         assertEq(adapterContract.getLTV(), 0);
     }
 
+    function test_adjustLeverage_only_flahsLoan_wstETH_dust() public {
+        uint256 amountMint = 10e18;
+        uint256 amountDeposit = 1e18;
+        uint256 amountWithdraw = 5e17;
+
+        deal(address(asset), bob, amountMint);
+
+        // send the adapter some wstETH dust
+        deal(address(asset), address(adapter), amountDeposit);
+
+        vm.startPrank(bob);
+        asset.approve(address(adapter), amountMint);
+        adapter.deposit(amountDeposit, bob);
+        vm.stopPrank();
+
+        // HARVEST - trigger leverage loop
+        adapterContract.adjustLeverage();
+
+        // check total assets - should be lt than totalDeposits
+        assertLt(adapter.totalAssets(), amountDeposit * 2);
+
+        // all wstETH should be in lending market
+        assertEq(wstETH.balanceOf(address(adapter)), 0);
+
+        // adapter should now have more wstETH aToken than before
+        assertGt(awstETH.balanceOf(address(adapter)), amountDeposit);
+
+        // adapter should hold debt tokens
+        assertGt(vdWETH.balanceOf(address(adapter)), 0);
+
+        // LTV is non zero now
+        assertGt(adapterContract.getLTV(), 0);
+
+        // LTV is slightly lower target, since some wstETH means extra collateral
+        assertGt(
+            adapterContract.targetLTV(), 
+            adapterContract.getLTV()
+        );
+    }
+
     function test_adjustLeverage_only_flahsLoan() public {
         uint256 amountMint = 10e18;
         uint256 amountDeposit = 1e18;
