@@ -10,6 +10,7 @@ import {Math} from "openzeppelin-contracts/utils/math/Math.sol";
 import {IWETH} from "../../../interfaces/external/IWETH.sol";
 import {ICurveMetapool} from "../../../interfaces/external/curve/ICurveMetapool.sol";
 import {ILendingPool, IAToken, IFlashLoanReceiver, IProtocolDataProvider, IPoolAddressesProvider, DataTypes} from "../aave/aaveV3/IAaveV3.sol";
+import "forge-std/console.sol";
 
 /// @title Leveraged wstETH yield adapter
 /// @author Andrea Di Nenno
@@ -211,8 +212,8 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
         if (initiator != address(this) || msg.sender != address(lendingPool))
             revert NotFlashLoan();
 
-        (bool isWithdraw, bool isFullWithdraw, uint256 assetsToWithdraw) = abi
-            .decode(params, (bool, bool, uint256));
+        (bool isWithdraw, bool isFullWithdraw, uint256 assetsToWithdraw, uint256 depositAmount) = abi
+            .decode(params, (bool, bool, uint256, uint256));
 
         if (isWithdraw) {
             // flash loan is to repay ETH debt as part of a withdrawal
@@ -225,7 +226,7 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
             _reduceLeverage(isFullWithdraw, assetsToWithdraw, flashLoanDebt);
         } else {
             // flash loan is to leverage UP
-            _redepositAsset(amounts[0]);
+            _redepositAsset(amounts[0], depositAmount);
         }
 
         return true;
@@ -278,27 +279,27 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
                     );
 
             // flash loan debtToRepay - mode 0 - flash loan is repaid at the end
-            _flashLoanETH(debtToRepay, assets, 0, isFullWithdraw);
+            _flashLoanETH(debtToRepay, 0, assets, 0, isFullWithdraw);
         }
     }
 
-    // increase leverage by borrowing ETH and depositing wstETH
-    function _redepositAsset(uint256 borrowAmount) internal {
+    // deposit back into the protocol 
+    // either from flash loan or simply ETH dust held by the adapter
+    function _redepositAsset(uint256 borrowAmount, uint256 depositAmount) internal {
         address wstETH = asset();
 
-        // account for eventual eth dust
-        uint256 ethDust = address(this).balance;
-
-        // unwrap into ETH
-        weth.withdraw(borrowAmount);
+        if (borrowAmount > 0) {
+            // unwrap into ETH the flash loaned amount
+            weth.withdraw(borrowAmount);
+        }
 
         // get amount of wstETH the vault receives
         uint256 wstETHAmount = ILido(stETH).getSharesByPooledEth(
-            borrowAmount + ethDust
+            depositAmount
         );
 
         // stake borrowed eth and receive wstETH
-        (bool sent, ) = wstETH.call{value: borrowAmount + ethDust}("");
+        (bool sent, ) = wstETH.call{value: depositAmount}("");
         require(sent, "Fail to send eth to wstETH");
 
         // deposit wstETH into lending protocol
@@ -373,21 +374,22 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
     // interestRateMode = 2 -> flash loan eth and deposit into cdp, don't repay
     // interestRateMode = 0 -> flash loan eth to repay cdp, have to repay flash loan at the end
     function _flashLoanETH(
-        uint256 amount,
+        uint256 borrowAmount,
+        uint256 depositAmount,
         uint256 assetsToWithdraw,
         uint256 interestRateMode,
         bool isFullWithdraw
     ) internal {
+        uint256 depositAmount_ = depositAmount; // avoids stack too deep
+        
         address[] memory assets = new address[](1);
         assets[0] = address(weth);
 
         uint256[] memory amounts = new uint256[](1);
-        amounts[0] = amount;
+        amounts[0] = borrowAmount;
 
         uint256[] memory interestRateModes = new uint256[](1);
         interestRateModes[0] = interestRateMode;
-
-        bool isWithdraw = interestRateMode == 0 ? true : false;
 
         lendingPool.flashLoan(
             address(this),
@@ -395,7 +397,7 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
             amounts,
             interestRateModes,
             address(this),
-            abi.encode(isWithdraw, isFullWithdraw, assetsToWithdraw),
+            abi.encode(interestRateMode == 0 ? true : false, isFullWithdraw, assetsToWithdraw, depositAmount_),
             0
         );
     }
@@ -450,7 +452,7 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
                 )).mulDiv(1e18, (1e18 - targetLTV), Math.Rounding.Ceil);
 
             // flash loan eth to repay part of the debt
-            _flashLoanETH(amountETH, 0, 0, false);
+            _flashLoanETH(amountETH, 0, 0, 0, false);
         } else {
             uint256 amountETH = (targetLTV.mulDiv(
                 currentCollateral,
@@ -462,11 +464,18 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
                     Math.Rounding.Ceil
                 );
 
-            // use eventual ETH dust remained in the contract
-            amountETH -= address(this).balance;
+            uint256 dustBalance = address(this).balance;
+            if (dustBalance <= amountETH) {
+                // flashloan but use eventual ETH dust remained in the contract as well
+                uint256 borrowAmount = amountETH - dustBalance;
 
-            // flash loan WETH from lending protocol and add to cdp
-            _flashLoanETH(amountETH, 0, 2, false);
+                // flash loan WETH from lending protocol and add to cdp
+                _flashLoanETH(borrowAmount, amountETH, 0, 2, false);
+            } else {
+                // deposit the dust as collateral- borrow amount is zero
+                // leverage naturally decreases
+                _redepositAsset(0, dustBalance);
+            }
         }
     }
 

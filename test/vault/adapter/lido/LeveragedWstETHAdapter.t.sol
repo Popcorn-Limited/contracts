@@ -142,7 +142,7 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
         assertEq(adapterContract.getLTV(), 0);
     }
 
-    function test_leverageUp() public {
+    function test_adjustLeverage_only_flahsLoan() public {
         uint256 amountMint = 10e18;
         uint256 amountDeposit = 1e18;
         uint256 amountWithdraw = 5e17;
@@ -191,6 +191,88 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
             1,
             string.concat("ltv != expected", baseTestId)
         );
+    }
+
+    function test_adjustLeverage_flahsLoan_and_eth_dust() public {
+        uint256 amountMint = 10e18;
+        uint256 amountDeposit = 1e18;
+        uint256 amountWithdraw = 5e17;
+
+        deal(address(asset), bob, amountMint);
+
+        vm.startPrank(bob);
+        asset.approve(address(adapter), amountMint);
+        adapter.deposit(amountDeposit, bob);
+        vm.stopPrank();
+
+        uint256 totAssetsBefore = adapter.totalAssets();
+
+        vm.deal(address(adapter), 0.01e18);
+
+        // HARVEST - trigger leverage loop
+        adapterContract.adjustLeverage();
+
+        // tot assets increased
+        assertGt(
+            adapter.totalAssets(),
+            totAssetsBefore
+        );
+
+        // wstETH should be in lending market
+        assertEq(wstETH.balanceOf(address(adapter)), 0);
+
+        // adapter should now have more wstETH aToken than before
+        assertGt(awstETH.balanceOf(address(adapter)), amountDeposit);
+
+        // adapter should hold debt tokens
+        assertGt(vdWETH.balanceOf(address(adapter)), 0);
+
+        // LTV is non zero now
+        assertGt(adapterContract.getLTV(), 0);
+
+        // LTV is slightly below target, since some eth dust has been deposited as collateral
+        assertGt(
+            adapterContract.targetLTV(), 
+            adapterContract.getLTV()
+        );
+    }
+
+    function test_adjustLeverage_only_eth_dust() public {
+        uint256 amountMint = 10e18;
+        uint256 amountDeposit = 1e18;
+        uint256 amountWithdraw = 5e17;
+        uint256 amountDust = 10e18;
+
+        deal(address(asset), bob, amountMint);
+
+        vm.startPrank(bob);
+        asset.approve(address(adapter), amountMint);
+        adapter.deposit(amountDeposit, bob);
+        vm.stopPrank();
+
+        // SEND ETH TO CONTRACT 
+        vm.deal(address(adapter), amountDust);
+
+        // adjust leverage - should only trigger a dust amount deposit - no flashloans
+        adapterContract.adjustLeverage();
+        
+        // check total assets - should be gt than totalDeposits
+        assertGt(adapter.totalAssets(), amountDeposit);
+
+        // wstETH should be in lending market
+        assertEq(wstETH.balanceOf(address(adapter)), 0);
+
+        // adapter should now have more wstETH aToken than before
+        assertGt(awstETH.balanceOf(address(adapter)), amountDeposit);
+
+        // adapter should not hold debt tokens
+        assertEq(vdWETH.balanceOf(address(adapter)), 0);
+
+        // adapter should now have 0 eth dust
+        assertEq(address(adapter).balance, 0);
+
+        // LTV is still zero
+        assertEq(adapterContract.getLTV(), 0);
     }
 
     function test_leverageDown() public {
