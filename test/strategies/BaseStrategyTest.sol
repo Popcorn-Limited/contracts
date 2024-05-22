@@ -228,9 +228,11 @@ abstract contract BaseStrategyTest is PropertyTest {
             testConfig.maxDeposit
         );
 
+        /// Some strategies have slippage or rounding errors which makes `maWithdraw` lower than the deposit amount
         uint256 reqAssets = strategy.previewMint(
             strategy.previewWithdraw(amount)
-        );
+        ) +10;
+
         _mintAssetAndApproveForStrategy(reqAssets, bob);
 
         vm.prank(bob);

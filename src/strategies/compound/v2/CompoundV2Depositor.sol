@@ -84,6 +84,9 @@ contract CompoundV2Depositor is BaseStrategy {
                             ACCOUNTING LOGIC
   //////////////////////////////////////////////////////////////*/
 
+    /// @dev CompoundV2 has some rounding issues on deposit / withdraw which "steals" small amount of funds from the user on instant deposit/withdrawals
+    /// As one can see in the tests we need to adjust the expected delta here slightly. 
+    /// These issues should vanish over time with a bit of interest and arent security relevant
     function _totalAssets() internal view override returns (uint256) {
         return LibCompound.viewUnderlyingBalanceOf(cToken, address(this));
     }
