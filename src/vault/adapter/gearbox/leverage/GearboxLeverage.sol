@@ -18,6 +18,7 @@ import {
  */
 abstract contract GearboxLeverage is AdapterBase {
     using SafeERC20 for IERC20;
+    using Math for uint256;
 
     string internal _name;
     string internal _symbol;
@@ -171,12 +172,12 @@ abstract contract GearboxLeverage is AdapterBase {
         uint256 currentDebt = collateralDebtData.debt;
 
         if(currentLeverageRatio > targetLeverageRatio) {
-            if(Math.ceilDiv((currentDebt - amount), (currentCollateral - amount)) < targetLeverageRatio) {
+            if((currentDebt - amount).mulDiv(1e18, (currentCollateral - amount), Math.Rounding.Ceil) < targetLeverageRatio) {
                 _gearboxStrategyWithdraw(data);
                 _reduceLeverage(amount);
             }
         } else {
-            if(Math.ceilDiv((currentDebt + amount), (currentCollateral + amount)) < targetLeverageRatio) {
+            if((currentDebt + amount).mulDiv(1e18, (currentCollateral + amount), Math.Rounding.Ceil) < targetLeverageRatio) {
                 _increaseLeverage(amount);
                 _gearboxStrategyDeposit(data);
             }
@@ -191,7 +192,13 @@ abstract contract GearboxLeverage is AdapterBase {
 
     function _calculateLeverageRatio() internal view returns (uint256, CollateralDebtData memory){
         CollateralDebtData memory collateralDebtData = _getCreditAccountData();
-        return (Math.ceilDiv(collateralDebtData.debt, collateralDebtData.totalValue), collateralDebtData);
+
+        uint256 totalValue = collateralDebtData.totalValue;
+        if (totalValue > 0)
+            return (collateralDebtData.debt.mulDiv(1e18, totalValue, Math.Rounding.Ceil), collateralDebtData);
+        
+        // leverage is 0 with no collateral
+        return (0, collateralDebtData);
     }
 
     function _reduceLeverage(uint256 amount) internal {

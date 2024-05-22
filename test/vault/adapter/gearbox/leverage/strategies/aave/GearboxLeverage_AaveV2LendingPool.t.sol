@@ -23,7 +23,7 @@ contract GearboxLeverage_AaveV2LendingPool_Test is AbstractAdapterTest {
     address addressProvider = 0xcF64698AFF7E5f27A11dff868AF228653ba53be0;
 
     function setUp() public {
-        uint256 forkId = vm.createSelectFork(vm.rpcUrl("mainnet"));
+        uint256 forkId = vm.createSelectFork(vm.rpcUrl("mainnet"), 19923553);
         vm.selectFork(forkId);
 
         testConfigStorage = ITestConfigStorage(

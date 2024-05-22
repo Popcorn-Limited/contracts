@@ -24,7 +24,7 @@ contract GearboxLeverage_CurveV1_Test is AbstractAdapterTest {
     address addressProvider = 0xcF64698AFF7E5f27A11dff868AF228653ba53be0;
 
     function setUp() public {
-        uint256 forkId = vm.createSelectFork(vm.rpcUrl("mainnet"));
+        uint256 forkId = vm.createSelectFork(vm.rpcUrl("mainnet"), 19923553);
         vm.selectFork(forkId);
 
         testConfigStorage = ITestConfigStorage(
@@ -141,7 +141,7 @@ contract GearboxLeverage_CurveV1_Test is AbstractAdapterTest {
         adapter.deposit(defaultAmount, bob);
 
         bytes memory data = abi.encode(address(asset), defaultAmount);
-        ILeverageAdapter(address(adapter)).adjustLeverage(1, data);
+        ILeverageAdapter(address(adapter)).adjustLeverage(1e18, data);
     }
 
 
