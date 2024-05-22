@@ -42,11 +42,13 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
         ICurveMetapool(0xDC24316b9AE028F1497c275EB9192a3Ea0f67022);
 
     uint256 public slippage; // 1e18 = 100% slippage, 1e14 = 1 BPS slippage
+    uint256 public slippageCap;
 
     uint256 public targetLTV; // in 18 decimals - 1e17 being 0.1%
     uint256 public maxLTV; // max ltv the vault can reach
 
     error InvalidLTV(uint256 targetLTV, uint256 maxLTV, uint256 protocolLTV);
+    error InvalidSlippage(uint256 slippage, uint256 slippageCap);
 
     /*//////////////////////////////////////////////////////////////
                                 INITIALIZATION
@@ -72,9 +74,10 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
         (
             address _poolAddressesProvider,
             uint256 _slippage,
+            uint256 _slippageCap,
             uint256 _targetLTV,
             uint256 _maxLTV
-        ) = abi.decode(_initData, (address, uint256, uint256, uint256));
+        ) = abi.decode(_initData, (address, uint256, uint256, uint256, uint256));
 
         address baseAsset = asset();
 
@@ -126,7 +129,10 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
         autoHarvest = false;
 
         // set slippage
+        if (_slippage > _slippageCap) revert InvalidSlippage(_slippage, _slippageCap);
+
         slippage = _slippage;
+        slippageCap = _slippageCap;
     }
 
     receive() external payable {}
@@ -499,6 +505,8 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
     }
 
     function setSlippage(uint256 slippage_) external onlyOwner {
+        if (slippage_ > slippageCap) revert InvalidSlippage(slippage_, slippageCap);
+
         slippage = slippage_;
     }
 

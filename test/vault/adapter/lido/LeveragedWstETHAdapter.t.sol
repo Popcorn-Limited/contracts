@@ -470,6 +470,17 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
         assertEq(adapterContract.slippage(), newSlippage);
     }
 
+    function test_setSlippage_invalidValue() public {
+        uint256 newSlippage = 1e18; // 100%
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                LeveragedWstETHAdapter.InvalidSlippage.selector, newSlippage, 1e17
+            )
+        );
+        adapterContract.setSlippage(newSlippage);
+    }
+
     function test_invalid_flashLoan() public {
         address[] memory assets = new address[](1);
         uint256[] memory amounts = new uint256[](1);
