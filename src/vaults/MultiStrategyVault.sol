@@ -244,14 +244,7 @@ contract MultiStrategyVault is
         // Get the Vault's floating balance.
         uint256 float = asset_.balanceOf(address(this));
 
-        if (amount < float) {
-            asset_.safeTransfer(receiver, amount);
-        } else {
-            // If the amount is greater than the float, withdraw from strategies.
-            if (float > 0) {
-                asset_.safeTransfer(receiver, float);
-            }
-
+        if (amount > float) {
             // Iterate the withdrawal queue and get indexes
             // Will revert due to underflow if we empty the stack before pulling the desired amount.
             uint256 len = withdrawalQueue_.length;
@@ -265,18 +258,23 @@ contract MultiStrategyVault is
                 );
 
                 if (withdrawableAssets >= missing) {
-                    strategy.withdraw(missing, receiver, address(this));
+                    strategy.withdraw(missing, address(this), address(this));
                     break;
                 } else if (withdrawableAssets > 0) {
-                    strategy.withdraw(
-                        withdrawableAssets,
-                        receiver,
-                        address(this)
-                    );
-                    float += withdrawableAssets;
+                    try
+                        strategy.withdraw(
+                            withdrawableAssets,
+                            address(this),
+                            address(this)
+                        )
+                    {
+                        float += withdrawableAssets;
+                    } catch {}
                 }
             }
         }
+
+        asset_.safeTransfer(receiver, amount);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -313,7 +311,9 @@ contract MultiStrategyVault is
         uint256 assets = totalAssets();
         uint256 depositLimit_ = depositLimit;
         return
-            (paused() || assets >= depositLimit_) ? 0 : depositLimit_ - assets;
+            (paused() || assets >= depositLimit_)
+                ? 0
+                : convertToShares(depositLimit_ - assets);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -477,7 +477,7 @@ contract MultiStrategyVault is
                 ? performanceFee_.mulDiv(
                     (shareValue - highWaterMark_) * totalSupply(),
                     1e36,
-                    Math.Rounding.Floor
+                    Math.Rounding.Ceil
                 )
                 : 0;
     }
