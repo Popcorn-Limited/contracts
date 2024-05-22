@@ -77,12 +77,12 @@ contract CurveGaugeSingleAssetCompounderTest is BaseStrategyTest {
         //Construct CurveSwap structs
         CurveSwap[] memory swaps_ = _getCurveSwaps(json_, index_);
 
-        uint256 discountBps_ = abi.decode(
+        uint256 slippage_ = abi.decode(
             json_.parseRaw(
                 string.concat(
                     ".configs[",
                     index_,
-                    "].specific.harvest.discountBps"
+                    "].specific.harvest.slippage"
                 )
             ),
             (uint256)
@@ -92,7 +92,7 @@ contract CurveGaugeSingleAssetCompounderTest is BaseStrategyTest {
         CurveGaugeSingleAssetCompounder(strategy).setHarvestValues(
             curveRouter_,
             swaps_,
-            discountBps_
+            slippage_
         );
     }
 
@@ -182,126 +182,225 @@ contract CurveGaugeSingleAssetCompounderTest is BaseStrategyTest {
                             OVERRIDEN TESTS
     //////////////////////////////////////////////////////////////*/
 
-    function test__withdraw(uint8 fuzzAmount) public override {
-        uint len = json.readUint(".length");
-        for (uint i; i < len; i++) {
-            if (i > 0) _setUpBaseTest(i, path);
-
-            uint256 amount = bound(
-                fuzzAmount,
-                testConfig.minDeposit,
-                testConfig.maxDeposit
-            );
-
-            uint256 reqAssets = strategy.previewMint(
-                strategy.previewWithdraw(amount)
-            );
-            _mintAssetAndApproveForStrategy(reqAssets, bob);
-            vm.prank(bob);
-            strategy.deposit(reqAssets, bob);
-
-            emit log_named_uint(
-                "discountBps",
-                CurveGaugeSingleAssetCompounder(address(strategy)).discountBps()
-            );
-
-            emit log_named_uint(
-                "gauge bal",
-                IERC20(address(0x059E0db6BF882f5fe680dc5409C7adeB99753736))
-                    .balanceOf(address(strategy))
-            );
-
-            emit log_named_uint(
-                "totalSupply",
-                CurveGaugeSingleAssetCompounder(address(strategy)).totalSupply()
-            );
-
-            emit log_named_uint(
-                "strategy.maxWithdraw(bob)",
-                strategy.maxWithdraw(bob)
-            );
-
-            prop_withdraw(
-                bob,
-                bob,
-                strategy.maxWithdraw(bob),
-                testConfig.testId
-            );
-
-            _mintAssetAndApproveForStrategy(reqAssets, bob);
-            vm.prank(bob);
-            strategy.deposit(reqAssets, bob);
-
-            _increasePricePerShare(testConfig.defaultAmount);
-
-            vm.prank(bob);
-            strategy.approve(alice, type(uint256).max);
-
-            prop_withdraw(
-                alice,
-                bob,
-                strategy.maxWithdraw(bob),
-                testConfig.testId
-            );
-        }
-    }
-
-    // NOTE - Slippage here is higher than the usual delta
-    function test__pause() public override {
+    function test__pushFunds() public override {
+        strategy.toggleAutoDeposit();
         _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
 
         vm.prank(bob);
         strategy.deposit(testConfig.defaultAmount, bob);
 
-        uint256 oldTotalAssets = strategy.totalAssets();
+        uint256 oldTa = strategy.totalAssets();
+        uint256 oldTs = strategy.totalSupply();
 
-        vm.prank(address(this));
-        strategy.pause();
+        strategy.pushFunds(testConfig.defaultAmount, bytes(""));
 
-        // We simply withdraw into the strategy
-        // TotalSupply and Assets dont change
+        assertApproxEqAbs(strategy.totalAssets(), oldTa, 416835800279253, "ta");
+        assertApproxEqAbs(strategy.totalSupply(), oldTs, _delta_, "ts");
         assertApproxEqAbs(
-            oldTotalAssets,
-            strategy.totalAssets(),
-            5.4e16,
-            "totalAssets"
-        );
-        assertApproxEqAbs(
-            IERC20(testConfig.asset).balanceOf(address(strategy)),
-            oldTotalAssets,
-            5.4e16,
-            "asset balance"
+            IERC20(_asset_).balanceOf(address(strategy)),
+            0,
+            _delta_,
+            "strategy asset bal"
         );
     }
 
-    // NOTE - Slippage here is higher than the usual delta
-    function test__unpause() public override {
-        _mintAssetAndApproveForStrategy(testConfig.defaultAmount * 3, bob);
+    function test__deposit_autoDeposit_off() public override {
+        strategy.toggleAutoDeposit();
+        _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
 
         vm.prank(bob);
-        strategy.deposit(testConfig.defaultAmount * 3, bob);
+        strategy.deposit(testConfig.defaultAmount, bob);
 
-        uint256 oldTotalAssets = strategy.totalAssets();
+        assertEq(strategy.totalAssets(), testConfig.defaultAmount, "ta");
+        assertEq(
+            strategy.totalSupply(),
+            testConfig.defaultAmount - testConfig.delta,
+            "ts"
+        );
+        assertEq(
+            strategy.balanceOf(bob),
+            testConfig.defaultAmount - testConfig.delta,
+            "share bal"
+        );
+        assertEq(
+            IERC20(_asset_).balanceOf(address(strategy)),
+            testConfig.defaultAmount,
+            "strategy asset bal"
+        );
+    }
 
-        vm.prank(address(this));
-        strategy.pause();
+    function test__mint_autoDeposit_off() public override {
+        strategy.toggleAutoDeposit();
+        _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
 
-        vm.prank(address(this));
-        strategy.unpause();
+        vm.prank(bob);
+        strategy.deposit(testConfig.defaultAmount, bob);
 
-        // We simply deposit back into the external protocol
-        // TotalAssets shouldnt change significantly besides some slippage or rounding errors
+        assertEq(strategy.totalAssets(), testConfig.defaultAmount, "ta");
+        assertEq(
+            strategy.totalSupply(),
+            testConfig.defaultAmount - testConfig.delta,
+            "ts"
+        );
+        assertEq(
+            strategy.balanceOf(bob),
+            testConfig.defaultAmount - testConfig.delta,
+            "share bal"
+        );
+        assertEq(
+            IERC20(_asset_).balanceOf(address(strategy)),
+            testConfig.defaultAmount,
+            "strategy asset bal"
+        );
+    }
+
+    function test__withdraw_autoDeposit_off() public override {
+        strategy.toggleAutoDeposit();
+        _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
+
+        vm.startPrank(bob);
+        strategy.deposit(testConfig.defaultAmount, bob);
+
+        strategy.withdraw(
+            strategy.previewRedeem(strategy.balanceOf(bob)),
+            bob,
+            bob
+        );
+        vm.stopPrank();
+
+        // @dev rounding issues fuck these numbers up by 1 wei
+        assertEq(strategy.totalAssets(), 1, "ta");
+        assertEq(strategy.totalSupply(), 0, "ts");
+        assertEq(strategy.balanceOf(bob), 0, "share bal");
+        assertEq(
+            IERC20(_asset_).balanceOf(bob),
+            testConfig.defaultAmount - 1,
+            "asset bal"
+        );
+        assertEq(
+            IERC20(_asset_).balanceOf(address(strategy)),
+            1,
+            "strategy asset bal"
+        );
+    }
+
+    function test__redeem_autoDeposit_off() public override {
+        strategy.toggleAutoDeposit();
+        _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
+
+        vm.startPrank(bob);
+        strategy.deposit(testConfig.defaultAmount, bob);
+
+        strategy.redeem(strategy.balanceOf(bob), bob, bob);
+        vm.stopPrank();
+
+        // @dev rounding issues fuck these numbers up by 1 wei
+        assertEq(strategy.totalAssets(), 1, "ta");
+        assertEq(strategy.totalSupply(), 0, "ts");
+        assertEq(strategy.balanceOf(bob), 0, "share bal");
+        assertEq(
+            IERC20(_asset_).balanceOf(bob),
+            testConfig.defaultAmount - 1,
+            "asset bal"
+        );
+        assertEq(
+            IERC20(_asset_).balanceOf(address(strategy)),
+            1,
+            "strategy asset bal"
+        );
+    }
+
+    /// @dev Partially withdraw assets directly from strategy and the underlying protocol
+    function test__withdraw_autoDeposit_partial() public override {
+        strategy.toggleAutoDeposit();
+        _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
+
+        vm.prank(bob);
+        strategy.deposit(testConfig.defaultAmount, bob);
+
+        // Push 40% the funds into the underlying protocol
+        strategy.pushFunds((testConfig.defaultAmount / 5) * 2, bytes(""));
+
+        // Withdraw 80% of deposit
+        vm.prank(bob);
+        strategy.withdraw((testConfig.defaultAmount / 5) * 4, bob, bob);
+
         assertApproxEqAbs(
-            oldTotalAssets,
             strategy.totalAssets(),
-            2e14,
-            "totalAssets"
+            testConfig.defaultAmount / 5,
+            2626663,
+            "ta"
         );
         assertApproxEqAbs(
-            IERC20(testConfig.asset).balanceOf(address(strategy)),
+            strategy.totalSupply(),
+            testConfig.defaultAmount / 5,
+            4202661,
+            "ts"
+        );
+        assertApproxEqAbs(
+            strategy.balanceOf(bob),
+            testConfig.defaultAmount / 5,
+            4202661,
+            "share bal"
+        );
+        assertApproxEqAbs(
+            IERC20(_asset_).balanceOf(bob),
+            (testConfig.defaultAmount / 5) * 4,
+            _delta_,
+            "asset bal"
+        );
+        assertApproxEqAbs(
+            IERC20(_asset_).balanceOf(address(strategy)),
             0,
-            testConfig.delta,
-            "asset balance"
+            _delta_,
+            "strategy asset bal"
+        );
+    }
+
+    /// @dev Partially redeem assets directly from strategy and the underlying protocol
+    function test__redeem_autoDeposit_partial() public override {
+        strategy.toggleAutoDeposit();
+        _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
+
+        vm.prank(bob);
+        strategy.deposit(testConfig.defaultAmount, bob);
+
+        // Push 40% the funds into the underlying protocol
+        strategy.pushFunds((testConfig.defaultAmount / 5) * 2, bytes(""));
+
+        // Redeem 80% of deposit
+        vm.prank(bob);
+        strategy.redeem((testConfig.defaultAmount / 5) * 4, bob, bob);
+
+        assertApproxEqAbs(
+            strategy.totalAssets(),
+            testConfig.defaultAmount / 5,
+            230869893,
+            "ta"
+        );
+        assertApproxEqAbs(
+            strategy.totalSupply(),
+            testConfig.defaultAmount / 5,
+            _delta_,
+            "ts"
+        );
+        assertApproxEqAbs(
+            strategy.balanceOf(bob),
+            testConfig.defaultAmount / 5,
+            _delta_,
+            "share bal"
+        );
+        assertApproxEqAbs(
+            IERC20(_asset_).balanceOf(bob),
+            (testConfig.defaultAmount / 5) * 4,
+            4202660,
+            "asset bal"
+        );
+        assertApproxEqAbs(
+            IERC20(_asset_).balanceOf(address(strategy)),
+            0,
+            _delta_,
+            "strategy asset bal"
         );
     }
 

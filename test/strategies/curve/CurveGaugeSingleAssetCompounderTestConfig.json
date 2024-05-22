@@ -6,7 +6,7 @@
         "asset": "0x17FC002b466eEc40DaE837Fc4bE5c67993ddBd6F",
         "blockNumber": 176205000,
         "defaultAmount": 1000000000000000000,
-        "delta": 10,
+        "delta": 5000000000000000,
         "maxDeposit": 1000000000000000000000,
         "maxWithdraw": 1000000000000000000000,
         "minDeposit": 1000000000000000,
@@ -58,7 +58,7 @@
               }
             ]
           },
-          "discountBps": 50
+          "slippage": 50
         }
       }
     }

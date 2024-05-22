@@ -29,10 +29,7 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy, BaseCurveCompounder {
     int128 public indexIn;
     uint256 public nCoins;
 
-    uint256 public discountBps;
-
-    uint256 public depositSlippage;
-    uint256 public withdrawSlippage;
+    uint256 public slippage;
 
     /*//////////////////////////////////////////////////////////////
                             INITIALIZATION
@@ -118,11 +115,7 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy, BaseCurveCompounder {
     ) public view override returns (uint256) {
         return
             _convertToShares(
-                assets.mulDiv(
-                    10_000 - depositSlippage,
-                    10_000,
-                    Math.Rounding.Floor
-                ),
+                assets.mulDiv(10_000 - slippage, 10_000, Math.Rounding.Floor),
                 Math.Rounding.Floor
             );
     }
@@ -132,37 +125,12 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy, BaseCurveCompounder {
     ) public view override returns (uint256) {
         return
             _convertToAssets(shares, Math.Rounding.Ceil).mulDiv(
-                10_000 - depositSlippage,
                 10_000,
+                10_000 - slippage,
                 Math.Rounding.Floor
             );
     }
-
-    function previewWithdraw(
-        uint256 assets
-    ) public view override returns (uint256) {
-        return
-            _convertToShares(
-                assets.mulDiv(
-                    10_000,
-                    10_000 - depositSlippage,
-                    Math.Rounding.Ceil
-                ),
-                Math.Rounding.Ceil
-            );
-    }
-
-    function previewRedeem(
-        uint256 shares
-    ) public view override returns (uint256) {
-        return
-            _convertToAssets(shares, Math.Rounding.Floor).mulDiv(
-                10_000,
-                10_000 - depositSlippage,
-                Math.Rounding.Ceil
-            );
-    }
-
+    
     /*//////////////////////////////////////////////////////////////
                           INTERNAL HOOKS LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -183,7 +151,10 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy, BaseCurveCompounder {
         gauge.deposit(IERC20(lpToken).balanceOf(address(this)));
     }
 
-    function _protocolWithdraw(uint256, uint256 shares) internal override {
+    function _protocolWithdraw(
+        uint256 assets,
+        uint256 shares
+    ) internal override {
         uint256 lpWithdraw = shares.mulDiv(
             IERC20(address(gauge)).balanceOf(address(this)),
             totalSupply(),
@@ -223,10 +194,10 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy, BaseCurveCompounder {
     function setHarvestValues(
         address newRouter,
         CurveSwap[] memory newSwaps,
-        uint256 discountBps_
+        uint256 slippage_
     ) external onlyOwner {
         setCurveTradeValues(newRouter, newSwaps);
 
-        discountBps = discountBps_;
+        slippage = slippage_;
     }
 }

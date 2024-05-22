@@ -122,9 +122,11 @@ abstract contract BaseStrategy is
         }
 
         if (!paused()) {
-            uint256 missing = assets - IERC20(asset()).balanceOf(address(this));
-            if (missing > 0)
+            uint256 float = IERC20(asset()).balanceOf(address(this));
+            if (assets > float) {
+                uint256 missing = assets - float;
                 _protocolWithdraw(missing, convertToShares(missing));
+            }
         }
 
         // If _asset is ERC-777, `transfer` can trigger a reentrancy AFTER the transfer happens through the

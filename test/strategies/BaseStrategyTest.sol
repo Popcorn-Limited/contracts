@@ -100,6 +100,7 @@ abstract contract BaseStrategyTest is PropertyTest {
         address receiver
     ) internal virtual {
         _mintAsset(amount, receiver);
+
         vm.prank(receiver);
         IERC20(testConfig.asset).approve(address(strategy), amount);
     }
@@ -196,12 +197,10 @@ abstract contract BaseStrategyTest is PropertyTest {
             testConfig.maxDeposit
         );
 
-        _mintAsset(testConfig.maxDeposit, bob);
+        _mintAsset(amount, bob);
         vm.prank(bob);
-        IERC20(testConfig.asset).approve(
-            address(strategy),
-            testConfig.maxDeposit
-        );
+
+        IERC20(testConfig.asset).approve(address(strategy), amount);
 
         prop_previewDeposit(bob, bob, amount, testConfig.testId);
     }
@@ -213,12 +212,11 @@ abstract contract BaseStrategyTest is PropertyTest {
             testConfig.maxDeposit
         );
 
-        _mintAsset(testConfig.maxDeposit, bob);
+        uint256 reqAssets = strategy.previewMint(amount);
+        _mintAsset(reqAssets, bob);
+
         vm.prank(bob);
-        IERC20(testConfig.asset).approve(
-            address(strategy),
-            testConfig.maxDeposit
-        );
+        IERC20(testConfig.asset).approve(address(strategy), reqAssets);
 
         prop_previewMint(bob, bob, amount, testConfig.testId);
     }
@@ -232,8 +230,9 @@ abstract contract BaseStrategyTest is PropertyTest {
 
         uint256 reqAssets = strategy.previewMint(
             strategy.previewWithdraw(amount)
-        ) * 10;
+        );
         _mintAssetAndApproveForStrategy(reqAssets, bob);
+
         vm.prank(bob);
         strategy.deposit(reqAssets, bob);
 
@@ -247,8 +246,11 @@ abstract contract BaseStrategyTest is PropertyTest {
             testConfig.maxDeposit
         );
 
-        uint256 reqAssets = strategy.previewMint(amount) * 10;
+        uint256 reqAssets = strategy.previewMint(
+            strategy.previewRedeem(amount)
+        );
         _mintAssetAndApproveForStrategy(reqAssets, bob);
+
         vm.prank(bob);
         strategy.deposit(reqAssets, bob);
 
@@ -525,11 +527,15 @@ abstract contract BaseStrategyTest is PropertyTest {
         strategy.toggleAutoDeposit();
         _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
 
-        vm.prank(bob);
+        vm.startPrank(bob);
         strategy.deposit(testConfig.defaultAmount, bob);
 
-        vm.prank(bob);
-        strategy.withdraw(testConfig.defaultAmount, bob, bob);
+        strategy.withdraw(
+            strategy.previewRedeem(strategy.balanceOf(bob)),
+            bob,
+            bob
+        );
+        vm.stopPrank();
 
         assertEq(strategy.totalAssets(), 0, "ta");
         assertEq(strategy.totalSupply(), 0, "ts");
@@ -550,11 +556,11 @@ abstract contract BaseStrategyTest is PropertyTest {
         strategy.toggleAutoDeposit();
         _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
 
-        vm.prank(bob);
+        vm.startPrank(bob);
         strategy.deposit(testConfig.defaultAmount, bob);
 
-        vm.prank(bob);
-        strategy.redeem(testConfig.defaultAmount, bob, bob);
+        strategy.redeem(strategy.balanceOf(bob), bob, bob);
+        vm.stopPrank();
 
         assertEq(strategy.totalAssets(), 0, "ta");
         assertEq(strategy.totalSupply(), 0, "ts");
