@@ -106,6 +106,8 @@ abstract contract BaseStrategy is
         emit Deposit(caller, receiver, assets, shares);
     }
 
+    event log_named_uint(string, uint);
+
     /**
      * @dev Withdraw/redeem common workflow.
      */
@@ -122,11 +124,16 @@ abstract contract BaseStrategy is
         }
 
         // We call this before the `burn` to allow for normal calculations with shares before they get burned
-        // Since we transfer assets after the burn the function should remain safe 
+        // Since we transfer assets after the burn the function should remain safe
         if (!paused()) {
             uint256 float = IERC20(asset()).balanceOf(address(this));
             if (assets > float) {
                 uint256 missing = assets - float;
+                emit log_named_uint("assets1", assets);
+                emit log_named_uint("shares1", shares);
+                emit log_named_uint("float", float);
+                emit log_named_uint("missing", missing);
+
                 _protocolWithdraw(missing, convertToShares(missing));
             }
         }

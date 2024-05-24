@@ -182,26 +182,22 @@ contract CurveGaugeSingleAssetCompounderTest is BaseStrategyTest {
                             OVERRIDEN TESTS
     //////////////////////////////////////////////////////////////*/
 
-    function test__pushFunds() public override {
-        strategy.toggleAutoDeposit();
-        _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
+    function test__previewRedeem(uint8 fuzzAmount) public override {
+        uint256 amount = bound(
+            fuzzAmount,
+            testConfig.minDeposit,
+            testConfig.maxDeposit
+        );
+
+        uint256 reqAssets = strategy.previewMint(
+            strategy.previewRedeem(amount)
+        ) + 10;
+        _mintAssetAndApproveForStrategy(reqAssets, bob);
 
         vm.prank(bob);
-        strategy.deposit(testConfig.defaultAmount, bob);
+        strategy.deposit(reqAssets, bob);
 
-        uint256 oldTa = strategy.totalAssets();
-        uint256 oldTs = strategy.totalSupply();
-
-        strategy.pushFunds(testConfig.defaultAmount, bytes(""));
-
-        assertApproxEqAbs(strategy.totalAssets(), oldTa, 416835800279253, "ta");
-        assertApproxEqAbs(strategy.totalSupply(), oldTs, _delta_, "ts");
-        assertApproxEqAbs(
-            IERC20(_asset_).balanceOf(address(strategy)),
-            0,
-            _delta_,
-            "strategy asset bal"
-        );
+        prop_previewRedeem(bob, bob, bob, amount, testConfig.testId);
     }
 
     function test__deposit_autoDeposit_off() public override {
@@ -313,10 +309,12 @@ contract CurveGaugeSingleAssetCompounderTest is BaseStrategyTest {
     /// @dev Partially withdraw assets directly from strategy and the underlying protocol
     function test__withdraw_autoDeposit_partial() public override {
         strategy.toggleAutoDeposit();
-        _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
+
+        uint256 reqAssets = (testConfig.defaultAmount * 10) / 10;
+        _mintAssetAndApproveForStrategy(reqAssets, bob);
 
         vm.prank(bob);
-        strategy.deposit(testConfig.defaultAmount, bob);
+        strategy.deposit(reqAssets, bob);
 
         // Push 40% the funds into the underlying protocol
         strategy.pushFunds((testConfig.defaultAmount / 5) * 2, bytes(""));
@@ -396,6 +394,28 @@ contract CurveGaugeSingleAssetCompounderTest is BaseStrategyTest {
             4202660,
             "asset bal"
         );
+        assertApproxEqAbs(
+            IERC20(_asset_).balanceOf(address(strategy)),
+            0,
+            _delta_,
+            "strategy asset bal"
+        );
+    }
+
+    function test__pushFunds() public override {
+        strategy.toggleAutoDeposit();
+        _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
+
+        vm.prank(bob);
+        strategy.deposit(testConfig.defaultAmount, bob);
+
+        uint256 oldTa = strategy.totalAssets();
+        uint256 oldTs = strategy.totalSupply();
+
+        strategy.pushFunds(testConfig.defaultAmount, bytes(""));
+
+        assertApproxEqAbs(strategy.totalAssets(), oldTa, 416835800279253, "ta");
+        assertApproxEqAbs(strategy.totalSupply(), oldTs, _delta_, "ts");
         assertApproxEqAbs(
             IERC20(_asset_).balanceOf(address(strategy)),
             0,

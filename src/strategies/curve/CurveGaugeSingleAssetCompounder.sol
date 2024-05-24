@@ -130,7 +130,7 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy, BaseCurveCompounder {
                 Math.Rounding.Floor
             );
     }
-    
+
     /*//////////////////////////////////////////////////////////////
                           INTERNAL HOOKS LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -155,15 +155,23 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy, BaseCurveCompounder {
         uint256 assets,
         uint256 shares
     ) internal override {
+        emit log_named_uint("assets", assets);
+        emit log_named_uint("shares", shares);
         uint256 lpWithdraw = shares.mulDiv(
             IERC20(address(gauge)).balanceOf(address(this)),
             totalSupply(),
             Math.Rounding.Ceil
         );
+        emit log_named_uint("lpWithdraw", lpWithdraw);
 
         gauge.withdraw(lpWithdraw);
 
         ICurveLp(lpToken).remove_liquidity_one_coin(lpWithdraw, indexIn, 0);
+
+        emit log_named_uint(
+            "balAfter",
+            IERC20(asset()).balanceOf(address(this))
+        );
     }
 
     /*//////////////////////////////////////////////////////////////
