@@ -18,7 +18,7 @@ contract GearboxLeverageTestConfigStorage is ITestConfigStorage {
     testConfigs.push(GearboxLeverageTestConfig(
       0x9Ab55e5c894238812295A31BdB415f00f7626792,
       0x3EB95430FdB99439A86d3c6D7D01C3c561393556,
-      0x93C54c10a8DC03e7773Ca1d1575044adF62fB53D
+      0xd5a4fA61A2ce5D44fBfe53c2590620c6Cf29557F
     ));
   }
 

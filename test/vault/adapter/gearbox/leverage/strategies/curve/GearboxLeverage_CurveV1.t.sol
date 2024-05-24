@@ -22,6 +22,7 @@ contract GearboxLeverage_CurveV1_Test is AbstractAdapterTest {
     address USDC = address(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
     address DAI = address(0x6B175474E89094C44Da98b954EedeAC495271d0F);
     address addressProvider = 0xcF64698AFF7E5f27A11dff868AF228653ba53be0;
+    GearboxLeverage_CurveV1 adapterContract;
 
     function setUp() public {
         uint256 forkId = vm.createSelectFork(vm.rpcUrl("mainnet"), 19923553);
@@ -42,7 +43,7 @@ contract GearboxLeverage_CurveV1_Test is AbstractAdapterTest {
         (address _creditFacade, address _creditManager, address _strategyAdapter) = abi.decode(testConfig, (address, address, address));
 
         setUpBaseTest(
-            IERC20(DAI),
+            IERC20(USDC),
             address(new GearboxLeverage_CurveV1()),
             addressProvider,
             10,
@@ -64,6 +65,10 @@ contract GearboxLeverage_CurveV1_Test is AbstractAdapterTest {
         raise = defaultAmount;
         maxAssets = defaultAmount * 1000;
         maxShares = maxAssets / 2;
+
+        adapterContract = GearboxLeverage_CurveV1(address(adapter));
+        adapterContract.setTargetLeverageRatio(2e18);
+        adapter.toggleAutoHarvest();
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -133,18 +138,20 @@ contract GearboxLeverage_CurveV1_Test is AbstractAdapterTest {
                             ADJUST LEVERAGE
     //////////////////////////////////////////////////////////////*/
     function test__adjustLeverage() public {
-        _mintAsset(defaultAmount, bob);
-        vm.prank(bob);
-        asset.approve(address(adapter), defaultAmount);
+        uint256 amount = 1e15;
+        _mintAsset(amount, bob);
 
         vm.prank(bob);
-        adapter.deposit(defaultAmount, bob);
+        asset.approve(address(adapter), amount);
 
-        bytes memory data = abi.encode(address(asset), defaultAmount);
-        ILeverageAdapter(address(adapter)).adjustLeverage(1e18, data);
+        vm.prank(bob);
+        adapter.deposit(amount, bob);
+
+        bytes memory data = abi.encode(amount, 1, 0);
+        ILeverageAdapter(address(adapter)).adjustLeverage(1e12, data);
+
+        // console.log("TOT", adapter.totalAssets());
     }
-
-
     function test__harvest() public override {}
 
     function test__redeem(uint8 fuzzAmount) public override {}

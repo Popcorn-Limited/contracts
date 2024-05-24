@@ -30,6 +30,7 @@ abstract contract GearboxLeverage is AdapterBase {
     ICreditManagerV3 public creditManager;
 
     address public constant YEARN_USDC_ADAPTER = 0x2fA039b014FF3167472a1DA127212634E7a57564;
+    address public constant LP_TOKEN = 0x02950460E2b9529D0E00284A5fA2d7bDF3fA4d72;
 
     /*//////////////////////////////////////////////////////////////
                                 INITIALIZATION
@@ -79,6 +80,23 @@ abstract contract GearboxLeverage is AdapterBase {
         _symbol = string.concat("vc-gl-", IERC20Metadata(asset()).symbol());
 
         IERC20(asset()).approve(_creditManager, type(uint256).max);
+        IERC20(asset()).approve(_strategyAdapter, type(uint256).max);
+
+        // enable LP token as collateral
+        MultiCall[] memory calls = new MultiCall[](1);
+
+        // POSSIBLY THIS NEEDS  TO BE TAKEN INTO ACCOUNT
+        // calls[0] = MultiCall({
+        // target: address(creditFacade),
+        // callData: abi.encodeCall(ICreditFacadeV3Multicall.updateQuota, (asset(), 1e19, 0))
+        // });
+
+        calls[0] = MultiCall({
+            target: address(creditFacade),
+            callData: abi.encodeCall(ICreditFacadeV3Multicall.enableToken, (LP_TOKEN))
+        });
+ 
+        creditFacade.multicall(creditAccount, calls);
     }
 
     function name()
@@ -103,7 +121,17 @@ abstract contract GearboxLeverage is AdapterBase {
                           ACCOUNTING LOGIC
     //////////////////////////////////////////////////////////////*/
     function _totalAssets() internal view override returns (uint256) {
-        return IERC20(asset()).balanceOf(creditAccount); //_getCreditAccountData().totalValue;
+        CollateralDebtData memory collateralDebtData = _getCreditAccountData();
+        uint256 debt = collateralDebtData.debt;
+
+        // if collateral is not quoted (ie USDC, WETH) the entire credit account balance is counted 
+        uint256 collateral = collateralDebtData.totalValue + IERC20(asset()).balanceOf(creditAccount);
+
+        if (debt > collateral) return 0;
+
+        return collateral - debt;
+
+        // return IERC20(asset()).balanceOf(creditAccount); //_getCreditAccountData().totalValue;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -129,6 +157,13 @@ abstract contract GearboxLeverage is AdapterBase {
 
     function _protocolDeposit(uint256 assets, uint256) internal override {
         MultiCall[] memory calls = new MultiCall[](1);
+
+        // POSSIBLY THIS NEEDS  TO BE TAKEN INTO ACCOUNT
+        // calls[0] = MultiCall({
+        // target: address(creditFacade),
+        // callData: abi.encodeCall(ICreditFacadeV3Multicall.updateQuota, (asset(), 1e19, 0))
+        // });
+
         calls[0] = MultiCall({
             target: address(creditFacade),
             callData: abi.encodeCall(
