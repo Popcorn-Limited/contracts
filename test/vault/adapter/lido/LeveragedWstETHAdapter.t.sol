@@ -21,14 +21,15 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
         ICurveMetapool(0xDC24316b9AE028F1497c275EB9192a3Ea0f67022);
 
     IERC20 wstETH = IERC20(0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0);
-    IERC20 awstETH = IERC20(0x12B54025C112Aa61fAce2CDB7118740875A566E9); // interest token spark
-    IERC20 vdWETH = IERC20(0x2e7576042566f8D6990e07A1B61Ad1efd86Ae70d); // variable debt token spark
-    ILendingPool lendingPool =
-        ILendingPool(0xC13e21B648A5Ee794902342038FF3aDAB66BE987); // spark
-    address aaveDataProvider =
-        address(0xFc21d6d146E6086B8359705C8b28512a983db0cb); //spark
-
-    uint256 slippage = 1e15;
+    IERC20 awstETH; // interest token
+    IERC20 vdWETH; // variable debt token
+    ILendingPool lendingPool;
+    address aaveDataProvider;
+    address poolAddressesProvider;
+    uint256 slippage;
+    uint256 slippageCap;
+    uint256 targetLTV;
+    uint256 maxLTV;
 
     LeveragedWstETHAdapter adapterContract;
 
@@ -67,13 +68,37 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
             false
         );
 
+        (    
+            address awstETH_,
+            address vdWETH_,
+            address lendingPool_,
+            address dataProvider_,
+            address poolAddressesProvider_,
+            uint256 slippage_,
+            uint256 slippageCap_,
+            uint256 targetLTV_,
+            uint256 maxLTV_
+        ) = abi.decode(testConfig, (
+            address,address,address,address,address,uint256,uint256,uint256,uint256
+        ));
+
+        awstETH = IERC20(awstETH_);
+        vdWETH = IERC20(vdWETH_);
+        lendingPool = ILendingPool(lendingPool_);
+        aaveDataProvider = dataProvider_;
+        poolAddressesProvider = poolAddressesProvider_;
+        slippage = slippage_;
+        slippageCap = slippageCap_;
+        targetLTV = targetLTV_;
+        maxLTV = maxLTV_;
+
         vm.label(address(asset), "asset");
         vm.label(address(this), "test");
 
         adapter.initialize(
             abi.encode(asset, address(this), address(0), 0, sigs, ""),
             aaveDataProvider,
-            testConfig
+            abi.encode(poolAddressesProvider,slippage,slippageCap,targetLTV,maxLTV)
         );
 
         adapterContract = LeveragedWstETHAdapter(payable(address(adapter)));
