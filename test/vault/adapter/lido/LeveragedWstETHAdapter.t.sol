@@ -11,6 +11,7 @@ import {LevWstETHTestConfigStorage, LevWstETHTestConfig} from "./wstETHTestConfi
 import {AbstractAdapterTest, ITestConfigStorage, IAdapter} from "../abstract/AbstractAdapterTest.sol";
 import {ICurveMetapool} from "../../../../src/interfaces/external/curve/ICurveMetapool.sol";
 import {Clones} from "openzeppelin-contracts/proxy/Clones.sol";
+import "forge-std/console.sol";
 
 contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
     using Math for uint256;
@@ -218,7 +219,7 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
         vm.stopPrank();
 
         // check total assets
-        assertEq(adapter.totalAssets(), amountDeposit + 1);
+        assertEq(adapter.totalAssets(), amountDeposit);
 
         // wstETH should be in lending market
         assertEq(wstETH.balanceOf(address(adapter)), 0);
@@ -454,6 +455,7 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
 
         // withdraw full amount - repay full debt
         uint256 amountWithd = adapter.totalAssets();
+        console.log(amountWithd);
 
         vm.prank(bob);
         adapter.withdraw(amountWithd, bob, bob);

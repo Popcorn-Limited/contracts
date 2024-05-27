@@ -169,8 +169,10 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
 
         if (debt >= collateral) return 0;
 
-        uint256 total = collateral - debt;
+        uint256 total = collateral;
         if (debt > 0) {
+            total -= debt;
+
             // if there's debt, apply slippage to repay it
             uint256 slippageDebt = debt.mulDiv(
                 slippage,
@@ -182,7 +184,7 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
 
             total -= slippageDebt;
         }
-        return total;
+        return total - 1;
     }
 
     function getLTV() public view returns (uint256 ltv) {
