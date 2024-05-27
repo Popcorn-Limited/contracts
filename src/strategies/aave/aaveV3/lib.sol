@@ -78,6 +78,14 @@ library DataTypes {
     uint256 data;
   }
 
+  struct EModeData {
+      uint16 maxLTV;
+      uint16 liqThreshold;
+      uint16 liqBonus;
+      address priceSource;
+      string label; 
+  }
+
   enum InterestRateMode {
     NONE,
     STABLE,

@@ -36,6 +36,10 @@ interface ILido {
         uint256 _ethAmount
     ) external view returns (uint256);
 
+    function getPooledEthByShares(
+        uint256 _sharesAmount
+    ) external view returns (uint256);
+
     function owner() external view returns (address);
 
     function strategy() external view returns (address);

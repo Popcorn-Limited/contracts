@@ -19,9 +19,9 @@
           "aaveDataProvider": "0xFc21d6d146E6086B8359705C8b28512a983db0cb",
           "maxLTV": 850000000000000000,
           "poolAddressesProvider": "0x02C3eA4e34C0cBd694D2adFa2c690EECbC1793eE",
-          "slippage": 1000000000000000,
-          "targetLTV": 800000000000000000,
-          "variableDepotToken": "0x2e7576042566f8D6990e07A1B61Ad1efd86Ae70d"
+          "slippage": 10000000000000000,
+          "slippageCap": 100000000000000000,
+          "targetLTV": 800000000000000000
         }
       }
     }
