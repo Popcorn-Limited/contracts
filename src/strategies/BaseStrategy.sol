@@ -122,7 +122,7 @@ abstract contract BaseStrategy is
         }
 
         // We call this before the `burn` to allow for normal calculations with shares before they get burned
-        // Since we transfer assets after the burn the function should remain safe 
+        // Since we transfer assets after the burn the function should remain safe
         if (!paused()) {
             uint256 float = IERC20(asset()).balanceOf(address(this));
             if (assets > float) {

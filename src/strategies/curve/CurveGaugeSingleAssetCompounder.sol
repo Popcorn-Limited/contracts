@@ -96,9 +96,9 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy, BaseCurveCompounder {
 
     /// @notice Calculates the total amount of underlying tokens the Vault holds.
     /// @return The total amount of underlying tokens the Vault holds.
-
     function _totalAssets() internal view override returns (uint256) {
         uint256 lpBal = IERC20(address(gauge)).balanceOf(address(this));
+
         return
             lpBal > 0
                 ? ((ICurveLp(lpToken).get_virtual_price() * lpBal) / 1e18)
@@ -130,7 +130,7 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy, BaseCurveCompounder {
                 Math.Rounding.Floor
             );
     }
-    
+
     /*//////////////////////////////////////////////////////////////
                           INTERNAL HOOKS LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -155,11 +155,9 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy, BaseCurveCompounder {
         uint256 assets,
         uint256 shares
     ) internal override {
-        uint256 lpWithdraw = shares.mulDiv(
-            IERC20(address(gauge)).balanceOf(address(this)),
-            totalSupply(),
-            Math.Rounding.Ceil
-        );
+        uint256 lpWithdraw = IERC20(address(gauge))
+            .balanceOf(address(this))
+            .mulDiv(assets, _totalAssets(), Math.Rounding.Ceil);
 
         gauge.withdraw(lpWithdraw);
 
