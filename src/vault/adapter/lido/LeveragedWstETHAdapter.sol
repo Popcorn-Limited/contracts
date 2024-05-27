@@ -46,6 +46,7 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
 
     uint256 public targetLTV; // in 18 decimals - 1e17 being 0.1%
     uint256 public maxLTV; // max ltv the vault can reach
+    uint256 public protocolLMaxLTV; // underlying money market max LTV
 
     error InvalidLTV(uint256 targetLTV, uint256 maxLTV, uint256 protocolLTV);
     error InvalidSlippage(uint256 slippage, uint256 slippageCap);
@@ -93,9 +94,10 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
 
         // get protocol LTV
         DataTypes.EModeData memory emodeData = lendingPool.getEModeCategoryData(uint8(1));
+        protocolLMaxLTV = uint256(emodeData.maxLTV) * 1e14; // make it 18 decimals to compare;
 
         // check ltv init values are correct
-        _verifyLTV(_targetLTV, _maxLTV, emodeData.maxLTV);
+        _verifyLTV(_targetLTV, _maxLTV, protocolLMaxLTV);
 
         targetLTV = _targetLTV;
         maxLTV = _maxLTV;
@@ -252,9 +254,26 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
         uint256 shares
     ) internal override {
         (, uint256 currentDebt, uint256 currentCollateral) = _getCurrentLTV();
-        uint256 ethAssetsValue = IwstETH(asset()).getStETHByWstETH(assets);
+        uint256 ethAssetsValue = ILido(stETH).getPooledEthByShares(assets);
+        bool isFullWithdraw;
+        uint256 ratioDebtToRepay;
 
-        bool isFullWithdraw = assets == _totalAssets();
+        {   
+            uint256 debtSlippage = currentDebt.mulDiv(
+                slippage,
+                1e18,
+                Math.Rounding.Ceil
+            );
+
+            // find the % of debt to repay as the % of collateral being withdrawn
+            ratioDebtToRepay = ethAssetsValue.mulDiv(
+                1e18, 
+                (currentCollateral - currentDebt - debtSlippage),
+                Math.Rounding.Floor
+            );
+
+            isFullWithdraw = assets == _totalAssets() || ratioDebtToRepay >= 1e18;
+        }
 
         // get the LTV we would have without repaying debt
         uint256 futureLTV = isFullWithdraw
@@ -273,14 +292,7 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
             // 1 - withdraw assets but repay debt
             uint256 debtToRepay = isFullWithdraw
                 ? currentDebt
-                : currentDebt -
-                    (
-                        targetLTV.mulDiv(
-                            (currentCollateral - ethAssetsValue),
-                            1e18,
-                            Math.Rounding.Floor
-                        )
-                    );
+                : currentDebt.mulDiv(ratioDebtToRepay, 1e18, Math.Rounding.Floor);
 
             // flash loan debtToRepay - mode 0 - flash loan is repaid at the end
             _flashLoanETH(debtToRepay, 0, assets, 0, isFullWithdraw);
@@ -349,7 +361,7 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
         );
 
         // swap stETH for ETH and deposit into WETH - will be pulled by AAVE pool as flash loan repayment
-        _swapToWETH(stETHAmount, flashLoanDebt, asset, isFullWithdraw);
+        _swapToWETH(stETHAmount, flashLoanDebt, asset, toWithdraw);
     }
 
     // returns current loan to value, debt and collateral (token) amounts
@@ -359,19 +371,18 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
         returns (uint256 loanToValue, uint256 debt, uint256 collateral)
     {
         debt = debtToken.balanceOf(address(this)); // ETH DEBT
-        collateral = IwstETH(asset()).getStETHByWstETH(
+        collateral = ILido(stETH).getPooledEthByShares(
             interestToken.balanceOf(address(this))
-        ); // converted into ETH (stETH) amount;
+        ); // converted into ETH amount;
 
         (debt == 0 || collateral == 0) ? loanToValue = 0 : loanToValue = debt
             .mulDiv(1e18, collateral, Math.Rounding.Ceil);
     }
 
     // reverts if targetLTV < maxLTV < protocolLTV is not satisfied
-    function _verifyLTV(uint256 targetLTV, uint256 maxLTV, uint16 protocolLTV) internal view {
-        uint256 _protocolLTV = uint256(protocolLTV) * 1e14; // make it 18 decimals to compare
-        if(targetLTV >= maxLTV) revert InvalidLTV(targetLTV, maxLTV, _protocolLTV);
-        if(maxLTV >= _protocolLTV) revert InvalidLTV(targetLTV, maxLTV, _protocolLTV);
+    function _verifyLTV(uint256 targetLTV, uint256 maxLTV, uint256 protocolLTV) internal view {
+        if(targetLTV >= maxLTV) revert InvalidLTV(targetLTV, maxLTV, protocolLTV);
+        if(maxLTV >= protocolLTV) revert InvalidLTV(targetLTV, maxLTV, protocolLTV);
     }
 
     // borrow WETH from lending protocol
@@ -411,15 +422,30 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
         uint256 amount,
         uint256 minAmount,
         address asset,
-        bool isFullWithdraw
-    ) internal returns (uint256 amountWETHReceived) {
-        amountWETHReceived = StableSwapSTETH.exchange(
+        uint256 wstETHToWithdraw
+    ) internal returns (uint256 amountETHReceived) {
+        // swap to ETH
+        amountETHReceived = StableSwapSTETH.exchange(
             STETHID,
             WETHID,
             amount,
             minAmount
         );
-        weth.deposit{value: minAmount}(); // wrap precise amount of eth for flash loan repayment
+        
+        // wrap precise amount of eth for flash loan repayment
+        weth.deposit{value: minAmount}();
+
+        // restake the eth needed to reach the wstETH amount the user is withdrawing
+        uint256 missingWstETH = wstETHToWithdraw - IERC20(asset).balanceOf(address(this)) + 1;
+        if(missingWstETH > 0) {
+            uint256 ethAmount = ILido(stETH).getPooledEthByShares(
+                missingWstETH
+            );
+
+            // stake eth to receive wstETH
+            (bool sent, ) = asset.call{value: ethAmount}("");
+            require(sent, "Fail to send eth to wstETH");
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -493,10 +519,8 @@ contract LeveragedWstETHAdapter is AdapterBase, IFlashLoanReceiver {
         uint256 targetLTV_,
         uint256 maxLTV_
     ) external onlyOwner {
-        DataTypes.EModeData memory emodeData = lendingPool.getEModeCategoryData(uint8(1));
-
         // reverts if targetLTV < maxLTV < protocolLTV is not satisfied
-        _verifyLTV(targetLTV_, maxLTV_, emodeData.maxLTV);
+        _verifyLTV(targetLTV_, maxLTV_, protocolLMaxLTV);
 
         targetLTV = targetLTV_;
         maxLTV = maxLTV_;

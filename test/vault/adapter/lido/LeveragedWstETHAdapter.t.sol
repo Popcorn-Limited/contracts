@@ -41,7 +41,7 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
             address(new LevWstETHTestConfigStorage())
         );
 
-        _setUpTest(testConfigStorage.getTestConfig(0));
+        _setUpTest(testConfigStorage.getTestConfig(1));
 
         defaultAmount = 1e18;
 
@@ -50,7 +50,7 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
 
         raise = defaultAmount * 1_000;
 
-        maxAssets = minFuzz * 10;
+        maxAssets = minFuzz * 1_000;
         maxShares = minShares * 10;
     }
 
@@ -137,6 +137,72 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
         vm.startPrank(address(adapter));
         lendingPool.supply(address(wstETH), 10 ether, address(adapter), 0);
         vm.stopPrank();
+    }
+
+    function test__initialization() public override {
+        createAdapter();
+        uint256 callTime = block.timestamp;
+
+        adapter.initialize(
+            abi.encode(asset, address(this), strategy, 0, sigs, ""),
+            aaveDataProvider,
+            abi.encode(poolAddressesProvider,slippage,slippageCap,targetLTV,maxLTV)
+        );
+
+        assertEq(adapter.owner(), address(this), "owner");
+        assertEq(adapter.strategy(), address(strategy), "strategy");
+        assertEq(adapter.harvestCooldown(), 0, "harvestCooldown");
+        assertEq(adapter.strategyConfig(), "", "strategyConfig");
+        assertEq(
+            IERC20Metadata(address(adapter)).decimals(),
+            IERC20Metadata(address(asset)).decimals() + adapter.decimalOffset(),
+            "decimals"
+        );
+
+        verify_adapterInit();
+    }
+
+    function test__deposit(uint8 fuzzAmount) public override {
+        uint8 len = uint8(testConfigStorage.getTestConfigLength());
+        for (uint8 i; i < len; i++) {
+            uint256 amount = bound(uint256(fuzzAmount), minFuzz, maxAssets);
+
+            _mintAssetAndApproveForAdapter(amount, bob);
+
+            prop_deposit(bob, bob, amount, testId);
+
+            increasePricePerShare(raise);
+
+            _mintAssetAndApproveForAdapter(amount, bob);
+            prop_deposit(bob, alice, amount, testId);
+        }
+    }
+
+    function test__withdraw(uint8 fuzzAmount) public override {
+        uint8 len = uint8(testConfigStorage.getTestConfigLength());
+        for (uint8 i; i < len; i++) {
+            uint256 amount = bound(uint256(fuzzAmount), minFuzz, maxAssets);
+
+            uint256 reqAssets = adapter.previewMint(
+                adapter.previewWithdraw(amount)
+            );
+            _mintAssetAndApproveForAdapter(reqAssets, bob);
+            vm.prank(bob);
+            adapter.deposit(reqAssets, bob);
+
+            prop_withdraw(bob, bob, adapter.maxWithdraw(bob), testId);
+
+            _mintAssetAndApproveForAdapter(reqAssets, bob);
+            vm.prank(bob);
+            adapter.deposit(reqAssets, bob);
+
+            increasePricePerShare(raise);
+
+            vm.prank(bob);
+            adapter.approve(alice, type(uint256).max);
+
+            prop_withdraw(alice, bob, adapter.maxWithdraw(bob), testId);
+        }
     }
 
     function test_deposit() public {
@@ -258,7 +324,7 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
         );
     }
 
-    function test_adjustLeverage_flahsLoan_and_eth_dust() public {
+    function test_adjustLeverage_flashLoan_and_eth_dust() public {
         uint256 amountMint = 10e18;
         uint256 amountDeposit = 1e18;
         uint256 amountWithdraw = 5e17;
@@ -272,12 +338,14 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
 
         uint256 totAssetsBefore = adapter.totalAssets();
 
-        vm.deal(address(adapter), 0.01e18);
+        vm.deal(address(adapter), 1e18);
 
         // HARVEST - trigger leverage loop
         adapterContract.adjustLeverage();
 
-        // tot assets increased
+        // tot assets increased in this case
+        // but if the amount of dust is lower than the slippage % of debt 
+        // totalAssets would be lower, as leverage incurred in debt
         assertGt(
             adapter.totalAssets(),
             totAssetsBefore
@@ -386,6 +454,7 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
 
         // withdraw full amount - repay full debt
         uint256 amountWithd = adapter.totalAssets();
+
         vm.prank(bob);
         adapter.withdraw(amountWithd, bob, bob);
 
@@ -397,7 +466,7 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
             wstETH.balanceOf(address(adapter)),
             0,
             _delta_,
-            string.concat("more wstETH dust than expected", baseTestId)
+            string.concat("more wstETH dust than expected")
         );
 
         // should not hold any wstETH aToken
@@ -472,7 +541,7 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
             LeveragedWstETHAdapter.InvalidLTV.selector,
             3e18,
             4e18,
-            9e17
+            adapterContract.protocolLMaxLTV()
         ));
         adapterContract.setLeverageValues(3e18, 4e18);
 
@@ -481,7 +550,7 @@ contract LeveragedWstETHAdapterTest is AbstractAdapterTest {
             LeveragedWstETHAdapter.InvalidLTV.selector,
             4e17,
             3e17,
-            9e17
+            adapterContract.protocolLMaxLTV()
         ));
         adapterContract.setLeverageValues(4e17, 3e17);
     }

@@ -29,11 +29,11 @@ contract LevWstETHTestConfigStorage is ITestConfigStorage {
                 address(0xC13e21B648A5Ee794902342038FF3aDAB66BE987),
                 address(0xFc21d6d146E6086B8359705C8b28512a983db0cb),
                 address(0x02C3eA4e34C0cBd694D2adFa2c690EECbC1793eE),
-                1e15, 
+                1e16, 
                 1e17,
                 80e16,
                 85e16
-            ) // 0.1% slippage / 10% slippage cap  / 80% targetLTV - 85% maxLTV
+            ) // 1% slippage / 10% slippage cap  / 80% targetLTV - 85% maxLTV
         );
 
         // AAVE-v3
@@ -44,11 +44,11 @@ contract LevWstETHTestConfigStorage is ITestConfigStorage {
                 address(0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2),
                 address(0x7B4EB56E7CD4b454BA8ff71E4518426369a138a3),
                 address(0x2f39d218133AFaB8F2B819B1066c7E434Ad94E9e),
-                1e15, 
+                1e16, 
                 1e17,
                 80e16,
                 85e16
-            ) // 0.1% slippage / 10% slippage cap  / 80% targetLTV - 85% maxLTV
+            ) // 1% slippage / 10% slippage cap  / 80% targetLTV - 85% maxLTV
         );
     }
 
