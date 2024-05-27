@@ -7,8 +7,8 @@ import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {BaseCurveCompounder, CurveTradeLibrary, CurveSwap, ICurveLp} from "./BaseCurveCompounder.sol";
 
 abstract contract BaseCurveLpCompounder is BaseCurveCompounder {
-    address internal depositAsset;
-    int128 internal indexIn;
+    address public depositAsset;
+    int128 public indexIn;
 
     error CompoundFailed();
 

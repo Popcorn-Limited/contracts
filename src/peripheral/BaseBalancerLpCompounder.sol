@@ -16,7 +16,7 @@ struct HarvestValues {
 }
 
 abstract contract BaseBalancerLpCompounder is BaseBalancerCompounder {
-    HarvestValues internal harvestValues;
+    HarvestValues public harvestValues;
 
     error CompoundFailed();
 

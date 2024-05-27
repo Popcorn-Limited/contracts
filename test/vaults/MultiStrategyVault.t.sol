@@ -89,7 +89,6 @@ contract MultiStrategyVaultTest is Test {
         address vaultAddress = Clones.clone(implementation);
         MultiStrategyVault newVault = MultiStrategyVault(vaultAddress);
 
-        uint256 callTime = block.timestamp;
         newVault.initialize(
             IERC20(address(asset)),
             strategies,
@@ -153,8 +152,6 @@ contract MultiStrategyVaultTest is Test {
     }
 
     function testFail__initialize_strategy_addressZero() public {
-        MockERC20 newAsset = new MockERC20("New Mock Token", "NTKN", 18);
-
         address vaultAddress = Clones.clone(implementation);
         MultiStrategyVault newVault = MultiStrategyVault(vaultAddress);
 
@@ -619,18 +616,18 @@ contract MultiStrategyVaultTest is Test {
     }
 
     function testFail_changeWithdrawalQueue_invalidLength() public {
-        uint256[] memory withdrawalQueue = new uint256[](1);
-        withdrawalQueue[0] = 0;
+        uint256[] memory newWithdrawalQueue = new uint256[](1);
+        newWithdrawalQueue[0] = 0;
 
-        vault.setWithdrawalQueue(withdrawalQueue);
+        vault.setWithdrawalQueue(newWithdrawalQueue);
     }
 
     function testFail_changeWithdrawalQueue_invalidIndex() public {
-        uint256[] memory withdrawalQueue = new uint256[](2);
-        withdrawalQueue[0] = 5;
-        withdrawalQueue[1] = 0;
+        uint256[] memory newWithdrawalQueue = new uint256[](2);
+        newWithdrawalQueue[0] = 5;
+        newWithdrawalQueue[1] = 0;
 
-        vault.setWithdrawalQueue(withdrawalQueue);
+        vault.setWithdrawalQueue(newWithdrawalQueue);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -691,11 +688,11 @@ contract MultiStrategyVaultTest is Test {
         assertEq(asset.balanceOf(address(strategies[1])), 9e18);
         assertEq(asset.balanceOf(address(strategies[0])), 1e18);
 
-        uint256[] memory withdrawalQueue = new uint256[](2);
-        withdrawalQueue[0] = 1;
-        withdrawalQueue[1] = 0;
+        uint256[] memory newWithdrawalQueue = new uint256[](2);
+        newWithdrawalQueue[0] = 1;
+        newWithdrawalQueue[1] = 0;
 
-        vault.setWithdrawalQueue(withdrawalQueue);
+        vault.setWithdrawalQueue(newWithdrawalQueue);
 
         vm.prank(bob);
         vault.withdraw(95e17);

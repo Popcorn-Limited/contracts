@@ -55,8 +55,6 @@ abstract contract BaseStrategy is
     //////////////////////////////////////////////////////////////*/
 
     error ZeroAmount();
-    error InvalidReceiver();
-    error MaxError(uint256 amount);
 
     function deposit(uint256 assets) public returns (uint256) {
         return deposit(assets, msg.sender);

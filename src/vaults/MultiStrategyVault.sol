@@ -44,7 +44,6 @@ contract MultiStrategyVault is
     event VaultInitialized(bytes32 contractName, address indexed asset);
 
     error InvalidAsset();
-    error InvalidAdapter();
 
     constructor() {
         _disableInitializers();
@@ -154,8 +153,6 @@ contract MultiStrategyVault is
     //////////////////////////////////////////////////////////////*/
 
     error ZeroAmount();
-    error InvalidReceiver();
-    error MaxError(uint256 amount);
 
     function deposit(uint256 assets) public returns (uint256) {
         return deposit(assets, msg.sender);
@@ -281,7 +278,6 @@ contract MultiStrategyVault is
                             ACCOUNTING LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev TODO - should we only track deposits / withdrawals and update balances on harvest operations to reduce gas costs?
     /// @return Total amount of underlying `asset` token managed by vault. Delegates to adapter.
     function totalAssets() public view override returns (uint256) {
         uint256 assets = IERC20(asset()).balanceOf(address(this));

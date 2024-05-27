@@ -13,10 +13,10 @@ struct TradePath {
 }
 
 abstract contract BaseBalancerCompounder {
-    IBalancerVault internal balancerVault;
+    IBalancerVault public balancerVault;
 
-    TradePath[] internal tradePaths;
-    address[] internal _rewardTokens;
+    TradePath[] public tradePaths;
+    address[] public _rewardTokens;
 
     function sellRewardsViaBalancer() internal {
         // Caching

@@ -4,7 +4,7 @@
 pragma solidity ^0.8.25;
 
 import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math} from "../BaseStrategy.sol";
-import {IAuraBooster, IAuraRewards, IAuraStaking} from "./IAura.sol";
+import {IAuraBooster, IAuraRewards} from "./IAura.sol";
 import {BaseBalancerLpCompounder, HarvestValues, TradePath} from "../../peripheral/BaseBalancerLpCompounder.sol";
 
 /**
@@ -118,7 +118,7 @@ contract AuraCompounder is BaseStrategy, BaseBalancerLpCompounder {
     }
 
     function _protocolWithdraw(uint256 assets, uint256) internal override {
-        auraRewards.withdrawAndUnwrap(assets, true);
+        auraRewards.withdrawAndUnwrap(assets, false);
     }
 
     /*//////////////////////////////////////////////////////////////

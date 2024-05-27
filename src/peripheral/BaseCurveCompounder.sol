@@ -10,7 +10,7 @@ import {CurveTradeLibrary} from "./CurveTradeLibrary.sol";
 abstract contract BaseCurveCompounder {
     ICurveRouter public curveRouter;
 
-    address[] internal _rewardTokens;
+    address[] public _rewardTokens;
     CurveSwap[] internal swaps; // Must be ordered like `_rewardTokens`
 
     function sellRewardsViaCurve() internal {
