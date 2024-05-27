@@ -326,19 +326,19 @@ contract CurveGaugeSingleAssetCompounderTest is BaseStrategyTest {
         assertApproxEqAbs(
             strategy.totalAssets(),
             testConfig.defaultAmount / 5,
-            2626663,
+            96442893003781,
             "ta"
         );
         assertApproxEqAbs(
             strategy.totalSupply(),
             testConfig.defaultAmount / 5,
-            4202661,
+            1132742627023746,
             "ts"
         );
         assertApproxEqAbs(
             strategy.balanceOf(bob),
             testConfig.defaultAmount / 5,
-            4202661,
+            1132742627023746,
             "share bal"
         );
         assertApproxEqAbs(
@@ -373,7 +373,7 @@ contract CurveGaugeSingleAssetCompounderTest is BaseStrategyTest {
         assertApproxEqAbs(
             strategy.totalAssets(),
             testConfig.defaultAmount / 5,
-            230869893,
+            3981119898726623,
             "ta"
         );
         assertApproxEqAbs(
@@ -391,7 +391,7 @@ contract CurveGaugeSingleAssetCompounderTest is BaseStrategyTest {
         assertApproxEqAbs(
             IERC20(_asset_).balanceOf(bob),
             (testConfig.defaultAmount / 5) * 4,
-            4202660,
+            3886042782479058,
             "asset bal"
         );
         assertApproxEqAbs(

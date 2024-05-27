@@ -96,14 +96,9 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy, BaseCurveCompounder {
 
     /// @notice Calculates the total amount of underlying tokens the Vault holds.
     /// @return The total amount of underlying tokens the Vault holds.
-
     function _totalAssets() internal view override returns (uint256) {
         uint256 lpBal = IERC20(address(gauge)).balanceOf(address(this));
-        // alternative way that simulates a full withdrawal
-        // return
-        //     lpBal > 0
-        //         ? ICurveLp(lpToken).calc_withdraw_one_coin(lpBal, indexIn)
-        //         : 0;
+
         return
             lpBal > 0
                 ? ((ICurveLp(lpToken).get_virtual_price() * lpBal) / 1e18)
@@ -160,32 +155,13 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy, BaseCurveCompounder {
         uint256 assets,
         uint256 shares
     ) internal override {
-        emit log_named_uint("assets", assets);
-        emit log_named_uint("shares", shares);
-
-        uint256 lpWithdraw = IERC20(address(gauge)).balanceOf(address(this)).mulDiv(
-            assets,
-            _totalAssets(),
-            Math.Rounding.Ceil
-        );
-
-        // this one mixes base strategy state and this adapter speficic state
-        // uint256 lpWithdraw = shares.mulDiv(
-        //     IERC20(address(gauge)).balanceOf(address(this)),
-        //     totalSupply(),
-        //     Math.Rounding.Ceil
-        // );
-
-        emit log_named_uint("lpWithdraw", lpWithdraw);
+        uint256 lpWithdraw = IERC20(address(gauge))
+            .balanceOf(address(this))
+            .mulDiv(assets, _totalAssets(), Math.Rounding.Ceil);
 
         gauge.withdraw(lpWithdraw);
 
         ICurveLp(lpToken).remove_liquidity_one_coin(lpWithdraw, indexIn, 0);
-
-        emit log_named_uint(
-            "balAfter",
-            IERC20(asset()).balanceOf(address(this))
-        );
     }
 
     /*//////////////////////////////////////////////////////////////
