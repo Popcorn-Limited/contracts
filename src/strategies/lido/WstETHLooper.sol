@@ -13,6 +13,7 @@ import {ILendingPool, IAToken, IFlashLoanReceiver, IProtocolDataProvider, IPoolA
 
 struct LooperInitValues {
     address aaveDataProvider;
+    address curvePool;
     uint256 maxLTV;
     address poolAddressesProvider;
     uint256 slippage;
@@ -47,15 +48,15 @@ contract WstETHLooper is BaseStrategy, IFlashLoanReceiver {
 
     int128 private constant WETHID = 0;
     int128 private constant STETHID = 1;
-    ICurveMetapool public constant StableSwapSTETH =
-        ICurveMetapool(0xDC24316b9AE028F1497c275EB9192a3Ea0f67022);
+
+    ICurveMetapool public stableSwapStETH;
 
     uint256 public slippage; // 1e18 = 100% slippage, 1e14 = 1 BPS slippage
     uint256 public slippageCap;
 
     uint256 public targetLTV; // in 18 decimals - 1e17 being 0.1%
     uint256 public maxLTV; // max ltv the vault can reach
-    uint256 public protocolLMaxLTV; // underlying money market max LTV
+    uint256 public protocolMaxLTV; // underlying money market max LTV
 
     error InvalidLTV(uint256 targetLTV, uint256 maxLTV, uint256 protocolLTV);
     error InvalidSlippage(uint256 slippage, uint256 slippageCap);
@@ -98,10 +99,10 @@ contract WstETHLooper is BaseStrategy, IFlashLoanReceiver {
 
         // get protocol LTV
         DataTypes.EModeData memory emodeData = lendingPool.getEModeCategoryData(uint8(1));
-        protocolLMaxLTV = uint256(emodeData.maxLTV) * 1e14; // make it 18 decimals to compare;
+        protocolMaxLTV = uint256(emodeData.maxLTV) * 1e14; // make it 18 decimals to compare;
 
         // check ltv init values are correct
-        _verifyLTV(initValues.targetLTV, initValues.maxLTV, protocolLMaxLTV);
+        _verifyLTV(initValues.targetLTV, initValues.maxLTV, protocolMaxLTV);
 
         targetLTV = initValues.targetLTV;
         maxLTV = initValues.maxLTV;
@@ -129,10 +130,12 @@ contract WstETHLooper is BaseStrategy, IFlashLoanReceiver {
         IERC20(address(weth)).approve(address(lendingPool), type(uint256).max);
 
         // approve curve router to pull stETH for swapping
-        IERC20(stETH).approve(address(StableSwapSTETH), type(uint256).max);
+        stableSwapStETH = ICurveMetapool(initValues.curvePool);
+        IERC20(stETH).approve(address(stableSwapStETH), type(uint256).max);
 
         // set slippage
-        if (initValues.slippage > initValues.slippageCap) revert InvalidSlippage(initValues.slippage, initValues.slippageCap);
+        if (initValues.slippage > initValues.slippageCap) 
+            revert InvalidSlippage(initValues.slippage, initValues.slippageCap);
 
         slippage = initValues.slippage;
         slippageCap = initValues.slippageCap;
@@ -185,7 +188,9 @@ contract WstETHLooper is BaseStrategy, IFlashLoanReceiver {
 
             total -= slippageDebt;
         }
-        return total - 1;
+        if (total > 0) 
+            return total - 1;
+        else return 0;
     }
 
     function getLTV() public view returns (uint256 ltv) {
@@ -428,7 +433,7 @@ contract WstETHLooper is BaseStrategy, IFlashLoanReceiver {
         uint256 wstETHToWithdraw
     ) internal returns (uint256 amountETHReceived) {
         // swap to ETH
-        amountETHReceived = StableSwapSTETH.exchange(
+        amountETHReceived = stableSwapStETH.exchange(
             STETHID,
             WETHID,
             amount,
@@ -454,6 +459,17 @@ contract WstETHLooper is BaseStrategy, IFlashLoanReceiver {
     /*//////////////////////////////////////////////////////////////
                           MANAGEMENT LOGIC
     //////////////////////////////////////////////////////////////*/
+
+    function setHarvestValues(
+        address curveSwapPool
+    ) external onlyOwner {
+        // reset old pool
+        IERC20(stETH).approve(address(stableSwapStETH), 0);
+
+        // set and approve new one
+        stableSwapStETH = ICurveMetapool(curveSwapPool);
+        IERC20(stETH).approve(address(stableSwapStETH), type(uint256).max);
+    }
 
     function harvest(bytes memory data) external override onlyKeeperOrOwner {
         adjustLeverage();
@@ -495,7 +511,7 @@ contract WstETHLooper is BaseStrategy, IFlashLoanReceiver {
                 );
 
             uint256 dustBalance = address(this).balance;
-            if (dustBalance <= amountETH) {
+            if (dustBalance < amountETH) {
                 // flashloan but use eventual ETH dust remained in the contract as well
                 uint256 borrowAmount = amountETH - dustBalance;
 
@@ -522,7 +538,7 @@ contract WstETHLooper is BaseStrategy, IFlashLoanReceiver {
         uint256 maxLTV_
     ) external onlyOwner {
         // reverts if targetLTV < maxLTV < protocolLTV is not satisfied
-        _verifyLTV(targetLTV_, maxLTV_, protocolLMaxLTV);
+        _verifyLTV(targetLTV_, maxLTV_, protocolMaxLTV);
 
         targetLTV = targetLTV_;
         maxLTV = maxLTV_;
