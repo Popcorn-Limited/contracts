@@ -1,0 +1,63 @@
+{
+  "length": 1,
+  "configs": [
+    {
+      "base": {
+        "asset": "0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0",
+        "blockNumber": 19823003,
+        "defaultAmount": 1000000000000000000,
+        "delta": 10,
+        "maxDeposit": 1000000000000000000000,
+        "maxWithdraw": 1000000000000000000000,
+        "minDeposit": 1000000000000000,
+        "minWithdraw": 1000000000000000,
+        "network": "mainnet",
+        "testId": "PendleBalancerCompounder"
+      },
+      "specific": {
+        "init": {
+          "pendleMarket": "0xD0354D4e7bCf345fB117cabe41aCaDb724eccCa2",
+          "pendleRouter": "0x888888888889758F76e7103c6CbF23ABbF58F946",
+          "pendleRouterStat": "0x263833d47eA3fA4a30f269323aba6a107f9eB14C",
+          "swapDelay": 600
+        },
+        "harvest": {
+          "balancerVault": "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+          "tradePaths": {
+            "length": 1,
+            "structs": [
+              {
+                "assets": [
+                  "0x808507121B80c02388fAd14726482e061B8da827",
+                  "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+                  "0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0"
+                ],
+                "limits": [
+                  57896044618658097711785492504343953926634992332820282019728792003956564819967,
+                  57896044618658097711785492504343953926634992332820282019728792003956564819967,
+                  57896044618658097711785492504343953926634992332820282019728792003956564819967
+                ],
+                "swaps": [
+                  {
+                    "a-poolId": "0xfd1cf6fd41f229ca86ada0584c63c49c3d66bbc9000200000000000000000438",
+                    "b-assetInIndex": 0,
+                    "c-assetOutIndex": 1,
+                    "d-amount": 0,
+                    "e-userData": ""
+                  },
+                  {
+                    "a-poolId": "0x93d199263632a4ef4bb438f1feb99e57b4b5f0bd0000000000000000000005c2",
+                    "b-assetInIndex": 1,
+                    "c-assetOutIndex": 0,
+                    "d-amount": 0,
+                    "e-userData": ""
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

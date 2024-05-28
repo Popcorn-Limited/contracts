@@ -1,0 +1,26 @@
+{
+  "length": 1,
+  "configs": [
+    {
+      "base": {
+        "asset": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+        "blockNumber": 0,
+        "defaultAmount": 1000000000000000000,
+        "delta": 10,
+        "maxDeposit": 1000000000000000000000,
+        "maxWithdraw": 1000000000000000000000,
+        "minDeposit": 1000000000000000,
+        "minWithdraw": 1000000000000000,
+        "network": "mainnet",
+        "testId": "Gearbox Leverage Farm"
+      },
+      "specific": {
+        "init": {
+          "creditFacade": "0x9Ab55e5c894238812295A31BdB415f00f7626792",
+          "creditManager": "0x3EB95430FdB99439A86d3c6D7D01C3c561393556",
+          "strategyAdapter": "0x2fA039b014FF3167472a1DA127212634E7a57564"
+        }
+      }
+    }
+  ]
+}

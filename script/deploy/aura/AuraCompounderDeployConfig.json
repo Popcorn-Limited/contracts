@@ -1,0 +1,68 @@
+{
+  "baseInit": {
+    "asset": "",
+    "owner": "",
+    "autoHarvest": false
+  },
+  "strategyInit": {
+    "auraBooster": "0xA57b8d98dAE62B26Ec3bcC4a365338157060B234",
+    "balPoolId": "0x596192bb6e41802428ac943d2f1476c1af25cc0e000000000000000000000659",
+    "balVault": "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+    "pid": 189,
+    "underlyings": [
+      "0x596192bB6e41802428Ac943D2f1476C1Af25CC0E",
+      "0xbf5495Efe5DB9ce00f80364C8B423567e58d2110",
+      "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+    ]
+  },
+  "harvest": {
+    "harvestValues": {
+      "amountsInLen": 2,
+      "baseAsset": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+      "indexIn": 2,
+      "indexInUserData": 1
+    },
+    "tradePaths": [
+      {
+        "assets": [
+          "0xba100000625a3754423978a60c9317c58a424e3D",
+          "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+        ],
+        "limits": [
+          57896044618658097711785492504343953926634992332820282019728792003956564819967,
+          57896044618658097711785492504343953926634992332820282019728792003956564819967
+        ],
+        "minTradeAmount": 0,
+        "swaps": [
+          {
+            "a-poolId": "0x5c6ee304399dbdb9c8ef030ab642b10820db8f56000200000000000000000014",
+            "b-assetInIndex": 0,
+            "c-assetOutIndex": 1,
+            "d-amount": 0,
+            "e-userData": ""
+          }
+        ]
+      },
+      {
+        "assets": [
+          "0xC0c293ce456fF0ED870ADd98a0828Dd4d2903DBF",
+          "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+        ],
+        "limits": [
+          57896044618658097711785492504343953926634992332820282019728792003956564819967,
+          57896044618658097711785492504343953926634992332820282019728792003956564819967
+        ],
+        "minTradeAmount": 0,
+        "swaps": [
+          {
+            "a-poolId": "0xcfca23ca9ca720b6e98e3eb9b6aa0ffc4a5c08b9000200000000000000000274",
+            "b-assetInIndex": 0,
+            "c-assetOutIndex": 1,
+            "d-amount": 0,
+            "e-userData": ""
+          }
+        ]
+      }
+    ]
+  }
+}
