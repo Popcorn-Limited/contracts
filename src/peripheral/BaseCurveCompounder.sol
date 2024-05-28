@@ -20,7 +20,7 @@ abstract contract BaseCurveCompounder {
 
         uint256 amount;
         uint256 rewLen = sellSwaps.length;
-        for (uint256 i = 0; i < rewLen; ) {
+        for (uint256 i = 0; i < rewLen;) {
             amount = IERC20(sellSwaps[i].route[0]).balanceOf(address(this));
 
             if (amount > 0) {
@@ -33,10 +33,7 @@ abstract contract BaseCurveCompounder {
         }
     }
 
-    function setCurveTradeValues(
-        address newRouter,
-        CurveSwap[] memory newSwaps
-    ) internal {
+    function setCurveTradeValues(address newRouter, CurveSwap[] memory newSwaps) internal {
         // Remove old rewardToken allowance
         uint256 rewardTokenLen = _rewardTokens.length;
         if (rewardTokenLen > 0) {
@@ -45,7 +42,7 @@ abstract contract BaseCurveCompounder {
             address[] memory oldRewardTokens = _rewardTokens;
 
             // void approvals
-            for (uint256 i = 0; i < rewardTokenLen; ) {
+            for (uint256 i = 0; i < rewardTokenLen;) {
                 IERC20(oldRewardTokens[i]).approve(oldRouter, 0);
 
                 unchecked {
@@ -61,7 +58,7 @@ abstract contract BaseCurveCompounder {
         // Add new allowance + state
         address newRewardToken;
         rewardTokenLen = newSwaps.length;
-        for (uint256 i = 0; i < rewardTokenLen; ) {
+        for (uint256 i = 0; i < rewardTokenLen;) {
             newRewardToken = newSwaps[i].route[0];
 
             IERC20(newRewardToken).approve(newRouter, type(uint256).max);

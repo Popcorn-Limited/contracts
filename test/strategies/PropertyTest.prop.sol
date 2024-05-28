@@ -44,11 +44,7 @@ contract PropertyTest is Test {
     //////////////////////////////////////////////////////////////*/
 
     // "MUST NOT show any variations depending on the caller."
-    function prop_convertToShares(
-        address caller1,
-        address caller2,
-        uint256 assets
-    ) public {
+    function prop_convertToShares(address caller1, address caller2, uint256 assets) public {
         vm.prank(caller1);
         uint256 res1 = IERC4626(_vault_).convertToShares(assets); // "MAY revert due to integer overflow caused by an unreasonably large input."
         vm.prank(caller2);
@@ -57,11 +53,7 @@ contract PropertyTest is Test {
     }
 
     // "MUST NOT show any variations depending on the caller."
-    function prop_convertToAssets(
-        address caller1,
-        address caller2,
-        uint256 shares
-    ) public {
+    function prop_convertToAssets(address caller1, address caller2, uint256 shares) public {
         vm.prank(caller1);
         uint256 res1 = IERC4626(_vault_).convertToAssets(shares); // "MAY revert due to integer overflow caused by an unreasonably large input."
         vm.prank(caller2);
@@ -102,12 +94,7 @@ contract PropertyTest is Test {
     // shares that would be minted in a deposit call in the same transaction.
     // I.e. deposit should return the same or more shares as previewDeposit if
     // called in the same transaction."
-    function prop_previewDeposit(
-        address caller,
-        address receiver,
-        uint256 assets,
-        string memory testPreFix
-    ) public {
+    function prop_previewDeposit(address caller, address receiver, uint256 assets, string memory testPreFix) public {
         uint256 sharesPreview = IERC4626(_vault_).previewDeposit(assets); // "MAY revert due to other conditions that would also cause deposit to revert."
 
         vm.prank(caller);
@@ -120,12 +107,7 @@ contract PropertyTest is Test {
     // that would be deposited in a mint call in the same transaction. I.e. mint
     // should return the same or fewer assets as previewMint if called in the
     // same transaction."
-    function prop_previewMint(
-        address caller,
-        address receiver,
-        uint256 shares,
-        string memory testPreFix
-    ) public {
+    function prop_previewMint(address caller, address receiver, uint256 shares, string memory testPreFix) public {
         uint256 assetsPreview = IERC4626(_vault_).previewMint(shares);
 
         vm.prank(caller);
@@ -174,12 +156,11 @@ contract PropertyTest is Test {
                     DEPOSIT/MINT/WITHDRAW/REDEEM
     //////////////////////////////////////////////////////////////*/
 
-    function prop_deposit(
-        address caller,
-        address receiver,
-        uint256 assets,
-        string memory testPreFix
-    ) public virtual returns (uint256 paid, uint256 received) {
+    function prop_deposit(address caller, address receiver, uint256 assets, string memory testPreFix)
+        public
+        virtual
+        returns (uint256 paid, uint256 received)
+    {
         uint256 oldCallerAsset = IERC20(_asset_).balanceOf(caller);
         uint256 oldReceiverShare = IERC20(_vault_).balanceOf(receiver);
         uint256 oldAllowance = IERC20(_asset_).allowance(caller, _vault_);
@@ -191,35 +172,20 @@ contract PropertyTest is Test {
         uint256 newReceiverShare = IERC20(_vault_).balanceOf(receiver);
         uint256 newAllowance = IERC20(_asset_).allowance(caller, _vault_);
 
-        assertApproxEqAbs(
-            newCallerAsset,
-            oldCallerAsset - assets,
-            _delta_,
-            string.concat("asset", testPreFix)
-        ); // NOTE: this may fail if the caller is a contract in which the asset is stored
-        assertApproxEqAbs(
-            newReceiverShare,
-            oldReceiverShare + shares,
-            _delta_,
-            string.concat("share", testPreFix)
-        );
-        if (oldAllowance != type(uint256).max)
-            assertApproxEqAbs(
-                newAllowance,
-                oldAllowance - assets,
-                _delta_,
-                string.concat("allowance", testPreFix)
-            );
+        assertApproxEqAbs(newCallerAsset, oldCallerAsset - assets, _delta_, string.concat("asset", testPreFix)); // NOTE: this may fail if the caller is a contract in which the asset is stored
+        assertApproxEqAbs(newReceiverShare, oldReceiverShare + shares, _delta_, string.concat("share", testPreFix));
+        if (oldAllowance != type(uint256).max) {
+            assertApproxEqAbs(newAllowance, oldAllowance - assets, _delta_, string.concat("allowance", testPreFix));
+        }
 
         return (assets, shares);
     }
 
-    function prop_mint(
-        address caller,
-        address receiver,
-        uint256 shares,
-        string memory testPreFix
-    ) public virtual returns (uint256 paid, uint256 received) {
+    function prop_mint(address caller, address receiver, uint256 shares, string memory testPreFix)
+        public
+        virtual
+        returns (uint256 paid, uint256 received)
+    {
         uint256 oldCallerAsset = IERC20(_asset_).balanceOf(caller);
         uint256 oldReceiverShare = IERC20(_vault_).balanceOf(receiver);
         uint256 oldAllowance = IERC20(_asset_).allowance(caller, _vault_);
@@ -231,36 +197,21 @@ contract PropertyTest is Test {
         uint256 newReceiverShare = IERC20(_vault_).balanceOf(receiver);
         uint256 newAllowance = IERC20(_asset_).allowance(caller, _vault_);
 
-        assertApproxEqAbs(
-            newCallerAsset,
-            oldCallerAsset - assets,
-            _delta_,
-            string.concat("asset", testPreFix)
-        ); // NOTE: this may fail if the caller is a contract in which the asset is stored
-        assertApproxEqAbs(
-            newReceiverShare,
-            oldReceiverShare + shares,
-            _delta_,
-            string.concat("share", testPreFix)
-        );
-        if (oldAllowance != type(uint256).max)
-            assertApproxEqAbs(
-                newAllowance,
-                oldAllowance - assets,
-                _delta_,
-                string.concat("allowance", testPreFix)
-            );
+        assertApproxEqAbs(newCallerAsset, oldCallerAsset - assets, _delta_, string.concat("asset", testPreFix)); // NOTE: this may fail if the caller is a contract in which the asset is stored
+        assertApproxEqAbs(newReceiverShare, oldReceiverShare + shares, _delta_, string.concat("share", testPreFix));
+        if (oldAllowance != type(uint256).max) {
+            assertApproxEqAbs(newAllowance, oldAllowance - assets, _delta_, string.concat("allowance", testPreFix));
+        }
 
         return (assets, shares);
     }
 
     // Simplifing it here a little to avoid `Stack to Deep` - Caller = Receiver
-    function prop_withdraw(
-        address caller,
-        address owner,
-        uint256 assets,
-        string memory testPreFix
-    ) public virtual returns (uint256 paid, uint256 received) {
+    function prop_withdraw(address caller, address owner, uint256 assets, string memory testPreFix)
+        public
+        virtual
+        returns (uint256 paid, uint256 received)
+    {
         uint256 oldReceiverAsset = IERC20(_asset_).balanceOf(caller);
         uint256 oldOwnerShare = IERC20(_vault_).balanceOf(owner);
         uint256 oldAllowance = IERC20(_vault_).allowance(owner, caller);
@@ -272,30 +223,14 @@ contract PropertyTest is Test {
         uint256 newOwnerShare = IERC20(_vault_).balanceOf(owner);
         uint256 newAllowance = IERC20(_vault_).allowance(owner, caller);
 
-        assertApproxEqAbs(
-            newOwnerShare,
-            oldOwnerShare - shares,
-            _delta_,
-            string.concat("share", testPreFix)
-        );
-        assertApproxEqAbs(
-            newReceiverAsset,
-            oldReceiverAsset + assets,
-            _delta_,
-            string.concat("asset", testPreFix)
-        ); // NOTE: this may fail if the receiver is a contract in which the asset is stored
-        if (caller != owner && oldAllowance != type(uint256).max)
-            assertApproxEqAbs(
-                newAllowance,
-                oldAllowance - shares,
-                _delta_,
-                string.concat("allowance", testPreFix)
-            );
+        assertApproxEqAbs(newOwnerShare, oldOwnerShare - shares, _delta_, string.concat("share", testPreFix));
+        assertApproxEqAbs(newReceiverAsset, oldReceiverAsset + assets, _delta_, string.concat("asset", testPreFix)); // NOTE: this may fail if the receiver is a contract in which the asset is stored
+        if (caller != owner && oldAllowance != type(uint256).max) {
+            assertApproxEqAbs(newAllowance, oldAllowance - shares, _delta_, string.concat("allowance", testPreFix));
+        }
 
         assertTrue(
-            caller == owner ||
-                oldAllowance != 0 ||
-                (shares == 0 && assets == 0),
+            caller == owner || oldAllowance != 0 || (shares == 0 && assets == 0),
             string.concat("access control", testPreFix)
         );
 
@@ -303,12 +238,11 @@ contract PropertyTest is Test {
     }
 
     // Simplifing it here a little to avoid `Stack to Deep` - Caller = Receiver
-    function prop_redeem(
-        address caller,
-        address owner,
-        uint256 shares,
-        string memory testPreFix
-    ) public virtual returns (uint256 paid, uint256 received) {
+    function prop_redeem(address caller, address owner, uint256 shares, string memory testPreFix)
+        public
+        virtual
+        returns (uint256 paid, uint256 received)
+    {
         uint256 oldReceiverAsset = IERC20(_asset_).balanceOf(caller);
         uint256 oldOwnerShare = IERC20(_vault_).balanceOf(owner);
         uint256 oldAllowance = IERC20(_vault_).allowance(owner, caller);
@@ -320,30 +254,14 @@ contract PropertyTest is Test {
         uint256 newOwnerShare = IERC20(_vault_).balanceOf(owner);
         uint256 newAllowance = IERC20(_vault_).allowance(owner, caller);
 
-        assertApproxEqAbs(
-            newOwnerShare,
-            oldOwnerShare - shares,
-            _delta_,
-            string.concat("share", testPreFix)
-        );
-        assertApproxEqAbs(
-            newReceiverAsset,
-            oldReceiverAsset + assets,
-            _delta_,
-            string.concat("asset", testPreFix)
-        ); // NOTE: this may fail if the receiver is a contract in which the asset is stored
-        if (caller != owner && oldAllowance != type(uint256).max)
-            assertApproxEqAbs(
-                newAllowance,
-                oldAllowance - shares,
-                _delta_,
-                string.concat("allowance", testPreFix)
-            );
+        assertApproxEqAbs(newOwnerShare, oldOwnerShare - shares, _delta_, string.concat("share", testPreFix));
+        assertApproxEqAbs(newReceiverAsset, oldReceiverAsset + assets, _delta_, string.concat("asset", testPreFix)); // NOTE: this may fail if the receiver is a contract in which the asset is stored
+        if (caller != owner && oldAllowance != type(uint256).max) {
+            assertApproxEqAbs(newAllowance, oldAllowance - shares, _delta_, string.concat("allowance", testPreFix));
+        }
 
         assertTrue(
-            caller == owner ||
-                oldAllowance != 0 ||
-                (shares == 0 && assets == 0),
+            caller == owner || oldAllowance != 0 || (shares == 0 && assets == 0),
             string.concat("access control", testPreFix)
         );
 

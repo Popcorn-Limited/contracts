@@ -6,15 +6,7 @@ pragma solidity ^0.8.25;
 import {Script} from "forge-std/Script.sol";
 import {stdJson} from "forge-std/StdJson.sol";
 
-import {WstETHLooper, IERC20} from "../../../src/strategies/lido/WstETHLooper.sol";
-
-struct LooperValues {
-    address aaveDataProvider;
-    uint256 maxLTV;
-    address poolAddressProvider;
-    uint256 slippage;
-    uint256 targetLTV;
-}
+import {WstETHLooper, LooperInitValues, IERC20} from "../../../src/strategies/lido/WstETHLooper.sol";
 
 contract DeployStrategy is Script {
     using stdJson for string;
@@ -31,9 +23,9 @@ contract DeployStrategy is Script {
             )
         );
 
-        LooperValues memory looperValues = abi.decode(
+        LooperInitValues memory looperValues = abi.decode(
             json.parseRaw(".strategyInit"),
-            (LooperValues)
+            (LooperInitValues)
         );
 
         // Deploy Strategy
@@ -46,11 +38,12 @@ contract DeployStrategy is Script {
             json.readAddress(".baseInit.owner"),
             json.readBool(".baseInit.autoHarvest"),
             abi.encode(
-                looperValues.poolAddressProvider,
                 looperValues.aaveDataProvider,
+                looperValues.curvePool,
+                looperValues.maxLTV,
+                looperValues.poolAddressesProvider,
                 looperValues.slippage,
-                looperValues.targetLTV,
-                looperValues.maxLTV
+                looperValues.targetLTV
             )
         );
 

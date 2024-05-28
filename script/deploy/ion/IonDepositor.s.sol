@@ -12,12 +12,8 @@ contract DeployStrategy is Script {
     using stdJson for string;
 
     function run() public {
-        string memory json = vm.readFile(
-            string.concat(
-                vm.projectRoot(),
-                "./srcript/deploy/ion/IonDepositorDeployConfig.json"
-            )
-        );
+        string memory json =
+            vm.readFile(string.concat(vm.projectRoot(), "./srcript/deploy/ion/IonDepositorDeployConfig.json"));
 
         // Deploy strategy
         IonDepositor strategy = new IonDepositor();

@@ -3,7 +3,14 @@
 
 pragma solidity ^0.8.25;
 
-import {IBalancerVault, SwapKind, IAsset, BatchSwapStep, FundManagement, JoinPoolRequest} from "../interfaces/external/balancer/IBalancerVault.sol";
+import {
+    IBalancerVault,
+    SwapKind,
+    IAsset,
+    BatchSwapStep,
+    FundManagement,
+    JoinPoolRequest
+} from "../interfaces/external/balancer/IBalancerVault.sol";
 
 library BalancerTradeLibrary {
     function trade(
@@ -52,10 +59,7 @@ library BalancerTradeLibrary {
 
         // Pool base asset
         balancerVault.joinPool(
-            poolId,
-            address(this),
-            address(this),
-            JoinPoolRequest(underlyings, amounts, userData, false)
+            poolId, address(this), address(this), JoinPoolRequest(underlyings, amounts, userData, false)
         );
     }
 }

@@ -16,24 +16,17 @@ contract ConvexCompounderTest is BaseStrategyTest {
     using stdJson for string;
 
     function setUp() public {
-        _setUpBaseTest(
-            0,
-            "./test/strategies/convex/ConvexCompounderTestConfig.json"
-        );
+        _setUpBaseTest(0, "./test/strategies/convex/ConvexCompounderTestConfig.json");
     }
 
-    function _setUpStrategy(
-        string memory json_,
-        string memory index_,
-        TestConfig memory testConfig_
-    ) internal override returns (IBaseStrategy) {
+    function _setUpStrategy(string memory json_, string memory index_, TestConfig memory testConfig_)
+        internal
+        override
+        returns (IBaseStrategy)
+    {
         // Read strategy init values
-        ConvexInit memory convexInit = abi.decode(
-            json_.parseRaw(
-                string.concat(".configs[", index_, "].specific.init")
-            ),
-            (ConvexInit)
-        );
+        ConvexInit memory convexInit =
+            abi.decode(json_.parseRaw(string.concat(".configs[", index_, "].specific.init")), (ConvexInit));
 
         // Deploy Strategy
         ConvexCompounder strategy = new ConvexCompounder();
@@ -42,11 +35,7 @@ contract ConvexCompounderTest is BaseStrategyTest {
             testConfig_.asset,
             address(this),
             true,
-            abi.encode(
-                convexInit.convexBooster,
-                convexInit.curvePool,
-                convexInit.pid
-            )
+            abi.encode(convexInit.convexBooster, convexInit.curvePool, convexInit.pid)
         );
 
         // Set Harvest values
@@ -55,73 +44,38 @@ contract ConvexCompounderTest is BaseStrategyTest {
         return IBaseStrategy(address(strategy));
     }
 
-    function _setHarvestValues(
-        string memory json_,
-        string memory index_,
-        address strategy
-    ) internal {
+    function _setHarvestValues(string memory json_, string memory index_, address strategy) internal {
         // Read harvest values
-        address curveRouter_ = abi.decode(
-            json_.parseRaw(
-                string.concat(
-                    ".configs[",
-                    index_,
-                    "].specific.harvest.curveRouter"
-                )
-            ),
-            (address)
-        );
+        address curveRouter_ =
+            abi.decode(json_.parseRaw(string.concat(".configs[", index_, "].specific.harvest.curveRouter")), (address));
 
-        int128 indexIn_ = abi.decode(
-            json_.parseRaw(
-                string.concat(".configs[", index_, "].specific.harvest.indexIn")
-            ),
-            (int128)
-        );
+        int128 indexIn_ =
+            abi.decode(json_.parseRaw(string.concat(".configs[", index_, "].specific.harvest.indexIn")), (int128));
 
         //Construct CurveSwap structs
         CurveSwap[] memory swaps_ = _getCurveSwaps(json_, index_);
 
         // Set harvest values
-        ConvexCompounder(strategy).setHarvestValues(
-            curveRouter_,
-            swaps_,
-            indexIn_
-        );
+        ConvexCompounder(strategy).setHarvestValues(curveRouter_, swaps_, indexIn_);
     }
 
-    function _getCurveSwaps(
-        string memory json_,
-        string memory index_
-    ) internal pure returns (CurveSwap[] memory) {
-        uint256 swapLen = json_.readUint(
-            string.concat(
-                ".configs[",
-                index_,
-                "].specific.harvest.swaps.length"
-            )
-        );
+    function _getCurveSwaps(string memory json_, string memory index_) internal pure returns (CurveSwap[] memory) {
+        uint256 swapLen = json_.readUint(string.concat(".configs[", index_, "].specific.harvest.swaps.length"));
 
         CurveSwap[] memory swaps_ = new CurveSwap[](swapLen);
-        for (uint i; i < swapLen; i++) {
+        for (uint256 i; i < swapLen; i++) {
             // Read route and convert dynamic into fixed size array
             address[] memory route_ = json_.readAddressArray(
-                string.concat(
-                    ".configs[",
-                    index_,
-                    "].specific.harvest.swaps.structs[",
-                    vm.toString(i),
-                    "].route"
-                )
+                string.concat(".configs[", index_, "].specific.harvest.swaps.structs[", vm.toString(i), "].route")
             );
             address[11] memory route;
-            for (uint n; n < 11; n++) {
+            for (uint256 n; n < 11; n++) {
                 route[n] = route_[n];
             }
 
             // Read swapParams and convert dynamic into fixed size array
             uint256[5][5] memory swapParams;
-            for (uint n = 0; n < 5; n++) {
+            for (uint256 n = 0; n < 5; n++) {
                 uint256[] memory swapParams_ = json_.readUintArray(
                     string.concat(
                         ".configs[",
@@ -133,32 +87,22 @@ contract ConvexCompounderTest is BaseStrategyTest {
                         "]"
                     )
                 );
-                for (uint y; y < 5; y++) {
+                for (uint256 y; y < 5; y++) {
                     swapParams[n][y] = swapParams_[y];
                 }
             }
 
             // Read pools and convert dynamic into fixed size array
             address[] memory pools_ = json_.readAddressArray(
-                string.concat(
-                    ".configs[",
-                    index_,
-                    "].specific.harvest.swaps.structs[",
-                    vm.toString(i),
-                    "].pools"
-                )
+                string.concat(".configs[", index_, "].specific.harvest.swaps.structs[", vm.toString(i), "].pools")
             );
             address[5] memory pools;
-            for (uint n = 0; n < 5; n++) {
+            for (uint256 n = 0; n < 5; n++) {
                 pools[n] = pools_[n];
             }
 
             // Construct the struct
-            swaps_[i] = CurveSwap({
-                route: route,
-                swapParams: swapParams,
-                pools: pools
-            });
+            swaps_[i] = CurveSwap({route: route, swapParams: swapParams, pools: pools});
         }
         return swaps_;
     }

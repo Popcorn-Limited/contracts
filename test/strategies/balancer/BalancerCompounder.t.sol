@@ -3,7 +3,12 @@
 
 pragma solidity ^0.8.25;
 
-import {BalancerCompounder, IERC20, HarvestValues, TradePath} from "../../../src/strategies/balancer/BalancerCompounder.sol";
+import {
+    BalancerCompounder,
+    IERC20,
+    HarvestValues,
+    TradePath
+} from "../../../src/strategies/balancer/BalancerCompounder.sol";
 import {IAsset, BatchSwapStep} from "../../../src/interfaces/external/balancer/IBalancerVault.sol";
 import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson} from "../BaseStrategyTest.sol";
 
@@ -11,35 +16,23 @@ contract BalancerCompounderTest is BaseStrategyTest {
     using stdJson for string;
 
     function setUp() public {
-        _setUpBaseTest(
-            0,
-            "./test/strategies/balancer/BalancerCompounderTestConfig.json"
-        );
+        _setUpBaseTest(0, "./test/strategies/balancer/BalancerCompounderTestConfig.json");
     }
 
-    function _setUpStrategy(
-        string memory json_,
-        string memory index_,
-        TestConfig memory testConfig_
-    ) internal override returns (IBaseStrategy) {
+    function _setUpStrategy(string memory json_, string memory index_, TestConfig memory testConfig_)
+        internal
+        override
+        returns (IBaseStrategy)
+    {
         // Read strategy init values
-        address minter = json_.readAddress(
-            string.concat(".configs[", index_, "].specific.init.minter")
-        );
+        address minter = json_.readAddress(string.concat(".configs[", index_, "].specific.init.minter"));
 
-        address gauge = json_.readAddress(
-            string.concat(".configs[", index_, "].specific.init.gauge")
-        );
+        address gauge = json_.readAddress(string.concat(".configs[", index_, "].specific.init.gauge"));
 
         // Deploy Strategy
         BalancerCompounder strategy = new BalancerCompounder();
 
-        strategy.initialize(
-            testConfig_.asset,
-            address(this),
-            true,
-            abi.encode(minter, gauge)
-        );
+        strategy.initialize(testConfig_.asset, address(this), true, abi.encode(minter, gauge));
 
         // Set Harvest values
         _setHarvestValues(json_, index_, address(strategy));
@@ -47,98 +40,49 @@ contract BalancerCompounderTest is BaseStrategyTest {
         return IBaseStrategy(address(strategy));
     }
 
-    function _setHarvestValues(
-        string memory json_,
-        string memory index_,
-        address strategy
-    ) internal {
+    function _setHarvestValues(string memory json_, string memory index_, address strategy) internal {
         // Read harvest values
-        address balancerVault_ = json_.readAddress(
-            string.concat(
-                ".configs[",
-                index_,
-                "].specific.harvest.balancerVault"
-            )
-        );
+        address balancerVault_ =
+            json_.readAddress(string.concat(".configs[", index_, "].specific.harvest.balancerVault"));
 
         HarvestValues memory harvestValues_ = abi.decode(
-            json_.parseRaw(
-                string.concat(
-                    ".configs[",
-                    index_,
-                    "].specific.harvest.harvestValues"
-                )
-            ),
-            (HarvestValues)
+            json_.parseRaw(string.concat(".configs[", index_, "].specific.harvest.harvestValues")), (HarvestValues)
         );
 
         TradePath[] memory tradePaths_ = _getTradePaths(json_, index_);
 
         // Set harvest values
-        BalancerCompounder(strategy).setHarvestValues(
-            balancerVault_,
-            tradePaths_,
-            harvestValues_
-        );
+        BalancerCompounder(strategy).setHarvestValues(balancerVault_, tradePaths_, harvestValues_);
     }
 
-    function _getTradePaths(
-        string memory json_,
-        string memory index_
-    ) internal pure returns (TradePath[] memory) {
-        uint256 swapLen = json_.readUint(
-            string.concat(
-                ".configs[",
-                index_,
-                "].specific.harvest.tradePaths.length"
-            )
-        );
+    function _getTradePaths(string memory json_, string memory index_) internal pure returns (TradePath[] memory) {
+        uint256 swapLen = json_.readUint(string.concat(".configs[", index_, "].specific.harvest.tradePaths.length"));
 
         TradePath[] memory tradePaths_ = new TradePath[](swapLen);
-        for (uint i; i < swapLen; i++) {
+        for (uint256 i; i < swapLen; i++) {
             // Read route and convert dynamic into fixed size array
             address[] memory assetAddresses = json_.readAddressArray(
-                string.concat(
-                    ".configs[",
-                    index_,
-                    "].specific.harvest.tradePaths.structs[",
-                    vm.toString(i),
-                    "].assets"
-                )
+                string.concat(".configs[", index_, "].specific.harvest.tradePaths.structs[", vm.toString(i), "].assets")
             );
             IAsset[] memory assets = new IAsset[](assetAddresses.length);
-            for (uint n; n < assetAddresses.length; n++) {
+            for (uint256 n; n < assetAddresses.length; n++) {
                 assets[n] = IAsset(assetAddresses[n]);
             }
 
             int256[] memory limits = json_.readIntArray(
-                string.concat(
-                    ".configs[",
-                    index_,
-                    "].specific.harvest.tradePaths.structs[",
-                    vm.toString(i),
-                    "].limits"
-                )
+                string.concat(".configs[", index_, "].specific.harvest.tradePaths.structs[", vm.toString(i), "].limits")
             );
 
             BatchSwapStep[] memory swapSteps = abi.decode(
                 json_.parseRaw(
                     string.concat(
-                        ".configs[",
-                        index_,
-                        "].specific.harvest.tradePaths.structs[",
-                        vm.toString(i),
-                        "].swaps"
+                        ".configs[", index_, "].specific.harvest.tradePaths.structs[", vm.toString(i), "].swaps"
                     )
                 ),
                 (BatchSwapStep[])
             );
 
-            tradePaths_[i] = TradePath({
-                assets: assets,
-                limits: limits,
-                swaps: abi.encode(swapSteps)
-            });
+            tradePaths_[i] = TradePath({assets: assets, limits: limits, swaps: abi.encode(swapSteps)});
         }
 
         return tradePaths_;

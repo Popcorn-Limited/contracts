@@ -20,18 +20,13 @@ interface IGauge {
 
     function claim_rewards(address user) external;
 
-    function claimable_reward(
-        address user,
-        address rewardToken
-    ) external view returns (uint256);
+    function claimable_reward(address user, address rewardToken) external view returns (uint256);
 }
 
 interface IGaugeFactory {
     function mint(address _gauge) external;
 
-    function get_gauge_from_lp_token(
-        address _lpToken
-    ) external view returns (address);
+    function get_gauge_from_lp_token(address _lpToken) external view returns (address);
 }
 
 interface IGaugeController {
@@ -47,23 +42,13 @@ interface IMinter {
 }
 
 interface ICurveLp {
-    function calc_withdraw_one_coin(
-        uint256 burn_amount,
-        int128 i
-    ) external view returns (uint256);
+    function calc_withdraw_one_coin(uint256 burn_amount, int128 i) external view returns (uint256);
 
-    function calc_token_amount(
-        uint256[] calldata amounts,
-        bool isDeposit
-    ) external view returns (uint256);
+    function calc_token_amount(uint256[] calldata amounts, bool isDeposit) external view returns (uint256);
 
     function add_liquidity(uint256[] calldata amounts, uint256 minOut) external;
 
-    function remove_liquidity_one_coin(
-        uint256 burnAmount,
-        int128 indexOut,
-        uint256 minOut
-    ) external;
+    function remove_liquidity_one_coin(uint256 burnAmount, int128 indexOut, uint256 minOut) external;
 
     function N_COINS() external view returns (uint256);
 

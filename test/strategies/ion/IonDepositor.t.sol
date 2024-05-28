@@ -16,25 +16,15 @@ contract IonDepositorTest is BaseStrategyTest {
         _setUpBaseTest(0, "./test/strategies/ion/IonDepositorTestConfig.json");
     }
 
-    function _setUpStrategy(
-        string memory json_,
-        string memory index_,
-        TestConfig memory testConfig_
-    ) internal override returns (IBaseStrategy) {
+    function _setUpStrategy(string memory json_, string memory index_, TestConfig memory testConfig_)
+        internal
+        override
+        returns (IBaseStrategy)
+    {
         // Get Ion Addresses
-        IIonPool ionPool = IIonPool(
-            json_.readAddress(
-                string.concat(".configs[", index_, "].specific.ionPool")
-            )
-        );
-        IWhitelist whitelist = IWhitelist(
-            json_.readAddress(
-                string.concat(".configs[", index_, "].specific.whitelist")
-            )
-        );
-        address ionOwner = json_.readAddress(
-            string.concat(".configs[", index_, "].specific.ionOwner")
-        );
+        IIonPool ionPool = IIonPool(json_.readAddress(string.concat(".configs[", index_, "].specific.ionPool")));
+        IWhitelist whitelist = IWhitelist(json_.readAddress(string.concat(".configs[", index_, "].specific.whitelist")));
+        address ionOwner = json_.readAddress(string.concat(".configs[", index_, "].specific.ionOwner"));
 
         vm.label(address(ionPool), "IonPool");
 
@@ -47,12 +37,7 @@ contract IonDepositorTest is BaseStrategyTest {
         // Deploy strategy
         IonDepositor strategy = new IonDepositor();
 
-        strategy.initialize(
-            testConfig_.asset,
-            address(this),
-            true,
-            abi.encode(address(ionPool))
-        );
+        strategy.initialize(testConfig_.asset, address(this), true, abi.encode(address(ionPool)));
 
         return IBaseStrategy(address(strategy));
     }
@@ -60,10 +45,6 @@ contract IonDepositorTest is BaseStrategyTest {
     function _increasePricePerShare(uint256 amount) internal override {
         address ionPool = address(IonDepositor(address(strategy)).ionPool());
 
-        deal(
-            testConfig.asset,
-            ionPool,
-            IERC20(testConfig.asset).balanceOf(ionPool) + amount
-        );
+        deal(testConfig.asset, ionPool, IERC20(testConfig.asset).balanceOf(ionPool) + amount);
     }
 }

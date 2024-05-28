@@ -49,19 +49,14 @@ contract ConvexCompounder is BaseStrategy, BaseCurveLpCompounder {
      * @param autoDeposit_ Controls if `protocolDeposit` gets called on deposit
      * @param strategyInitData_ Encoded data for this specific strategy
      */
-    function initialize(
-        address asset_,
-        address owner_,
-        bool autoDeposit_,
-        bytes memory strategyInitData_
-    ) external initializer {
-        (address _convexBooster, address _curvePool, uint256 _pid) = abi.decode(
-            strategyInitData_,
-            (address, address, uint256)
-        );
+    function initialize(address asset_, address owner_, bool autoDeposit_, bytes memory strategyInitData_)
+        external
+        initializer
+    {
+        (address _convexBooster, address _curvePool, uint256 _pid) =
+            abi.decode(strategyInitData_, (address, address, uint256));
 
-        (, , , address _convexRewards, , ) = IConvexBooster(_convexBooster)
-            .poolInfo(_pid);
+        (,,, address _convexRewards,,) = IConvexBooster(_convexBooster).poolInfo(_pid);
 
         convexBooster = IConvexBooster(_convexBooster);
         convexRewards = IConvexRewards(_convexRewards);
@@ -73,29 +68,15 @@ contract ConvexCompounder is BaseStrategy, BaseCurveLpCompounder {
 
         IERC20(asset_).approve(_convexBooster, type(uint256).max);
 
-        _name = string.concat(
-            "VaultCraft Convex ",
-            IERC20Metadata(asset_).name(),
-            " Adapter"
-        );
+        _name = string.concat("VaultCraft Convex ", IERC20Metadata(asset_).name(), " Adapter");
         _symbol = string.concat("vcCvx-", IERC20Metadata(asset_).symbol());
     }
 
-    function name()
-        public
-        view
-        override(IERC20Metadata, ERC20)
-        returns (string memory)
-    {
+    function name() public view override(IERC20Metadata, ERC20) returns (string memory) {
         return _name;
     }
 
-    function symbol()
-        public
-        view
-        override(IERC20Metadata, ERC20)
-        returns (string memory)
-    {
+    function symbol() public view override(IERC20Metadata, ERC20) returns (string memory) {
         return _symbol;
     }
 
@@ -119,16 +100,12 @@ contract ConvexCompounder is BaseStrategy, BaseCurveLpCompounder {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Deposit into Convex convexBooster contract.
-    function _protocolDeposit(
-        uint256 assets,
-        uint256,
-        bytes memory
-    ) internal override {
+    function _protocolDeposit(uint256 assets, uint256, bytes memory) internal override {
         convexBooster.deposit(pid, assets, true);
     }
 
     /// @notice Withdraw from Convex convexRewards contract.
-    function _protocolWithdraw(uint256 assets, uint256) internal override {
+    function _protocolWithdraw(uint256 assets, uint256, bytes memory) internal override {
         /**
          * @dev No need to convert as Convex shares are 1:1 with Curve deposits.
          * @param assets Amount of shares to withdraw.
@@ -158,25 +135,12 @@ contract ConvexCompounder is BaseStrategy, BaseCurveLpCompounder {
 
         sellRewardsForLpTokenViaCurve(address(pool), asset(), nCoins, data);
 
-        _protocolDeposit(
-            IERC20(asset()).balanceOf(address(this)),
-            0,
-            bytes("")
-        );
+        _protocolDeposit(IERC20(asset()).balanceOf(address(this)), 0, bytes(""));
 
         emit Harvested();
     }
 
-    function setHarvestValues(
-        address newRouter,
-        CurveSwap[] memory newSwaps,
-        int128 indexIn_
-    ) external onlyOwner {
-        setCurveLpCompounderValues(
-            newRouter,
-            newSwaps,
-            address(pool),
-            indexIn_
-        );
+    function setHarvestValues(address newRouter, CurveSwap[] memory newSwaps, int128 indexIn_) external onlyOwner {
+        setCurveLpCompounderValues(newRouter, newSwaps, address(pool), indexIn_);
     }
 }

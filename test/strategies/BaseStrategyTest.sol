@@ -28,28 +28,18 @@ abstract contract BaseStrategyTest is PropertyTest {
     address public bob = address(0x9999);
     address public alice = address(0x8888);
 
-    function _setUpBaseTest(
-        uint256 configIndex,
-        string memory path_
-    ) internal virtual {
+    function _setUpBaseTest(uint256 configIndex, string memory path_) internal virtual {
         // Read test config
         path = path_;
         fullPath = string.concat(vm.projectRoot(), path_);
         json = vm.readFile(path);
 
-        testConfig = abi.decode(
-            json.parseRaw(
-                string.concat(".configs[", vm.toString(configIndex), "].base")
-            ),
-            (TestConfig)
-        );
+        testConfig =
+            abi.decode(json.parseRaw(string.concat(".configs[", vm.toString(configIndex), "].base")), (TestConfig));
 
         // Setup fork environment
         testConfig.blockNumber > 0
-            ? vm.createSelectFork(
-                vm.rpcUrl(testConfig.network),
-                testConfig.blockNumber
-            )
+            ? vm.createSelectFork(vm.rpcUrl(testConfig.network), testConfig.blockNumber)
             : vm.createSelectFork(vm.rpcUrl(testConfig.network));
 
         // Setup strategy
@@ -73,32 +63,22 @@ abstract contract BaseStrategyTest is PropertyTest {
     //////////////////////////////////////////////////////////////*/
 
     /// @dev -- This MUST be overriden to setup a strategy
-    function _setUpStrategy(
-        string memory json_,
-        string memory index_,
-        TestConfig memory testConfig_
-    ) internal virtual returns (IBaseStrategy);
+    function _setUpStrategy(string memory json_, string memory index_, TestConfig memory testConfig_)
+        internal
+        virtual
+        returns (IBaseStrategy);
 
     function _mintAsset(uint256 amount, address receiver) internal virtual {
         // USDC on mainnet cant be dealt (find(StdStorage): Slot(s) not found) therefore we transfer from a whale
-        if (
-            block.chainid == 1 &&
-            testConfig.asset == 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48
-        ) {
+        if (block.chainid == 1 && testConfig.asset == 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48) {
             vm.prank(0x4B16c5dE96EB2117bBE5fd171E4d203624B014aa);
-            IERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48).transfer(
-                receiver,
-                amount
-            );
+            IERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48).transfer(receiver, amount);
         } else {
             deal(testConfig.asset, receiver, amount);
         }
     }
 
-    function _mintAssetAndApproveForStrategy(
-        uint256 amount,
-        address receiver
-    ) internal virtual {
+    function _mintAssetAndApproveForStrategy(uint256 amount, address receiver) internal virtual {
         _mintAsset(amount, receiver);
 
         vm.prank(receiver);
@@ -120,10 +100,7 @@ abstract contract BaseStrategyTest is PropertyTest {
      */
     function test__initialization() public virtual {
         assertEq(strategy.asset(), testConfig.asset);
-        assertEq(
-            strategy.decimals(),
-            IERC20Metadata(testConfig.asset).decimals()
-        );
+        assertEq(strategy.decimals(), IERC20Metadata(testConfig.asset).decimals());
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -191,11 +168,7 @@ abstract contract BaseStrategyTest is PropertyTest {
     //////////////////////////////////////////////////////////////*/
 
     function test__previewDeposit(uint8 fuzzAmount) public virtual {
-        uint256 amount = bound(
-            fuzzAmount,
-            testConfig.minDeposit,
-            testConfig.maxDeposit
-        );
+        uint256 amount = bound(fuzzAmount, testConfig.minDeposit, testConfig.maxDeposit);
 
         _mintAsset(amount, bob);
         vm.prank(bob);
@@ -206,11 +179,7 @@ abstract contract BaseStrategyTest is PropertyTest {
     }
 
     function test__previewMint(uint8 fuzzAmount) public virtual {
-        uint256 amount = bound(
-            fuzzAmount,
-            testConfig.minDeposit,
-            testConfig.maxDeposit
-        );
+        uint256 amount = bound(fuzzAmount, testConfig.minDeposit, testConfig.maxDeposit);
 
         uint256 reqAssets = strategy.previewMint(amount);
         _mintAsset(reqAssets, bob);
@@ -222,16 +191,10 @@ abstract contract BaseStrategyTest is PropertyTest {
     }
 
     function test__previewWithdraw(uint8 fuzzAmount) public virtual {
-        uint256 amount = bound(
-            fuzzAmount,
-            testConfig.minDeposit,
-            testConfig.maxDeposit
-        );
+        uint256 amount = bound(fuzzAmount, testConfig.minDeposit, testConfig.maxDeposit);
 
         /// Some strategies have slippage or rounding errors which makes `maWithdraw` lower than the deposit amount
-        uint256 reqAssets = strategy.previewMint(
-            strategy.previewWithdraw(amount)
-        ) +10;
+        uint256 reqAssets = strategy.previewMint(strategy.previewWithdraw(amount)) + 10;
 
         _mintAssetAndApproveForStrategy(reqAssets, bob);
 
@@ -242,15 +205,9 @@ abstract contract BaseStrategyTest is PropertyTest {
     }
 
     function test__previewRedeem(uint8 fuzzAmount) public virtual {
-        uint256 amount = bound(
-            fuzzAmount,
-            testConfig.minDeposit,
-            testConfig.maxDeposit
-        );
+        uint256 amount = bound(fuzzAmount, testConfig.minDeposit, testConfig.maxDeposit);
 
-        uint256 reqAssets = strategy.previewMint(
-            strategy.previewRedeem(amount)
-        );
+        uint256 reqAssets = strategy.previewMint(strategy.previewRedeem(amount));
         _mintAssetAndApproveForStrategy(reqAssets, bob);
 
         vm.prank(bob);
@@ -264,15 +221,11 @@ abstract contract BaseStrategyTest is PropertyTest {
     //////////////////////////////////////////////////////////////*/
 
     function test__deposit(uint8 fuzzAmount) public virtual {
-        uint len = json.readUint(".length");
-        for (uint i; i < len; i++) {
+        uint256 len = json.readUint(".length");
+        for (uint256 i; i < len; i++) {
             if (i > 0) _setUpBaseTest(i, path);
 
-            uint256 amount = bound(
-                fuzzAmount,
-                testConfig.minDeposit,
-                testConfig.maxDeposit
-            );
+            uint256 amount = bound(fuzzAmount, testConfig.minDeposit, testConfig.maxDeposit);
 
             _mintAssetAndApproveForStrategy(amount, bob);
 
@@ -290,15 +243,11 @@ abstract contract BaseStrategyTest is PropertyTest {
     }
 
     function test__mint(uint8 fuzzAmount) public virtual {
-        uint len = json.readUint(".length");
-        for (uint i; i < len; i++) {
+        uint256 len = json.readUint(".length");
+        for (uint256 i; i < len; i++) {
             if (i > 0) _setUpBaseTest(i, path);
 
-            uint256 amount = bound(
-                fuzzAmount,
-                testConfig.minDeposit,
-                testConfig.maxDeposit
-            );
+            uint256 amount = bound(fuzzAmount, testConfig.minDeposit, testConfig.maxDeposit);
 
             _mintAssetAndApproveForStrategy(strategy.previewMint(amount), bob);
 
@@ -317,29 +266,18 @@ abstract contract BaseStrategyTest is PropertyTest {
     }
 
     function test__withdraw(uint8 fuzzAmount) public virtual {
-        uint len = json.readUint(".length");
-        for (uint i; i < len; i++) {
+        uint256 len = json.readUint(".length");
+        for (uint256 i; i < len; i++) {
             if (i > 0) _setUpBaseTest(i, path);
 
-            uint256 amount = bound(
-                fuzzAmount,
-                testConfig.minDeposit,
-                testConfig.maxDeposit
-            );
+            uint256 amount = bound(fuzzAmount, testConfig.minDeposit, testConfig.maxDeposit);
 
-            uint256 reqAssets = strategy.previewMint(
-                strategy.previewWithdraw(amount)
-            );
+            uint256 reqAssets = strategy.previewMint(strategy.previewWithdraw(amount));
             _mintAssetAndApproveForStrategy(reqAssets, bob);
             vm.prank(bob);
             strategy.deposit(reqAssets, bob);
 
-            prop_withdraw(
-                bob,
-                bob,
-                strategy.maxWithdraw(bob),
-                testConfig.testId
-            );
+            prop_withdraw(bob, bob, strategy.maxWithdraw(bob), testConfig.testId);
 
             _mintAssetAndApproveForStrategy(reqAssets, bob);
             vm.prank(bob);
@@ -350,12 +288,7 @@ abstract contract BaseStrategyTest is PropertyTest {
             vm.prank(bob);
             strategy.approve(alice, type(uint256).max);
 
-            prop_withdraw(
-                alice,
-                bob,
-                strategy.maxWithdraw(bob),
-                testConfig.testId
-            );
+            prop_withdraw(alice, bob, strategy.maxWithdraw(bob), testConfig.testId);
         }
     }
 
@@ -364,15 +297,11 @@ abstract contract BaseStrategyTest is PropertyTest {
     }
 
     function test__redeem(uint8 fuzzAmount) public virtual {
-        uint len = json.readUint(".length");
-        for (uint i; i < len; i++) {
+        uint256 len = json.readUint(".length");
+        for (uint256 i; i < len; i++) {
             if (i > 0) _setUpBaseTest(i, path);
 
-            uint256 amount = bound(
-                fuzzAmount,
-                testConfig.minDeposit,
-                testConfig.maxDeposit
-            );
+            uint256 amount = bound(fuzzAmount, testConfig.minDeposit, testConfig.maxDeposit);
 
             uint256 reqAssets = strategy.previewMint(amount);
             _mintAssetAndApproveForStrategy(reqAssets, bob);
@@ -420,11 +349,7 @@ abstract contract BaseStrategyTest is PropertyTest {
 
         vm.startPrank(bob);
         uint256 shares1 = strategy.deposit(testConfig.defaultAmount, bob);
-        uint256 shares2 = strategy.withdraw(
-            strategy.maxWithdraw(bob),
-            bob,
-            bob
-        );
+        uint256 shares2 = strategy.withdraw(strategy.maxWithdraw(bob), bob, bob);
         vm.stopPrank();
 
         // Pass the test if maxWithdraw is smaller than deposit since round trips are impossible
@@ -434,10 +359,7 @@ abstract contract BaseStrategyTest is PropertyTest {
     }
 
     function test__RT_mint_withdraw() public virtual {
-        _mintAssetAndApproveForStrategy(
-            strategy.previewMint(testConfig.minDeposit),
-            bob
-        );
+        _mintAssetAndApproveForStrategy(strategy.previewMint(testConfig.minDeposit), bob);
 
         vm.startPrank(bob);
         uint256 assets = strategy.mint(testConfig.minDeposit, bob);
@@ -450,10 +372,7 @@ abstract contract BaseStrategyTest is PropertyTest {
     }
 
     function test__RT_mint_redeem() public virtual {
-        _mintAssetAndApproveForStrategy(
-            strategy.previewMint(testConfig.minDeposit),
-            bob
-        );
+        _mintAssetAndApproveForStrategy(strategy.previewMint(testConfig.minDeposit), bob);
 
         vm.startPrank(bob);
         uint256 assets1 = strategy.mint(testConfig.minDeposit, bob);
@@ -492,16 +411,8 @@ abstract contract BaseStrategyTest is PropertyTest {
 
         assertEq(strategy.totalAssets(), testConfig.defaultAmount, "ta");
         assertEq(strategy.totalSupply(), testConfig.defaultAmount, "ts");
-        assertEq(
-            strategy.balanceOf(bob),
-            testConfig.defaultAmount,
-            "share bal"
-        );
-        assertEq(
-            IERC20(_asset_).balanceOf(address(strategy)),
-            testConfig.defaultAmount,
-            "strategy asset bal"
-        );
+        assertEq(strategy.balanceOf(bob), testConfig.defaultAmount, "share bal");
+        assertEq(IERC20(_asset_).balanceOf(address(strategy)), testConfig.defaultAmount, "strategy asset bal");
     }
 
     function test__mint_autoDeposit_off() public virtual {
@@ -513,16 +424,8 @@ abstract contract BaseStrategyTest is PropertyTest {
 
         assertEq(strategy.totalAssets(), testConfig.defaultAmount, "ta");
         assertEq(strategy.totalSupply(), testConfig.defaultAmount, "ts");
-        assertEq(
-            strategy.balanceOf(bob),
-            testConfig.defaultAmount,
-            "share bal"
-        );
-        assertEq(
-            IERC20(_asset_).balanceOf(address(strategy)),
-            testConfig.defaultAmount,
-            "strategy asset bal"
-        );
+        assertEq(strategy.balanceOf(bob), testConfig.defaultAmount, "share bal");
+        assertEq(IERC20(_asset_).balanceOf(address(strategy)), testConfig.defaultAmount, "strategy asset bal");
     }
 
     function test__withdraw_autoDeposit_off() public virtual {
@@ -532,26 +435,14 @@ abstract contract BaseStrategyTest is PropertyTest {
         vm.startPrank(bob);
         strategy.deposit(testConfig.defaultAmount, bob);
 
-        strategy.withdraw(
-            strategy.previewRedeem(strategy.balanceOf(bob)),
-            bob,
-            bob
-        );
+        strategy.withdraw(strategy.previewRedeem(strategy.balanceOf(bob)), bob, bob);
         vm.stopPrank();
 
         assertEq(strategy.totalAssets(), 0, "ta");
         assertEq(strategy.totalSupply(), 0, "ts");
         assertEq(strategy.balanceOf(bob), 0, "share bal");
-        assertEq(
-            IERC20(_asset_).balanceOf(bob),
-            testConfig.defaultAmount,
-            "asset bal"
-        );
-        assertEq(
-            IERC20(_asset_).balanceOf(address(strategy)),
-            0,
-            "strategy asset bal"
-        );
+        assertEq(IERC20(_asset_).balanceOf(bob), testConfig.defaultAmount, "asset bal");
+        assertEq(IERC20(_asset_).balanceOf(address(strategy)), 0, "strategy asset bal");
     }
 
     function test__redeem_autoDeposit_off() public virtual {
@@ -567,16 +458,8 @@ abstract contract BaseStrategyTest is PropertyTest {
         assertEq(strategy.totalAssets(), 0, "ta");
         assertEq(strategy.totalSupply(), 0, "ts");
         assertEq(strategy.balanceOf(bob), 0, "share bal");
-        assertEq(
-            IERC20(_asset_).balanceOf(bob),
-            testConfig.defaultAmount,
-            "asset bal"
-        );
-        assertEq(
-            IERC20(_asset_).balanceOf(address(strategy)),
-            0,
-            "strategy asset bal"
-        );
+        assertEq(IERC20(_asset_).balanceOf(bob), testConfig.defaultAmount, "asset bal");
+        assertEq(IERC20(_asset_).balanceOf(address(strategy)), 0, "strategy asset bal");
     }
 
     /// @dev Partially withdraw assets directly from strategy and the underlying protocol
@@ -594,36 +477,11 @@ abstract contract BaseStrategyTest is PropertyTest {
         vm.prank(bob);
         strategy.withdraw((testConfig.defaultAmount / 5) * 4, bob, bob);
 
-        assertApproxEqAbs(
-            strategy.totalAssets(),
-            testConfig.defaultAmount / 5,
-            _delta_,
-            "ta"
-        );
-        assertApproxEqAbs(
-            strategy.totalSupply(),
-            testConfig.defaultAmount / 5,
-            _delta_,
-            "ts"
-        );
-        assertApproxEqAbs(
-            strategy.balanceOf(bob),
-            testConfig.defaultAmount / 5,
-            _delta_,
-            "share bal"
-        );
-        assertApproxEqAbs(
-            IERC20(_asset_).balanceOf(bob),
-            (testConfig.defaultAmount / 5) * 4,
-            _delta_,
-            "asset bal"
-        );
-        assertApproxEqAbs(
-            IERC20(_asset_).balanceOf(address(strategy)),
-            0,
-            _delta_,
-            "strategy asset bal"
-        );
+        assertApproxEqAbs(strategy.totalAssets(), testConfig.defaultAmount / 5, _delta_, "ta");
+        assertApproxEqAbs(strategy.totalSupply(), testConfig.defaultAmount / 5, _delta_, "ts");
+        assertApproxEqAbs(strategy.balanceOf(bob), testConfig.defaultAmount / 5, _delta_, "share bal");
+        assertApproxEqAbs(IERC20(_asset_).balanceOf(bob), (testConfig.defaultAmount / 5) * 4, _delta_, "asset bal");
+        assertApproxEqAbs(IERC20(_asset_).balanceOf(address(strategy)), 0, _delta_, "strategy asset bal");
     }
 
     /// @dev Partially redeem assets directly from strategy and the underlying protocol
@@ -641,40 +499,15 @@ abstract contract BaseStrategyTest is PropertyTest {
         vm.prank(bob);
         strategy.redeem((testConfig.defaultAmount / 5) * 4, bob, bob);
 
-        assertApproxEqAbs(
-            strategy.totalAssets(),
-            testConfig.defaultAmount / 5,
-            _delta_,
-            "ta"
-        );
-        assertApproxEqAbs(
-            strategy.totalSupply(),
-            testConfig.defaultAmount / 5,
-            _delta_,
-            "ts"
-        );
-        assertApproxEqAbs(
-            strategy.balanceOf(bob),
-            testConfig.defaultAmount / 5,
-            _delta_,
-            "share bal"
-        );
-        assertApproxEqAbs(
-            IERC20(_asset_).balanceOf(bob),
-            (testConfig.defaultAmount / 5) * 4,
-            _delta_,
-            "asset bal"
-        );
-        assertApproxEqAbs(
-            IERC20(_asset_).balanceOf(address(strategy)),
-            0,
-            _delta_,
-            "strategy asset bal"
-        );
+        assertApproxEqAbs(strategy.totalAssets(), testConfig.defaultAmount / 5, _delta_, "ta");
+        assertApproxEqAbs(strategy.totalSupply(), testConfig.defaultAmount / 5, _delta_, "ts");
+        assertApproxEqAbs(strategy.balanceOf(bob), testConfig.defaultAmount / 5, _delta_, "share bal");
+        assertApproxEqAbs(IERC20(_asset_).balanceOf(bob), (testConfig.defaultAmount / 5) * 4, _delta_, "asset bal");
+        assertApproxEqAbs(IERC20(_asset_).balanceOf(address(strategy)), 0, _delta_, "strategy asset bal");
     }
 
     /*//////////////////////////////////////////////////////////////
-                            PUSH FUNDS
+                            PUSH/PULL FUNDS
     //////////////////////////////////////////////////////////////*/
 
     function test__pushFunds() public virtual {
@@ -691,17 +524,35 @@ abstract contract BaseStrategyTest is PropertyTest {
 
         assertApproxEqAbs(strategy.totalAssets(), oldTa, _delta_, "ta");
         assertApproxEqAbs(strategy.totalSupply(), oldTs, _delta_, "ts");
-        assertApproxEqAbs(
-            IERC20(_asset_).balanceOf(address(strategy)),
-            0,
-            _delta_,
-            "strategy asset bal"
-        );
+        assertApproxEqAbs(IERC20(_asset_).balanceOf(address(strategy)), 0, _delta_, "strategy asset bal");
     }
 
     function testFail__pushFunds_nonOwnerNorKeeper() public virtual {
         vm.prank(alice);
         strategy.pushFunds(uint256(1e18), bytes(""));
+    }
+
+    function test__pullFunds() public virtual {
+        _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
+
+        vm.prank(bob);
+        strategy.deposit(testConfig.defaultAmount, bob);
+
+        uint256 oldTa = strategy.totalAssets();
+        uint256 oldTs = strategy.totalSupply();
+
+        strategy.pullFunds(oldTa, bytes(""));
+
+        assertApproxEqAbs(strategy.totalAssets(), oldTa, _delta_, "ta");
+        assertApproxEqAbs(strategy.totalSupply(), oldTs, _delta_, "ts");
+        assertApproxEqAbs(
+            IERC20(_asset_).balanceOf(address(strategy)), testConfig.defaultAmount, _delta_, "strategy asset bal"
+        );
+    }
+
+    function testFail__pullFunds_nonOwnerNorKeeper() public virtual {
+        vm.prank(alice);
+        strategy.pullFunds(uint256(1e18), bytes(""));
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -747,18 +598,7 @@ abstract contract BaseStrategyTest is PropertyTest {
 
         // We simply withdraw into the strategy
         // TotalSupply and Assets dont change
-        assertApproxEqAbs(
-            oldTotalAssets,
-            strategy.totalAssets(),
-            testConfig.delta,
-            "totalAssets"
-        );
-        assertApproxEqAbs(
-            IERC20(testConfig.asset).balanceOf(address(strategy)),
-            oldTotalAssets,
-            testConfig.delta,
-            "asset balance"
-        );
+        assertApproxEqAbs(oldTotalAssets, strategy.totalAssets(), testConfig.delta, "totalAssets");
     }
 
     function testFail__pause_nonOwner() public virtual {
@@ -782,18 +622,8 @@ abstract contract BaseStrategyTest is PropertyTest {
 
         // We simply deposit back into the external protocol
         // TotalAssets shouldnt change significantly besides some slippage or rounding errors
-        assertApproxEqAbs(
-            oldTotalAssets,
-            strategy.totalAssets(),
-            testConfig.delta * 3,
-            "totalAssets"
-        );
-        assertApproxEqAbs(
-            IERC20(testConfig.asset).balanceOf(address(strategy)),
-            0,
-            testConfig.delta,
-            "asset balance"
-        );
+        assertApproxEqAbs(oldTotalAssets, strategy.totalAssets(), testConfig.delta * 3, "totalAssets");
+        assertApproxEqAbs(IERC20(testConfig.asset).balanceOf(address(strategy)), 0, testConfig.delta, "asset balance");
     }
 
     function testFail__unpause_nonOwner() public virtual {
@@ -808,9 +638,7 @@ abstract contract BaseStrategyTest is PropertyTest {
     //////////////////////////////////////////////////////////////*/
 
     bytes32 constant PERMIT_TYPEHASH =
-        keccak256(
-            "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
-        );
+        keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
 
     function test__permit() public {
         uint256 privateKey = 0xBEEF;
@@ -822,16 +650,7 @@ abstract contract BaseStrategyTest is PropertyTest {
                 abi.encodePacked(
                     "\x19\x01",
                     strategy.DOMAIN_SEPARATOR(),
-                    keccak256(
-                        abi.encode(
-                            PERMIT_TYPEHASH,
-                            owner,
-                            address(0xCAFE),
-                            1e18,
-                            0,
-                            block.timestamp
-                        )
-                    )
+                    keccak256(abi.encode(PERMIT_TYPEHASH, owner, address(0xCAFE), 1e18, 0, block.timestamp))
                 )
             )
         );

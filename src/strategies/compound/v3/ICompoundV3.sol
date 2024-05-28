@@ -70,7 +70,5 @@ interface ICometConfigurator {
         uint128 supplyCap;
     }
 
-    function getConfiguration(
-        address cometProxy
-    ) external view returns (Configuration memory);
+    function getConfiguration(address cometProxy) external view returns (Configuration memory);
 }

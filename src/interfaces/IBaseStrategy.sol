@@ -11,12 +11,7 @@ import {IPausable} from "./IPausable.sol";
 interface IBaseStrategy is IERC4626, IOwned, IPermit, IPausable {
     function harvest(bytes memory data) external;
 
-    function initialize(
-        address asset_,
-        address owner_,
-        bool autoDeposit_,
-        bytes memory adapterData_
-    ) external;
+    function initialize(address asset_, address owner_, bool autoDeposit_, bytes memory adapterData_) external;
 
     function decimals() external view returns (uint8);
 
@@ -32,10 +27,9 @@ interface IBaseStrategy is IERC4626, IOwned, IPermit, IPausable {
 
     function pushFunds(uint256 assets, bytes memory data) external;
 
+    function pullFunds(uint256 assets, bytes memory data) external;
+
     function rewardTokens() external view returns (address[] memory);
 
-    function convertToUnderlyingShares(
-        uint256 assets,
-        uint256 shares
-    ) external view returns (uint256);
+    function convertToUnderlyingShares(uint256 assets, uint256 shares) external view returns (uint256);
 }

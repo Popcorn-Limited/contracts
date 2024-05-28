@@ -12,23 +12,14 @@ abstract contract BaseCurveLpCompounder is BaseCurveCompounder {
 
     error CompoundFailed();
 
-    function sellRewardsForLpTokenViaCurve(
-        address poolAddress,
-        address vaultAsset,
-        uint256 nCoins,
-        bytes memory data
-    ) internal {
+    function sellRewardsForLpTokenViaCurve(address poolAddress, address vaultAsset, uint256 nCoins, bytes memory data)
+        internal
+    {
         sellRewardsViaCurve();
 
         uint256 amount = IERC20(depositAsset).balanceOf(address(this));
 
-        CurveTradeLibrary.addLiquidity(
-            poolAddress,
-            nCoins,
-            uint256(uint128(indexIn)),
-            amount,
-            0
-        );
+        CurveTradeLibrary.addLiquidity(poolAddress, nCoins, uint256(uint128(indexIn)), amount, 0);
 
         amount = IERC20(vaultAsset).balanceOf(address(this));
         uint256 minOut = abi.decode(data, (uint256));
@@ -43,11 +34,10 @@ abstract contract BaseCurveLpCompounder is BaseCurveCompounder {
     ) internal {
         setCurveTradeValues(newRouter, newSwaps);
 
-        address depositAsset_ = ICurveLp(poolAddress).coins(
-            uint256(uint128(indexIn_))
-        );
-        if (depositAsset != address(0))
+        address depositAsset_ = ICurveLp(poolAddress).coins(uint256(uint128(indexIn_)));
+        if (depositAsset != address(0)) {
             IERC20(depositAsset).approve(poolAddress, 0);
+        }
         IERC20(depositAsset_).approve(poolAddress, type(uint256).max);
 
         depositAsset = depositAsset_;

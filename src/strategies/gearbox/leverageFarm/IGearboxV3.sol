@@ -147,15 +147,9 @@ interface ICreditFacadeV3 {
 
     function expirationDate() external view returns (uint40);
 
-    function debtLimits()
-        external
-        view
-        returns (uint128 minDebt, uint128 maxDebt);
+    function debtLimits() external view returns (uint128 minDebt, uint128 maxDebt);
 
-    function lossParams()
-        external
-        view
-        returns (uint128 currentCumulativeLoss, uint128 maxCumulativeLoss);
+    function lossParams() external view returns (uint128 currentCumulativeLoss, uint128 maxCumulativeLoss);
 
     function forbiddenTokenMask() external view returns (uint256);
 
@@ -165,38 +159,20 @@ interface ICreditFacadeV3 {
     // ACCOUNT MANAGEMENT //
     // ------------------ //
 
-    function openCreditAccount(
-        address onBehalfOf,
-        MultiCall[] calldata calls,
-        uint256 referralCode
-    ) external payable returns (address creditAccount);
+    function openCreditAccount(address onBehalfOf, MultiCall[] calldata calls, uint256 referralCode)
+        external
+        payable
+        returns (address creditAccount);
 
-    function closeCreditAccount(
-        address creditAccount,
-        MultiCall[] calldata calls
-    ) external payable;
+    function closeCreditAccount(address creditAccount, MultiCall[] calldata calls) external payable;
 
-    function liquidateCreditAccount(
-        address creditAccount,
-        address to,
-        MultiCall[] calldata calls
-    ) external;
+    function liquidateCreditAccount(address creditAccount, address to, MultiCall[] calldata calls) external;
 
-    function multicall(
-        address creditAccount,
-        MultiCall[] calldata calls
-    ) external payable;
+    function multicall(address creditAccount, MultiCall[] calldata calls) external payable;
 
-    function botMulticall(
-        address creditAccount,
-        MultiCall[] calldata calls
-    ) external;
+    function botMulticall(address creditAccount, MultiCall[] calldata calls) external;
 
-    function setBotPermissions(
-        address creditAccount,
-        address bot,
-        uint192 permissions
-    ) external;
+    function setBotPermissions(address creditAccount, address bot, uint192 permissions) external;
 
     // ------------- //
     // CONFIGURATION //
@@ -204,28 +180,15 @@ interface ICreditFacadeV3 {
 
     function setExpirationDate(uint40 newExpirationDate) external;
 
-    function setDebtLimits(
-        uint128 newMinDebt,
-        uint128 newMaxDebt,
-        uint8 newMaxDebtPerBlockMultiplier
-    ) external;
+    function setDebtLimits(uint128 newMinDebt, uint128 newMaxDebt, uint8 newMaxDebtPerBlockMultiplier) external;
 
     function setBotList(address newBotList) external;
 
-    function setCumulativeLossParams(
-        uint128 newMaxCumulativeLoss,
-        bool resetCumulativeLoss
-    ) external;
+    function setCumulativeLossParams(uint128 newMaxCumulativeLoss, bool resetCumulativeLoss) external;
 
-    function setTokenAllowance(
-        address token,
-        AllowanceAction allowance
-    ) external;
+    function setTokenAllowance(address token, AllowanceAction allowance) external;
 
-    function setEmergencyLiquidator(
-        address liquidator,
-        AllowanceAction allowance
-    ) external;
+    function setEmergencyLiquidator(address liquidator, AllowanceAction allowance) external;
 }
 
 // ----------- //
@@ -243,17 +206,11 @@ uint192 constant REVOKE_ALLOWANCES_PERMISSION = 1 << 7;
 
 uint192 constant EXTERNAL_CALLS_PERMISSION = 1 << 16;
 
-uint256 constant ALL_CREDIT_FACADE_CALLS_PERMISSION = ADD_COLLATERAL_PERMISSION |
-    WITHDRAW_COLLATERAL_PERMISSION |
-    INCREASE_DEBT_PERMISSION |
-    DECREASE_DEBT_PERMISSION |
-    ENABLE_TOKEN_PERMISSION |
-    DISABLE_TOKEN_PERMISSION |
-    UPDATE_QUOTA_PERMISSION |
-    REVOKE_ALLOWANCES_PERMISSION;
+uint256 constant ALL_CREDIT_FACADE_CALLS_PERMISSION = ADD_COLLATERAL_PERMISSION | WITHDRAW_COLLATERAL_PERMISSION
+    | INCREASE_DEBT_PERMISSION | DECREASE_DEBT_PERMISSION | ENABLE_TOKEN_PERMISSION | DISABLE_TOKEN_PERMISSION
+    | UPDATE_QUOTA_PERMISSION | REVOKE_ALLOWANCES_PERMISSION;
 
-uint256 constant ALL_PERMISSIONS = ALL_CREDIT_FACADE_CALLS_PERMISSION |
-    EXTERNAL_CALLS_PERMISSION;
+uint256 constant ALL_PERMISSIONS = ALL_CREDIT_FACADE_CALLS_PERMISSION | EXTERNAL_CALLS_PERMISSION;
 
 // ----- //
 // FLAGS //
@@ -276,11 +233,7 @@ interface ICreditFacadeV3Multicall {
     /// @param data Data to call `updatePrice` with
     /// @dev Calls of this type must be placed before all other calls in the multicall not to revert
     /// @dev This method is available in all kinds of multicalls
-    function onDemandPriceUpdate(
-        address token,
-        bool reserve,
-        bytes calldata data
-    ) external;
+    function onDemandPriceUpdate(address token, bool reserve, bytes calldata data) external;
 
     /// @notice Stores expected token balances (current balance + delta) after operations for a slippage check.
     ///         Normally, a check is performed automatically at the end of the multicall, but more fine-grained
@@ -288,9 +241,7 @@ interface ICreditFacadeV3Multicall {
     /// @param balanceDeltas Array of (token, minBalanceDelta) pairs, deltas are allowed to be negative
     /// @dev Reverts if expected balances are already set
     /// @dev This method is available in all kinds of multicalls
-    function storeExpectedBalances(
-        BalanceDelta[] calldata balanceDeltas
-    ) external;
+    function storeExpectedBalances(BalanceDelta[] calldata balanceDeltas) external;
 
     /// @notice Performs a slippage check ensuring that current token balances are greater than saved expected ones
     /// @dev Resets stored expected balances
@@ -311,14 +262,8 @@ interface ICreditFacadeV3Multicall {
     /// @param deadline Permit deadline
     /// @dev `v`, `r`, `s` must be a valid signature of the permit message from caller to the credit manager
     /// @dev This method can also be called during liquidation
-    function addCollateralWithPermit(
-        address token,
-        uint256 amount,
-        uint256 deadline,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
-    ) external;
+    function addCollateralWithPermit(address token, uint256 amount, uint256 deadline, uint8 v, bytes32 r, bytes32 s)
+        external;
 
     /// @notice Increases account's debt
     /// @param amount Underlying amount to borrow
@@ -347,11 +292,7 @@ interface ICreditFacadeV3Multicall {
     /// @dev Quota increase is prohibited if there are forbidden tokens enabled as collateral on the account
     /// @dev Quota update is prohibited if account has zero debt
     /// @dev Resulting account's quota for token must not exceed the limit defined in the facade
-    function updateQuota(
-        address token,
-        int96 quotaChange,
-        uint96 minQuota
-    ) external;
+    function updateQuota(address token, int96 quotaChange, uint96 minQuota) external;
 
     /// @notice Withdraws collateral from account
     /// @param token Token to withdraw
@@ -360,20 +301,13 @@ interface ICreditFacadeV3Multicall {
     /// @dev This method can also be called during liquidation
     /// @dev Withdrawals are prohibited in multicalls if there are forbidden tokens enabled as collateral on the account
     /// @dev Withdrawals activate safe pricing (min of main and reserve feeds) in collateral check
-    function withdrawCollateral(
-        address token,
-        uint256 amount,
-        address to
-    ) external;
+    function withdrawCollateral(address token, uint256 amount, address to) external;
 
     /// @notice Sets advanced collateral check parameters
     /// @param collateralHints Optional array of token masks to check first to reduce the amount of computation
     ///        when known subset of account's collateral tokens covers all the debt
     /// @param minHealthFactor Min account's health factor in bps in order not to revert, must be at least 10000
-    function setFullCheckParams(
-        uint256[] calldata collateralHints,
-        uint16 minHealthFactor
-    ) external;
+    function setFullCheckParams(uint256[] calldata collateralHints, uint16 minHealthFactor) external;
 
     /// @notice Enables token as account's collateral, which makes it count towards account's total value
     /// @param token Token to enable as collateral
@@ -389,28 +323,20 @@ interface ICreditFacadeV3Multicall {
     /// @notice Revokes account's allowances for specified spender/token pairs
     /// @param revocations Array of spender/token pairs
     /// @dev Exists primarily to allow users to revoke allowances on accounts from old account factory on mainnet
-    function revokeAdapterAllowances(
-        RevocationPair[] calldata revocations
-    ) external;
+    function revokeAdapterAllowances(RevocationPair[] calldata revocations) external;
 }
 
 interface ICreditManagerV3 {
-    function calcTotalValue(
-        address creditAccount
-    ) external view returns (uint256 total, uint256 twv);
+    function calcTotalValue(address creditAccount) external view returns (uint256 total, uint256 twv);
 
-    function calcDebtAndCollateral(
-        address creditAccount,
-        CollateralCalcTask task
-    ) external view returns (CollateralDebtData memory cdd);
+    function calcDebtAndCollateral(address creditAccount, CollateralCalcTask task)
+        external
+        view
+        returns (CollateralDebtData memory cdd);
 
-    function calcCreditAccountHealthFactor(
-        address creditAccount
-    ) external view returns (uint256 hf); // health factory of 1 means liquiditation
+    function calcCreditAccountHealthFactor(address creditAccount) external view returns (uint256 hf); // health factory of 1 means liquiditation
 
-    function creditAccountInfo(
-        address creditAccount
-    )
+    function creditAccountInfo(address creditAccount)
         external
         view
         returns (

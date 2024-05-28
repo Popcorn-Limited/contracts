@@ -2,5 +2,5 @@
 pragma solidity ^0.8.25;
 
 interface IEIP165 {
-  function supportsInterface(bytes4 interfaceId) external view returns (bool);
+    function supportsInterface(bytes4 interfaceId) external view returns (bool);
 }

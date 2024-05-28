@@ -5,11 +5,11 @@
     "autoHarvest": false
   },
   "strategyInit": {
-    "aaveDataProvider": "0xFc21d6d146E6086B8359705C8b28512a983db0cb",
+    "aaveDataProvider": "0x7B4EB56E7CD4b454BA8ff71E4518426369a138a3",
+    "curvePool": "0xDC24316b9AE028F1497c275EB9192a3Ea0f67022",
     "maxLTV": 850000000000000000,
-    "poolAddressesProvider": "0x02C3eA4e34C0cBd694D2adFa2c690EECbC1793eE",
-    "slippage": 1000000000000000,
-    "targetLTV": 800000000000000000,
-    "variableDepotToken": "0x2e7576042566f8D6990e07A1B61Ad1efd86Ae70d"
+    "poolAddressesProvider": "0x2f39d218133AFaB8F2B819B1066c7E434Ad94E9e",
+    "slippage": 10000000000000000,
+    "targetLTV": 800000000000000000
   }
 }

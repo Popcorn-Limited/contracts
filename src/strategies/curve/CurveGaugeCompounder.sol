@@ -37,16 +37,11 @@ contract CurveGaugeCompounder is BaseStrategy, BaseCurveLpCompounder {
      * @param autoDeposit_ Controls if `protocolDeposit` gets called on deposit
      * @param strategyInitData_ Encoded data for this specific strategy
      */
-    function initialize(
-        address asset_,
-        address owner_,
-        bool autoDeposit_,
-        bytes memory strategyInitData_
-    ) external initializer {
-        (address _gauge, address _pool, address _minter) = abi.decode(
-            strategyInitData_,
-            (address, address, address)
-        );
+    function initialize(address asset_, address owner_, bool autoDeposit_, bytes memory strategyInitData_)
+        external
+        initializer
+    {
+        (address _gauge, address _pool, address _minter) = abi.decode(strategyInitData_, (address, address, address));
 
         minter = IMinter(_minter);
         gauge = IGauge(_gauge);
@@ -58,29 +53,15 @@ contract CurveGaugeCompounder is BaseStrategy, BaseCurveLpCompounder {
 
         IERC20(asset()).approve(_gauge, type(uint256).max);
 
-        _name = string.concat(
-            "VaultCraft CurveGaugeCompounder ",
-            IERC20Metadata(asset()).name(),
-            " Adapter"
-        );
+        _name = string.concat("VaultCraft CurveGaugeCompounder ", IERC20Metadata(asset()).name(), " Adapter");
         _symbol = string.concat("vc-sccrv-", IERC20Metadata(asset()).symbol());
     }
 
-    function name()
-        public
-        view
-        override(IERC20Metadata, ERC20)
-        returns (string memory)
-    {
+    function name() public view override(IERC20Metadata, ERC20) returns (string memory) {
         return _name;
     }
 
-    function symbol()
-        public
-        view
-        override(IERC20Metadata, ERC20)
-        returns (string memory)
-    {
+    function symbol() public view override(IERC20Metadata, ERC20) returns (string memory) {
         return _symbol;
     }
 
@@ -104,15 +85,11 @@ contract CurveGaugeCompounder is BaseStrategy, BaseCurveLpCompounder {
                           INTERNAL HOOKS LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function _protocolDeposit(
-        uint256 assets,
-        uint256,
-        bytes memory
-    ) internal override {
+    function _protocolDeposit(uint256 assets, uint256, bytes memory) internal override {
         gauge.deposit(assets);
     }
 
-    function _protocolWithdraw(uint256 assets, uint256) internal override {
+    function _protocolWithdraw(uint256 assets, uint256, bytes memory) internal override {
         gauge.withdraw(assets);
     }
 
@@ -137,25 +114,12 @@ contract CurveGaugeCompounder is BaseStrategy, BaseCurveLpCompounder {
 
         sellRewardsForLpTokenViaCurve(address(pool), asset(), nCoins, data);
 
-        _protocolDeposit(
-            IERC20(asset()).balanceOf(address(this)),
-            0,
-            bytes("")
-        );
+        _protocolDeposit(IERC20(asset()).balanceOf(address(this)), 0, bytes(""));
 
         emit Harvested();
     }
 
-    function setHarvestValues(
-        address newRouter,
-        CurveSwap[] memory newSwaps,
-        int128 indexIn_
-    ) external onlyOwner {
-        setCurveLpCompounderValues(
-            newRouter,
-            newSwaps,
-            address(pool),
-            indexIn_
-        );
+    function setHarvestValues(address newRouter, CurveSwap[] memory newSwaps, int128 indexIn_) external onlyOwner {
+        setCurveLpCompounderValues(newRouter, newSwaps, address(pool), indexIn_);
     }
 }

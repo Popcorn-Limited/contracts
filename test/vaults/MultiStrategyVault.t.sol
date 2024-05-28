@@ -15,9 +15,7 @@ contract MultiStrategyVaultTest is Test {
     using FixedPointMathLib for uint256;
 
     bytes32 constant PERMIT_TYPEHASH =
-        keccak256(
-            "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
-        );
+        keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
 
     MockERC20 asset;
     IERC4626[] strategies;
@@ -58,12 +56,7 @@ contract MultiStrategyVaultTest is Test {
         withdrawalQueue.push(0);
 
         vault.initialize(
-            IERC20(address(asset)),
-            strategies,
-            uint256(0),
-            withdrawalQueue,
-            type(uint256).max,
-            address(this)
+            IERC20(address(asset)), strategies, uint256(0), withdrawalQueue, type(uint256).max, address(this)
         );
     }
 
@@ -73,11 +66,7 @@ contract MultiStrategyVaultTest is Test {
 
     function _createStrategy(IERC20 _asset) internal returns (IERC4626) {
         address strategyAddress = Clones.clone(strategyImplementation);
-        MockERC4626(strategyAddress).initialize(
-            _asset,
-            "Mock Token Vault",
-            "vwTKN"
-        );
+        MockERC4626(strategyAddress).initialize(_asset, "Mock Token Vault", "vwTKN");
         return IERC4626(strategyAddress);
     }
 
@@ -89,14 +78,7 @@ contract MultiStrategyVaultTest is Test {
         address vaultAddress = Clones.clone(implementation);
         MultiStrategyVault newVault = MultiStrategyVault(vaultAddress);
 
-        newVault.initialize(
-            IERC20(address(asset)),
-            strategies,
-            uint256(0),
-            withdrawalQueue,
-            type(uint256).max,
-            bob
-        );
+        newVault.initialize(IERC20(address(asset)), strategies, uint256(0), withdrawalQueue, type(uint256).max, bob);
 
         assertEq(newVault.name(), "VaultCraft Mock Token Vault");
         assertEq(newVault.symbol(), "vc-TKN");
@@ -108,14 +90,8 @@ contract MultiStrategyVaultTest is Test {
         assertEq(newVault.owner(), bob);
 
         assertEq(newVault.quitPeriod(), 3 days);
-        assertEq(
-            asset.allowance(address(newVault), address(strategies[0])),
-            type(uint256).max
-        );
-        assertEq(
-            asset.allowance(address(newVault), address(strategies[1])),
-            type(uint256).max
-        );
+        assertEq(asset.allowance(address(newVault), address(strategies[0])), type(uint256).max);
+        assertEq(asset.allowance(address(newVault), address(strategies[1])), type(uint256).max);
     }
 
     function testFail__initialize_asset_is_zero() public {
@@ -123,12 +99,7 @@ contract MultiStrategyVaultTest is Test {
         MultiStrategyVault newVault = MultiStrategyVault(vaultAddress);
 
         newVault.initialize(
-            IERC20(address(0)),
-            strategies,
-            uint256(0),
-            withdrawalQueue,
-            type(uint256).max,
-            address(this)
+            IERC20(address(0)), strategies, uint256(0), withdrawalQueue, type(uint256).max, address(this)
         );
     }
 
@@ -142,12 +113,7 @@ contract MultiStrategyVaultTest is Test {
         MultiStrategyVault newVault = MultiStrategyVault(vaultAddress);
 
         newVault.initialize(
-            IERC20(address(asset)),
-            newStrategies,
-            uint256(0),
-            withdrawalQueue,
-            type(uint256).max,
-            address(this)
+            IERC20(address(asset)), newStrategies, uint256(0), withdrawalQueue, type(uint256).max, address(this)
         );
     }
 
@@ -156,12 +122,7 @@ contract MultiStrategyVaultTest is Test {
         MultiStrategyVault newVault = MultiStrategyVault(vaultAddress);
 
         newVault.initialize(
-            IERC20(address(asset)),
-            new IERC4626[](1),
-            uint256(0),
-            withdrawalQueue,
-            type(uint256).max,
-            address(this)
+            IERC20(address(asset)), new IERC4626[](1), uint256(0), withdrawalQueue, type(uint256).max, address(this)
         );
     }
 
@@ -169,14 +130,7 @@ contract MultiStrategyVaultTest is Test {
         address vaultAddress = Clones.clone(implementation);
         MultiStrategyVault newVault = MultiStrategyVault(vaultAddress);
 
-        newVault.initialize(
-            IERC20(address(asset)),
-            strategies,
-            uint256(3),
-            withdrawalQueue,
-            type(uint256).max,
-            bob
-        );
+        newVault.initialize(IERC20(address(asset)), strategies, uint256(3), withdrawalQueue, type(uint256).max, bob);
     }
 
     function testFail__initialize_withdrawalQueue_too_long() public {
@@ -185,14 +139,7 @@ contract MultiStrategyVaultTest is Test {
 
         uint256[] memory newWithdrawalQueue = new uint256[](3);
 
-        newVault.initialize(
-            IERC20(address(asset)),
-            strategies,
-            uint256(0),
-            newWithdrawalQueue,
-            type(uint256).max,
-            bob
-        );
+        newVault.initialize(IERC20(address(asset)), strategies, uint256(0), newWithdrawalQueue, type(uint256).max, bob);
     }
 
     function testFail__initialize_withdrawalQueue_too_short() public {
@@ -201,14 +148,7 @@ contract MultiStrategyVaultTest is Test {
 
         uint256[] memory newWithdrawalQueue = new uint256[](1);
 
-        newVault.initialize(
-            IERC20(address(asset)),
-            strategies,
-            uint256(0),
-            newWithdrawalQueue,
-            type(uint256).max,
-            bob
-        );
+        newVault.initialize(IERC20(address(asset)), strategies, uint256(0), newWithdrawalQueue, type(uint256).max, bob);
     }
 
     function testFail__initialize_withdrawalQueue_index_out_of_bounds() public {
@@ -219,14 +159,7 @@ contract MultiStrategyVaultTest is Test {
         newWithdrawalQueue[0] = 0;
         newWithdrawalQueue[0] = 2;
 
-        newVault.initialize(
-            IERC20(address(asset)),
-            strategies,
-            uint256(0),
-            newWithdrawalQueue,
-            type(uint256).max,
-            bob
-        );
+        newVault.initialize(IERC20(address(asset)), strategies, uint256(0), newWithdrawalQueue, type(uint256).max, bob);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -251,14 +184,8 @@ contract MultiStrategyVaultTest is Test {
         vm.prank(alice);
         uint256 aliceShareAmount = vault.deposit(aliceassetAmount, alice);
 
-        assertEq(
-            MockERC4626(address(strategies[0])).afterDepositHookCalledCounter(),
-            1
-        );
-        assertEq(
-            MockERC4626(address(strategies[1])).afterDepositHookCalledCounter(),
-            0
-        );
+        assertEq(MockERC4626(address(strategies[0])).afterDepositHookCalledCounter(), 1);
+        assertEq(MockERC4626(address(strategies[1])).afterDepositHookCalledCounter(), 0);
 
         assertEq(aliceassetAmount, aliceShareAmount);
         assertEq(vault.previewWithdraw(aliceassetAmount), aliceShareAmount);
@@ -266,25 +193,14 @@ contract MultiStrategyVaultTest is Test {
         assertEq(vault.totalSupply(), aliceShareAmount);
         assertEq(vault.totalAssets(), aliceassetAmount);
         assertEq(vault.balanceOf(alice), aliceShareAmount);
-        assertEq(
-            vault.convertToAssets(vault.balanceOf(alice)),
-            aliceassetAmount
-        );
+        assertEq(vault.convertToAssets(vault.balanceOf(alice)), aliceassetAmount);
         assertEq(asset.balanceOf(alice), alicePreDepositBal - aliceassetAmount);
 
         vm.prank(alice);
         vault.withdraw(aliceassetAmount, alice, alice);
 
-        assertEq(
-            MockERC4626(address(strategies[0]))
-                .beforeWithdrawHookCalledCounter(),
-            1
-        );
-        assertEq(
-            MockERC4626(address(strategies[1]))
-                .beforeWithdrawHookCalledCounter(),
-            0
-        );
+        assertEq(MockERC4626(address(strategies[0])).beforeWithdrawHookCalledCounter(), 1);
+        assertEq(MockERC4626(address(strategies[1])).beforeWithdrawHookCalledCounter(), 0);
 
         assertEq(vault.totalAssets(), 0);
         assertEq(vault.balanceOf(alice), 0);
@@ -344,62 +260,24 @@ contract MultiStrategyVaultTest is Test {
         vm.prank(alice);
         uint256 aliceAssetAmount = vault.mint(aliceShareAmount, alice);
 
-        assertEq(
-            MockERC4626(address(strategies[0])).afterDepositHookCalledCounter(),
-            1
-        );
-        assertEq(
-            MockERC4626(address(strategies[1])).afterDepositHookCalledCounter(),
-            0
-        );
+        assertEq(MockERC4626(address(strategies[0])).afterDepositHookCalledCounter(), 1);
+        assertEq(MockERC4626(address(strategies[1])).afterDepositHookCalledCounter(), 0);
 
         // Expect exchange rate to be 1:1 on initial mint.
-        assertApproxEqAbs(
-            aliceShareAmount,
-            aliceAssetAmount,
-            1,
-            "share = assets"
-        );
-        assertApproxEqAbs(
-            vault.previewWithdraw(aliceAssetAmount),
-            aliceShareAmount,
-            1,
-            "pw"
-        );
-        assertApproxEqAbs(
-            vault.previewDeposit(aliceAssetAmount),
-            aliceShareAmount,
-            1,
-            "pd"
-        );
+        assertApproxEqAbs(aliceShareAmount, aliceAssetAmount, 1, "share = assets");
+        assertApproxEqAbs(vault.previewWithdraw(aliceAssetAmount), aliceShareAmount, 1, "pw");
+        assertApproxEqAbs(vault.previewDeposit(aliceAssetAmount), aliceShareAmount, 1, "pd");
         assertEq(vault.totalSupply(), aliceShareAmount, "ts");
         assertEq(vault.totalAssets(), aliceAssetAmount, "ta");
         assertEq(vault.balanceOf(alice), aliceShareAmount, "bal");
-        assertApproxEqAbs(
-            vault.convertToAssets(vault.balanceOf(alice)),
-            aliceAssetAmount,
-            1,
-            "convert"
-        );
-        assertEq(
-            asset.balanceOf(alice),
-            alicePreDepositBal - aliceAssetAmount,
-            "a bal"
-        );
+        assertApproxEqAbs(vault.convertToAssets(vault.balanceOf(alice)), aliceAssetAmount, 1, "convert");
+        assertEq(asset.balanceOf(alice), alicePreDepositBal - aliceAssetAmount, "a bal");
 
         vm.prank(alice);
         vault.redeem(aliceShareAmount, alice, alice);
 
-        assertEq(
-            MockERC4626(address(strategies[0]))
-                .beforeWithdrawHookCalledCounter(),
-            1
-        );
-        assertEq(
-            MockERC4626(address(strategies[1]))
-                .beforeWithdrawHookCalledCounter(),
-            0
-        );
+        assertEq(MockERC4626(address(strategies[0])).beforeWithdrawHookCalledCounter(), 1);
+        assertEq(MockERC4626(address(strategies[1])).beforeWithdrawHookCalledCounter(), 0);
 
         assertApproxEqAbs(vault.totalAssets(), 0, 1);
         assertEq(vault.balanceOf(alice), 0);
@@ -561,10 +439,7 @@ contract MultiStrategyVaultTest is Test {
 
         assertEq(asset.balanceOf(address(newStrategy)), 0);
         assertEq(asset.balanceOf(address(vault)), depositAmount);
-        assertEq(
-            asset.allowance(address(vault), address(newStrategy)),
-            type(uint256).max
-        );
+        assertEq(asset.allowance(address(vault), address(newStrategy)), type(uint256).max);
         IERC4626[] memory changedStrategies = vault.getStrategies();
 
         assertEq(changedStrategies.length, 1);
@@ -963,16 +838,7 @@ contract MultiStrategyVaultTest is Test {
                 abi.encodePacked(
                     "\x19\x01",
                     vault.DOMAIN_SEPARATOR(),
-                    keccak256(
-                        abi.encode(
-                            PERMIT_TYPEHASH,
-                            owner,
-                            address(0xCAFE),
-                            1e18,
-                            0,
-                            block.timestamp
-                        )
-                    )
+                    keccak256(abi.encode(PERMIT_TYPEHASH, owner, address(0xCAFE), 1e18, 0, block.timestamp))
                 )
             )
         );

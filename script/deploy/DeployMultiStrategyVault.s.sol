@@ -42,14 +42,7 @@ contract DeployMultiStrategyVault is Script {
         // Actual deployment
         MultiStrategyVault vault = new MultiStrategyVault();
 
-        vault.initialize(
-            asset,
-            strategies,
-            defaultDepositIndex,
-            withdrawalQueue,
-            depositLimit,
-            deployer
-        );
+        vault.initialize(asset, strategies, defaultDepositIndex, withdrawalQueue, depositLimit, deployer);
 
         vm.stopBroadcast();
     }

@@ -3,13 +3,13 @@
 // (c) Gearbox Foundation, 2023
 pragma solidity ^0.8.25;
 
-import { MultiCall } from "../IGearboxV3.sol";
-import { GearboxLeverageFarm } from "../GearboxLeverageFarm.sol";
-import { IAaveV2_LendingPoolAdapter } from "../IGearboxStrategyAdapter.sol";
+import {MultiCall} from "../IGearboxV3.sol";
+import {GearboxLeverageFarm} from "../GearboxLeverageFarm.sol";
+import {IAaveV2_LendingPoolAdapter} from "../IGearboxStrategyAdapter.sol";
 
 contract GearboxLeverageFarmAaveV2 is GearboxLeverageFarm {
     function _gearboxStrategyDeposit(bytes memory data) internal override {
-        (address asset, uint256 amount) = abi.decode(data, (address , uint256));
+        (address asset, uint256 amount) = abi.decode(data, (address, uint256));
 
         MultiCall[] memory calls = new MultiCall[](1);
         calls[0] = MultiCall({
@@ -21,7 +21,7 @@ contract GearboxLeverageFarmAaveV2 is GearboxLeverageFarm {
     }
 
     function _gearboxStrategyWithdraw(bytes memory data) internal override {
-        (address asset, uint256 amount) = abi.decode(data, (address , uint256));
+        (address asset, uint256 amount) = abi.decode(data, (address, uint256));
 
         MultiCall[] memory calls = new MultiCall[](1);
         calls[0] = MultiCall({

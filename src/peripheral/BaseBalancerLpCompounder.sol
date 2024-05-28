@@ -20,18 +20,13 @@ abstract contract BaseBalancerLpCompounder is BaseBalancerCompounder {
 
     error CompoundFailed();
 
-    function sellRewardsForLpTokenViaBalancer(
-        address vaultAsset,
-        bytes memory data
-    ) internal {
+    function sellRewardsForLpTokenViaBalancer(address vaultAsset, bytes memory data) internal {
         sellRewardsViaBalancer();
 
         // caching
         HarvestValues memory harvestValues_ = harvestValues;
 
-        uint256 amount = IERC20(harvestValues_.depositAsset).balanceOf(
-            address(this)
-        );
+        uint256 amount = IERC20(harvestValues_.depositAsset).balanceOf(address(this));
 
         BalancerTradeLibrary.addLiquidity(
             balancerVault,
@@ -57,16 +52,10 @@ abstract contract BaseBalancerLpCompounder is BaseBalancerCompounder {
 
         // Reset old base asset
         if (harvestValues.depositAsset != address(0)) {
-            IERC20(harvestValues.depositAsset).approve(
-                address(balancerVault),
-                0
-            );
+            IERC20(harvestValues.depositAsset).approve(address(balancerVault), 0);
         }
         // approve and set new base asset
-        IERC20(harvestValues_.depositAsset).approve(
-            newBalancerVault,
-            type(uint).max
-        );
+        IERC20(harvestValues_.depositAsset).approve(newBalancerVault, type(uint256).max);
 
         harvestValues = harvestValues_;
     }

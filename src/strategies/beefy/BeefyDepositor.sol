@@ -33,12 +33,10 @@ contract BeefyDepositor is BaseStrategy {
      * @param autoDeposit_ Controls if `protocolDeposit` gets called on deposit
      * @param strategyInitData_ Encoded data for this specific strategy
      */
-    function initialize(
-        address asset_,
-        address owner_,
-        bool autoDeposit_,
-        bytes memory strategyInitData_
-    ) external initializer {
+    function initialize(address asset_, address owner_, bool autoDeposit_, bytes memory strategyInitData_)
+        external
+        initializer
+    {
         address _beefyVault = abi.decode(strategyInitData_, (address));
 
         beefyVault = IBeefyVault(_beefyVault);
@@ -47,29 +45,15 @@ contract BeefyDepositor is BaseStrategy {
 
         IERC20(asset_).approve(_beefyVault, type(uint256).max);
 
-        _name = string.concat(
-            "VaultCraft Beefy ",
-            IERC20Metadata(asset_).name(),
-            " Adapter"
-        );
+        _name = string.concat("VaultCraft Beefy ", IERC20Metadata(asset_).name(), " Adapter");
         _symbol = string.concat("vcB-", IERC20Metadata(asset_).symbol());
     }
 
-    function name()
-        public
-        view
-        override(IERC20Metadata, ERC20)
-        returns (string memory)
-    {
+    function name() public view override(IERC20Metadata, ERC20) returns (string memory) {
         return _name;
     }
 
-    function symbol()
-        public
-        view
-        override(IERC20Metadata, ERC20)
-        returns (string memory)
-    {
+    function symbol() public view override(IERC20Metadata, ERC20) returns (string memory) {
         return _symbol;
     }
 
@@ -78,34 +62,19 @@ contract BeefyDepositor is BaseStrategy {
     //////////////////////////////////////////////////////////////*/
 
     function _totalAssets() internal view override returns (uint256) {
-        return
-            beefyVault.balanceOf(address(this)).mulDiv(
-                beefyVault.balance(),
-                beefyVault.totalSupply(),
-                Math.Rounding.Floor
-            );
+        return beefyVault.balanceOf(address(this)).mulDiv(
+            beefyVault.balance(), beefyVault.totalSupply(), Math.Rounding.Floor
+        );
     }
 
     /// @notice The amount of beefy shares to withdraw given an amount of adapter shares
-    function convertToUnderlyingShares(
-        uint256,
-        uint256 shares
-    ) public view override returns (uint256) {
+    function convertToUnderlyingShares(uint256, uint256 shares) public view override returns (uint256) {
         uint256 supply = totalSupply();
-        return
-            supply == 0
-                ? shares
-                : shares.mulDiv(
-                    beefyVault.balanceOf(address(this)),
-                    supply,
-                    Math.Rounding.Ceil
-                );
+        return supply == 0 ? shares : shares.mulDiv(beefyVault.balanceOf(address(this)), supply, Math.Rounding.Ceil);
     }
 
     /// @notice `previewWithdraw` that takes beefy withdrawal fees into account
-    function previewWithdraw(
-        uint256 assets
-    ) public view override returns (uint256) {
+    function previewWithdraw(uint256 assets) public view override returns (uint256) {
         IBeefyStrat strat = IBeefyStrat(beefyVault.strategy());
 
         uint256 beefyFee;
@@ -115,20 +84,15 @@ contract BeefyDepositor is BaseStrategy {
             beefyFee = strat.withdrawFee();
         }
 
-        if (beefyFee > 0)
-            assets = assets.mulDiv(
-                BPS_DENOMINATOR,
-                BPS_DENOMINATOR - beefyFee,
-                Math.Rounding.Floor
-            );
+        if (beefyFee > 0) {
+            assets = assets.mulDiv(BPS_DENOMINATOR, BPS_DENOMINATOR - beefyFee, Math.Rounding.Floor);
+        }
 
         return _convertToShares(assets, Math.Rounding.Ceil);
     }
 
     /// @notice `previewRedeem` that takes beefy withdrawal fees into account
-    function previewRedeem(
-        uint256 shares
-    ) public view override returns (uint256) {
+    function previewRedeem(uint256 shares) public view override returns (uint256) {
         uint256 assets = _convertToAssets(shares, Math.Rounding.Floor);
 
         IBeefyStrat strat = IBeefyStrat(beefyVault.strategy());
@@ -140,12 +104,9 @@ contract BeefyDepositor is BaseStrategy {
             beefyFee = strat.withdrawFee();
         }
 
-        if (beefyFee > 0)
-            assets = assets.mulDiv(
-                BPS_DENOMINATOR - beefyFee,
-                BPS_DENOMINATOR,
-                Math.Rounding.Floor
-            );
+        if (beefyFee > 0) {
+            assets = assets.mulDiv(BPS_DENOMINATOR - beefyFee, BPS_DENOMINATOR, Math.Rounding.Floor);
+        }
 
         return assets;
     }
@@ -154,15 +115,11 @@ contract BeefyDepositor is BaseStrategy {
                           INTERNAL HOOKS LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function _protocolDeposit(
-        uint256 assets,
-        uint256,
-        bytes memory
-    ) internal override {
+    function _protocolDeposit(uint256 assets, uint256, bytes memory) internal override {
         beefyVault.deposit(assets);
     }
 
-    function _protocolWithdraw(uint256, uint256 shares) internal override {
+    function _protocolWithdraw(uint256, uint256 shares, bytes memory) internal override {
         uint256 beefyShares = convertToUnderlyingShares(0, shares);
 
         beefyVault.withdraw(beefyShares);

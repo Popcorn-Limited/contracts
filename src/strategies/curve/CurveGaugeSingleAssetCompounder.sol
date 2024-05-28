@@ -42,14 +42,12 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy, BaseCurveCompounder {
      * @param autoDeposit_ Controls if `protocolDeposit` gets called on deposit
      * @param strategyInitData_ Encoded data for this specific strategy
      */
-    function initialize(
-        address asset_,
-        address owner_,
-        bool autoDeposit_,
-        bytes memory strategyInitData_
-    ) external initializer {
-        (address _lpToken, address _pool, address _gauge, int128 _indexIn) = abi
-            .decode(strategyInitData_, (address, address, address, int128));
+    function initialize(address asset_, address owner_, bool autoDeposit_, bytes memory strategyInitData_)
+        external
+        initializer
+    {
+        (address _lpToken, address _pool, address _gauge, int128 _indexIn) =
+            abi.decode(strategyInitData_, (address, address, address, int128));
 
         lpToken = _lpToken;
         pool = _pool;
@@ -64,29 +62,15 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy, BaseCurveCompounder {
         IERC20(_lpToken).approve(_gauge, type(uint256).max);
         IERC20(asset()).approve(_lpToken, type(uint256).max);
 
-        _name = string.concat(
-            "VaultCraft CurveGaugeSingleAssetCompounder ",
-            IERC20Metadata(asset()).name(),
-            " Adapter"
-        );
+        _name = string.concat("VaultCraft CurveGaugeSingleAssetCompounder ", IERC20Metadata(asset()).name(), " Adapter");
         _symbol = string.concat("vc-sccrv-", IERC20Metadata(asset()).symbol());
     }
 
-    function name()
-        public
-        view
-        override(IERC20Metadata, ERC20)
-        returns (string memory)
-    {
+    function name() public view override(IERC20Metadata, ERC20) returns (string memory) {
         return _name;
     }
 
-    function symbol()
-        public
-        view
-        override(IERC20Metadata, ERC20)
-        returns (string memory)
-    {
+    function symbol() public view override(IERC20Metadata, ERC20) returns (string memory) {
         return _symbol;
     }
 
@@ -99,10 +83,7 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy, BaseCurveCompounder {
     function _totalAssets() internal view override returns (uint256) {
         uint256 lpBal = IERC20(address(gauge)).balanceOf(address(this));
 
-        return
-            lpBal > 0
-                ? ((ICurveLp(lpToken).get_virtual_price() * lpBal) / 1e18)
-                : 0;
+        return lpBal > 0 ? ((ICurveLp(lpToken).get_virtual_price() * lpBal) / 1e18) : 0;
     }
 
     /// @notice The token rewarded from the convex reward contract
@@ -110,54 +91,29 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy, BaseCurveCompounder {
         return _rewardTokens;
     }
 
-    function previewDeposit(
-        uint256 assets
-    ) public view override returns (uint256) {
-        return
-            _convertToShares(
-                assets.mulDiv(10_000 - slippage, 10_000, Math.Rounding.Floor),
-                Math.Rounding.Floor
-            );
+    function previewDeposit(uint256 assets) public view override returns (uint256) {
+        return _convertToShares(assets.mulDiv(10_000 - slippage, 10_000, Math.Rounding.Floor), Math.Rounding.Floor);
     }
 
-    function previewMint(
-        uint256 shares
-    ) public view override returns (uint256) {
-        return
-            _convertToAssets(shares, Math.Rounding.Ceil).mulDiv(
-                10_000,
-                10_000 - slippage,
-                Math.Rounding.Floor
-            );
+    function previewMint(uint256 shares) public view override returns (uint256) {
+        return _convertToAssets(shares, Math.Rounding.Ceil).mulDiv(10_000, 10_000 - slippage, Math.Rounding.Floor);
     }
 
     /*//////////////////////////////////////////////////////////////
                           INTERNAL HOOKS LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function _protocolDeposit(
-        uint256 assets,
-        uint256,
-        bytes memory data
-    ) internal override {
+    function _protocolDeposit(uint256 assets, uint256, bytes memory data) internal override {
         CurveTradeLibrary.addLiquidity(
-            pool,
-            nCoins,
-            uint256(uint128(indexIn)),
-            assets,
-            data.length > 0 ? abi.decode(data, (uint256)) : 0
+            pool, nCoins, uint256(uint128(indexIn)), assets, data.length > 0 ? abi.decode(data, (uint256)) : 0
         );
 
         gauge.deposit(IERC20(lpToken).balanceOf(address(this)));
     }
 
-    function _protocolWithdraw(
-        uint256 assets,
-        uint256
-    ) internal override {
-        uint256 lpWithdraw = IERC20(address(gauge))
-            .balanceOf(address(this))
-            .mulDiv(assets, _totalAssets(), Math.Rounding.Ceil);
+    function _protocolWithdraw(uint256 assets, uint256, bytes memory) internal override {
+        uint256 lpWithdraw =
+            IERC20(address(gauge)).balanceOf(address(this)).mulDiv(assets, _totalAssets(), Math.Rounding.Ceil);
 
         gauge.withdraw(lpWithdraw);
 
@@ -189,11 +145,7 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy, BaseCurveCompounder {
         emit Harvested();
     }
 
-    function setHarvestValues(
-        address newRouter,
-        CurveSwap[] memory newSwaps,
-        uint256 slippage_
-    ) external onlyOwner {
+    function setHarvestValues(address newRouter, CurveSwap[] memory newSwaps, uint256 slippage_) external onlyOwner {
         setCurveTradeValues(newRouter, newSwaps);
 
         slippage = slippage_;

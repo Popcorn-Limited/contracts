@@ -20,13 +20,9 @@ contract VaultRouter {
 
     constructor() {}
 
-    function depositAndStake(
-        IERC4626 vault,
-        ICurveGauge gauge,
-        uint256 assetAmount,
-        uint256 minOut,
-        address receiver
-    ) external {
+    function depositAndStake(IERC4626 vault, ICurveGauge gauge, uint256 assetAmount, uint256 minOut, address receiver)
+        external
+    {
         IERC20 asset = IERC20(vault.asset());
         asset.safeTransferFrom(msg.sender, address(this), assetAmount);
         asset.approve(address(vault), assetAmount);
@@ -39,18 +35,10 @@ contract VaultRouter {
         gauge.deposit(shares, receiver);
     }
 
-    function unstakeAndWithdraw(
-        IERC4626 vault,
-        ICurveGauge gauge,
-        uint256 burnAmount,
-        uint256 minOut,
-        address receiver
-    ) external {
-        IERC20(address(gauge)).safeTransferFrom(
-            msg.sender,
-            address(this),
-            burnAmount
-        );
+    function unstakeAndWithdraw(IERC4626 vault, ICurveGauge gauge, uint256 burnAmount, uint256 minOut, address receiver)
+        external
+    {
+        IERC20(address(gauge)).safeTransferFrom(msg.sender, address(this), burnAmount);
 
         gauge.withdraw(burnAmount);
 

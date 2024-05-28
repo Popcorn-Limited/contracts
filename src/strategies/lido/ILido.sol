@@ -26,19 +26,11 @@ interface ILido {
 
     function asset() external view returns (address);
 
-    function initialize(
-        bytes memory adapterInitData,
-        address _wethAddress,
-        bytes memory lidoInitData
-    ) external;
+    function initialize(bytes memory adapterInitData, address _wethAddress, bytes memory lidoInitData) external;
 
-    function getSharesByPooledEth(
-        uint256 _ethAmount
-    ) external view returns (uint256);
+    function getSharesByPooledEth(uint256 _ethAmount) external view returns (uint256);
 
-    function getPooledEthByShares(
-        uint256 _sharesAmount
-    ) external view returns (uint256);
+    function getPooledEthByShares(uint256 _sharesAmount) external view returns (uint256);
 
     function owner() external view returns (address);
 
@@ -52,10 +44,7 @@ interface ILido {
 
     function balanceOf(address _account) external view returns (uint256);
 
-    function burnShares(
-        address _account,
-        uint256 _sharesAmount
-    ) external returns (uint256 newTotalShares);
+    function burnShares(address _account, uint256 _sharesAmount) external returns (uint256 newTotalShares);
 
     /**
      * @notice Stop pool routine operations
@@ -104,10 +93,7 @@ interface ILido {
      * @param _maxStakeLimit max stake limit value
      * @param _stakeLimitIncreasePerBlock stake limit increase per single block
      */
-    function setStakingLimit(
-        uint256 _maxStakeLimit,
-        uint256 _stakeLimitIncreasePerBlock
-    ) external;
+    function setStakingLimit(uint256 _maxStakeLimit, uint256 _stakeLimitIncreasePerBlock) external;
 
     /**
      * @notice Removes the staking rate limit
@@ -158,10 +144,7 @@ interface ILido {
 
     event StakingPaused();
     event StakingResumed();
-    event StakingLimitSet(
-        uint256 maxStakeLimit,
-        uint256 stakeLimitIncreasePerBlock
-    );
+    event StakingLimitSet(uint256 maxStakeLimit, uint256 stakeLimitIncreasePerBlock);
     event StakingLimitRemoved();
 
     /**
@@ -170,17 +153,9 @@ interface ILido {
      * @param _treasury treasury contract
      * @param _insuranceFund insurance fund contract
      */
-    function setProtocolContracts(
-        address _oracle,
-        address _treasury,
-        address _insuranceFund
-    ) external;
+    function setProtocolContracts(address _oracle, address _treasury, address _insuranceFund) external;
 
-    event ProtocolContactsSet(
-        address oracle,
-        address treasury,
-        address insuranceFund
-    );
+    event ProtocolContactsSet(address oracle, address treasury, address insuranceFund);
 
     /**
      * @notice Set fee rate to `_feeBasisPoints` basis points.
@@ -215,18 +190,12 @@ interface ILido {
     function getFeeDistribution()
         external
         view
-        returns (
-            uint16 treasuryFeeBasisPoints,
-            uint16 insuranceFeeBasisPoints,
-            uint16 operatorsFeeBasisPoints
-        );
+        returns (uint16 treasuryFeeBasisPoints, uint16 insuranceFeeBasisPoints, uint16 operatorsFeeBasisPoints);
 
     event FeeSet(uint16 feeBasisPoints);
 
     event FeeDistributionSet(
-        uint16 treasuryFeeBasisPoints,
-        uint16 insuranceFeeBasisPoints,
-        uint16 operatorsFeeBasisPoints
+        uint16 treasuryFeeBasisPoints, uint16 insuranceFeeBasisPoints, uint16 operatorsFeeBasisPoints
     );
 
     /**
@@ -325,11 +294,7 @@ interface ILido {
     function getBeaconStat()
         external
         view
-        returns (
-            uint256 depositedValidators,
-            uint256 beaconValidators,
-            uint256 beaconBalance
-        );
+        returns (uint256 depositedValidators, uint256 beaconValidators, uint256 beaconBalance);
 }
 
 interface VaultAPI is IERC20 {

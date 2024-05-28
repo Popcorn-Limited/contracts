@@ -3,52 +3,51 @@
 
 pragma solidity ^0.8.25;
 
-import { Owned } from "../utils/Owned.sol";
-import { IERC20 } from "openzeppelin-contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import {Owned} from "../utils/Owned.sol";
+import {IERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 
 contract FeeRecipientProxy is Owned {
-  
-  constructor(address owner) Owned(owner) {}
+    constructor(address owner) Owned(owner) {}
 
-  uint256 public approvals;
+    uint256 public approvals;
 
-  event TokenApproved(uint8 len);
-  event TokenApprovalVoided(uint8 len);
+    event TokenApproved(uint8 len);
+    event TokenApprovalVoided(uint8 len);
 
-  error TokenAlreadyApproved(IERC20 token);
-  error TokenApprovalAlreadyVoided(IERC20 token);
+    error TokenAlreadyApproved(IERC20 token);
+    error TokenApprovalAlreadyVoided(IERC20 token);
 
-  function approveToken(IERC20[] calldata tokens) external onlyOwner {
-    uint8 len = uint8(tokens.length);
-    for (uint8 i = 0; i < len; i++) {
-      if (tokens[i].allowance(address(this), owner) > 0) revert TokenAlreadyApproved(tokens[i]);
+    function approveToken(IERC20[] calldata tokens) external onlyOwner {
+        uint8 len = uint8(tokens.length);
+        for (uint8 i = 0; i < len; i++) {
+            if (tokens[i].allowance(address(this), owner) > 0) revert TokenAlreadyApproved(tokens[i]);
 
-      tokens[i].approve(owner, type(uint256).max);
-      approvals++;
+            tokens[i].approve(owner, type(uint256).max);
+            approvals++;
+        }
+
+        emit TokenApproved(len);
     }
 
-    emit TokenApproved(len);
-  }
+    function voidTokenApproval(IERC20[] calldata tokens) external onlyOwner {
+        uint8 len = uint8(tokens.length);
+        for (uint8 i = 0; i < len; i++) {
+            if (tokens[i].allowance(address(this), owner) == 0) revert TokenApprovalAlreadyVoided(tokens[i]);
 
-  function voidTokenApproval(IERC20[] calldata tokens) external onlyOwner {
-    uint8 len = uint8(tokens.length);
-    for (uint8 i = 0; i < len; i++) {
-      if (tokens[i].allowance(address(this), owner) == 0) revert TokenApprovalAlreadyVoided(tokens[i]);
+            tokens[i].approve(owner, 0);
+            approvals--;
+        }
 
-      tokens[i].approve(owner, 0);
-      approvals--;
+        emit TokenApprovalVoided(len);
     }
 
-    emit TokenApprovalVoided(len);
-  }
+    function acceptOwnership() external override {
+        require(msg.sender == nominatedOwner, "You must be nominated before you can accept ownership");
+        require(approvals == 0, "Must void all approvals first");
 
-  function acceptOwnership() external override {
-    require(msg.sender == nominatedOwner, "You must be nominated before you can accept ownership");
-    require(approvals == 0, "Must void all approvals first");
+        emit OwnerChanged(owner, nominatedOwner);
 
-    emit OwnerChanged(owner, nominatedOwner);
-
-    owner = nominatedOwner;
-    nominatedOwner = address(0);
-  }
+        owner = nominatedOwner;
+        nominatedOwner = address(0);
+    }
 }

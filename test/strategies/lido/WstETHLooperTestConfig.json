@@ -21,7 +21,6 @@
           "maxLTV": 850000000000000000,
           "poolAddressesProvider": "0x02C3eA4e34C0cBd694D2adFa2c690EECbC1793eE",
           "slippage": 10000000000000000,
-          "slippageCap": 100000000000000000,
           "targetLTV": 800000000000000000
         }
       }
@@ -46,7 +45,6 @@
           "maxLTV": 850000000000000000,
           "poolAddressesProvider": "0x2f39d218133AFaB8F2B819B1066c7E434Ad94E9e",
           "slippage": 10000000000000000,
-          "slippageCap": 100000000000000000,
           "targetLTV": 800000000000000000
         }
       }

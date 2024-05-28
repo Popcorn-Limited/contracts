@@ -3,7 +3,8 @@
 
 pragma solidity ^0.8.25;
 
-import {GearboxLeverageFarmWstETHV1} from "../../../../src/strategies/gearbox/leverageFarm/lido/GearboxLeverageFarmWstETHV1.sol";
+import {GearboxLeverageFarmWstETHV1} from
+    "../../../../src/strategies/gearbox/leverageFarm/lido/GearboxLeverageFarmWstETHV1.sol";
 import {ILeverageAdapter} from "../../../../src/strategies/gearbox/leverageFarm/IGearboxV3.sol";
 import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson, IERC20} from "../../BaseStrategyTest.sol";
 
@@ -17,36 +18,25 @@ contract GearboxLeverageFarmWstETHTest is BaseStrategyTest {
     using stdJson for string;
 
     function setUp() public {
-        _setUpBaseTest(
-            0,
-            "./test/strategies/gearbox/leverageFarm/GearboxLeverageTestConfig.json"
-        );
+        _setUpBaseTest(0, "./test/strategies/gearbox/leverageFarm/GearboxLeverageTestConfig.json");
     }
 
-    function _setUpStrategy(
-        string memory json_,
-        string memory index_,
-        TestConfig memory testConfig_
-    ) internal override returns (IBaseStrategy) {
+    function _setUpStrategy(string memory json_, string memory index_, TestConfig memory testConfig_)
+        internal
+        override
+        returns (IBaseStrategy)
+    {
         GearboxLeverageFarmWstETHV1 strategy = new GearboxLeverageFarmWstETHV1();
 
         // Read strategy init values
-        GearboxValues memory gearboxValues = abi.decode(
-            json_.parseRaw(
-                string.concat(".configs[", index_, "].specific.init")
-            ),
-            (GearboxValues)
-        );
+        GearboxValues memory gearboxValues =
+            abi.decode(json_.parseRaw(string.concat(".configs[", index_, "].specific.init")), (GearboxValues));
 
         strategy.initialize(
             testConfig_.asset,
             address(this),
             true,
-            abi.encode(
-                gearboxValues.creditFacade,
-                gearboxValues.creditManager,
-                gearboxValues.strategyAdapter
-            )
+            abi.encode(gearboxValues.creditFacade, gearboxValues.creditManager, gearboxValues.strategyAdapter)
         );
 
         return IBaseStrategy(address(strategy));
@@ -69,17 +59,11 @@ contract GearboxLeverageFarmWstETHTest is BaseStrategyTest {
         _mintAsset(testConfig.defaultAmount, bob);
 
         vm.prank(bob);
-        IERC20(testConfig.asset).approve(
-            address(strategy),
-            testConfig.defaultAmount
-        );
+        IERC20(testConfig.asset).approve(address(strategy), testConfig.defaultAmount);
 
         vm.prank(bob);
         strategy.deposit(testConfig.defaultAmount, bob);
 
-        ILeverageAdapter(address(strategy)).adjustLeverage(
-            1,
-            abi.encode(testConfig.asset, testConfig.defaultAmount)
-        );
+        ILeverageAdapter(address(strategy)).adjustLeverage(1, abi.encode(testConfig.asset, testConfig.defaultAmount));
     }
 }

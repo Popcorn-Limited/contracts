@@ -3,7 +3,15 @@
 
 pragma solidity ^0.8.25;
 
-import {WstETHLooper, LooperInitValues, IERC20, IERC20Metadata, IwstETH, ILendingPool, Math} from "../../../src/strategies/lido/WstETHLooper.sol";
+import {
+    WstETHLooper,
+    LooperInitValues,
+    IERC20,
+    IERC20Metadata,
+    IwstETH,
+    ILendingPool,
+    Math
+} from "../../../src/strategies/lido/WstETHLooper.sol";
 import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson, Math} from "../BaseStrategyTest.sol";
 
 contract WstETHLooperTest is BaseStrategyTest {
@@ -23,28 +31,19 @@ contract WstETHLooperTest is BaseStrategyTest {
         _setUpBaseTest(1, "./test/strategies/lido/WstETHLooperTestConfig.json");
     }
 
-    function _setUpStrategy(
-        string memory json_,
-        string memory index_,
-        TestConfig memory testConfig_
-    ) internal override returns (IBaseStrategy) {
+    function _setUpStrategy(string memory json_, string memory index_, TestConfig memory testConfig_)
+        internal
+        override
+        returns (IBaseStrategy)
+    {
         // Read strategy init values
-        LooperInitValues memory looperInitValues = abi.decode(
-            json_.parseRaw(
-                string.concat(".configs[", index_, "].specific.init")
-            ),
-            (LooperInitValues)
-        );
+        LooperInitValues memory looperInitValues =
+            abi.decode(json_.parseRaw(string.concat(".configs[", index_, "].specific.init")), (LooperInitValues));
 
         // Deploy Strategy
         WstETHLooper strategy = new WstETHLooper();
 
-        strategy.initialize(
-            testConfig_.asset,
-            address(this),
-            true,
-            abi.encode(looperInitValues)
-        );
+        strategy.initialize(testConfig_.asset, address(this), true, abi.encode(looperInitValues));
 
         strategyContract = WstETHLooper(payable(strategy));
 
@@ -54,7 +53,7 @@ contract WstETHLooperTest is BaseStrategyTest {
         lendingPool = strategyContract.lendingPool();
         defaultAmount = testConfig_.defaultAmount;
         slippage = strategyContract.slippage();
-        
+
         deal(testConfig_.asset, address(this), 1);
         IERC20(testConfig_.asset).approve(address(strategy), 1);
         strategyContract.setUserUseReserveAsCollateral(1);
@@ -63,7 +62,7 @@ contract WstETHLooperTest is BaseStrategyTest {
     }
 
     // Verify that totalAssets returns the expected amount
-    function test_verify_totalAssets() public {
+    function test__verify_totalAssets() public {
         // Make sure totalAssets isnt 0
         deal(address(wstETH), bob, defaultAmount);
         vm.startPrank(bob);
@@ -80,43 +79,30 @@ contract WstETHLooperTest is BaseStrategyTest {
     }
 
     function increasePricePerShare(uint256 amount) public {
-        deal(address(wstETH), address(strategy), 10 ether);
+        deal(address(wstETH), address(strategy), amount);
         vm.startPrank(address(strategy));
-        lendingPool.supply(address(wstETH), 10 ether, address(strategy), 0);
+        lendingPool.supply(address(wstETH), amount, address(strategy), 0);
         vm.stopPrank();
     }
 
     function test__initialization() public override {
-        LooperInitValues memory looperInitValues = abi.decode(
-            json.parseRaw(
-                string.concat(".configs[1].specific.init")
-            ),
-            (LooperInitValues)
-        );
+        LooperInitValues memory looperInitValues =
+            abi.decode(json.parseRaw(string.concat(".configs[1].specific.init")), (LooperInitValues));
 
         // Deploy Strategy
         WstETHLooper strategy = new WstETHLooper();
 
-        strategy.initialize(
-            testConfig.asset,
-            address(this),
-            true,
-            abi.encode(looperInitValues)
-        );
+        strategy.initialize(testConfig.asset, address(this), true, abi.encode(looperInitValues));
 
         verify_adapterInit();
     }
 
     function test__deposit(uint8 fuzzAmount) public override {
-        uint len = json.readUint(".length");
-        for (uint i; i < len; i++) {
+        uint256 len = json.readUint(".length");
+        for (uint256 i; i < len; i++) {
             if (i > 0) _setUpBaseTest(i, path);
 
-            uint256 amount = bound(
-                fuzzAmount,
-                testConfig.minDeposit,
-                testConfig.maxDeposit
-            );
+            uint256 amount = bound(fuzzAmount, testConfig.minDeposit, testConfig.maxDeposit);
 
             _mintAssetAndApproveForStrategy(amount, bob);
 
@@ -130,29 +116,18 @@ contract WstETHLooperTest is BaseStrategyTest {
     }
 
     function test__withdraw(uint8 fuzzAmount) public override {
-        uint len = json.readUint(".length");
-        for (uint i; i < len; i++) {
+        uint256 len = json.readUint(".length");
+        for (uint256 i; i < len; i++) {
             if (i > 0) _setUpBaseTest(i, path);
 
-            uint256 amount = bound(
-                fuzzAmount,
-                testConfig.minDeposit,
-                testConfig.maxDeposit
-            );
+            uint256 amount = bound(fuzzAmount, testConfig.minDeposit, testConfig.maxDeposit);
 
-            uint256 reqAssets = strategy.previewMint(
-                strategy.previewWithdraw(amount)
-            );
+            uint256 reqAssets = strategy.previewMint(strategy.previewWithdraw(amount));
             _mintAssetAndApproveForStrategy(reqAssets, bob);
             vm.prank(bob);
             strategy.deposit(reqAssets, bob);
 
-            prop_withdraw(
-                bob,
-                bob,
-                strategy.maxWithdraw(bob),
-                testConfig.testId
-            );
+            prop_withdraw(bob, bob, strategy.maxWithdraw(bob), testConfig.testId);
 
             _mintAssetAndApproveForStrategy(reqAssets, bob);
             vm.prank(bob);
@@ -163,18 +138,13 @@ contract WstETHLooperTest is BaseStrategyTest {
             vm.prank(bob);
             strategy.approve(alice, type(uint256).max);
 
-            prop_withdraw(
-                alice,
-                bob,
-                strategy.maxWithdraw(bob),
-                testConfig.testId
-            );
+            prop_withdraw(alice, bob, strategy.maxWithdraw(bob), testConfig.testId);
         }
     }
 
-    function test_setHarvestValues() public {
+    function test__setHarvestValues() public {
         address oldPool = address(strategyContract.stableSwapStETH());
-        address newPool = address(0x85dE3ADd465a219EE25E04d22c39aB027cF5C12E); 
+        address newPool = address(0x85dE3ADd465a219EE25E04d22c39aB027cF5C12E);
         address stETH = strategyContract.stETH();
 
         strategyContract.setHarvestValues(newPool);
@@ -186,10 +156,9 @@ contract WstETHLooperTest is BaseStrategyTest {
         assertEq(newAllowance, type(uint256).max);
     }
 
-    function test_deposit() public {
+    function test__deposit_manual() public {
         uint256 amountMint = 10e18;
         uint256 amountDeposit = 1e18;
-        uint256 amountWithdraw = 5e17;
 
         deal(address(wstETH), bob, amountMint);
 
@@ -214,10 +183,9 @@ contract WstETHLooperTest is BaseStrategyTest {
         assertEq(strategyContract.getLTV(), 0);
     }
 
-    function test_adjustLeverage_only_flashLoan_wstETH_dust() public {
+    function test__adjustLeverage_only_flashLoan_wstETH_dust() public {
         uint256 amountMint = 10e18;
         uint256 amountDeposit = 1e18;
-        uint256 amountWithdraw = 5e17;
 
         deal(address(wstETH), bob, amountMint);
 
@@ -248,16 +216,12 @@ contract WstETHLooperTest is BaseStrategyTest {
         assertGt(strategyContract.getLTV(), 0);
 
         // LTV is slightly lower target, since some wstETH means extra collateral
-        assertGt(
-            strategyContract.targetLTV(), 
-            strategyContract.getLTV()
-        );
+        assertGt(strategyContract.targetLTV(), strategyContract.getLTV());
     }
 
-    function test_adjustLeverage_only_flashLoan() public {
+    function test__adjustLeverage_only_flashLoan() public {
         uint256 amountMint = 10e18;
         uint256 amountDeposit = 1e18;
-        uint256 amountWithdraw = 5e17;
 
         deal(address(wstETH), bob, amountMint);
 
@@ -272,16 +236,11 @@ contract WstETHLooperTest is BaseStrategyTest {
         // check total assets - should be lt than totalDeposits
         assertLt(strategy.totalAssets(), amountDeposit);
 
-        uint256 slippageDebt = IwstETH(address(wstETH)).getWstETHByStETH(
-            vdWETH.balanceOf(address(strategy))
-        );
+        uint256 slippageDebt = IwstETH(address(wstETH)).getWstETHByStETH(vdWETH.balanceOf(address(strategy)));
         slippageDebt = slippageDebt.mulDiv(slippage, 1e18, Math.Rounding.Ceil);
 
         assertApproxEqAbs(
-            strategy.totalAssets(),
-            amountDeposit - slippageDebt,
-            _delta_,
-            string.concat("totalAssets != expected")
+            strategy.totalAssets(), amountDeposit - slippageDebt, _delta_, string.concat("totalAssets != expected")
         );
 
         // wstETH should be in lending market
@@ -297,18 +256,12 @@ contract WstETHLooperTest is BaseStrategyTest {
         assertGt(strategyContract.getLTV(), 0);
 
         // LTV is at target - or 1 wei delta for approximation up of ltv
-        assertApproxEqAbs(
-            strategyContract.targetLTV(), 
-            strategyContract.getLTV(),
-            1,
-            string.concat("ltv != expected")
-        );
+        assertApproxEqAbs(strategyContract.targetLTV(), strategyContract.getLTV(), 1, string.concat("ltv != expected"));
     }
 
-    function test_adjustLeverage_flashLoan_and_eth_dust() public {
+    function test__adjustLeverage_flashLoan_and_eth_dust() public {
         uint256 amountMint = 10e18;
         uint256 amountDeposit = 1e18;
-        uint256 amountWithdraw = 5e17;
 
         deal(address(wstETH), bob, amountMint);
 
@@ -325,12 +278,9 @@ contract WstETHLooperTest is BaseStrategyTest {
         strategyContract.adjustLeverage();
 
         // tot assets increased in this case
-        // but if the amount of dust is lower than the slippage % of debt 
+        // but if the amount of dust is lower than the slippage % of debt
         // totalAssets would be lower, as leverage incurred in debt
-        assertGt(
-            strategy.totalAssets(),
-            totAssetsBefore
-        );
+        assertGt(strategy.totalAssets(), totAssetsBefore);
 
         // wstETH should be in lending market
         assertEq(wstETH.balanceOf(address(strategy)), 0);
@@ -345,16 +295,12 @@ contract WstETHLooperTest is BaseStrategyTest {
         assertGt(strategyContract.getLTV(), 0);
 
         // LTV is slightly below target, since some eth dust has been deposited as collateral
-        assertGt(
-            strategyContract.targetLTV(), 
-            strategyContract.getLTV()
-        );
+        assertGt(strategyContract.targetLTV(), strategyContract.getLTV());
     }
 
-    function test_adjustLeverage_only_eth_dust() public {
+    function test__adjustLeverage_only_eth_dust() public {
         uint256 amountMint = 10e18;
         uint256 amountDeposit = 1e18;
-        uint256 amountWithdraw = 5e17;
         uint256 amountDust = 10e18;
 
         deal(address(wstETH), bob, amountMint);
@@ -364,12 +310,12 @@ contract WstETHLooperTest is BaseStrategyTest {
         strategy.deposit(amountDeposit, bob);
         vm.stopPrank();
 
-        // SEND ETH TO CONTRACT 
+        // SEND ETH TO CONTRACT
         vm.deal(address(strategy), amountDust);
 
         // adjust leverage - should only trigger a dust amount deposit - no flashloans
         strategyContract.adjustLeverage();
-        
+
         // check total assets - should be gt than totalDeposits
         assertGt(strategy.totalAssets(), amountDeposit);
 
@@ -389,7 +335,7 @@ contract WstETHLooperTest is BaseStrategyTest {
         assertEq(strategyContract.getLTV(), 0);
     }
 
-    function test_leverageDown() public {
+    function test__leverageDown() public {
         uint256 amountMint = 10e18;
         uint256 amountDeposit = 1e18;
         uint256 amountWithdraw = 5e17;
@@ -418,10 +364,9 @@ contract WstETHLooperTest is BaseStrategyTest {
         assertGt(currentLTV, strategyContract.getLTV());
     }
 
-    function test_withdraw() public {
+    function test__withdraw_manual() public {
         uint256 amountMint = 10e18;
         uint256 amountDeposit = 1e18;
-        uint256 amountWithdraw = 5e17;
 
         deal(address(wstETH), bob, amountMint);
 
@@ -444,10 +389,7 @@ contract WstETHLooperTest is BaseStrategyTest {
 
         // should not hold any wstETH
         assertApproxEqAbs(
-            wstETH.balanceOf(address(strategy)),
-            0,
-            _delta_,
-            string.concat("more wstETH dust than expected")
+            wstETH.balanceOf(address(strategy)), 0, _delta_, string.concat("more wstETH dust than expected")
         );
 
         // should not hold any wstETH aToken
@@ -468,10 +410,9 @@ contract WstETHLooperTest is BaseStrategyTest {
         assertEq(alice.balance, aliceBalBefore + dust);
     }
 
-    function test_setLeverageValues_lever_up() public {
+    function test__setLeverageValues_lever_up() public {
         uint256 amountMint = 10e18;
         uint256 amountDeposit = 1e18;
-        uint256 amountWithdraw = 5e17;
 
         deal(address(wstETH), bob, amountMint);
 
@@ -492,10 +433,9 @@ contract WstETHLooperTest is BaseStrategyTest {
         assertGt(strategyContract.getLTV(), oldLTV);
     }
 
-    function test_setLeverageValues_lever_down() public {
+    function test__setLeverageValues_lever_down() public {
         uint256 amountMint = 10e18;
         uint256 amountDeposit = 1e18;
-        uint256 amountWithdraw = 5e17;
 
         deal(address(wstETH), bob, amountMint);
 
@@ -516,27 +456,21 @@ contract WstETHLooperTest is BaseStrategyTest {
         assertLt(strategyContract.getLTV(), oldLTV);
     }
 
-    function test_setLeverageValues_invalidInputs() public {
+    function test__setLeverageValues_invalidInputs() public {
         // protocolLTV < targetLTV < maxLTV
-        vm.expectRevert(abi.encodeWithSelector(
-            WstETHLooper.InvalidLTV.selector,
-            3e18,
-            4e18,
-            strategyContract.protocolMaxLTV()
-        ));
+        vm.expectRevert(
+            abi.encodeWithSelector(WstETHLooper.InvalidLTV.selector, 3e18, 4e18, strategyContract.protocolMaxLTV())
+        );
         strategyContract.setLeverageValues(3e18, 4e18);
 
         // maxLTV < targetLTV < protocolLTV
-        vm.expectRevert(abi.encodeWithSelector(
-            WstETHLooper.InvalidLTV.selector,
-            4e17,
-            3e17,
-            strategyContract.protocolMaxLTV()
-        ));
+        vm.expectRevert(
+            abi.encodeWithSelector(WstETHLooper.InvalidLTV.selector, 4e17, 3e17, strategyContract.protocolMaxLTV())
+        );
         strategyContract.setLeverageValues(4e17, 3e17);
     }
 
-    function test_setSlippage() public {
+    function test__setSlippage() public {
         uint256 oldSlippage = strategyContract.slippage();
         uint256 newSlippage = oldSlippage + 1;
         strategyContract.setSlippage(newSlippage);
@@ -545,18 +479,14 @@ contract WstETHLooperTest is BaseStrategyTest {
         assertEq(strategyContract.slippage(), newSlippage);
     }
 
-    function test_setSlippage_invalidValue() public {
+    function test__setSlippage_invalidValue() public {
         uint256 newSlippage = 1e18; // 100%
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                WstETHLooper.InvalidSlippage.selector, newSlippage, 1e17
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(WstETHLooper.InvalidSlippage.selector, newSlippage, 2e17));
         strategyContract.setSlippage(newSlippage);
     }
 
-    function test_invalid_flashLoan() public {
+    function test__invalid_flashLoan() public {
         address[] memory assets = new address[](1);
         uint256[] memory amounts = new uint256[](1);
         uint256[] memory premiums = new uint256[](1);
@@ -564,12 +494,12 @@ contract WstETHLooperTest is BaseStrategyTest {
         // reverts with invalid msg.sender and valid initiator
         vm.expectRevert(WstETHLooper.NotFlashLoan.selector);
         vm.prank(bob);
-        strategyContract.executeOperation(assets,amounts,premiums,address(strategy), "");
+        strategyContract.executeOperation(assets, amounts, premiums, address(strategy), "");
 
         // reverts with invalid initiator and valid msg.sender
         vm.expectRevert(WstETHLooper.NotFlashLoan.selector);
         vm.prank(address(lendingPool));
-        strategyContract.executeOperation(assets,amounts,premiums,address(bob), "");
+        strategyContract.executeOperation(assets, amounts, premiums, address(bob), "");
     }
 
     function test__harvest() public override {
@@ -584,12 +514,7 @@ contract WstETHLooperTest is BaseStrategyTest {
         strategy.harvest(hex"");
 
         // LTV should be at target now
-        assertApproxEqAbs(
-            strategyContract.targetLTV(), 
-            strategyContract.getLTV(),
-            1,
-            string.concat("ltv != expected")    
-        );
+        assertApproxEqAbs(strategyContract.targetLTV(), strategyContract.getLTV(), 1, string.concat("ltv != expected"));
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -600,11 +525,7 @@ contract WstETHLooperTest is BaseStrategyTest {
         assertEq(strategy.asset(), address(wstETH), "asset");
         assertEq(
             IERC20Metadata(address(strategy)).name(),
-            string.concat(
-                "VaultCraft Leveraged ",
-                IERC20Metadata(address(wstETH)).name(),
-                " Adapter"
-            ),
+            string.concat("VaultCraft Leveraged ", IERC20Metadata(address(wstETH)).name(), " Adapter"),
             "name"
         );
         assertEq(
@@ -613,11 +534,6 @@ contract WstETHLooperTest is BaseStrategyTest {
             "symbol"
         );
 
-        assertApproxEqAbs(
-            wstETH.allowance(address(strategy), address(lendingPool)),
-            type(uint256).max,
-            1,
-            "allowance"
-        );
+        assertApproxEqAbs(wstETH.allowance(address(strategy), address(lendingPool)), type(uint256).max, 1, "allowance");
     }
 }
