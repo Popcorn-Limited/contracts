@@ -16,7 +16,6 @@ import {
     TokenOutput,
     SwapData
 } from "./IPendle.sol";
-import "forge-std/console.sol";
 
 /**
  * @title   ERC4626 Pendle Protocol Vault Adapter
@@ -108,9 +107,12 @@ contract PendleDepositor is BaseStrategy {
     function maxDeposit(address who) public view override returns (uint256) {
         if(paused()) return 0;
         
-        try ISYTokenV3(pendleSYToken).supplyCap() returns (uint256 supplyCap) {
-            console.log("HERE");
-            return supplyCap - ISYTokenV3(pendleSYToken).totalSupply();
+        ISYTokenV3 syToken = ISYTokenV3(pendleSYToken);
+
+        try syToken.supplyCap() returns (uint256 supplyCap) {
+            uint256 syCap = supplyCap - syToken.totalSupply();
+            
+            return syCap.mulDiv(syToken.exchangeRate(), 1e18, Math.Rounding.Floor);
         } catch {
             return super.maxDeposit(who);
         }
@@ -175,10 +177,6 @@ contract PendleDepositor is BaseStrategy {
         // caching
         address asset = asset();
 
-        // floating is already scaled from the amount by the base strategy
-        // we have to use it just to determine if withdrawAmount == totalAssets
-        uint256 float = IERC20(asset).balanceOf(address(this));
-
         // Empty structs
         LimitOrderData memory limitOrderData;
         SwapData memory swapData;
@@ -186,7 +184,7 @@ contract PendleDepositor is BaseStrategy {
         TokenOutput memory tokenOutput = TokenOutput(asset, amount, asset, address(0), swapData);
 
         pendleRouter.removeLiquiditySingleToken(
-            address(this), address(pendleMarket), amountToLp(amount + float, totalAssets()), tokenOutput, limitOrderData
+            address(this), address(pendleMarket), amountToLp(amount, _totalAssets()), tokenOutput, limitOrderData
         );
     }
 

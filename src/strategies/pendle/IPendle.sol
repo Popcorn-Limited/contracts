@@ -150,6 +150,9 @@ interface IPendleSYToken {
     function getTokensOut() external view returns (address[] memory);
 
     function totalSupply() external view returns (uint256);
+    
+    // returns exchange rate with underlying
+    function exchangeRate() external view returns(uint256);
 }
 
 interface ISYTokenV3 is IPendleSYToken {

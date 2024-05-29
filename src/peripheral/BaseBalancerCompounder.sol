@@ -4,6 +4,7 @@
 pragma solidity ^0.8.25;
 
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 import {BalancerTradeLibrary, IBalancerVault, IAsset, BatchSwapStep} from "./BalancerTradeLibrary.sol";
 
 struct TradePath {
@@ -13,6 +14,7 @@ struct TradePath {
 }
 
 abstract contract BaseBalancerCompounder {
+    using SafeERC20 for IERC20;
     IBalancerVault public balancerVault;
 
     address[] public _balancerSellTokens;
@@ -51,7 +53,7 @@ abstract contract BaseBalancerCompounder {
 
             // void approvals
             for (uint256 i = 0; i < rewardTokenLen;) {
-                IERC20(oldRewardTokens[i]).approve(oldBalancerVault, 0);
+                IERC20(oldRewardTokens[i]).forceApprove(oldBalancerVault, 0);
 
                 unchecked {
                     ++i;
@@ -69,7 +71,7 @@ abstract contract BaseBalancerCompounder {
         for (uint256 i; i < rewardTokenLen;) {
             newRewardToken = address(newTradePaths[i].assets[0]);
 
-            IERC20(newRewardToken).approve(newBalancerVault, type(uint256).max);
+            IERC20(newRewardToken).forceApprove(newBalancerVault, type(uint256).max);
 
             _balancerSellTokens.push(newRewardToken);
             tradePaths.push(newTradePaths[i]);

@@ -4,10 +4,13 @@
 pragma solidity ^0.8.25;
 
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 import {ICurveRouter, CurveSwap, ICurveLp} from "../strategies/curve/ICurve.sol";
 import {CurveTradeLibrary} from "./CurveTradeLibrary.sol";
 
 abstract contract BaseCurveCompounder {
+    using SafeERC20 for IERC20;
+    
     ICurveRouter public curveRouter;
 
     address[] public _curveSellTokens;
@@ -43,7 +46,7 @@ abstract contract BaseCurveCompounder {
 
             // void approvals
             for (uint256 i = 0; i < sellTokensLen;) {
-                IERC20(oldSellTokens[i]).approve(oldRouter, 0);
+                IERC20(oldSellTokens[i]).forceApprove(oldRouter, 0);
 
                 unchecked {
                     ++i;
@@ -61,7 +64,7 @@ abstract contract BaseCurveCompounder {
         for (uint256 i = 0; i < sellTokensLen;) {
             newRewardToken = newSwaps[i].route[0];
 
-            IERC20(newRewardToken).approve(newRouter, type(uint256).max);
+            IERC20(newRewardToken).forceApprove(newRouter, type(uint256).max);
 
             _curveSellTokens.push(newRewardToken);
             curveSwaps.push(newSwaps[i]);
