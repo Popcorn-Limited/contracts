@@ -134,6 +134,22 @@ contract PendleBalancerCurveCompounderTest is BaseStrategyTest {
         assertEq(strategy.maxDeposit(bob), 0);
     }
 
+    function test__previewWithdraw(uint8 fuzzAmount) public override {
+        uint256 amount = bound(fuzzAmount, testConfig.minDeposit, testConfig.maxDeposit);
+
+        /// Some strategies have slippage or rounding errors which makes `maWithdraw` lower than the deposit amount
+        uint256 reqAssets = strategy.previewMint(strategy.previewWithdraw(amount));
+
+        _mintAssetAndApproveForStrategy(reqAssets, bob);
+
+        vm.prank(bob);
+        strategy.deposit(reqAssets, bob);
+
+        amount = strategy.totalAssets();
+        
+        prop_previewWithdraw(bob, bob, bob, amount, testConfig.testId);
+    }
+
     function test_depositWithdraw() public {
         assertEq(IERC20(pendleMarket).balanceOf(address(strategy)), 0);
 

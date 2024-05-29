@@ -103,6 +103,22 @@ contract PendleBalancerCompounderTest is BaseStrategyTest {
         verify_strategyInit();
     }
 
+    function test__previewWithdraw(uint8 fuzzAmount) public override {
+        uint256 amount = bound(fuzzAmount, testConfig.minDeposit, testConfig.maxDeposit);
+
+        /// Some strategies have slippage or rounding errors which makes `maWithdraw` lower than the deposit amount
+        uint256 reqAssets = strategy.previewMint(strategy.previewWithdraw(amount));
+
+        _mintAssetAndApproveForStrategy(reqAssets, bob);
+
+        vm.prank(bob);
+        strategy.deposit(reqAssets, bob);
+
+        amount = strategy.totalAssets();
+        
+        prop_previewWithdraw(bob, bob, bob, amount, testConfig.testId);
+    }
+
     function test_depositWithdraw() public {
         assertEq(IERC20(pendleMarket).balanceOf(address(strategy)), 0);
 
@@ -131,25 +147,6 @@ contract PendleBalancerCompounderTest is BaseStrategyTest {
         IERC20(strategy.asset()).approve(address(strategy), type(uint256).max);
         strategy.deposit(amount, bob);
         vm.stopPrank();
-
-        // // only pendle reward
-        // BalancerRewardTokenData[] memory rewData = new BalancerRewardTokenData[](1);
-
-        // bytes32[] memory pools = new bytes32[](2);
-        // pools[0] = hex"fd1cf6fd41f229ca86ada0584c63c49c3d66bbc9000200000000000000000438"; // pendle/weth
-        // pools[1] = hex"93d199263632a4ef4bb438f1feb99e57b4b5f0bd0000000000000000000005c2"; // weth/wstETH
-
-        // rewData[0].poolIds = pools;
-        // rewData[0].minTradeAmount = 0;
-
-        // rewData[0].pathAddresses = new address[](3);
-        // rewData[0].pathAddresses[0] = pendleToken;
-        // rewData[0].pathAddresses[1] = WETH;
-        // rewData[0].pathAddresses[2] = strategy.asset();
-
-        // // set harvest data
-        // strategyContract.setHarvestData(balancerRouter, rewData);
-        // _setHarvestValues(json_, index_, strategy);
 
         vm.roll(block.number + 1_000_000);
         vm.warp(block.timestamp + 15_000_000);
