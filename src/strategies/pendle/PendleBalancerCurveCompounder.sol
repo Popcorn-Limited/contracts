@@ -31,6 +31,7 @@ contract PendleBalancerCurveCompounder is PendleDepositor, BaseBalancerCompounde
     function initialize(address asset_, address owner_, bool autoDeposit_, bytes memory strategyInitData_)
         external
         virtual
+        override
         initializer
     {
         __PendleBase_init(asset_, owner_, autoDeposit_, strategyInitData_);

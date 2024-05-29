@@ -5,8 +5,11 @@ pragma solidity ^0.8.15;
 
 import {Test} from "forge-std/Test.sol";
 
-import {PendleBalancerCurveCompounder} from "../../../src/strategies/pendle/PendleBalancerCurveCompounder.sol";
+import {IPendleRouter, IPendleSYToken, ISYTokenV3} from "../../../src/strategies/pendle/IPendle.sol";
+import {PendleBalancerCurveCompounder, CurveSwap, IERC20, PendleDepositor} from "../../../src/strategies/pendle/PendleBalancerCurveCompounder.sol";
 import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson, Math} from "../BaseStrategyTest.sol";
+import {TradePath, IAsset, BatchSwapStep} from "../../../src/peripheral/BaseBalancerCompounder.sol";
+import {IERC20Metadata} from "openzeppelin-contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 contract PendleBalancerCurveCompounderTest is BaseStrategyTest {
     using stdJson for string;
@@ -20,22 +23,23 @@ contract PendleBalancerCurveCompounderTest is BaseStrategyTest {
 
     address curveRouter = address(0xF0d4c12A5768D806021F80a262B4d39d26C58b8D);
 
-    IPendleSYToken synToken;
+    address syToken;
     address pendleMarket;
     address pendleToken = address(0x808507121B80c02388fAd14726482e061B8da827);
     address WETH = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
     address USDC = address(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
     address USDe = address(0x4c9EDD5852cd905f086C759E8383e09bff1E68B3);
     address pendleRouterStatic;
+    address asset;
 
-    PendleAdapterBalancerCurveHarvest adapterContract;
+    PendleBalancerCurveCompounder strategyContract;
 
     uint256 swapDelay;
 
     function setUp() public {
         _setUpBaseTest(
-            1,
-            "./test/strategies/pendle/PendleBalancerCurveHarvestTestConfig.json"
+            0,
+            "./test/strategies/pendle/PendleBalancerCurveCompounderTestConfig.json"
         );
     }
 
@@ -45,34 +49,189 @@ contract PendleBalancerCurveCompounderTest is BaseStrategyTest {
         TestConfig memory testConfig_
     ) internal override returns (IBaseStrategy) {
         // Read strategy init values
-        address minter = json_.readAddress(
-            string.concat(".configs[", index_, "].specific.init.minter")
-        );
-
-        address gauge = json_.readAddress(
-            string.concat(".configs[", index_, "].specific.init.gauge")
-        );
+        // Read strategy init values
+        pendleMarket = json_.readAddress(string.concat(".configs[", index_, "].specific.init.pendleMarket"));
+        pendleRouter = IPendleRouter(json_.readAddress(string.concat(".configs[", index_, "].specific.init.pendleRouter")));
+        pendleRouterStatic = json_.readAddress(string.concat(".configs[", index_, "].specific.init.pendleRouterStat"));
+        swapDelay = json_.readUint(string.concat(".configs[", index_, "].specific.init.swapDelay"));
 
         // Deploy Strategy
-        BalancerCompounder strategy = new BalancerCompounder();
+        PendleBalancerCurveCompounder strategy = new PendleBalancerCurveCompounder();
 
         strategy.initialize(
             testConfig_.asset,
             address(this),
             true,
-            abi.encode(minter, gauge)
+            abi.encode(pendleMarket, pendleRouter, pendleRouterStatic, swapDelay)
         );
 
+        asset = strategy.asset();
+        syToken = strategy.pendleSYToken();
+        
         // Set Harvest values
-        _setHarvestValues(json_, index_, address(strategy));
+        _setHarvestValues(json_, index_, payable(strategy));
 
         return IBaseStrategy(address(strategy));
     }
 
+    /*//////////////////////////////////////////////////////////////
+                          HELPER
+    //////////////////////////////////////////////////////////////*/
+
+    function iouBalance() public view returns (uint256) {
+        return IERC20(pendleMarket).balanceOf(address(strategy));
+    }
+
+    function increasePricePerShare(uint256 amount) public {
+        deal(
+            address(asset),
+            address(pendleMarket),
+            IERC20(address(asset)).balanceOf(address(pendleMarket)) + amount
+        );
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                          INITIALIZATION
+    //////////////////////////////////////////////////////////////*/
+
+    function test__initialization() public override {
+        string memory json = vm.readFile("./test/strategies/pendle/PendleBalancerCurveCompounderTestConfig.json");
+
+        // Read strategy init values
+        pendleMarket = json.readAddress(string.concat(".configs[0].specific.init.pendleMarket"));
+        pendleRouter = IPendleRouter(json.readAddress(string.concat(".configs[0].specific.init.pendleRouter")));
+        pendleRouterStatic = json.readAddress(string.concat(".configs[0].specific.init.pendleRouterStat"));
+        swapDelay = json.readUint(string.concat(".configs[0].specific.init.swapDelay"));
+
+        // Deploy Strategy
+        PendleBalancerCurveCompounder strategy = new PendleBalancerCurveCompounder();
+
+        strategy.initialize(
+            asset,
+            address(this),
+            true,
+            abi.encode(pendleMarket, pendleRouter, pendleRouterStatic, swapDelay)
+        );
+
+        assertEq(strategy.owner(), address(this), "owner");
+
+        verify_strategyInit();
+    }
+
+    function test__maxDeposit() public override {
+        uint256 maxDeposit = ISYTokenV3(syToken).supplyCap() - ISYTokenV3(syToken).totalSupply();
+
+        assertEq(strategy.maxDeposit(bob), maxDeposit);
+
+        // We need to deposit smth since pause tries to burn rETH which it cant if balance is 0
+        _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
+        vm.prank(bob);
+        strategy.deposit(testConfig.defaultAmount, bob);
+
+        vm.prank(address(this));
+        strategy.pause();
+
+        assertEq(strategy.maxDeposit(bob), 0);
+    }
+
+    function test_depositWithdraw() public {
+        assertEq(IERC20(pendleMarket).balanceOf(address(strategy)), 0);
+
+        uint256 amount = 100 ether;
+        deal(strategy.asset(), bob, amount);
+
+        vm.startPrank(bob);
+        IERC20(strategy.asset()).approve(address(strategy), type(uint256).max);
+        strategy.deposit(amount, bob);
+
+        assertGt(IERC20(pendleMarket).balanceOf(address(strategy)), 0);
+        uint256 totAssets = strategy.totalAssets();
+
+        // remove partial amount
+        uint256 shares = IERC20(address(strategy))
+            .balanceOf(address(bob))
+            .mulDiv(2e17, 1e18, Math.Rounding.Ceil);
+
+        strategy.redeem(shares, bob, bob);
+        assertEq(
+            IERC20(strategy.asset()).balanceOf(bob),
+            totAssets.mulDiv(2e17, 1e18, Math.Rounding.Floor)
+        );
+
+        // redeem whole amount
+        strategy.redeem(IERC20(address(strategy)).balanceOf(bob), bob, bob);
+
+        uint256 floating = IERC20(strategy.asset()).balanceOf(address(strategy));
+
+        assertEq(IERC20(pendleMarket).balanceOf(address(strategy)), 0);
+        assertEq(floating, 0);
+    }
+
+    function test__harvest() public override {
+        uint256 amount = 100 ether;
+        deal(strategy.asset(), bob, amount);
+
+        vm.startPrank(bob);
+        IERC20(strategy.asset()).approve(address(strategy), type(uint256).max);
+        strategy.deposit(amount, bob);
+        vm.stopPrank();
+
+        vm.roll(block.number + 1_000);
+        vm.warp(block.timestamp + 15_000);
+
+        uint256 totAssetsBefore = strategy.totalAssets();
+        strategy.harvest(hex"");
+
+        // total assets have increased
+        assertGt(strategy.totalAssets(), totAssetsBefore);
+    }
+
+    function verify_strategyInit() public {
+        assertEq(
+            IERC20Metadata(address(strategy)).name(),
+            string.concat(
+                "VaultCraft Pendle ",
+                IERC20Metadata(address(asset)).name(),
+                " Adapter"
+            ),
+            "name"
+        );
+        assertEq(
+            IERC20Metadata(address(strategy)).symbol(),
+            string.concat("vcp-", IERC20Metadata(address(asset)).symbol()),
+            "symbol"
+        );
+
+        assertEq(
+            IERC20(asset).allowance(address(strategy), address(pendleRouter)),
+            type(uint256).max,
+            "allowance"
+        );
+    }
+
+    function test_invalidToken() public {
+        // Revert if asset is not compatible with pendle market
+        address invalidAsset = address(
+            0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2
+        );
+
+        // Deploy Strategy
+        PendleBalancerCurveCompounder strategy = new PendleBalancerCurveCompounder();
+
+        vm.expectRevert(PendleDepositor.InvalidAsset.selector);
+        strategy.initialize(
+            invalidAsset, 
+            address(this), 
+            true, 
+            abi.encode(pendleMarket, address(pendleRouter), pendleRouterStatic, swapDelay)
+        );
+    }
+
+
     function _setHarvestValues(
         string memory json_,
         string memory index_,
-        address strategy
+        address payable strategy
     ) internal {
         // Read harvest values
         address balancerVault_ = json_.readAddress(
@@ -83,23 +242,20 @@ contract PendleBalancerCurveCompounderTest is BaseStrategyTest {
             )
         );
 
-        HarvestValues memory harvestValues_ = abi.decode(
-            json_.parseRaw(
-                string.concat(
-                    ".configs[",
-                    index_,
-                    "].specific.harvest.harvestValues"
-                )
-            ),
-            (HarvestValues)
-        );
-
         TradePath[] memory tradePaths_ = _getTradePaths(json_, index_);
 
+        address curveRouter_ =
+            abi.decode(json_.parseRaw(string.concat(".configs[", index_, "].specific.harvest.curveRouter")), (address));
+
+        //Construct CurveSwap structs
+        CurveSwap[] memory swaps_ = _getCurveSwaps(json_, index_);
+
         // Set harvest values
-        PendleBalancerCurveCompounder(strategy).setHarvestValues(
+        PendleBalancerCurveCompounder(payable(strategy)).setHarvestValues(
             balancerVault_,
             tradePaths_,
+            curveRouter,
+            swaps_
         );
     }
 
@@ -165,294 +321,52 @@ contract PendleBalancerCurveCompounderTest is BaseStrategyTest {
         return tradePaths_;
     }
 
-    /*//////////////////////////////////////////////////////////////
-                          HELPER
-    //////////////////////////////////////////////////////////////*/
 
-    function iouBalance() public view override returns (uint256) {
-        return IERC20(pendleMarket).balanceOf(address(adapter));
-    }
+    function _getCurveSwaps(string memory json_, string memory index_) internal pure returns (CurveSwap[] memory) {
+        uint256 swapLen = json_.readUint(string.concat(".configs[", index_, "].specific.harvest.swaps.length"));
 
-    function increasePricePerShare(uint256 amount) public override {
-        deal(
-            address(asset),
-            address(pendleMarket),
-            IERC20(address(asset)).balanceOf(address(pendleMarket)) + amount
-        );
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                          INITIALIZATION
-    //////////////////////////////////////////////////////////////*/
-
-    function test__initialization() public override {
-        createAdapter();
-
-        adapter.initialize(
-            abi.encode(asset, address(this), strategy, 0, sigs, ""),
-            address(pendleRouter),
-            abi.encode(pendleMarket, pendleRouterStatic, swapDelay)
-        );
-
-        assertEq(adapter.owner(), address(this), "owner");
-        assertEq(adapter.strategy(), address(strategy), "strategy");
-        assertEq(adapter.harvestCooldown(), 0, "harvestCooldown");
-        assertEq(adapter.strategyConfig(), "", "strategyConfig");
-        assertEq(
-            IERC20Metadata(address(adapter)).decimals(),
-            IERC20Metadata(address(asset)).decimals() + adapter.decimalOffset(),
-            "decimals"
-        );
-
-        verify_adapterInit();
-    }
-
-    function test__disable_auto_harvest() public override {
-        adapter.toggleAutoHarvest();
-        super.test__disable_auto_harvest();
-    }
-
-    function test__maxDeposit() public override {
-        uint256 amount = adapter.maxDeposit(bob);
-
-        prop_maxDeposit(bob);
-
-        // Deposit smth so withdraw on pause is not 0
-        _mintAsset(amount, address(this));
-        asset.approve(address(adapter), amount);
-        adapter.deposit(amount, address(this));
-        adapter.pause();
-        assertEq(adapter.maxDeposit(bob), 0);
-    }
-
-    // override tests that uses multiple configurations
-    // as this adapter only wants USDe
-    function test__deposit(uint8 fuzzAmount) public override {
-        uint8 len = uint8(testConfigStorage.getTestConfigLength());
-        for (uint8 i; i < len; i++) {
-            if (i > 0) overrideSetup(testConfigStorage.getTestConfig(1));
-            uint256 amount = bound(uint256(fuzzAmount), minFuzz, maxAssets);
-
-            _mintAssetAndApproveForAdapter(amount, bob);
-
-            prop_deposit(bob, bob, amount, testId);
-
-            increasePricePerShare(raise);
-
-            _mintAssetAndApproveForAdapter(amount, bob);
-            prop_deposit(bob, alice, amount, testId);
-        }
-    }
-
-    function test__mint(uint8 fuzzAmount) public override {
-        uint8 len = uint8(testConfigStorage.getTestConfigLength());
-        for (uint8 i; i < len; i++) {
-            if (i > 0) overrideSetup(testConfigStorage.getTestConfig(1));
-            uint256 amount = bound(uint256(fuzzAmount), minShares, maxShares);
-
-            _mintAssetAndApproveForAdapter(adapter.previewMint(amount), bob);
-
-            prop_mint(bob, bob, amount, testId);
-
-            increasePricePerShare(raise);
-
-            _mintAssetAndApproveForAdapter(adapter.previewMint(amount), bob);
-
-            prop_mint(bob, alice, amount, testId);
-        }
-    }
-
-    function test__redeem(uint8 fuzzAmount) public override {
-        uint8 len = uint8(testConfigStorage.getTestConfigLength());
-        for (uint8 i; i < len; i++) {
-            if (i > 0) overrideSetup(testConfigStorage.getTestConfig(1));
-            uint256 amount = bound(uint256(fuzzAmount), minShares, maxShares);
-
-            uint256 reqAssets = adapter.previewMint(amount);
-            _mintAssetAndApproveForAdapter(reqAssets, bob);
-
-            vm.prank(bob);
-            adapter.deposit(reqAssets, bob);
-            prop_redeem(bob, bob, adapter.maxRedeem(bob), testId);
-
-            _mintAssetAndApproveForAdapter(reqAssets, bob);
-            vm.prank(bob);
-            adapter.deposit(reqAssets, bob);
-
-            increasePricePerShare(raise);
-
-            vm.prank(bob);
-            adapter.approve(alice, type(uint256).max);
-            prop_redeem(alice, bob, adapter.maxRedeem(bob), testId);
-        }
-    }
-
-    function test__withdraw(uint8 fuzzAmount) public override {
-        uint8 len = uint8(testConfigStorage.getTestConfigLength());
-        for (uint8 i; i < len; i++) {
-            if (i > 0) overrideSetup(testConfigStorage.getTestConfig(1));
-            uint256 amount = bound(uint256(fuzzAmount), minFuzz, maxAssets);
-
-            uint256 reqAssets = adapter.previewMint(
-                adapter.previewWithdraw(amount)
+        CurveSwap[] memory swaps_ = new CurveSwap[](swapLen);
+        for (uint256 i; i < swapLen; i++) {
+            // Read route and convert dynamic into fixed size array
+            address[] memory route_ = json_.readAddressArray(
+                string.concat(".configs[", index_, "].specific.harvest.swaps.structs[", vm.toString(i), "].route")
             );
-            _mintAssetAndApproveForAdapter(reqAssets, bob);
-            vm.prank(bob);
-            adapter.deposit(reqAssets, bob);
+            address[11] memory route;
+            for (uint256 n; n < 11; n++) {
+                route[n] = route_[n];
+            }
 
-            prop_withdraw(bob, bob, adapter.maxWithdraw(bob), testId);
+            // Read swapParams and convert dynamic into fixed size array
+            uint256[5][5] memory swapParams;
+            for (uint256 n = 0; n < 5; n++) {
+                uint256[] memory swapParams_ = json_.readUintArray(
+                    string.concat(
+                        ".configs[",
+                        index_,
+                        "].specific.harvest.swaps.structs[",
+                        vm.toString(i),
+                        "].swapParams[",
+                        vm.toString(n),
+                        "]"
+                    )
+                );
+                for (uint256 y; y < 5; y++) {
+                    swapParams[n][y] = swapParams_[y];
+                }
+            }
 
-            _mintAssetAndApproveForAdapter(reqAssets, bob);
-            vm.prank(bob);
-            adapter.deposit(reqAssets, bob);
+            // Read pools and convert dynamic into fixed size array
+            address[] memory pools_ = json_.readAddressArray(
+                string.concat(".configs[", index_, "].specific.harvest.swaps.structs[", vm.toString(i), "].pools")
+            );
+            address[5] memory pools;
+            for (uint256 n = 0; n < 5; n++) {
+                pools[n] = pools_[n];
+            }
 
-            increasePricePerShare(raise);
-
-            vm.prank(bob);
-            adapter.approve(alice, type(uint256).max);
-
-            prop_withdraw(alice, bob, adapter.maxWithdraw(bob), testId);
+            // Construct the struct
+            swaps_[i] = CurveSwap({route: route, swapParams: swapParams, pools: pools});
         }
-    }
-
-    function test_depositWithdraw() public {
-        assertEq(IERC20(pendleMarket).balanceOf(address(adapter)), 0);
-
-        uint256 amount = 100 ether;
-        deal(adapter.asset(), bob, amount);
-
-        vm.startPrank(bob);
-        IERC20(adapter.asset()).approve(address(adapter), type(uint256).max);
-        adapter.deposit(amount, bob);
-
-        assertGt(IERC20(pendleMarket).balanceOf(address(adapter)), 0);
-        uint256 totAssets = adapter.totalAssets();
-
-        // remove partial amount
-        uint256 shares = IERC20(address(adapter))
-            .balanceOf(address(bob))
-            .mulDiv(2e17, 1e18, Math.Rounding.Ceil);
-        adapter.redeem(shares, bob, bob);
-        assertEq(
-            IERC20(adapter.asset()).balanceOf(bob),
-            totAssets.mulDiv(2e17, 1e18, Math.Rounding.Floor)
-        );
-
-        // redeem whole amount
-        adapter.redeem(IERC20(address(adapter)).balanceOf(bob), bob, bob);
-
-        uint256 floating = IERC20(adapter.asset()).balanceOf(address(adapter));
-
-        assertEq(IERC20(pendleMarket).balanceOf(address(adapter)), 0);
-        assertEq(floating, 0);
-    }
-
-    function test__harvest() public override {
-        // adapter.toggleAutoHarvest();
-
-        uint256 amount = 100 ether;
-        deal(adapter.asset(), bob, amount);
-
-        vm.startPrank(bob);
-        IERC20(adapter.asset()).approve(address(adapter), type(uint256).max);
-        adapter.deposit(amount, bob);
-        vm.stopPrank();
-
-        // only pendle reward
-        BalancerRewardTokenData[]
-            memory rewData = new BalancerRewardTokenData[](1);
-
-        bytes32[] memory pools = new bytes32[](2);
-        pools[
-            0
-        ] = hex"fd1cf6fd41f229ca86ada0584c63c49c3d66bbc9000200000000000000000438"; // pendle/weth
-        pools[
-            1
-        ] = hex"96646936b91d6b9d7d0c47c496afbf3d6ec7b6f8000200000000000000000019"; // weth/USDC
-
-        rewData[0].poolIds = pools;
-        rewData[0].minTradeAmount = 0;
-
-        rewData[0].pathAddresses = new address[](3);
-        rewData[0].pathAddresses[0] = pendleToken;
-        rewData[0].pathAddresses[1] = WETH;
-        rewData[0].pathAddresses[2] = USDC;
-
-        // curve data
-        address[11] memory route = [
-            USDC, // usdc
-            address(0x02950460E2b9529D0E00284A5fA2d7bDF3fA4d72), // usdc/usde pool
-            USDe, // usde
-            address(0),
-            address(0),
-            address(0),
-            address(0),
-            address(0),
-            address(0),
-            address(0),
-            address(0)
-        ];
-
-        uint256[5][5] memory swapParams; // [i, j, swap type, pool_type, n_coins]
-        swapParams[0] = [uint256(1), 0, 1, 1, 2];
-        address[5] memory curvePools;
-        curvePools[0] = address(0x02950460E2b9529D0E00284A5fA2d7bDF3fA4d72);
-
-        CurveSwap memory curveSwap = CurveSwap(route, swapParams, curvePools);
-
-        // set harvest data
-        adapterContract.setHarvestData(
-            balancerRouter,
-            curveRouter,
-            rewData,
-            curveSwap
-        );
-
-        vm.roll(block.number + 1_000);
-        vm.warp(block.timestamp + 15_000);
-
-        uint256 totAssetsBefore = adapter.totalAssets();
-        adapter.harvest();
-
-        // total assets have increased
-        assertGt(adapter.totalAssets(), totAssetsBefore);
-    }
-
-    function verify_adapterInit() public override {
-        assertEq(
-            IERC20Metadata(address(adapter)).name(),
-            string.concat(
-                "VaultCraft Pendle ",
-                IERC20Metadata(address(asset)).name(),
-                " Adapter"
-            ),
-            "name"
-        );
-        assertEq(
-            IERC20Metadata(address(adapter)).symbol(),
-            string.concat("vc-", IERC20Metadata(address(asset)).symbol()),
-            "symbol"
-        );
-
-        assertEq(
-            asset.allowance(address(adapter), address(pendleRouter)),
-            type(uint256).max,
-            "allowance"
-        );
-    }
-
-    function testFail_invalidToken() public {
-        // Revert if asset is not compatible with pendle market
-        address invalidAsset = address(
-            0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2
-        );
-
-        createAdapter();
-
-        adapter.initialize(
-            abi.encode(invalidAsset, address(this), strategy, 0, sigs, ""),
-            address(pendleRouter),
-            abi.encode(pendleMarket, pendleRouterStatic, swapDelay)
-        );
+        return swaps_;
     }
 }

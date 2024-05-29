@@ -6,7 +6,7 @@
         "asset": "0x4c9EDD5852cd905f086C759E8383e09bff1E68B3",
         "blockNumber": 19823003,
         "defaultAmount": 1000000000000000000,
-        "delta": 10,
+        "delta": 10000000000000000,
         "maxDeposit": 1000000000000000000000,
         "maxWithdraw": 1000000000000000000000,
         "minDeposit": 1000000000000000,
@@ -48,7 +48,7 @@
                   {
                     "a-poolId": "0x96646936b91d6b9d7d0c47c496afbf3d6ec7b6f8000200000000000000000019",
                     "b-assetInIndex": 1,
-                    "c-assetOutIndex": 0,
+                    "c-assetOutIndex": 2,
                     "d-amount": 0,
                     "e-userData": ""
                   }

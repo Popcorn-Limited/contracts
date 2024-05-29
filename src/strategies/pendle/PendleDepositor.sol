@@ -16,6 +16,7 @@ import {
     TokenOutput,
     SwapData
 } from "./IPendle.sol";
+import "forge-std/console.sol";
 
 /**
  * @title   ERC4626 Pendle Protocol Vault Adapter
@@ -105,7 +106,10 @@ contract PendleDepositor is BaseStrategy {
 
     /// @notice Some pendle markets may have a supply cap, some not
     function maxDeposit(address who) public view override returns (uint256) {
+        if(paused()) return 0;
+        
         try ISYTokenV3(pendleSYToken).supplyCap() returns (uint256 supplyCap) {
+            console.log("HERE");
             return supplyCap - ISYTokenV3(pendleSYToken).totalSupply();
         } catch {
             return super.maxDeposit(who);
@@ -118,7 +122,7 @@ contract PendleDepositor is BaseStrategy {
         if (lpBalance == 0) {
             t = 0;
         } else {
-            (t,,,,,,,) = pendleRouterStatic.removeLiquiditySingleTokenStatic(pendleMarket, lpBalance, asset());
+            (t,,,,,,,) = pendleRouterStatic.removeLiquiditySingleTokenStatic(address(pendleMarket), lpBalance, asset());
         }
     }
 
@@ -140,7 +144,7 @@ contract PendleDepositor is BaseStrategy {
     }
 
     /// @notice Claim liquidity mining rewards given that it's active
-    function claim() public override returns (bool success) {
+    function claim() internal override returns (bool success) {
         try IPendleMarket(pendleMarket).redeemRewards(address(this)) {
             success = true;
         } catch {}
@@ -164,24 +168,25 @@ contract PendleDepositor is BaseStrategy {
         uint256 netInput = amount == maxDeposit(address(this)) ? amount : IERC20(asset).balanceOf(address(this)); // amount + eventual floating
 
         TokenInput memory tokenInput = TokenInput(asset, netInput, asset, address(0), swapData);
-        pendleRouter.addLiquiditySingleToken(address(this), pendleMarket, 0, approxParams, tokenInput, limitOrderData);
+        pendleRouter.addLiquiditySingleToken(address(this), address(pendleMarket), 0, approxParams, tokenInput, limitOrderData);
     }
 
     function _protocolWithdraw(uint256 amount, uint256, bytes memory) internal virtual override {
         // caching
         address asset = asset();
 
-        // sub floating
-        uint256 protocolAmount = amount - IERC20(asset).balanceOf(address(this));
+        // floating is already scaled from the amount by the base strategy
+        // we have to use it just to determine if withdrawAmount == totalAssets
+        uint256 float = IERC20(asset).balanceOf(address(this));
 
         // Empty structs
         LimitOrderData memory limitOrderData;
         SwapData memory swapData;
 
-        TokenOutput memory tokenOutput = TokenOutput(asset, protocolAmount, asset, address(0), swapData);
+        TokenOutput memory tokenOutput = TokenOutput(asset, amount, asset, address(0), swapData);
 
         pendleRouter.removeLiquiditySingleToken(
-            address(this), pendleMarket, amountToLp(amount, totalAssets()), tokenOutput, limitOrderData
+            address(this), address(pendleMarket), amountToLp(amount + float, totalAssets()), tokenOutput, limitOrderData
         );
     }
 
