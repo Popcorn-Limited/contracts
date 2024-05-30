@@ -54,12 +54,9 @@ contract PendleBalancerCompounder is PendleDepositor, BaseBalancerCompounder {
     function harvest(bytes memory data) external override onlyKeeperOrOwner {
         claim();
 
-        // caching
-        address asset_ = asset();
-
         sellRewardsViaBalancer();
 
-        _protocolDeposit(IERC20(asset_).balanceOf(address(this)), 0, bytes(""));
+        _protocolDeposit(IERC20(asset()).balanceOf(address(this)), 0, data);
 
         emit Harvested();
     }

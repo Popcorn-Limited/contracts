@@ -34,8 +34,6 @@ contract PendleBalancerCurveCompounderTest is BaseStrategyTest {
 
     PendleBalancerCurveCompounder strategyContract;
 
-    uint256 swapDelay;
-
     function setUp() public {
         _setUpBaseTest(
             0,
@@ -49,11 +47,25 @@ contract PendleBalancerCurveCompounderTest is BaseStrategyTest {
         TestConfig memory testConfig_
     ) internal override returns (IBaseStrategy) {
         // Read strategy init values
-        // Read strategy init values
-        pendleMarket = json_.readAddress(string.concat(".configs[", index_, "].specific.init.pendleMarket"));
-        pendleRouter = IPendleRouter(json_.readAddress(string.concat(".configs[", index_, "].specific.init.pendleRouter")));
-        pendleRouterStatic = json_.readAddress(string.concat(".configs[", index_, "].specific.init.pendleRouterStat"));
-        swapDelay = json_.readUint(string.concat(".configs[", index_, "].specific.init.swapDelay"));
+        pendleMarket = json_.readAddress(
+            string.concat(".configs[", index_, "].specific.init.pendleMarket")
+        );
+        pendleRouter = IPendleRouter(
+            json_.readAddress(
+                string.concat(
+                    ".configs[",
+                    index_,
+                    "].specific.init.pendleRouter"
+                )
+            )
+        );
+        pendleRouterStatic = json_.readAddress(
+            string.concat(
+                ".configs[",
+                index_,
+                "].specific.init.pendleRouterStat"
+            )
+        );
 
         // Deploy Strategy
         PendleBalancerCurveCompounder strategy = new PendleBalancerCurveCompounder();
@@ -62,12 +74,12 @@ contract PendleBalancerCurveCompounderTest is BaseStrategyTest {
             testConfig_.asset,
             address(this),
             true,
-            abi.encode(pendleMarket, pendleRouter, pendleRouterStatic, swapDelay)
+            abi.encode(pendleMarket, pendleRouter, pendleRouterStatic)
         );
 
         asset = strategy.asset();
         syToken = strategy.pendleSYToken();
-        
+
         // Set Harvest values
         _setHarvestValues(json_, index_, payable(strategy));
 
@@ -95,13 +107,22 @@ contract PendleBalancerCurveCompounderTest is BaseStrategyTest {
     //////////////////////////////////////////////////////////////*/
 
     function test__initialization() public override {
-        string memory json = vm.readFile("./test/strategies/pendle/PendleBalancerCurveCompounderTestConfig.json");
+        string memory json = vm.readFile(
+            "./test/strategies/pendle/PendleBalancerCurveCompounderTestConfig.json"
+        );
 
         // Read strategy init values
-        pendleMarket = json.readAddress(string.concat(".configs[0].specific.init.pendleMarket"));
-        pendleRouter = IPendleRouter(json.readAddress(string.concat(".configs[0].specific.init.pendleRouter")));
-        pendleRouterStatic = json.readAddress(string.concat(".configs[0].specific.init.pendleRouterStat"));
-        swapDelay = json.readUint(string.concat(".configs[0].specific.init.swapDelay"));
+        pendleMarket = json.readAddress(
+            string.concat(".configs[0].specific.init.pendleMarket")
+        );
+        pendleRouter = IPendleRouter(
+            json.readAddress(
+                string.concat(".configs[0].specific.init.pendleRouter")
+            )
+        );
+        pendleRouterStatic = json.readAddress(
+            string.concat(".configs[0].specific.init.pendleRouterStat")
+        );
 
         // Deploy Strategy
         PendleBalancerCurveCompounder strategy = new PendleBalancerCurveCompounder();
@@ -110,7 +131,7 @@ contract PendleBalancerCurveCompounderTest is BaseStrategyTest {
             asset,
             address(this),
             true,
-            abi.encode(pendleMarket, pendleRouter, pendleRouterStatic, swapDelay)
+            abi.encode(pendleMarket, pendleRouter, pendleRouterStatic)
         );
 
         assertEq(strategy.owner(), address(this), "owner");
@@ -119,7 +140,8 @@ contract PendleBalancerCurveCompounderTest is BaseStrategyTest {
     }
 
     function test__maxDeposit() public override {
-        uint256 maxDeposit = ISYTokenV3(syToken).supplyCap() - ISYTokenV3(syToken).totalSupply();
+        uint256 maxDeposit = ISYTokenV3(syToken).supplyCap() -
+            ISYTokenV3(syToken).totalSupply();
 
         assertEq(strategy.maxDeposit(bob), maxDeposit);
 
@@ -135,10 +157,16 @@ contract PendleBalancerCurveCompounderTest is BaseStrategyTest {
     }
 
     function test__previewWithdraw(uint8 fuzzAmount) public override {
-        uint256 amount = bound(fuzzAmount, testConfig.minDeposit, testConfig.maxDeposit);
+        uint256 amount = bound(
+            fuzzAmount,
+            testConfig.minDeposit,
+            testConfig.maxDeposit
+        );
 
         /// Some strategies have slippage or rounding errors which makes `maWithdraw` lower than the deposit amount
-        uint256 reqAssets = strategy.previewMint(strategy.previewWithdraw(amount));
+        uint256 reqAssets = strategy.previewMint(
+            strategy.previewWithdraw(amount)
+        );
 
         _mintAssetAndApproveForStrategy(reqAssets, bob);
 
@@ -146,7 +174,7 @@ contract PendleBalancerCurveCompounderTest is BaseStrategyTest {
         strategy.deposit(reqAssets, bob);
 
         amount = strategy.totalAssets();
-        
+
         prop_previewWithdraw(bob, bob, bob, amount, testConfig.testId);
     }
 
@@ -177,7 +205,9 @@ contract PendleBalancerCurveCompounderTest is BaseStrategyTest {
         // redeem whole amount
         strategy.redeem(IERC20(address(strategy)).balanceOf(bob), bob, bob);
 
-        uint256 floating = IERC20(strategy.asset()).balanceOf(address(strategy));
+        uint256 floating = IERC20(strategy.asset()).balanceOf(
+            address(strategy)
+        );
 
         assertEq(IERC20(pendleMarket).balanceOf(address(strategy)), 0);
         assertEq(floating, 0);
@@ -236,13 +266,23 @@ contract PendleBalancerCurveCompounderTest is BaseStrategyTest {
 
         vm.expectRevert(PendleDepositor.InvalidAsset.selector);
         strategy.initialize(
-            invalidAsset, 
-            address(this), 
-            true, 
-            abi.encode(pendleMarket, address(pendleRouter), pendleRouterStatic, swapDelay)
+            invalidAsset,
+            address(this),
+            true,
+            abi.encode(pendleMarket, address(pendleRouter), pendleRouterStatic)
         );
     }
 
+    function test_setHarvestValues_rerun() public {
+        address[] memory oldRewards = strategy.rewardTokens();
+
+        _setHarvestValues(json, "0", payable(address(strategy)));
+
+        address[] memory newRewards = strategy.rewardTokens();
+
+        assertEq(oldRewards.length, newRewards.length);
+        assertEq(oldRewards[0], newRewards[0]);
+    }
 
     function _setHarvestValues(
         string memory json_,
@@ -260,8 +300,16 @@ contract PendleBalancerCurveCompounderTest is BaseStrategyTest {
 
         TradePath[] memory tradePaths_ = _getTradePaths(json_, index_);
 
-        address curveRouter_ =
-            abi.decode(json_.parseRaw(string.concat(".configs[", index_, "].specific.harvest.curveRouter")), (address));
+        address curveRouter_ = abi.decode(
+            json_.parseRaw(
+                string.concat(
+                    ".configs[",
+                    index_,
+                    "].specific.harvest.curveRouter"
+                )
+            ),
+            (address)
+        );
 
         //Construct CurveSwap structs
         CurveSwap[] memory swaps_ = _getCurveSwaps(json_, index_);
@@ -337,15 +385,29 @@ contract PendleBalancerCurveCompounderTest is BaseStrategyTest {
         return tradePaths_;
     }
 
-
-    function _getCurveSwaps(string memory json_, string memory index_) internal pure returns (CurveSwap[] memory) {
-        uint256 swapLen = json_.readUint(string.concat(".configs[", index_, "].specific.harvest.swaps.length"));
+    function _getCurveSwaps(
+        string memory json_,
+        string memory index_
+    ) internal pure returns (CurveSwap[] memory) {
+        uint256 swapLen = json_.readUint(
+            string.concat(
+                ".configs[",
+                index_,
+                "].specific.harvest.swaps.length"
+            )
+        );
 
         CurveSwap[] memory swaps_ = new CurveSwap[](swapLen);
         for (uint256 i; i < swapLen; i++) {
             // Read route and convert dynamic into fixed size array
             address[] memory route_ = json_.readAddressArray(
-                string.concat(".configs[", index_, "].specific.harvest.swaps.structs[", vm.toString(i), "].route")
+                string.concat(
+                    ".configs[",
+                    index_,
+                    "].specific.harvest.swaps.structs[",
+                    vm.toString(i),
+                    "].route"
+                )
             );
             address[11] memory route;
             for (uint256 n; n < 11; n++) {
@@ -373,7 +435,13 @@ contract PendleBalancerCurveCompounderTest is BaseStrategyTest {
 
             // Read pools and convert dynamic into fixed size array
             address[] memory pools_ = json_.readAddressArray(
-                string.concat(".configs[", index_, "].specific.harvest.swaps.structs[", vm.toString(i), "].pools")
+                string.concat(
+                    ".configs[",
+                    index_,
+                    "].specific.harvest.swaps.structs[",
+                    vm.toString(i),
+                    "].pools"
+                )
             );
             address[5] memory pools;
             for (uint256 n = 0; n < 5; n++) {
@@ -381,7 +449,11 @@ contract PendleBalancerCurveCompounderTest is BaseStrategyTest {
             }
 
             // Construct the struct
-            swaps_[i] = CurveSwap({route: route, swapParams: swapParams, pools: pools});
+            swaps_[i] = CurveSwap({
+                route: route,
+                swapParams: swapParams,
+                pools: pools
+            });
         }
         return swaps_;
     }

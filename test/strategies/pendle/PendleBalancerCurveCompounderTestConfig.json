@@ -18,8 +18,7 @@
         "init": {
           "pendleMarket": "0x19588F29f9402Bb508007FeADd415c875Ee3f19F",
           "pendleRouter": "0x888888888889758F76e7103c6CbF23ABbF58F946",
-          "pendleRouterStat": "0x263833d47eA3fA4a30f269323aba6a107f9eB14C",
-          "swapDelay": 600
+          "pendleRouterStat": "0x263833d47eA3fA4a30f269323aba6a107f9eB14C"
         },
         "harvest": {
           "balancerVault": "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
