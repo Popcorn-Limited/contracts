@@ -46,6 +46,7 @@ contract MultiStrategyVault is
     event VaultInitialized(bytes32 contractName, address indexed asset);
 
     error InvalidAsset();
+    error Duplicate();
 
     constructor() {
         _disableInitializers();
@@ -55,7 +56,7 @@ contract MultiStrategyVault is
      * @notice Initialize a new Vault.
      * @param asset_ Underlying Asset which users will deposit.
      * @param strategies_ strategies to be used to earn interest for this vault.
-     * @param defaultDepositIndex_ index of the strategy that the vault should use on deposit
+     * @param depositIndex_ index of the strategy that the vault should use on deposit
      * @param withdrawalQueue_ indices determining the order in which we should withdraw funds from strategies
      * @param depositLimit_ Maximum amount of assets which can be deposited.
      * @param owner_ Owner of the contract. Controls management functions.
@@ -64,9 +65,9 @@ contract MultiStrategyVault is
      */
     function initialize(
         IERC20 asset_,
-        IERC4626[] calldata strategies_,
-        uint256 defaultDepositIndex_,
-        uint256[] calldata withdrawalQueue_,
+        IERC4626[] memory strategies_,
+        uint256 depositIndex_,
+        uint256[] memory withdrawalQueue_,
         uint256 depositLimit_,
         address owner_
     ) external initializer {
@@ -77,51 +78,46 @@ contract MultiStrategyVault is
 
         if (address(asset_) == address(0)) revert InvalidAsset();
 
+        // Cache
         uint256 len = strategies_.length;
 
-        // Verify WithdrawalQueue
+        // Verify WithdrawalQueue length
         if (withdrawalQueue_.length != len) {
             revert InvalidWithdrawalQueue();
         }
 
         if (len > 0) {
-            // Set Strategies
+            // Verify strategies and withdrawal queue + approve asset for strategies
             for (uint256 i; i < len; i++) {
-                if (strategies_[i].asset() != address(asset_)) {
-                    revert VaultAssetMismatchNewAdapterAsset();
-                }
-                strategies.push(strategies_[i]);
+                _verifyStrategyAndWithdrawalQueue(
+                    i,
+                    len,
+                    address(asset_),
+                    strategies_,
+                    withdrawalQueue_
+                );
+
+                // Approve asset for strategy
+                // Doing this inside this loop instead of its own loop for gas savings
                 asset_.approve(address(strategies_[i]), type(uint256).max);
             }
 
-            // Set WithdrawalQueue
-            withdrawalQueue = new uint256[](len);
-
-            for (uint256 i; i < len; i++) {
-                uint256 index = withdrawalQueue_[i];
-
-                if (index > len - 1) {
-                    revert InvalidIndex();
-                }
-
-                withdrawalQueue[i] = index;
-            }
-
-            // Validate DefaultDepositIndex
-            if (
-                defaultDepositIndex_ > len - 1 &&
-                defaultDepositIndex_ != type(uint256).max
-            ) {
+            // Validate depositIndex
+            if (depositIndex_ >= len && depositIndex_ != type(uint256).max) {
                 revert InvalidIndex();
             }
+
+            // Set withdrawalQueue and strategies
+            strategies = strategies_;
+            withdrawalQueue = withdrawalQueue_;
         } else {
-            // Validate DefaultDepositIndex
-            if (defaultDepositIndex_ != type(uint256).max) {
+            // Validate depositIndex
+            if (depositIndex_ != type(uint256).max) {
                 revert InvalidIndex();
             }
         }
 
-        defaultDepositIndex = defaultDepositIndex_;
+        depositIndex = depositIndex_;
 
         // Set other state variables
         quitPeriod = 3 days;
@@ -164,6 +160,41 @@ contract MultiStrategyVault is
         returns (string memory)
     {
         return _symbol;
+    }
+
+    // Helper function to verify strategies and withdrawal queue and prevent stack-too-deep
+    function _verifyStrategyAndWithdrawalQueue(
+        uint256 i,
+        uint256 len,
+        address asset_,
+        IERC4626[] memory strategies_,
+        uint256[] memory withdrawalQueue_
+    ) internal view {
+        // Cache
+        uint256 index = withdrawalQueue_[i];
+        IERC4626 strategy = strategies_[i];
+
+        // Verify asset matching
+        if (strategy.asset() != asset_) {
+            revert VaultAssetMismatchNewAdapterAsset();
+        }
+
+        // Verify index not out of bound
+        if (index > len - 1) {
+            revert InvalidIndex();
+        }
+
+        // Check for duplicates
+        for (uint256 n; n < len; n++) {
+            if (n != i) {
+                if (
+                    address(strategy) == address(strategies_[n]) ||
+                    index == withdrawalQueue_[n]
+                ) {
+                    revert Duplicate();
+                }
+            }
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -214,8 +245,8 @@ contract MultiStrategyVault is
         );
 
         // deposit into default index strategy or leave funds idle
-        if (defaultDepositIndex != type(uint256).max) {
-            strategies[defaultDepositIndex].deposit(assets, address(this));
+        if (depositIndex != type(uint256).max) {
+            strategies[depositIndex].deposit(assets, address(this));
         }
 
         _mint(receiver, shares);
@@ -254,7 +285,7 @@ contract MultiStrategyVault is
         uint256 float = asset_.balanceOf(address(this));
 
         if (withdrawalQueue_.length > 0 && assets > float) {
-            _withdrawStrategyFunds(assets, float, withdrawalQueue_, receiver);
+            _withdrawStrategyFunds(assets, float, withdrawalQueue_);
         }
 
         asset_.safeTransfer(receiver, assets);
@@ -265,8 +296,7 @@ contract MultiStrategyVault is
     function _withdrawStrategyFunds(
         uint256 amount,
         uint256 float,
-        uint256[] memory queue,
-        address receiver
+        uint256[] memory queue
     ) internal {
         // Iterate the withdrawal queue and get indexes
         // Will revert due to underflow if we empty the stack before pulling the desired amount.
@@ -341,9 +371,14 @@ contract MultiStrategyVault is
 
     IERC4626[] public strategies;
     IERC4626[] public proposedStrategies;
+
     uint256 public proposedStrategyTime;
-    uint256 public defaultDepositIndex; // index of the strategy to deposit funds by default - if uint.max, leave funds idle
+
+    uint256 public depositIndex; // index of the strategy to deposit funds by default - if uint.max, leave funds idle
+    uint256 public proposedDepositIndex; // index of the strategy to deposit funds by default - if uint.max, leave funds idle
+
     uint256[] public withdrawalQueue; // indexes of the strategy order in the withdrawal queue
+    uint256[] public proposedWithdrawalQueue;
 
     event NewStrategiesProposed();
     event ChangedStrategies();
@@ -365,30 +400,47 @@ contract MultiStrategyVault is
         return withdrawalQueue;
     }
 
-    function setDefaultDepositIndex(uint256 index) external onlyOwner {
+    function getProposedWithdrawalQueue()
+        external
+        view
+        returns (uint256[] memory)
+    {
+        return proposedWithdrawalQueue;
+    }
+
+    function setdepositIndex(uint256 index) external onlyOwner {
         if (index > strategies.length - 1 && index != type(uint256).max) {
             revert InvalidIndex();
         }
 
-        defaultDepositIndex = index;
+        depositIndex = index;
     }
 
-    function setWithdrawalQueue(uint256[] memory indexes) external onlyOwner {
-        if (indexes.length != strategies.length) {
+    function setWithdrawalQueue(uint256[] memory newQueue) external onlyOwner {
+        uint256 len = newQueue.length;
+        if (len != strategies.length) {
             revert InvalidWithdrawalQueue();
         }
 
-        withdrawalQueue = new uint256[](indexes.length);
+        for (uint256 i; i < len; i++) {
+            uint256 index = newQueue[i];
 
-        for (uint256 i = 0; i < indexes.length; i++) {
-            uint256 index = indexes[i];
-
-            if (index > strategies.length - 1 && index != type(uint256).max) {
+            // Verify index not out of bound
+            if (index > len - 1) {
                 revert InvalidIndex();
             }
 
-            withdrawalQueue[i] = index;
+            // Check for duplicates
+            for (uint256 n; n < len; n++) {
+                if (n != i) {
+                    if (index == newQueue[n]) {
+                        revert Duplicate();
+                    }
+                }
+            }
         }
+
+        withdrawalQueue = newQueue;
     }
 
     /**
@@ -396,18 +448,48 @@ contract MultiStrategyVault is
      * @param strategies_ A new ERC4626 that should be used as a yield adapter for this asset.
      */
     function proposeStrategies(
-        IERC4626[] calldata strategies_
+        IERC4626[] calldata strategies_,
+        uint256[] calldata withdrawalQueue_,
+        uint256 depositIndex_
     ) external onlyOwner {
+        // Cache
         address asset_ = asset();
         uint256 len = strategies_.length;
-        for (uint256 i; i < len; i++) {
-            if (strategies_[i].asset() != asset_) {
-                revert VaultAssetMismatchNewAdapterAsset();
-            }
-            proposedStrategies.push(strategies_[i]);
+
+        // Verify WithdrawalQueue length
+        if (withdrawalQueue_.length != len) {
+            revert InvalidWithdrawalQueue();
         }
 
+        if (len > 0) {
+            // Validate depositIndex
+            if (depositIndex_ >= len && depositIndex_ != type(uint256).max) {
+                revert InvalidIndex();
+            }
+
+            // Verify strategies and withdrawal queue
+            for (uint256 i; i < len; i++) {
+                _verifyStrategyAndWithdrawalQueue(
+                    i,
+                    len,
+                    asset_,
+                    strategies_,
+                    withdrawalQueue_
+                );
+            }
+        } else {
+            // Validate depositIndex
+            if (depositIndex_ != type(uint256).max) {
+                revert InvalidIndex();
+            }
+        }
+
+        // Set proposed state
+        proposedStrategies = strategies_;
+        proposedWithdrawalQueue = withdrawalQueue_;
+        proposedDepositIndex = depositIndex_;
         proposedStrategyTime = block.timestamp;
+
         emit NewStrategiesProposed();
     }
 
@@ -438,20 +520,24 @@ contract MultiStrategyVault is
             }
         }
 
-        delete strategies;
-
         len = proposedStrategies.length;
-        for (uint256 i; i < len; i++) {
-            strategies.push(proposedStrategies[i]);
-
-            IERC20(asset_).approve(
-                address(proposedStrategies[i]),
-                type(uint256).max
-            );
+        if (len > 0) {
+            for (uint256 i; i < len; i++) {
+                IERC20(asset_).approve(
+                    address(proposedStrategies[i]),
+                    type(uint256).max
+                );
+            }
         }
 
-        delete proposedStrategyTime;
+        strategies = proposedStrategies;
+        withdrawalQueue = proposedWithdrawalQueue;
+        depositIndex = proposedDepositIndex;
+
         delete proposedStrategies;
+        delete proposedWithdrawalQueue;
+        delete proposedDepositIndex;
+        delete proposedStrategyTime;
 
         emit ChangedStrategies();
     }

@@ -214,11 +214,46 @@ contract MultiStrategyVaultTest is Test {
         address vaultAddress = Clones.clone(implementation);
         MultiStrategyVault newVault = MultiStrategyVault(vaultAddress);
 
-        emit log_uint(strategies.length);
+        uint256[] memory newWithdrawalQueue = new uint256[](2);
+        newWithdrawalQueue[0] = 0;
+        newWithdrawalQueue[1] = uint256(2);
+
+        newVault.initialize(
+            IERC20(address(asset)),
+            strategies,
+            uint256(0),
+            newWithdrawalQueue,
+            type(uint256).max,
+            bob
+        );
+    }
+
+    function testFail__initialize_strategies_duplicates() public {
+        address vaultAddress = Clones.clone(implementation);
+        MultiStrategyVault newVault = MultiStrategyVault(vaultAddress);
+
+        IERC4626[] memory newStrategies = new IERC4626[](2);
+        IERC4626 newStrategy = _createStrategy(IERC20(address(asset)));
+        newStrategies[0] = newStrategy;
+        newStrategies[1] = newStrategy;
+
+        newVault.initialize(
+            IERC20(address(asset)),
+            newStrategies,
+            uint256(0),
+            withdrawalQueue,
+            type(uint256).max,
+            bob
+        );
+    }
+
+    function testFail__initialize_withdrawalQueue_duplicates() public {
+        address vaultAddress = Clones.clone(implementation);
+        MultiStrategyVault newVault = MultiStrategyVault(vaultAddress);
 
         uint256[] memory newWithdrawalQueue = new uint256[](2);
         newWithdrawalQueue[0] = 0;
-        newWithdrawalQueue[0] = 2;
+        newWithdrawalQueue[1] = 0;
 
         newVault.initialize(
             IERC20(address(asset)),
@@ -516,7 +551,7 @@ contract MultiStrategyVaultTest is Test {
 
         assertEq(newVault.getStrategies().length, 0);
         assertEq(newVault.getWithdrawalQueue().length, 0);
-        assertEq(newVault.defaultDepositIndex(), type(uint256).max);
+        assertEq(newVault.depositIndex(), type(uint256).max);
     }
 
     function testFail__init_no_strategies_defaultIndex_wrong() public {
@@ -651,37 +686,17 @@ contract MultiStrategyVaultTest is Test {
         assertApproxEqAbs(asset.balanceOf(alice), alicePreDepositBal, 1);
     }
 
-    function test__setStrategies() public {
+    function test__setStrategies_no_strategies() public {
         MultiStrategyVault newVault = _createVaultWithoutStrategies();
 
         vm.prank(bob);
-        newVault.proposeStrategies(strategies);
+        newVault.proposeStrategies(strategies, withdrawalQueue, uint256(0));
 
         vm.warp(block.timestamp + 3 days + 1);
 
         newVault.changeStrategies();
         assertEq(newVault.getStrategies().length, 2);
         assertEq(newVault.getProposedStrategies().length, 0);
-    }
-
-    function test__setWithdrawalQueue_after_setting_strategies() public {
-        MultiStrategyVault newVault = _createVaultWithoutStrategies();
-
-        vm.prank(bob);
-        newVault.proposeStrategies(strategies);
-
-        vm.warp(block.timestamp + 3 days + 1);
-
-        newVault.changeStrategies();
-
-        uint256[] memory indexes = new uint256[](2);
-        indexes[0] = uint256(0);
-        indexes[1] = uint256(1);
-
-        vm.prank(bob);
-        newVault.setWithdrawalQueue(indexes);
-
-        assertEq(newVault.getWithdrawalQueue().length, 2);
     }
 
     function testFail__setWithdrawalQueue() public {
@@ -703,16 +718,79 @@ contract MultiStrategyVaultTest is Test {
         IERC4626 newStrategy = _createStrategy(IERC20(address(asset)));
         newStrategies[0] = newStrategy;
 
+        uint256[] memory newWithdrawalQueue = new uint256[](1);
+        newWithdrawalQueue[0] = uint256(0);
+
         vm.expectEmit(false, false, false, true, address(vault));
         emit NewStrategiesProposed();
 
         uint256 callTime = block.timestamp;
-        vault.proposeStrategies(newStrategies);
+        vault.proposeStrategies(newStrategies, newWithdrawalQueue, uint256(0));
 
         IERC4626[] memory proposedStrategies = vault.getProposedStrategies();
+        uint256[] memory proposedWithdrawalQueue = vault
+            .getProposedWithdrawalQueue();
 
         assertEq(proposedStrategies.length, 1);
         assertEq(address(proposedStrategies[0]), address(newStrategy));
+        assertEq(proposedWithdrawalQueue.length, 1);
+        assertEq(proposedWithdrawalQueue[0], uint256(0));
+        assertEq(vault.proposedDepositIndex(), uint256(0));
+        assertEq(vault.proposedStrategyTime(), callTime);
+    }
+
+    function test__proposeStrategies_depositIndex_max() public {
+        IERC4626[] memory newStrategies = new IERC4626[](1);
+        IERC4626 newStrategy = _createStrategy(IERC20(address(asset)));
+        newStrategies[0] = newStrategy;
+
+        uint256[] memory newWithdrawalQueue = new uint256[](1);
+        newWithdrawalQueue[0] = uint256(0);
+
+        vm.expectEmit(false, false, false, true, address(vault));
+        emit NewStrategiesProposed();
+
+        uint256 callTime = block.timestamp;
+        vault.proposeStrategies(
+            newStrategies,
+            newWithdrawalQueue,
+            type(uint256).max
+        );
+
+        IERC4626[] memory proposedStrategies = vault.getProposedStrategies();
+        uint256[] memory proposedWithdrawalQueue = vault
+            .getProposedWithdrawalQueue();
+
+        assertEq(proposedStrategies.length, 1);
+        assertEq(address(proposedStrategies[0]), address(newStrategy));
+        assertEq(proposedWithdrawalQueue.length, 1);
+        assertEq(proposedWithdrawalQueue[0], uint256(0));
+        assertEq(vault.proposedDepositIndex(), type(uint256).max);
+        assertEq(vault.proposedStrategyTime(), callTime);
+    }
+
+    function test__proposeStrategies_no_strategies() public {
+        IERC4626[] memory newStrategies;
+
+        uint256[] memory newWithdrawalQueue;
+
+        vm.expectEmit(false, false, false, true, address(vault));
+        emit NewStrategiesProposed();
+
+        uint256 callTime = block.timestamp;
+        vault.proposeStrategies(
+            newStrategies,
+            newWithdrawalQueue,
+            type(uint256).max
+        );
+
+        IERC4626[] memory proposedStrategies = vault.getProposedStrategies();
+        uint256[] memory proposedWithdrawalQueue = vault
+            .getProposedWithdrawalQueue();
+
+        assertEq(proposedStrategies.length, 0);
+        assertEq(proposedWithdrawalQueue.length, 0);
+        assertEq(vault.proposedDepositIndex(), type(uint256).max);
         assertEq(vault.proposedStrategyTime(), callTime);
     }
 
@@ -721,17 +799,106 @@ contract MultiStrategyVaultTest is Test {
         IERC4626 newStrategy = _createStrategy(IERC20(address(asset)));
         newStrategies[0] = newStrategy;
 
+        uint256[] memory newWithdrawalQueue = new uint256[](1);
+        newWithdrawalQueue[0] = uint256(0);
+
         vm.prank(alice);
-        vault.proposeStrategies(newStrategies);
+        vault.proposeStrategies(newStrategies, newWithdrawalQueue, uint256(0));
     }
 
     function testFail__proposeStrategies_asset_mismatch() public {
         MockERC20 newAsset = new MockERC20("New Mock Token", "NTKN", 18);
+
         IERC4626[] memory newStrategies = new IERC4626[](1);
-        IERC4626 newStrategy = _createStrategy(IERC20(address(newAsset)));
+        newStrategies[0] = _createStrategy(IERC20(address(newAsset)));
+
+        uint256[] memory newWithdrawalQueue = new uint256[](1);
+
+        vault.proposeStrategies(newStrategies, newWithdrawalQueue, uint256(0));
+    }
+
+    function testFail__proposeStrategies_depositIndex_out_of_bounds() public {
+        IERC4626[] memory newStrategies = new IERC4626[](1);
+        newStrategies[0] = _createStrategy(IERC20(address(asset)));
+
+        uint256[] memory newWithdrawalQueue = new uint256[](1);
+
+        vm.prank(alice);
+        vault.proposeStrategies(newStrategies, newWithdrawalQueue, uint256(2));
+    }
+
+    function testFail__proposeStrategies_withdrawalQueue_too_long() public {
+        IERC4626[] memory newStrategies = new IERC4626[](1);
+        newStrategies[0] = _createStrategy(IERC20(address(asset)));
+
+        uint256[] memory newWithdrawalQueue = new uint256[](2);
+
+        vm.prank(alice);
+        vault.proposeStrategies(newStrategies, newWithdrawalQueue, uint256(0));
+    }
+
+    function testFail__proposeStrategies_withdrawalQueue_too_short() public {
+        IERC4626[] memory newStrategies = new IERC4626[](1);
+        IERC4626 newStrategy = _createStrategy(IERC20(address(asset)));
         newStrategies[0] = newStrategy;
 
-        vault.proposeStrategies(newStrategies);
+        uint256[] memory newWithdrawalQueue;
+
+        vm.prank(alice);
+        vault.proposeStrategies(newStrategies, newWithdrawalQueue, uint256(0));
+    }
+
+    function testFail__proposeStrategies_withdrawalQueue_out_of_bounds()
+        public
+    {
+        IERC4626[] memory newStrategies = new IERC4626[](1);
+        newStrategies[0] = _createStrategy(IERC20(address(asset)));
+
+        uint256[] memory newWithdrawalQueue = new uint256[](1);
+        newWithdrawalQueue[0] = uint256(1);
+
+        vm.prank(alice);
+        vault.proposeStrategies(newStrategies, newWithdrawalQueue, uint256(0));
+    }
+
+    function testFail__proposeStrategies_duplicates() public {
+        IERC4626[] memory newStrategies = new IERC4626[](2);
+        IERC4626 newStrategy = _createStrategy(IERC20(address(asset)));
+        newStrategies[0] = newStrategy;
+        newStrategies[1] = newStrategy;
+
+        uint256[] memory newWithdrawalQueue = new uint256[](2);
+        newWithdrawalQueue[0] = uint256(0);
+        newWithdrawalQueue[1] = uint256(1);
+
+        vm.prank(alice);
+        vault.proposeStrategies(newStrategies, newWithdrawalQueue, uint256(0));
+    }
+
+    function testFail__proposeStrategies__withdrawalQueue_duplicates() public {
+        IERC4626[] memory newStrategies = new IERC4626[](2);
+        newStrategies[0] = _createStrategy(IERC20(address(asset)));
+        newStrategies[1] = _createStrategy(IERC20(address(asset)));
+
+        uint256[] memory newWithdrawalQueue = new uint256[](2);
+        newWithdrawalQueue[0] = uint256(0);
+        newWithdrawalQueue[1] = uint256(0);
+
+        vm.prank(alice);
+        vault.proposeStrategies(newStrategies, newWithdrawalQueue, uint256(0));
+    }
+
+    function testFail__proposeStrategies_no_strategies_depositIndex_out_of_bounds()
+        public
+    {
+        IERC4626[] memory newStrategies;
+
+        uint256[] memory newWithdrawalQueue;
+
+        vm.expectEmit(false, false, false, true, address(vault));
+        emit NewStrategiesProposed();
+
+        vault.proposeStrategies(newStrategies, newWithdrawalQueue, 0);
     }
 
     // Change Strategy
@@ -739,6 +906,9 @@ contract MultiStrategyVaultTest is Test {
         IERC4626[] memory newStrategies = new IERC4626[](1);
         IERC4626 newStrategy = _createStrategy(IERC20(address(asset)));
         newStrategies[0] = newStrategy;
+
+        uint256[] memory newWithdrawalQueue = new uint256[](1);
+        newWithdrawalQueue[0] = uint256(0);
 
         uint256 depositAmount = 1 ether;
 
@@ -750,7 +920,7 @@ contract MultiStrategyVaultTest is Test {
         vm.stopPrank();
 
         // Preparation to change the strategies
-        vault.proposeStrategies(newStrategies);
+        vault.proposeStrategies(newStrategies, newWithdrawalQueue, uint256(0));
 
         vm.warp(block.timestamp + 3 days);
 
@@ -771,13 +941,71 @@ contract MultiStrategyVaultTest is Test {
             asset.allowance(address(vault), address(newStrategy)),
             type(uint256).max
         );
+
         IERC4626[] memory changedStrategies = vault.getStrategies();
+        uint256[] memory changedWithdrawalQueue = vault.getWithdrawalQueue();
 
         assertEq(changedStrategies.length, 1);
         assertEq(address(changedStrategies[0]), address(newStrategy));
 
-        assertEq(vault.proposedStrategyTime(), 0);
+        assertEq(changedWithdrawalQueue.length, 1);
+        assertEq(changedWithdrawalQueue[0], uint256(0));
+
+        assertEq(vault.depositIndex(), 0);
+
         assertEq(vault.getProposedStrategies().length, 0);
+        assertEq(vault.getProposedWithdrawalQueue().length, 0);
+        assertEq(vault.proposedDepositIndex(), 0);
+        assertEq(vault.proposedStrategyTime(), 0);
+    }
+
+    function test__changeStrategies_to_no_strategies() public {
+        IERC4626[] memory newStrategies;
+
+        uint256[] memory newWithdrawalQueue;
+
+        uint256 depositAmount = 1 ether;
+
+        // Deposit funds for testing
+        asset.mint(alice, depositAmount);
+        vm.startPrank(alice);
+        asset.approve(address(vault), depositAmount);
+        vault.deposit(depositAmount, alice);
+        vm.stopPrank();
+
+        // Preparation to change the strategies
+        vault.proposeStrategies(
+            newStrategies,
+            newWithdrawalQueue,
+            type(uint256).max
+        );
+
+        vm.warp(block.timestamp + 3 days);
+
+        vault.changeStrategies();
+
+        assertEq(asset.allowance(address(vault), address(strategies[0])), 0);
+        assertEq(asset.allowance(address(vault), address(strategies[1])), 0);
+
+        // Annoyingly Math fails us here and leaves 1 asset in the adapter
+        assertEq(asset.balanceOf(address(strategies[0])), 0);
+        assertEq(asset.balanceOf(address(strategies[1])), 0);
+
+        assertEq(strategies[0].balanceOf(address(vault)), 0);
+
+        assertEq(asset.balanceOf(address(vault)), depositAmount);
+
+        IERC4626[] memory changedStrategies = vault.getStrategies();
+        uint256[] memory changedWithdrawalQueue = vault.getWithdrawalQueue();
+
+        assertEq(changedStrategies.length, 0);
+        assertEq(changedWithdrawalQueue.length, 0);
+        assertEq(vault.depositIndex(), type(uint256).max);
+
+        assertEq(vault.getProposedStrategies().length, 0);
+        assertEq(vault.getProposedWithdrawalQueue().length, 0);
+        assertEq(vault.proposedDepositIndex(), 0);
+        assertEq(vault.proposedStrategyTime(), 0);
     }
 
     function testFail__changeStrategies_respect_rageQuit() public {
@@ -785,7 +1013,9 @@ contract MultiStrategyVaultTest is Test {
         IERC4626 newStrategy = _createStrategy(IERC20(address(asset)));
         newStrategies[0] = newStrategy;
 
-        vault.proposeStrategies(newStrategies);
+        uint256[] memory newWithdrawalQueue = new uint256[](1);
+
+        vault.proposeStrategies(newStrategies, newWithdrawalQueue, uint256(0));
 
         // Didnt respect 3 days before propsal and change
         vault.changeStrategies();
@@ -800,6 +1030,8 @@ contract MultiStrategyVaultTest is Test {
         IERC4626 newStrategy = _createStrategy(IERC20(address(asset)));
         newStrategies[0] = newStrategy;
 
+        uint256[] memory newWithdrawalQueue = new uint256[](1);
+
         uint256 depositAmount = 1 ether;
 
         // Deposit funds for testing
@@ -810,7 +1042,7 @@ contract MultiStrategyVaultTest is Test {
         vm.stopPrank();
 
         // Preparation to change the adapter
-        vault.proposeStrategies(newStrategies);
+        vault.proposeStrategies(newStrategies, newWithdrawalQueue, uint256(0));
 
         vm.warp(block.timestamp + 3 days);
 
@@ -842,7 +1074,7 @@ contract MultiStrategyVaultTest is Test {
 
     function test_deposit_fundsIdle() public {
         // set default index to be type max
-        vault.setDefaultDepositIndex(type(uint256).max);
+        vault.setdepositIndex(type(uint256).max);
 
         uint256 amount = 1e18;
         _depositIntoVault(bob, amount);
@@ -854,7 +1086,7 @@ contract MultiStrategyVaultTest is Test {
 
     function test_withdrawIdleFunds() public {
         // set default index to be type max
-        vault.setDefaultDepositIndex(type(uint256).max);
+        vault.setdepositIndex(type(uint256).max);
 
         uint256 amount = 1e18;
         _depositIntoVault(bob, amount);
@@ -908,7 +1140,7 @@ contract MultiStrategyVaultTest is Test {
     }
 
     function testFail_setDefaultIndex_invalidIndex() public {
-        vault.setDefaultDepositIndex(5);
+        vault.setdepositIndex(5);
     }
 
     function _depositIntoVault(address user, uint256 amount) internal {
