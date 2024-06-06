@@ -120,7 +120,11 @@ contract PendleDepositor is BaseStrategy {
             uint256 syCap = supplyCap - syToken.totalSupply();
 
             return
-                syCap.mulDiv(syToken.exchangeRate(), 1e18, Math.Rounding.Floor);
+                syCap.mulDiv(
+                    syToken.exchangeRate(),
+                    (10 ** syToken.decimals()),
+                    Math.Rounding.Floor
+                );
         } catch {
             return super.maxDeposit(who);
         }

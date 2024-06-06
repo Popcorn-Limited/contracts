@@ -2,7 +2,7 @@
 pragma solidity ^0.8.25;
 
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
-
+import {IERC20Metadata} from "openzeppelin-contracts/token/ERC20/extensions/IERC20Metadata.sol";
 /*
  *******************************************************************************************************************
  *******************************************************************************************************************
@@ -142,7 +142,7 @@ interface IPendleMarket is IERC20 {
     function increaseObservationsCardinalityNext(uint16 cardinalityNext) external;
 }
 
-interface IPendleSYToken {
+interface IPendleSYToken is IERC20Metadata {
     // returns all tokens that can mint this SY token
     function getTokensIn() external view returns (address[] memory);
 
