@@ -18,6 +18,17 @@ import {EnsoConverter, IERC20Metadata, ERC20, IERC20, Math} from "./EnsoConverte
 abstract contract EnsoCompounder is EnsoConverter {
     using Math for uint256;
 
+    address[] public _rewardTokens;
+
+    /*//////////////////////////////////////////////////////////////
+                            ACCOUNTING LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice The token rewarded from the convex reward contract
+    function rewardTokens() external view override returns (address[] memory) {
+        return _rewardTokens;
+    }
+
     /*//////////////////////////////////////////////////////////////
                             STRATEGY LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -49,5 +60,25 @@ abstract contract EnsoCompounder is EnsoConverter {
         }
 
         emit Harvested();
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            ADMIN LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    function setRewardTokens(
+        address[] memory newRewardTokens
+    ) external onlyOwner {
+        // Remove old rewardToken allowance
+        _approveTokens(_rewardTokens, ensoRouter, 0);
+
+        // Add new rewardToken allowance
+        _approveTokens(newRewardTokens, ensoRouter, type(uint256).max);
+
+        _rewardTokens = newRewardTokens;
+        
+        tokens = newRewardTokens;
+        tokens.push(asset());
+        tokens.push(yieldAsset);
     }
 }

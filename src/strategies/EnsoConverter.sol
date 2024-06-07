@@ -4,6 +4,7 @@
 pragma solidity ^0.8.25;
 
 import {BaseStrategy, IERC20Metadata, ERC20, IERC20, Math} from "./BaseStrategy.sol";
+import {IPriceOracle} from "../interfaces/IPriceOracle.sol";
 
 /**
  * @title   BaseStrategy
@@ -18,10 +19,14 @@ import {BaseStrategy, IERC20Metadata, ERC20, IERC20, Math} from "./BaseStrategy.
 abstract contract EnsoConverter is BaseStrategy {
     using Math for uint256;
 
-    uint256 public slippage;
-    uint256 public floatRatio;
+    address public yieldAsset;
+    address[] internal tokens;
 
     address public ensoRouter;
+    IPriceOracle public oracle;
+
+    uint256 public slippage;
+    uint256 public floatRatio;
 
     /*//////////////////////////////////////////////////////////////
                             INITIALIZATION
@@ -42,11 +47,34 @@ abstract contract EnsoConverter is BaseStrategy {
     ) external onlyInitializing {
         __BaseStrategy_init(asset_, owner_, autoDeposit_);
 
-        (ensoRouter, slippage, floatRatio) = abi.decode(
+        address oracle_;
+        (yieldAsset, ensoRouter, oracle_, slippage, floatRatio) = abi.decode(
             strategyInitData_,
-            (address, uint256, uint256)
+            (address, address, address, uint256, uint256)
         );
+        oracle = IPriceOracle(oracle_);
+
+        tokens.push(asset_);
+        tokens.push(yieldAsset);
+
+        _approveTokens(tokens, ensoRouter, type(uint256).max);
     }
+
+    /*//////////////////////////////////////////////////////////////
+                            ACCOUNTING LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Calculates the total amount of underlying tokens the Vault holds.
+    /// @return The total amount of underlying tokens the Vault holds.
+    function _totalAssets() internal view override returns (uint256) {
+        return
+            oracle.getQuote(
+                IERC20(yieldAsset).balanceOf(address(this)),
+                yieldAsset,
+                asset()
+            );
+    }
+
     /*//////////////////////////////////////////////////////////////
                           INTERNAL HOOKS LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -69,6 +97,10 @@ abstract contract EnsoConverter is BaseStrategy {
         // stay empty
     }
 
+    /*//////////////////////////////////////////////////////////////
+                        PUSH/PULL LOGIC
+    //////////////////////////////////////////////////////////////*/
+
     error SlippageTooHigh();
     error NotEnoughFloat();
 
@@ -79,12 +111,6 @@ abstract contract EnsoConverter is BaseStrategy {
         _pushViaEnso(data);
         _postPushCall(assets, convertToShares(assets), data);
     }
-
-    function _postPushCall(
-        uint256 assets,
-        uint256 shares,
-        bytes memory data
-    ) internal virtual {}
 
     function _pushViaEnso(bytes memory data) internal {
         uint256 ta = this.totalAssets();
@@ -122,6 +148,12 @@ abstract contract EnsoConverter is BaseStrategy {
         }
     }
 
+    function _postPushCall(
+        uint256 assets,
+        uint256 shares,
+        bytes memory data
+    ) internal virtual {}
+
     function _prePullCall(
         uint256 assets,
         uint256 shares,
@@ -140,7 +172,26 @@ abstract contract EnsoConverter is BaseStrategy {
         floatRatio = floatRatio_;
     }
 
-    function setEnsoRouter(address ensoRouter_) external onlyOwner {
+    function setEnsoRouter(address ensoRouter_) external virtual onlyOwner {
+        _approveTokens(tokens, ensoRouter, 0);
+        _approveTokens(tokens, ensoRouter_, type(uint256).max);
         ensoRouter = ensoRouter_;
+    }
+
+    function _approveTokens(
+        address[] memory tokens,
+        address spender,
+        uint256 amount
+    ) internal {
+        uint256 len = tokens.length;
+        if (len > 0) {
+            for (uint256 i; i < len; ) {
+                IERC20(tokens[i]).approve(spender, amount);
+
+                unchecked {
+                    ++i;
+                }
+            }
+        }
     }
 }
