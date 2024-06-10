@@ -4,7 +4,7 @@
 pragma solidity ^0.8.25;
 
 import {IERC4626} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
-import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
+import {IPriceOracle} from "euler-price-oracle/interfaces/IPriceOracle.sol";
 import {Owned} from "../../utils/Owned.sol";
 
 /// @title EulerRouter
@@ -15,6 +15,9 @@ import {Owned} from "../../utils/Owned.sol";
 /// By ERC4626 spec `convert*` ignores liquidity restrictions, fees, slippage and per-user restrictions.
 /// Therefore the reported price may not be realizable through `redeem` or `withdraw`.
 contract MainOracle is Owned, IPriceOracle {
+    /// @inheritdoc IPriceOracle
+    string public constant name = "MainOracle";
+
     /// @notice The PriceOracle to call if this router is not configured for base/quote.
     /// @dev If `address(0)` then there is no fallback.
     address public fallbackOracle;

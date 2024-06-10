@@ -22,12 +22,13 @@ struct WithdrawalRequest {
 contract VaultRouter {
     using SafeERC20 for IERC20;
 
-    mapping(address => uint256) public burnPerVault;
-    WithdrawalRequest[] public withdrawalQueue;
-
     error SlippageTooHigh();
 
     constructor() {}
+
+    /*//////////////////////////////////////////////////////////////
+                    SYNCHRONOUS INTERACTION LOGIC
+    //////////////////////////////////////////////////////////////*/
 
     function depositAndStake(
         address vault,
@@ -68,6 +69,28 @@ contract VaultRouter {
         if (assets < minOut) revert SlippageTooHigh();
     }
 
+    /*//////////////////////////////////////////////////////////////
+                      ASYNCHRONOUS INTERACTION LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    event RequestedWithdrawal(
+        address indexed user,
+        address indexed vault,
+        address receiver,
+        uint256 burnAmount,
+        uint256 minOut,
+        bytes32 requestId
+    );
+
+    event WithdrawalFullfilled(address indexed user, bytes32 requestId);
+
+    mapping(bytes32 => WithdrawalRequest) public IdToRequest;
+    bytes32[] public requestIds;
+
+    function getRequestIds() external view returns (bytes32[] memory) {
+        return requestIds;
+    }
+
     function unstakeAndRequestWithdrawal(
         address vault,
         address gauge,
@@ -98,15 +121,65 @@ contract VaultRouter {
         uint256 minOut,
         address receiver
     ) internal {
-        withdrawalQueue.push(
-            WithdrawalRequest({
-                vault: vault,
-                burnAmount: burnAmount,
-                minOut: minOut,
-                receiver: receiver
-            })
+        bytes32 requestId = keccak256(
+            abi.encodePacked(
+                vault,
+                burnAmount,
+                minOut,
+                receiver,
+                msg.sender,
+                block.timestamp
+            )
+        );
+        IdToRequest[requestId] = WithdrawalRequest({
+            vault: vault,
+            burnAmount: burnAmount,
+            minOut: minOut,
+            receiver: receiver
+        });
+        requestIds.push(requestId);
+
+        emit RequestedWithdrawal(
+            msg.sender,
+            vault,
+            receiver,
+            burnAmount,
+            minOut,
+            requestId
         );
     }
 
-    function fullfillWithdrawal() external {}
+    function fullfillWithdrawal(bytes32 requestId) external {
+        WithdrawalRequest memory request = IdToRequest[requestId];
+
+        IERC20 asset = IERC20(IERC4626(request.vault).asset());
+
+        _fullfillWithdrawal(requestId, request, asset);
+    }
+
+    function fullfillWithdrawals(bytes32[] memory requestIds) external {
+        WithdrawalRequest memory request;
+        uint256 len = requestIds.length;
+        for (uint256 i; i < len; i++) {
+            request = IdToRequest[requestIds[i]];
+
+            _fullfillWithdrawal(
+                requestIds[i],
+                request,
+                IERC20(IERC4626(request.vault).asset())
+            );
+        }
+    }
+
+    function _fullfillWithdrawal(
+        bytes32 requestId,
+        WithdrawalRequest memory request,
+        IERC20 asset
+    ) internal {
+        asset.safeTransferFrom(msg.sender, request.receiver, request.minOut);
+
+        IERC20(request.vault).transfer(msg.sender, request.burnAmount);
+
+        emit WithdrawalFullfilled(msg.sender, requestId);
+    }
 }

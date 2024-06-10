@@ -6,8 +6,6 @@ import {stdJson} from "forge-std/StdJson.sol";
 
 import {ERC4626Upgradeable, IERC20, IERC20Metadata, ERC20Upgradeable as ERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 
-import {BytesLib} from "./BytesLib.sol";
-
 contract Executor {
     function approve(address to, address spender, uint256 amount) external {
         IERC20(to).approve(spender, amount);

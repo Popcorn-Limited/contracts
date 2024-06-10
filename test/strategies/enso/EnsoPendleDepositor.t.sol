@@ -17,8 +17,8 @@ contract AaveOracle {
 contract EnsoAaveDepositorTest is BaseStrategyTest {
     using stdJson for string;
 
-    address underlying = 0x6B175474E89094C44Da98b954EedeAC495271d0F;
-    address aToken = 0x028171bCA77440897B824Ca71D1c56caC55b68A3;
+    address underlying = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
+    address lpToken = 0xF32e58F92e60f4b0A37A69b95d642A471365EAe8;
     address ensoRouter = 0x80EbA3855878739F4710233A8a19d89Bdd2ffB8E;
 
     bytes depositData =
@@ -47,7 +47,7 @@ contract EnsoAaveDepositorTest is BaseStrategyTest {
             address(this),
             true,
             abi.encode(
-                aToken,
+                lpToken,
                 ensoRouter,
                 address(oracle),
                 uint256(10),
@@ -66,8 +66,8 @@ contract EnsoAaveDepositorTest is BaseStrategyTest {
 
         emit log_string("Balances after deposit:");
         emit log_named_uint(
-            "aToken: ",
-            IERC20(aToken).balanceOf(address(strategy))
+            "lpToken: ",
+            IERC20(lpToken).balanceOf(address(strategy))
         );
         emit log_named_uint(
             "asset: ",
@@ -78,8 +78,8 @@ contract EnsoAaveDepositorTest is BaseStrategyTest {
 
         emit log_string("Balances after push:");
         emit log_named_uint(
-            "aToken: ",
-            IERC20(aToken).balanceOf(address(strategy))
+            "lpToken: ",
+            IERC20(lpToken).balanceOf(address(strategy))
         );
         emit log_named_uint(
             "asset: ",
@@ -90,8 +90,8 @@ contract EnsoAaveDepositorTest is BaseStrategyTest {
 
         emit log_string("Balances after pull:");
         emit log_named_uint(
-            "aToken: ",
-            IERC20(aToken).balanceOf(address(strategy))
+            "lpToken: ",
+            IERC20(lpToken).balanceOf(address(strategy))
         );
         emit log_named_uint(
             "asset: ",
@@ -103,8 +103,8 @@ contract EnsoAaveDepositorTest is BaseStrategyTest {
 
         emit log_string("Balances after withdraw:");
         emit log_named_uint(
-            "aToken: ",
-            IERC20(aToken).balanceOf(address(strategy))
+            "lpToken: ",
+            IERC20(lpToken).balanceOf(address(strategy))
         );
         emit log_named_uint(
             "asset: ",
@@ -113,11 +113,11 @@ contract EnsoAaveDepositorTest is BaseStrategyTest {
     }
 
     // function _increasePricePerShare(uint256 amount) internal override {
-    //     address aToken = address(AaveV3Depositor(address(strategy)).aToken());
+    //     address lpToken = address(AaveV3Depositor(address(strategy)).lpToken());
     //     deal(
     //         testConfig.asset,
-    //         aToken,
-    //         IERC20(testConfig.asset).balanceOf(aToken) + amount
+    //         lpToken,
+    //         IERC20(testConfig.asset).balanceOf(lpToken) + amount
     //     );
     // }
 }
