@@ -4,7 +4,7 @@
 pragma solidity ^0.8.25;
 
 import {BaseStrategy, IERC20Metadata, ERC20, IERC20, Math} from "./BaseStrategy.sol";
-import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
+import {IPriceOracle} from "euler-price-oracle/interfaces/IPriceOracle.sol";
 
 /**
  * @title   BaseStrategy

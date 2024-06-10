@@ -1,10 +1,12 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.23;
 
 import {Test, console2} from "forge-std/Test.sol";
 import {stdJson} from "forge-std/StdJson.sol";
 
 import {ERC4626Upgradeable, IERC20, IERC20Metadata, ERC20Upgradeable as ERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
+import {EulerRouter} from "euler-price-oracle/EulerRouter.sol";
+import {PendleLpOracle} from "src/peripheral/oracles/adapter/PendleLpOracle.sol";
+import {CrossOracle, OracleStep} from "src/peripheral/oracles/adapter/CrossOracle.sol";
 
 contract Executor {
     function approve(address to, address spender, uint256 amount) external {
@@ -52,6 +54,51 @@ contract Tester is Test {
         emit log_uint(
             IERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2).balanceOf(
                 address(executor)
+            )
+        );
+    }
+
+    function testB() public {
+        PendleLpOracle oracle = new PendleLpOracle(
+            15 minutes,
+            0x66a1096C6366b2529274dF4f5D8247827fe4CEA8,
+            0x1A6fCc85557BC4fB7B534ed835a03EF056552D52
+        );
+
+        new CrossOracle(address(this));
+
+        
+        emit log_named_uint(
+            "weETH: ",
+            oracle.getQuote(
+                1e18,
+                0xF32e58F92e60f4b0A37A69b95d642A471365EAe8,
+                0xCd5fE23C85820F7B72D0926FC9b05b43E359b7ee
+            )
+        );
+        emit log_named_uint(
+            "weETH Inverse: ",
+            oracle.getQuote(
+                1e18,
+                0xCd5fE23C85820F7B72D0926FC9b05b43E359b7ee,
+                0xF32e58F92e60f4b0A37A69b95d642A471365EAe8
+            )
+        );
+
+        emit log_named_uint(
+            "aUSDT: ",
+            oracle.getQuote(
+                1e18,
+                0xb8FBF5cC2826c1C9909f59DD11633b494f46FBfe,
+                0x23878914EFE38d27C4D67Ab83ed1b93A74D4086a
+            )
+        );
+        emit log_named_uint(
+            "aUSDT Inverse: ",
+            oracle.getQuote(
+                1e18,
+                0x23878914EFE38d27C4D67Ab83ed1b93A74D4086a,
+                0xb8FBF5cC2826c1C9909f59DD11633b494f46FBfe
             )
         );
     }
