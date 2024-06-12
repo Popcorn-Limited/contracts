@@ -81,8 +81,8 @@ contract EnsoPendleDepositorTest is BaseStrategyTest {
             oracle: address(uniOracle)
         });
 
-        oracle.setOraclePath(vaultAsset, lpToken, oracleSteps);
-        oracle.setOraclePath(lpToken, vaultAsset, oracleStepsInverse);
+        oracle.addOraclePath(vaultAsset, lpToken, oracleSteps);
+        oracle.addOraclePath(lpToken, vaultAsset, oracleStepsInverse);
 
         strategy.initialize(
             testConfig_.asset,

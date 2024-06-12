@@ -20,8 +20,17 @@ contract CrossOracle is BaseAdapter, Owned {
     string public constant name = "CrossAdapter";
 
     mapping(address => mapping(address => OracleStep[])) public oraclePath;
+    mapping(address => mapping(address => OracleStep[]))
+        public proposedOraclePath;
+    mapping(address => mapping(address => uint256)) public proposedTime;
+
+    event OracleAdded(address base, address quote);
+    event OracleProposed(address base, address quote);
+    event OracleChanged(address base, address quote);
 
     error OracleExists();
+    error NoOraclePath();
+    error RespectTimeLock();
 
     /// @notice Deploy a CrossAdapter.
     /// @param _owner Owner of the contract
@@ -55,7 +64,7 @@ contract CrossOracle is BaseAdapter, Owned {
         return inAmount;
     }
 
-    function setOraclePath(
+    function addOraclePath(
         address base,
         address quote,
         OracleStep[] memory oracleSteps
@@ -63,10 +72,50 @@ contract CrossOracle is BaseAdapter, Owned {
         if (oraclePath[base][quote].length > 0) revert OracleExists();
 
         uint256 len = oracleSteps.length;
+        if (len == 0) revert NoOraclePath();
+
+        for (uint256 i; i < len; i++) {
+            oraclePath[base][quote].push(oracleSteps[i]);
+        }
+
+        emit OracleAdded(base, quote);
+    }
+
+    function proposeOraclePath(
+        address base,
+        address quote,
+        OracleStep[] memory oracleSteps
+    ) external onlyOwner {
+        delete proposedOraclePath[base][quote];
+
+        uint256 len = oracleSteps.length;
         if (len > 0) {
             for (uint256 i; i < len; i++) {
-                oraclePath[base][quote].push(oracleSteps[i]);
+                proposedOraclePath[base][quote].push(oracleSteps[i]);
             }
         }
+
+        proposedTime[base][quote] = block.timestamp + 3 days;
+
+        emit OracleProposed(base, quote);
+    }
+
+    function changeOraclePath(address base, address quote) external onlyOwner {
+        if (block.timestamp < proposedTime[base][quote])
+            revert RespectTimeLock();
+
+        delete oraclePath[base][quote];
+
+        uint256 len = proposedOraclePath[base][quote].length;
+        if (len > 0) {
+            for (uint256 i; i < len; i++) {
+                oraclePath[base][quote].push(proposedOraclePath[base][quote][i]);
+            }
+        }
+
+        delete proposedOraclePath[base][quote];
+        delete proposedTime[base][quote];
+
+        emit OracleChanged(base, quote);
     }
 }

@@ -38,7 +38,7 @@ abstract contract AnyConverter is BaseStrategy {
      * @param autoDeposit_ Controls if `protocolDeposit` gets called on deposit
      * @param strategyInitData_ Encoded data for this specific strategy
      */
-    function __EnsoConverter_init(
+    function __AnyConverter_init(
         address asset_,
         address owner_,
         bool autoDeposit_,

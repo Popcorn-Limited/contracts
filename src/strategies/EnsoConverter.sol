@@ -180,14 +180,14 @@ abstract contract EnsoConverter is BaseStrategy {
     }
 
     function _approveTokens(
-        address[] memory tokens,
+        address[] memory tokens_,
         address spender,
         uint256 amount
     ) internal {
-        uint256 len = tokens.length;
+        uint256 len = tokens_.length;
         if (len > 0) {
             for (uint256 i; i < len; ) {
-                IERC20(tokens[i]).approve(spender, amount);
+                IERC20(tokens_[i]).approve(spender, amount);
 
                 unchecked {
                     ++i;
