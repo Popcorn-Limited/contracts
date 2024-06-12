@@ -60,7 +60,7 @@ contract CrossOracle is BaseAdapter, Owned {
         address quote,
         OracleStep[] memory oracleSteps
     ) external onlyOwner {
-        if(oraclePath[base][quote].length > 0) revert OracleExists();
+        if (oraclePath[base][quote].length > 0) revert OracleExists();
 
         uint256 len = oracleSteps.length;
         if (len > 0) {
