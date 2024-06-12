@@ -16,7 +16,7 @@ import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
  * All specific interactions for the underlying protocol need to be overriden in the actual implementation.
  * The adapter can be initialized with a strategy that can perform additional operations. (Leverage, Compounding, etc.)
  */
-abstract contract Converter is BaseStrategy {
+abstract contract AnyConverter is BaseStrategy {
     using Math for uint256;
 
     address public yieldAsset;
@@ -118,11 +118,12 @@ abstract contract Converter is BaseStrategy {
         uint256 withdrawable = oracle.getQuote(assets, yieldAsset, asset());
 
         if (floatRatio > 0) {
-            uint256 balAfterFloat = bal.mulDiv(
+            uint256 float = ta.mulDiv(
                 10_000 - floatRatio,
                 10_000,
                 Math.Rounding.Floor
             );
+            uint256 balAfterFloat = bal - float;
             if (balAfterFloat < withdrawable) withdrawable = balAfterFloat;
         } else {
             if (bal < withdrawable) withdrawable = bal;
