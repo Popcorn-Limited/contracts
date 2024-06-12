@@ -3,6 +3,7 @@ pragma solidity ^0.8.25;
 
 import {Errors, BaseAdapter, IPriceOracle} from "./BaseAdapter.sol";
 import {ScaleUtils} from "src/lib/euler/ScaleUtils.sol";
+import {Owned} from "src/utils/Owned.sol";
 
 struct OracleStep {
     address base;
@@ -15,14 +16,16 @@ struct OracleStep {
 /// @author Euler Labs (https://www.eulerlabs.com/)
 /// @notice PriceOracle that chains two PriceOracles.
 /// @dev For example, CrossAdapter can price wstETH/USD by querying a wstETH/stETH oracle and a stETH/USD oracle.
-contract CrossOracle is BaseAdapter {
+contract CrossOracle is BaseAdapter, Owned {
     string public constant name = "CrossAdapter";
 
     mapping(address => mapping(address => OracleStep[])) public oraclePath;
 
+    error OracleExists();
+
     /// @notice Deploy a CrossAdapter.
     /// @param _owner Owner of the contract
-    constructor(address _owner) {}
+    constructor(address _owner) Owned(_owner) {}
 
     /// @notice Get a quote by chaining the cross oracles.
     /// @dev For the inverse direction it calculates quote/cross * cross/base.
@@ -56,8 +59,8 @@ contract CrossOracle is BaseAdapter {
         address base,
         address quote,
         OracleStep[] memory oracleSteps
-    ) external {
-        delete oraclePath[base][quote];
+    ) external onlyOwner {
+        if(oraclePath[base][quote].length > 0) revert OracleExists();
 
         uint256 len = oracleSteps.length;
         if (len > 0) {
