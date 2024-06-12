@@ -3,8 +3,8 @@
 
 pragma solidity ^0.8.23;
 
-import {BaseAdapter, Errors, IPriceOracle} from "euler-price-oracle/adapter/BaseAdapter.sol";
-import {ScaleUtils, Scale} from "euler-price-oracle/lib/ScaleUtils.sol";
+import {BaseAdapter, Errors, IPriceOracle} from "./BaseAdapter.sol";
+import {ScaleUtils, Scale} from "src/lib/ScaleUtils.sol";
 
 interface IPendleMarket {
     function readTokens()

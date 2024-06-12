@@ -3,7 +3,7 @@
 
 pragma solidity ^0.8.23;
 
-import {BaseAdapter, Errors, IPriceOracle} from "euler-price-oracle/adapter/BaseAdapter.sol";
+import {BaseAdapter, Errors, IPriceOracle} from "./BaseAdapter.sol";
 import {IAToken} from "src/interfaces/external/aave/IAaveV3.sol";
 
 /// @title AaveV3 Oracle

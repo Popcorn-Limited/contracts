@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-pragma solidity ^0.8.23;
+pragma solidity ^0.8.25;
 
-import {Errors, BaseAdapter} from "euler-price-oracle/adapter/BaseAdapter.sol";
-import {IPriceOracle} from "euler-price-oracle/interfaces/IPriceOracle.sol";
-import {ScaleUtils} from "euler-price-oracle/lib/ScaleUtils.sol";
+import {Errors, BaseAdapter, IPriceOracle} from "./BaseAdapter.sol";
+import {ScaleUtils} from "src/lib/ScaleUtils.sol";
 
 struct OracleStep {
     address base;
