@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0
 // Docgen-SOLC: 0.8.0
-pragma solidity >=0.6.0 <0.9.0;
+pragma solidity ^0.8.25;
 
-// import {EnsoDepositor, IERC20} from "src/strategies/EnsoDepositor.sol";
+import {EnsoDepositor, IERC20} from "src/strategies/EnsoDepositor.sol";
 import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson} from "../BaseStrategyTest.sol";
 import {PendleLpOracle} from "src/peripheral/oracles/adapter/PendleLpOracle.sol";
-// import {UniswapV3Oracle} from "src/peripheral/oracles/adapter/UniswapV3Oracle.sol";
-// import {CrossOracle, OracleStep} from "src/peripheral/oracles/adapter/CrossOracle.sol";
+import {UniswapV3Oracle} from "src/peripheral/oracles/adapter/UniswapV3Oracle.sol";
+import {CrossOracle, OracleStep} from "src/peripheral/oracles/adapter/CrossOracle.sol";
 
 contract AaveOracle {
     function getQuote(
@@ -39,66 +39,66 @@ contract EnsoPendleDepositorTest is BaseStrategyTest {
         );
     }
 
-    // function _setUpStrategy(
-    //     string memory json_,
-    //     string memory index_,
-    //     TestConfig memory testConfig_
-    // ) internal override returns (IBaseStrategy) {
-    //     // EnsoDepositor strategy = new EnsoDepositor();
-    //     // PendleLpOracle pendleOracle = new PendleLpOracle(
-    //     //     15 minutes,
-    //     //     0x66a1096C6366b2529274dF4f5D8247827fe4CEA8,
-    //     //     0x1A6fCc85557BC4fB7B534ed835a03EF056552D52
-    //     // );
-    //     // UniswapV3Oracle uniOracle = new UniswapV3Oracle(
-    //     //     500,
-    //     //     15 minutes,
-    //     //     0x1F98431c8aD98523631AE4a59f267346ea31F984
-    //     // );
-    //     // CrossOracle oracle = new CrossOracle(address(this));
+    function _setUpStrategy(
+        string memory json_,
+        string memory index_,
+        TestConfig memory testConfig_
+    ) internal override returns (IBaseStrategy) {
+        EnsoDepositor strategy = new EnsoDepositor();
+        PendleLpOracle pendleOracle = new PendleLpOracle(
+            15 minutes,
+            0x66a1096C6366b2529274dF4f5D8247827fe4CEA8,
+            0x1A6fCc85557BC4fB7B534ed835a03EF056552D52
+        );
+        UniswapV3Oracle uniOracle = new UniswapV3Oracle(
+            500,
+            15 minutes,
+            0x1F98431c8aD98523631AE4a59f267346ea31F984
+        );
+        CrossOracle oracle = new CrossOracle(address(this));
 
-    //     // OracleStep[] memory oracleSteps = new OracleStep[](2);
-    //     // oracleSteps[0] = OracleStep({
-    //     //     base: vaultAsset,
-    //     //     quote: underlying,
-    //     //     oracle: address(uniOracle)
-    //     // });
-    //     // oracleSteps[1] = OracleStep({
-    //     //     base: underlying,
-    //     //     quote: lpToken,
-    //     //     oracle: address(pendleOracle)
-    //     // });
+        OracleStep[] memory oracleSteps = new OracleStep[](2);
+        oracleSteps[0] = OracleStep({
+            base: vaultAsset,
+            quote: underlying,
+            oracle: address(uniOracle)
+        });
+        oracleSteps[1] = OracleStep({
+            base: underlying,
+            quote: lpToken,
+            oracle: address(pendleOracle)
+        });
 
-    //     // OracleStep[] memory oracleStepsInverse = new OracleStep[](2);
-    //     // oracleStepsInverse[0] = OracleStep({
-    //     //     base: lpToken,
-    //     //     quote: underlying,
-    //     //     oracle: address(pendleOracle)
-    //     // });
-    //     // oracleStepsInverse[1] = OracleStep({
-    //     //     base: underlying,
-    //     //     quote: vaultAsset,
-    //     //     oracle: address(uniOracle)
-    //     // });
+        OracleStep[] memory oracleStepsInverse = new OracleStep[](2);
+        oracleStepsInverse[0] = OracleStep({
+            base: lpToken,
+            quote: underlying,
+            oracle: address(pendleOracle)
+        });
+        oracleStepsInverse[1] = OracleStep({
+            base: underlying,
+            quote: vaultAsset,
+            oracle: address(uniOracle)
+        });
 
-    //     // oracle.setOraclePath(vaultAsset, lpToken, oracleSteps);
-    //     // oracle.setOraclePath(lpToken, vaultAsset, oracleStepsInverse);
+        oracle.setOraclePath(vaultAsset, lpToken, oracleSteps);
+        oracle.setOraclePath(lpToken, vaultAsset, oracleStepsInverse);
 
-    //     strategy.initialize(
-    //         testConfig_.asset,
-    //         address(this),
-    //         true,
-    //         abi.encode(
-    //             lpToken,
-    //             ensoRouter,
-    //             address(uniOracle),
-    //             uint256(100),
-    //             uint256(0)
-    //         )
-    //     );
+        strategy.initialize(
+            testConfig_.asset,
+            address(this),
+            true,
+            abi.encode(
+                lpToken,
+                ensoRouter,
+                address(uniOracle),
+                uint256(100),
+                uint256(0)
+            )
+        );
 
-    //     return IBaseStrategy(address(strategy));
-    // }
+        return IBaseStrategy(address(strategy));
+    }
 
     function test__basic() public {
         _mintAssetAndApproveForStrategy(1e18, bob);

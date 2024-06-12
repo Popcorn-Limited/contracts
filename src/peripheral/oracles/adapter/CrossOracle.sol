@@ -2,7 +2,7 @@
 pragma solidity ^0.8.25;
 
 import {Errors, BaseAdapter, IPriceOracle} from "./BaseAdapter.sol";
-import {ScaleUtils} from "src/lib/ScaleUtils.sol";
+import {ScaleUtils} from "src/lib/euler/ScaleUtils.sol";
 
 struct OracleStep {
     address base;

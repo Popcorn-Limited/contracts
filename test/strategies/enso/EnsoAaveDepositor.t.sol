@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0
 // Docgen-SOLC: 0.8.0
+pragma solidity ^0.8.25;
 
 import {EnsoDepositor, IERC20} from "src/strategies/EnsoDepositor.sol";
 import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson} from "../BaseStrategyTest.sol";

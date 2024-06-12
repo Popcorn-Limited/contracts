@@ -4,7 +4,6 @@ import {Test, console2} from "forge-std/Test.sol";
 import {stdJson} from "forge-std/StdJson.sol";
 
 import {ERC4626Upgradeable, IERC20, IERC20Metadata, ERC20Upgradeable as ERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
-import {EulerRouter} from "euler-price-oracle/EulerRouter.sol";
 import {PendleLpOracle} from "src/peripheral/oracles/adapter/PendleLpOracle.sol";
 import {CrossOracle, OracleStep} from "src/peripheral/oracles/adapter/CrossOracle.sol";
 

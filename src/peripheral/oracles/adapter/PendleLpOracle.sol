@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0
-// Docgen-SOLC: 0.8.23
+// Docgen-SOLC: 0.8.25
 
-pragma solidity ^0.8.23;
+pragma solidity ^0.8.25;
 
 import {BaseAdapter, Errors, IPriceOracle} from "./BaseAdapter.sol";
-import {ScaleUtils, Scale} from "src/lib/ScaleUtils.sol";
+import {ScaleUtils, Scale} from "src/lib/euler/ScaleUtils.sol";
 
 interface IPendleMarket {
     function readTokens()

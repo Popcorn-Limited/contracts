@@ -5,7 +5,7 @@ verbosity = 2
 fuzz_runs = 256
 fuzz_max_global_rejects = 100000000
 evm_version = "shanghai" 
-auto_detect_solc = true
+auto_detect_solc=true
 
 remappings = [
   'ds-test/=lib/forge-std/lib/ds-test/src/',
@@ -14,7 +14,8 @@ remappings = [
   'openzeppelin-contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts',
   'solmate/=lib/solmate/src/',
   'solady/=lib/solady/src/',
-  'uniswap/v3-core/=lib/v3-core/contracts/'
+  '@uniswap/v3-core/=lib/v3-core/contracts/',
+  '@uniswap/v3-periphery/=lib/v3-periphery/contracts/'
 ]
 
 no_match_contract = "Skip"

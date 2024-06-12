@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-pragma solidity 0.8.25;
+pragma solidity ^0.8.25;
 
-import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "openzeppelin-contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
-import {Errors} from "src/lib/Errors.sol";
+import {Errors} from "src/lib/euler/Errors.sol";
 
 /// @title BaseAdapter
 /// @custom:security-contact security@euler.xyz
@@ -38,8 +38,8 @@ abstract contract BaseAdapter is IPriceOracle {
     /// - a contract that does not implement `decimals()`.
     /// @return The decimals of the asset.
     function _getDecimals(address asset) internal view returns (uint8) {
-        (bool success, bytes memory data) = asset.staticcall(
-            abi.encodeCall(IERC20.decimals, ())
+        (bool success, bytes memory data) = address(asset).staticcall(
+            abi.encodeCall(IERC20Metadata.decimals, ())
         );
         return success && data.length == 32 ? abi.decode(data, (uint8)) : 18;
     }
