@@ -13,7 +13,7 @@ remappings = [
   'openzeppelin-contracts/=lib/openzeppelin-contracts/contracts/',
   'openzeppelin-contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts',
   'solmate/=lib/solmate/src/',
-  'euler-price-oracle/=lib/euler-price-oracle/src/'
+  'solady/=lib/solady/src/'
 ]
 
 no_match_contract = "Skip"
