@@ -125,6 +125,7 @@ abstract contract AnyConverter is BaseStrategy {
         // caching
         address _asset = asset();
         address _yieldAsset = yieldAsset;
+        uint256 _floatRatio = floatRatio;
 
         uint256 ta = this.totalAssets();
         uint256 bal = IERC20(_asset).balanceOf(address(this));
@@ -135,9 +136,9 @@ abstract contract AnyConverter is BaseStrategy {
 
         uint256 withdrawable = oracle.getQuote(assets, _yieldAsset, _asset);
 
-        if (floatRatio > 0) {
+        if (_floatRatio > 0) {
             uint256 float = ta.mulDiv(
-                10_000 - floatRatio,
+                10_000 - _floatRatio,
                 10_000,
                 Math.Rounding.Floor
             );
