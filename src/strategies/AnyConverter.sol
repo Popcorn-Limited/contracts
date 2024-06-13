@@ -184,14 +184,15 @@ abstract contract AnyConverter is BaseStrategy {
     }
 
     /*//////////////////////////////////////////////////////////////
-                        ADMIN LOGIC
+                            ADMIN LOGIC
     //////////////////////////////////////////////////////////////*/
-    error Misconfigured();
 
     event SlippageProposed(uint256 slippage);
     event SlippageChanged(uint256 oldSlippage, uint256 newSlippage);
     event FloatRatioProposed(uint256 ratio);
     event FloatRatioChanged(uint256 oldRatio, uint256 newRatio);
+
+    error Misconfigured();
 
     struct ProposedChange {
         uint256 value;
@@ -251,16 +252,16 @@ abstract contract AnyConverter is BaseStrategy {
     }
 
     /*//////////////////////////////////////////////////////////////
-                        ADMIN LOGIC
+                            RESERVE LOGIC
     //////////////////////////////////////////////////////////////*/
+
+    event ReserveClaimed(address user, address token, uint256 withdrawn);
 
     struct Reserved {
         uint256 unlockTime;
         uint256 deposited;
         uint256 withdrawable;
     }
-
-    event ReserveClaimed(address user, address token, uint256 withdrawn);
 
     uint256 public totalReservedAssets;
     uint256 public totalReservedYieldAssets;
