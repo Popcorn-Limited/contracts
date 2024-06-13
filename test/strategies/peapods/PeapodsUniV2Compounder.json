@@ -24,6 +24,12 @@
               "0x3a590132Da355fdf36656807e9DB8ea1c9f4a431",
               "0x6B175474E89094C44Da98b954EedeAC495271d0F"
              ],
+             "rewards": {
+              "length": 1,
+              "tokens": [
+                "0x02f92800F57BCD74066F5709F1Daa1A4302Df875"
+              ]
+             },
              "tradePaths": [
                 {
                   "length": "4",

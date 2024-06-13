@@ -42,7 +42,7 @@ contract PeapodsDepositorUniswapV2Compounder is PeapodsDepositor, BaseUniV2LpCom
 
     /// @notice The token rewarded from the pendle market
     function rewardTokens() external view override returns (address[] memory) {
-        return _getRewardTokens();
+        return sellTokens;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -66,11 +66,12 @@ contract PeapodsDepositorUniswapV2Compounder is PeapodsDepositor, BaseUniV2LpCom
     }
 
     function setHarvestValues(
+        address[] memory rewTokens,
         address newRouter,
         address[2] memory newDepositAssets,
         SwapStep[] memory newSwaps
     ) external onlyOwner {
-        setUniswapLpCompounderValues(newRouter, newDepositAssets, _getRewardTokens(), newSwaps);
+        setUniswapLpCompounderValues(newRouter, newDepositAssets, rewTokens, newSwaps);
     }
 
     // allow owner to withdraw eventual dust amount of tokens 
@@ -80,10 +81,5 @@ contract PeapodsDepositorUniswapV2Compounder is PeapodsDepositor, BaseUniV2LpCom
             revert("Invalid Token");
 
         IERC20(token).safeTransfer(owner, IERC20(token).balanceOf(address(this)));
-    }
-
-    function _getRewardTokens() internal view returns (address[] memory tokens) {
-        tokens = new address[](1);
-        tokens[0] = poolRewards.rewardsToken();
     }
 }

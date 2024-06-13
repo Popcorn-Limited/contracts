@@ -43,7 +43,7 @@ contract PeapodsDepositorBalancerUniV2Compounder is PeapodsDepositor, BaseBalanc
 
     /// @notice The token rewarded from the pendle market
     function rewardTokens() external view override returns (address[] memory) {
-        return _getRewardTokens();
+        return sellTokens;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -81,10 +81,5 @@ contract PeapodsDepositorBalancerUniV2Compounder is PeapodsDepositor, BaseBalanc
     ) external onlyOwner {
         setUniswapTradeValues(newUniswapRouter, rewTokens, newSwapSteps);
         setBalancerLpCompounderValues(newBalancerVault, newTradePaths, harvestValues_);
-    }
-
-    function _getRewardTokens() internal view returns (address[] memory tokens) {
-        tokens = new address[](1);
-        tokens[0] = poolRewards.rewardsToken();
     }
 }

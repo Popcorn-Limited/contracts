@@ -74,7 +74,16 @@ contract PeapodsUniswapV2CompounderTest is BaseStrategyTest {
         swaps[0] = SwapStep(swap0);
         swaps[1] = SwapStep(swap1);
 
-        strategy.setHarvestValues(router, depositAssets, swaps);
+        // rewards 
+        uint256 rewLen = json_.readUint(string.concat(".configs[", index_, "].specific.harvest.rewards.length"));
+        address[] memory rewardTokens = new address[](rewLen);
+        for(uint256 i=0; i<rewLen; i++) {
+            rewardTokens[i] = json_.readAddress(
+                string.concat(".configs[", index_, "].specific.harvest.rewards.tokens[", vm.toString(i), "]"));
+        }
+
+        strategy.setHarvestValues(rewardTokens, router, depositAssets, swaps);
+
         asset = strategy.asset();
 
         return IBaseStrategy(address(strategy));

@@ -5,6 +5,7 @@ pragma solidity ^0.8.25;
 
 import {UniswapV2TradeLibrary, IUniswapRouterV2} from "./UniswapV2TradeLibrary.sol";
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "openzeppelin-contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 import {Math} from "openzeppelin-contracts/utils/math/Math.sol";
 
@@ -32,8 +33,15 @@ abstract contract BaseUniV2Compounder {
             uint256 totAmount = IERC20(sellTokens[i]).balanceOf(address(this));
 
             // sell half for tokenA
+            uint256 decimals = IERC20Metadata(sellTokens[i]).decimals();
+            uint256 amount = totAmount.mulDiv(
+                10**decimals, 
+                20**decimals, 
+                Math.Rounding.Floor
+            );
+
             swap = sellSwaps[2 * i];
-            uint256 amount = totAmount.mulDiv(1e18, 2e18, Math.Rounding.Floor);
+
             if (amount > 0) {
                 UniswapV2TradeLibrary.trade(router, swap.path, address(this), block.timestamp, amount, 0);
             }
