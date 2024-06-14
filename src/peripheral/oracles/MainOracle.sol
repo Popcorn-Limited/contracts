@@ -4,8 +4,8 @@
 pragma solidity ^0.8.25;
 
 import {IERC4626} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
-import {IPriceOracle} from "euler-price-oracle/interfaces/IPriceOracle.sol";
-import {Owned} from "../../utils/Owned.sol";
+import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
+import {Owned} from "src/utils/Owned.sol";
 
 /// @title EulerRouter
 /// @custom:security-contact security@euler.xyz
