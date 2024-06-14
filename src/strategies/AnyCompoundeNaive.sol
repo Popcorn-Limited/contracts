@@ -4,7 +4,6 @@
 pragma solidity ^0.8.25;
 
 import {AnyConverter, IERC20Metadata, ERC20, IERC20, Math} from "./AnyConverter.sol";
-import {ContinousDutchAuction} from "src/peripheral/ContinousDutchAuction.sol";
 
 /**
  * @title   BaseStrategy
@@ -16,46 +15,10 @@ import {ContinousDutchAuction} from "src/peripheral/ContinousDutchAuction.sol";
  * All specific interactions for the underlying protocol need to be overriden in the actual implementation.
  * The adapter can be initialized with a strategy that can perform additional operations. (Leverage, Compounding, etc.)
  */
-abstract contract AnyCompounder is AnyConverter, ContinousDutchAuction {
+abstract contract AnyCompounderNaive is AnyConverter {
     using Math for uint256;
 
     address[] public _rewardTokens;
-
-    /**
-     * @notice Initialize a new Strategy.
-     * @param asset_ The underlying asset used for deposit/withdraw and accounting
-     * @param owner_ Owner of the contract. Controls management functions.
-     * @param autoDeposit_ Controls if `protocolDeposit` gets called on deposit
-     * @param strategyInitData_ Encoded data for this specific strategy
-     */
-    function __AnyCompounder_init(
-        address asset_,
-        address owner_,
-        bool autoDeposit_,
-        bytes memory strategyInitData_
-    ) internal onlyInitializing {
-        (
-            bytes memory baseStrategyData,
-            uint256 initPrice_,
-            address paymentToken_,
-            address paymentReceiver_,
-            uint256 epochPeriod_,
-            uint256 priceMultiplier_,
-            uint256 minInitPrice_
-        ) = abi.decode(
-                strategyInitData_,
-                (bytes, uint256, address, address, uint256, uint256, uint256)
-            );
-        __AnyConverter_init(asset_, owner_, autoDeposit_, baseStrategyData);
-        __ContinousDutchAuction_init(
-            initPrice_,
-            paymentToken_,
-            paymentReceiver_,
-            epochPeriod_,
-            priceMultiplier_,
-            minInitPrice_
-        );
-    }
 
     /*//////////////////////////////////////////////////////////////
                             ACCOUNTING LOGIC
@@ -75,24 +38,26 @@ abstract contract AnyCompounder is AnyConverter, ContinousDutchAuction {
     /**
      * @notice Claim rewards and compound them into the vault
      */
-    function harvest(bytes memory data) external override nonReentrant {
+    function harvest(bytes memory data) external override onlyKeeperOrOwner {
         claim();
 
         uint256 ta = this.totalAssets();
 
-        (
-            address[] memory assets,
-            address assetsReceiver,
-            uint256 epochId,
-            uint256 deadline,
-            uint256 maxPaymentTokenAmount
-        ) = abi.decode(data, (address[], address, uint256, uint256, uint256));
+        uint256 assets = abi.decode(data, (uint256));
 
-        buy(assets, assetsReceiver, epochId, deadline, maxPaymentTokenAmount);
+        IERC20(yieldAsset).transferFrom(msg.sender, address(this), assets);
 
         uint256 postTa = this.totalAssets();
 
         if (ta >= postTa) revert HarvestFailed();
+
+        uint256 len = _rewardTokens.length;
+        for (uint256 i; i < len; i++) {
+            IERC20(_rewardTokens[i]).transfer(
+                msg.sender,
+                IERC20(_rewardTokens[i]).balanceOf(address(this))
+            );
+        }
 
         emit Harvested();
     }

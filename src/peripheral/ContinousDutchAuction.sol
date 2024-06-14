@@ -39,7 +39,6 @@ abstract contract ContinousDutchAuction is Initializable {
         uint256 paymentAmount
     );
 
-    error Reentrancy();
     error InitPriceBelowMin();
     error InitPriceExceedsMax();
     error EpochPeriodBelowMin();
@@ -53,18 +52,6 @@ abstract contract ContinousDutchAuction is Initializable {
     error EpochIdMismatch();
     error MaxPaymentTokenAmountExceeded();
     error PaymentReceiverIsThis();
-
-    modifier nonReentrant() {
-        if (slot0.locked == 2) revert Reentrancy();
-        slot0.locked = 2;
-        _;
-        slot0.locked = 1;
-    }
-
-    modifier nonReentrantView() {
-        if (slot0.locked == 2) revert Reentrancy();
-        _;
-    }
 
     /// @dev Initializes the FeeFlowController contract with the specified parameters.
     /// @param initPrice The initial price for the first epoch.
@@ -115,12 +102,12 @@ abstract contract ContinousDutchAuction is Initializable {
     /// @notice This function performs various checks and transfers the payment tokens to the payment receiver.
     /// It also transfers the assets to the assets receiver and sets up a new auction with an updated initial price.
     function buy(
-        address[] calldata assets,
+        address[] memory assets,
         address assetsReceiver,
         uint256 epochId,
         uint256 deadline,
         uint256 maxPaymentTokenAmount
-    ) external nonReentrant returns (uint256 paymentAmount) {
+    ) internal returns (uint256 paymentAmount) {
         if (block.timestamp > deadline) revert DeadlinePassed();
         if (assets.length == 0) revert EmptyAssets();
 
@@ -195,13 +182,13 @@ abstract contract ContinousDutchAuction is Initializable {
     /// @dev Calculates the current price
     /// @return price The current price calculated based on the elapsed time and the initial price.
     /// @notice Uses the internal function `getPriceFromCache` to calculate the current price.
-    function getPrice() external view nonReentrantView returns (uint256) {
+    function getPrice() external view returns (uint256) {
         return getPriceFromCache(slot0);
     }
 
     /// @dev Retrieves Slot0 as a memory struct
     /// @return Slot0 The Slot0 value as a Slot0 struct
-    function getSlot0() external view nonReentrantView returns (Slot0 memory) {
+    function getSlot0() external view returns (Slot0 memory) {
         return slot0;
     }
 }
