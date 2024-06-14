@@ -109,7 +109,9 @@ contract CrossOracle is BaseAdapter, Owned {
         uint256 len = proposedOraclePath[base][quote].length;
         if (len > 0) {
             for (uint256 i; i < len; i++) {
-                oraclePath[base][quote].push(proposedOraclePath[base][quote][i]);
+                oraclePath[base][quote].push(
+                    proposedOraclePath[base][quote][i]
+                );
             }
         }
 

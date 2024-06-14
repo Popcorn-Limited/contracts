@@ -70,7 +70,7 @@ abstract contract EnsoCompounder is EnsoConverter {
         _approveTokens(newRewardTokens, ensoRouter, type(uint256).max);
 
         _rewardTokens = newRewardTokens;
-        
+
         tokens = newRewardTokens;
         tokens.push(asset());
         tokens.push(yieldAsset);

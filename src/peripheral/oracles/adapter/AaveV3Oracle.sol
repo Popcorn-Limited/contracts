@@ -15,11 +15,11 @@ contract AaveV3Oracle is BaseAdapter {
 
     error WrongAsset();
 
-    /// @notice Get a quote by querying the exchange rate from the stEth contract.
-    /// @dev Calls `getSharesByPooledEth` for stEth/wstEth and `getPooledEthByShares` for wstEth/stEth.
+    /// @notice Get a quote for aToken
+    /// @dev Since the underlying balance of assets in aToken is equal to the supply of aToken we simply return 1:1
     /// @param inAmount The amount of `base` to convert.
-    /// @param base The token that is being priced. Either `stEth` or `wstEth`.
-    /// @param quote The token that is the unit of account. Either `wstEth` or `stEth`.
+    /// @param base The token that is being priced. Either `aToken` or `underlying`.
+    /// @param quote The token that is the unit of account. Either `underlying` or `aToken`.
     /// @return The converted amount.
     function _getQuote(
         uint256 inAmount,

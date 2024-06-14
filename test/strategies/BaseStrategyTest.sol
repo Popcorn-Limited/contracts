@@ -760,24 +760,19 @@ abstract contract BaseStrategyTest is PropertyTest {
     //////////////////////////////////////////////////////////////*/
 
     function test__pause() public virtual {
-        _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
+        _mintAssetAndApproveForStrategy(testConfig.defaultAmount * 2, bob);
 
         vm.prank(bob);
         strategy.deposit(testConfig.defaultAmount, bob);
 
-        uint256 oldTotalAssets = strategy.totalAssets();
-
         vm.prank(address(this));
         strategy.pause();
 
-        // We simply withdraw into the strategy
-        // TotalSupply and Assets dont change
-        assertApproxEqAbs(
-            oldTotalAssets,
-            strategy.totalAssets(),
-            testConfig.delta,
-            "totalAssets"
-        );
+        vm.prank(bob);
+        vm.expectRevert();
+        strategy.deposit(testConfig.defaultAmount, bob);
+
+        assertEq(strategy.totalAssets(), testConfig.defaultAmount);
     }
 
     function testFail__pause_nonOwner() public virtual {
@@ -786,12 +781,10 @@ abstract contract BaseStrategyTest is PropertyTest {
     }
 
     function test__unpause() public virtual {
-        _mintAssetAndApproveForStrategy(testConfig.defaultAmount * 3, bob);
+        _mintAssetAndApproveForStrategy(testConfig.defaultAmount * 2, bob);
 
         vm.prank(bob);
-        strategy.deposit(testConfig.defaultAmount * 3, bob);
-
-        uint256 oldTotalAssets = strategy.totalAssets();
+        strategy.deposit(testConfig.defaultAmount, bob);
 
         vm.prank(address(this));
         strategy.pause();
@@ -799,20 +792,10 @@ abstract contract BaseStrategyTest is PropertyTest {
         vm.prank(address(this));
         strategy.unpause();
 
-        // We simply deposit back into the external protocol
-        // TotalAssets shouldnt change significantly besides some slippage or rounding errors
-        assertApproxEqAbs(
-            oldTotalAssets,
-            strategy.totalAssets(),
-            testConfig.delta * 3,
-            "totalAssets"
-        );
-        assertApproxEqAbs(
-            IERC20(testConfig.asset).balanceOf(address(strategy)),
-            0,
-            testConfig.delta,
-            "asset balance"
-        );
+        vm.prank(bob);
+        strategy.deposit(testConfig.defaultAmount, bob);
+
+        assertEq(strategy.totalAssets(), testConfig.defaultAmount * 2);
     }
 
     function testFail__unpause_nonOwner() public virtual {

@@ -274,12 +274,12 @@ abstract contract BaseStrategy is
                       PAUSING LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Pause Deposits and withdraw all funds from the underlying protocol. Caller must be owner.
+    /// @notice Pause Deposits. Caller must be owner.
     function pause() external virtual onlyOwner {
         _pause();
     }
 
-    /// @notice Unpause Deposits and deposit all funds into the underlying protocol. Caller must be owner.
+    /// @notice Unpause Deposits. Caller must be owner.
     function unpause() external virtual onlyOwner {
         _unpause();
     }
