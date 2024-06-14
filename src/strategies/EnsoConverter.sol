@@ -6,27 +6,23 @@ pragma solidity ^0.8.25;
 import {BaseStrategy, IERC20Metadata, ERC20, IERC20, Math} from "./BaseStrategy.sol";
 import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
 
-/**
- * @title   BaseStrategy
- * @author  RedVeil
- * @notice  See the following for the full EIP-4626 specification https://eips.ethereum.org/EIPS/eip-4626.
- *
- * The ERC4626 compliant base contract for all adapter contracts.
- * It allows interacting with an underlying protocol.
- * All specific interactions for the underlying protocol need to be overriden in the actual implementation.
- * The adapter can be initialized with a strategy that can perform additional operations. (Leverage, Compounding, etc.)
- */
+struct ProposedChange {
+    uint256 value;
+    uint256 changeTime;
+}
+
+struct ProposedRouter {
+    address value;
+    uint256 changeTime;
+}
+
 abstract contract EnsoConverter is BaseStrategy {
     using Math for uint256;
 
     address public yieldAsset;
     address[] internal tokens;
 
-    address public ensoRouter;
     IPriceOracle public oracle;
-
-    uint256 public slippage;
-    uint256 public floatRatio;
 
     /*//////////////////////////////////////////////////////////////
                             INITIALIZATION
@@ -105,42 +101,47 @@ abstract contract EnsoConverter is BaseStrategy {
     error NotEnoughFloat();
 
     function pushFunds(
-        uint256 assets,
+        uint256,
         bytes memory data
     ) external override onlyKeeperOrOwner {
         _pushViaEnso(data);
-        _postPushCall(assets, convertToShares(assets), data);
     }
 
     function _pushViaEnso(bytes memory data) internal {
-        uint256 ta = this.totalAssets();
-        uint256 bal = IERC20(asset()).balanceOf(address(this));
+        // caching
+        address _asset = asset();
+        uint256 _floatRatio = floatRatio;
 
-        (bool success, bytes memory returnData) = ensoRouter.call(data);
+        uint256 ta = this.totalAssets();
+        uint256 bal = IERC20(_asset).balanceOf(address(this));
+
+        (bool success, ) = ensoRouter.call(data);
         if (success) {
             if (
                 this.totalAssets() <
                 ta.mulDiv(10_000 - slippage, 10_000, Math.Rounding.Floor)
             ) revert SlippageTooHigh();
-            if (
-                floatRatio > 0 &&
-                IERC20(asset()).balanceOf(address(this)) <
-                bal.mulDiv(10_000 - floatRatio, 10_000, Math.Rounding.Floor)
-            ) revert NotEnoughFloat();
+
+            if (_floatRatio > 0) {
+                if (
+                    IERC20(_asset).balanceOf(address(this)) <
+                    ta.mulDiv(10_000 - _floatRatio, 10_000, Math.Rounding.Floor)
+                ) revert NotEnoughFloat();
+            }
         }
     }
 
     function pullFunds(
-        uint256 assets,
+        uint256,
         bytes memory data
     ) external override onlyKeeperOrOwner {
-        _prePullCall(assets, convertToShares(assets), data);
         _pullViaEnso(data);
     }
 
     function _pullViaEnso(bytes memory data) internal {
         uint256 ta = this.totalAssets();
-        (bool success, bytes memory returnData) = ensoRouter.call(data);
+
+        (bool success, ) = ensoRouter.call(data);
         if (success) {
             if (
                 this.totalAssets() <
@@ -149,45 +150,109 @@ abstract contract EnsoConverter is BaseStrategy {
         }
     }
 
-    function _postPushCall(
-        uint256 assets,
-        uint256 shares,
-        bytes memory data
-    ) internal virtual {}
-
-    function _prePullCall(
-        uint256 assets,
-        uint256 shares,
-        bytes memory data
-    ) internal virtual {}
-
     /*//////////////////////////////////////////////////////////////
-                        ADMIN LOGIC
+                            ADMIN LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function setSlippage(uint256 slippage_) external onlyOwner {
-        slippage = slippage_;
+    event SlippageProposed(uint256 slippage);
+    event SlippageChanged(uint256 oldSlippage, uint256 newSlippage);
+    event FloatRatioProposed(uint256 ratio);
+    event FloatRatioChanged(uint256 oldRatio, uint256 newRatio);
+    event EnsoRouterProposed(address router);
+    event EnsoRouterChanged(address oldRouter, address newRouter);
+
+    error Misconfigured();
+
+    ProposedChange public proposedSlippage;
+    uint256 public slippage;
+
+    ProposedChange public proposedFloatRatio;
+    uint256 public floatRatio;
+
+    ProposedRouter public proposedEnsoRouter;
+    address public ensoRouter;
+
+    function proposeSlippage(uint256 slippage_) external onlyOwner {
+        if (slippage_ > 10_000) revert Misconfigured();
+
+        proposedSlippage = ProposedChange({
+            value: slippage_,
+            changeTime: block.timestamp + 3 days
+        });
+
+        emit SlippageProposed(slippage_);
     }
 
-    function setFloatRatio(uint256 floatRatio_) external onlyOwner {
-        floatRatio = floatRatio_;
+    function changeSlippage() external onlyOwner {
+        ProposedChange memory _proposedSlippage = proposedSlippage;
+
+        if (_proposedSlippage.changeTime == 0) revert Misconfigured();
+
+        emit SlippageChanged(slippage, _proposedSlippage.value);
+
+        slippage = _proposedSlippage.value;
+
+        delete proposedSlippage;
     }
 
-    function setEnsoRouter(address ensoRouter_) external virtual onlyOwner {
+    function proposeFloatRatio(uint256 ratio_) external onlyOwner {
+        if (ratio_ > 10_000) revert Misconfigured();
+
+        proposedFloatRatio = ProposedChange({
+            value: ratio_,
+            changeTime: block.timestamp + 3 days
+        });
+
+        emit FloatRatioProposed(ratio_);
+    }
+
+    function changeFloatRatio() external onlyOwner {
+        ProposedChange memory _proposedFloatRatio = proposedFloatRatio;
+
+        if (_proposedFloatRatio.changeTime == 0) revert Misconfigured();
+
+        emit FloatRatioChanged(slippage, _proposedFloatRatio.value);
+
+        floatRatio = _proposedFloatRatio.value;
+
+        delete proposedFloatRatio;
+    }
+
+    function proposeEnsoRouter(address ensoRouter_) external onlyOwner {
+        if (ensoRouter_ == ensoRouter) revert Misconfigured();
+
+        proposedEnsoRouter = ProposedRouter({
+            value: ensoRouter_,
+            changeTime: block.timestamp + 3 days
+        });
+
+        emit EnsoRouterProposed(ensoRouter_);
+    }
+
+    function changeEnsoRouter() external virtual onlyOwner {
+        ProposedRouter memory _proposedEnsoRouter = proposedEnsoRouter;
+
+        if (_proposedEnsoRouter.changeTime == 0) revert Misconfigured();
+
         _approveTokens(tokens, ensoRouter, 0);
-        _approveTokens(tokens, ensoRouter_, type(uint256).max);
-        ensoRouter = ensoRouter_;
+        _approveTokens(tokens, _proposedEnsoRouter.value, type(uint256).max);
+
+        emit EnsoRouterChanged(ensoRouter, _proposedEnsoRouter.value);
+
+        ensoRouter = _proposedEnsoRouter.value;
+
+        delete proposedFloatRatio;
     }
 
     function _approveTokens(
-        address[] memory tokens,
+        address[] memory tokens_,
         address spender,
         uint256 amount
     ) internal {
-        uint256 len = tokens.length;
+        uint256 len = tokens_.length;
         if (len > 0) {
             for (uint256 i; i < len; ) {
-                IERC20(tokens[i]).approve(spender, amount);
+                IERC20(tokens_[i]).approve(spender, amount);
 
                 unchecked {
                     ++i;
