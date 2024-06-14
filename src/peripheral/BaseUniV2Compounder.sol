@@ -18,7 +18,7 @@ abstract contract BaseUniV2Compounder {
     using Math for uint256;
 
     IUniswapRouterV2 public uniswapRouter;
-    
+
     address[] public sellTokens;
     SwapStep[] internal sellSwaps; // for each sellToken there are two paths.
 
@@ -34,11 +34,7 @@ abstract contract BaseUniV2Compounder {
 
             // sell half for tokenA
             uint256 decimals = IERC20Metadata(sellTokens[i]).decimals();
-            uint256 amount = totAmount.mulDiv(
-                10**decimals, 
-                20**decimals, 
-                Math.Rounding.Floor
-            );
+            uint256 amount = totAmount.mulDiv(10 ** decimals, 20 ** decimals, Math.Rounding.Floor);
 
             swap = sellSwaps[2 * i];
 
@@ -68,22 +64,20 @@ abstract contract BaseUniV2Compounder {
         for (uint256 i = 0; i < rewLen;) {
             uint256 totAmount = IERC20(sellTokens[i]).balanceOf(address(this));
             swap = sellSwaps[i];
-            
+
             if (totAmount > 0) {
                 UniswapV2TradeLibrary.trade(router, swap.path, address(this), block.timestamp, totAmount, 0);
             }
-            
+
             unchecked {
                 ++i;
             }
         }
     }
 
-    function setUniswapTradeValues(
-        address newRouter, 
-        address[] memory rewTokens, 
-        SwapStep[] memory newSwaps
-    ) internal {
+    function setUniswapTradeValues(address newRouter, address[] memory rewTokens, SwapStep[] memory newSwaps)
+        internal
+    {
         // Remove old rewardToken allowance
         uint256 sellTokensLen = sellTokens.length;
         if (sellTokensLen > 0) {
@@ -120,7 +114,7 @@ abstract contract BaseUniV2Compounder {
             }
         }
 
-        for (uint256 i=0; i<newSwaps.length;) {
+        for (uint256 i = 0; i < newSwaps.length;) {
             sellSwaps.push(newSwaps[i]);
             unchecked {
                 ++i;

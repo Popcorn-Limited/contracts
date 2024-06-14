@@ -10,7 +10,7 @@ import {CurveTradeLibrary} from "./CurveTradeLibrary.sol";
 
 abstract contract BaseCurveCompounder {
     using SafeERC20 for IERC20;
-    
+
     ICurveRouter public curveRouter;
 
     address[] public _curveSellTokens;

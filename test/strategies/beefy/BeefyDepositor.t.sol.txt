@@ -3,7 +3,7 @@
 
 pragma solidity ^0.8.25;
 
-import {BeefyDepositor, IBeefyVault, IERC20} from "../../../src/strategies/beefy/BeefyDepositor.sol";
+import {BeefyDepositor, IBeefyVault, IERC20} from "src/strategies/beefy/BeefyDepositor.sol";
 import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson} from "../BaseStrategyTest.sol";
 
 contract BeefyDepositorTest is BaseStrategyTest {

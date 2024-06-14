@@ -7,7 +7,7 @@ import {
     CurveGaugeSingleAssetCompounder,
     IERC20,
     CurveSwap
-} from "../../../src/strategies/curve/CurveGaugeSingleAssetCompounder.sol";
+} from "src/strategies/curve/CurveGaugeSingleAssetCompounder.sol";
 import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson} from "../BaseStrategyTest.sol";
 
 struct CurveGaugeInit {

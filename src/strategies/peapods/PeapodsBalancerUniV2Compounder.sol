@@ -4,8 +4,8 @@
 pragma solidity ^0.8.15;
 
 import {PeapodsDepositor, IERC20, SafeERC20} from "./PeapodsStrategy.sol";
-import {BaseBalancerLpCompounder, HarvestValues, TradePath} from "../../peripheral/BaseBalancerLpCompounder.sol";
-import {BaseUniV2Compounder, SwapStep} from "../../peripheral/BaseUniV2Compounder.sol";
+import {BaseBalancerLpCompounder, HarvestValues, TradePath} from "src/peripheral/BaseBalancerLpCompounder.sol";
+import {BaseUniV2Compounder, SwapStep} from "src/peripheral/BaseUniV2Compounder.sol";
 
 /**
  * @title   ERC4626 Peapods Protocol Vault Adapter
@@ -15,7 +15,7 @@ import {BaseUniV2Compounder, SwapStep} from "../../peripheral/BaseUniV2Compounde
  * An ERC4626 compliant Wrapper for Peapods.
  * Implements harvest func that swaps via Balancer
  */
-contract PeapodsDepositorBalancerUniV2Compounder is PeapodsDepositor, BaseBalancerLpCompounder, BaseUniV2Compounder{
+contract PeapodsDepositorBalancerUniV2Compounder is PeapodsDepositor, BaseBalancerLpCompounder, BaseUniV2Compounder {
     using SafeERC20 for IERC20;
 
     /*//////////////////////////////////////////////////////////////
@@ -55,13 +55,13 @@ contract PeapodsDepositorBalancerUniV2Compounder is PeapodsDepositor, BaseBalanc
      */
     function harvest(bytes memory data) external override onlyKeeperOrOwner {
         claim();
-        
+
         // caching
         address asset_ = asset();
 
         // sell for a balancer asset via univ2
         sellRewardsViaUniswapV2();
-        
+
         // sell the balancer asset for deposit asset and add liquidity
         sellRewardsForLpTokenViaBalancer(asset_, data);
 

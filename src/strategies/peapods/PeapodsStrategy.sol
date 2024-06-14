@@ -3,11 +3,8 @@
 
 pragma solidity ^0.8.15;
 
-import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math} from "../BaseStrategy.sol";
-import {
-    IStakedToken,
-    IPoolRewards
-} from "./IPeapods.sol";
+import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math} from "src/strategies/BaseStrategy.sol";
+import {IStakedToken, IPoolRewards} from "./IPeapods.sol";
 
 /**
  * @title   ERC4626 Peapods Finance Vault Adapter
@@ -25,7 +22,7 @@ contract PeapodsDepositor is BaseStrategy {
     string internal _symbol;
 
     IStakedToken public stakedToken; // vault holding after deposit
-    IPoolRewards public poolRewards; // pool to get rewards from 
+    IPoolRewards public poolRewards; // pool to get rewards from
 
     /*//////////////////////////////////////////////////////////////
                             INITIALIZATION
@@ -51,26 +48,26 @@ contract PeapodsDepositor is BaseStrategy {
     function __PeapodsBase_init(address asset_, address owner_, bool autoDeposit_, bytes memory strategyInitData_)
         internal
         onlyInitializing
-    {   
+    {
         // asset is LP token
         __BaseStrategy_init(asset_, owner_, autoDeposit_);
 
         _name = string.concat("VaultCraft Peapods ", IERC20Metadata(asset_).name(), " Adapter");
-        _symbol = string.concat("vcp-", IERC20Metadata(asset_).symbol());    
+        _symbol = string.concat("vcp-", IERC20Metadata(asset_).symbol());
 
-        // validate staking contract 
+        // validate staking contract
         (address staking_) = abi.decode(strategyInitData_, (address));
         stakedToken = IStakedToken(staking_);
 
-        if(stakedToken.stakingToken() != asset_)
+        if (stakedToken.stakingToken() != asset_) {
             revert InvalidAsset();
+        }
 
         poolRewards = IPoolRewards(stakedToken.poolRewards());
 
         // approve peapods staking contract
-        IERC20(asset_).approve(staking_, type(uint256).max); 
+        IERC20(asset_).approve(staking_, type(uint256).max);
     }
-
 
     function name() public view override(IERC20Metadata, ERC20) returns (string memory) {
         return _name;
@@ -95,7 +92,7 @@ contract PeapodsDepositor is BaseStrategy {
 
     /// @notice Claim liquidity mining rewards given that it's active
     function claim() internal override returns (bool success) {
-        try poolRewards.claimReward(address(this)){
+        try poolRewards.claimReward(address(this)) {
             success = true;
         } catch {}
     }
@@ -106,7 +103,7 @@ contract PeapodsDepositor is BaseStrategy {
 
     function _protocolDeposit(uint256 amount, uint256, bytes memory) internal override {
         // stake lp tokens
-        stakedToken.stake(address(this), amount); 
+        stakedToken.stake(address(this), amount);
     }
 
     function _protocolWithdraw(uint256 amount, uint256, bytes memory) internal override {

@@ -15,12 +15,7 @@ abstract contract BaseUniV2LpCompounder is BaseUniV2Compounder {
 
     error CompoundFailed();
 
-    function sellRewardsForLpTokenViaUniswap(
-        address vaultAsset,
-        address to,
-        uint deadline,
-        bytes memory data
-    )
+    function sellRewardsForLpTokenViaUniswap(address vaultAsset, address to, uint256 deadline, bytes memory data)
         internal
     {
         sellRewardsForBaseTokensViaUniswapV2();
@@ -31,17 +26,9 @@ abstract contract BaseUniV2LpCompounder is BaseUniV2Compounder {
         uint256 amountA = IERC20(tokenA).balanceOf(address(this));
         uint256 amountB = IERC20(tokenB).balanceOf(address(this));
 
-        if(amountA > 0 && amountB > 0) {
+        if (amountA > 0 && amountB > 0) {
             UniswapV2TradeLibrary.addLiquidity(
-                uniswapRouter,
-                depositAssets[0], 
-                depositAssets[1],
-                amountA,
-                amountB,
-                0,
-                0,
-                to,
-                deadline
+                uniswapRouter, depositAssets[0], depositAssets[1], amountA, amountB, 0, 0, to, deadline
             );
 
             uint256 amountLP = IERC20(vaultAsset).balanceOf(address(this));

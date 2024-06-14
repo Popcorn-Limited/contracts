@@ -3,7 +3,7 @@
 
 pragma solidity ^0.8.25;
 
-import {Owned} from "../utils/Owned.sol";
+import {Owned} from "src/utils/Owned.sol";
 import {IERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 
 contract FeeRecipientProxy is Owned {

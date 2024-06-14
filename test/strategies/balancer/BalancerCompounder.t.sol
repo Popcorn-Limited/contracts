@@ -3,13 +3,8 @@
 
 pragma solidity ^0.8.25;
 
-import {
-    BalancerCompounder,
-    IERC20,
-    HarvestValues,
-    TradePath
-} from "../../../src/strategies/balancer/BalancerCompounder.sol";
-import {IAsset, BatchSwapStep} from "../../../src/interfaces/external/balancer/IBalancer.sol";
+import {BalancerCompounder, IERC20, HarvestValues, TradePath} from "src/strategies/balancer/BalancerCompounder.sol";
+import {IAsset, BatchSwapStep} from "src/interfaces/external/balancer/IBalancer.sol";
 import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson} from "../BaseStrategyTest.sol";
 
 contract BalancerCompounderTest is BaseStrategyTest {

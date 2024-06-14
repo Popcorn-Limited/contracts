@@ -18,7 +18,7 @@ struct HarvestValues {
 
 abstract contract BaseBalancerLpCompounder is BaseBalancerCompounder {
     using SafeERC20 for IERC20;
-    
+
     HarvestValues public harvestValues;
 
     error CompoundFailed();

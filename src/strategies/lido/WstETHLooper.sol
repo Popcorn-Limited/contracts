@@ -3,12 +3,12 @@
 
 pragma solidity ^0.8.25;
 
-import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math} from "../BaseStrategy.sol";
+import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math} from "src/strategies/BaseStrategy.sol";
 import {IwstETH} from "./IwstETH.sol";
 import {ILido} from "./ILido.sol";
 import {Math} from "openzeppelin-contracts/utils/math/Math.sol";
-import {IWETH} from "../../interfaces/external/IWETH.sol";
-import {ICurveMetapool} from "../../interfaces/external/curve/ICurveMetapool.sol";
+import {IWETH} from "src/interfaces/external/IWETH.sol";
+import {ICurveMetapool} from "src/interfaces/external/curve/ICurveMetapool.sol";
 import {
     ILendingPool,
     IAToken,
@@ -16,7 +16,7 @@ import {
     IProtocolDataProvider,
     IPoolAddressesProvider,
     DataTypes
-} from "../aave/aaveV3/IAaveV3.sol";
+} from "src/interfaces/external/aave/IAaveV3.sol";
 
 struct LooperInitValues {
     address aaveDataProvider;
@@ -337,10 +337,11 @@ contract WstETHLooper is BaseStrategy, IFlashLoanReceiver {
 
     // verify that currentLTV is not above maxLTV
     function _assertHealthyLTV() internal view {
-        (uint256 currentLTV, ,) = _getCurrentLTV();
+        (uint256 currentLTV,,) = _getCurrentLTV();
 
-        if (currentLTV > maxLTV)
+        if (currentLTV > maxLTV) {
             revert BadLTV(currentLTV, maxLTV);
+        }
     }
 
     // borrow WETH from lending protocol

@@ -15,6 +15,7 @@ struct TradePath {
 
 abstract contract BaseBalancerCompounder {
     using SafeERC20 for IERC20;
+
     IBalancerVault public balancerVault;
 
     address[] public _balancerSellTokens;

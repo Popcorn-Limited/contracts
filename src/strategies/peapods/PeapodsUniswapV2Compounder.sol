@@ -4,7 +4,7 @@
 pragma solidity ^0.8.15;
 
 import {PeapodsDepositor, IERC20, SafeERC20} from "./PeapodsStrategy.sol";
-import {BaseUniV2LpCompounder, SwapStep} from "../../peripheral/BaseUniV2LpCompounder.sol";
+import {BaseUniV2LpCompounder, SwapStep} from "src/peripheral/BaseUniV2LpCompounder.sol";
 
 /**
  * @title   ERC4626 Peapods Protocol Vault Adapter
@@ -14,7 +14,7 @@ import {BaseUniV2LpCompounder, SwapStep} from "../../peripheral/BaseUniV2LpCompo
  * An ERC4626 compliant Wrapper for Peapods.
  * Implements harvest func that swaps via Uniswap V2
  */
-contract PeapodsDepositorUniswapV2Compounder is PeapodsDepositor, BaseUniV2LpCompounder{
+contract PeapodsDepositorUniswapV2Compounder is PeapodsDepositor, BaseUniV2LpCompounder {
     using SafeERC20 for IERC20;
 
     /*//////////////////////////////////////////////////////////////
@@ -54,7 +54,7 @@ contract PeapodsDepositorUniswapV2Compounder is PeapodsDepositor, BaseUniV2LpCom
      */
     function harvest(bytes memory data) external override onlyKeeperOrOwner {
         claim();
-        
+
         // caching
         address asset_ = asset();
 
@@ -74,11 +74,12 @@ contract PeapodsDepositorUniswapV2Compounder is PeapodsDepositor, BaseUniV2LpCom
         setUniswapLpCompounderValues(newRouter, newDepositAssets, rewTokens, newSwaps);
     }
 
-    // allow owner to withdraw eventual dust amount of tokens 
+    // allow owner to withdraw eventual dust amount of tokens
     // from the compounding operation
     function withdrawDust(address token) external onlyOwner {
-        if(token != depositAssets[0] && token != depositAssets[1])
+        if (token != depositAssets[0] && token != depositAssets[1]) {
             revert("Invalid Token");
+        }
 
         IERC20(token).safeTransfer(owner, IERC20(token).balanceOf(address(this)));
     }

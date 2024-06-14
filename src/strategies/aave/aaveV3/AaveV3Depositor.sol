@@ -3,9 +3,14 @@
 
 pragma solidity ^0.8.25;
 
-import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math} from "../../BaseStrategy.sol";
-import {ILendingPool, IAaveIncentives, IAToken, IProtocolDataProvider} from "./IAaveV3.sol";
-import {DataTypes} from "./lib.sol";
+import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math} from "src/strategies/BaseStrategy.sol";
+import {
+    ILendingPool,
+    IAaveIncentives,
+    IAToken,
+    IProtocolDataProvider,
+    DataTypes
+} from "src/interfaces/external/aave/IAaveV3.sol";
 
 /**
  * @title   AaveV3 Adapter

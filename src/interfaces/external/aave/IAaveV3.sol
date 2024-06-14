@@ -45,9 +45,7 @@ interface IAaveIncentives {
      * @dev Returns list of reward token addresses for particular aToken.
      *
      */
-    function getRewardsByAsset(
-        address asset
-    ) external view returns (address[] memory);
+    function getRewardsByAsset(address asset) external view returns (address[] memory);
 
     /**
      * @dev Returns list of reward tokens for all markets.
@@ -59,44 +57,21 @@ interface IAaveIncentives {
      * @dev Claim all rewards for specified assets for user.
      *
      */
-    function claimAllRewardsOnBehalf(
-        address[] memory assets,
-        address user,
-        address to
-    )
+    function claimAllRewardsOnBehalf(address[] memory assets, address user, address to)
         external
         returns (address[] memory rewardsList, uint256[] memory claimedAmount);
 }
 
 // Aave lending pool interface
 interface ILendingPool {
-    function supply(
-        address asset,
-        uint256 amount,
-        address onBehalfOf,
-        uint16 referralCode
-    ) external;
+    function supply(address asset, uint256 amount, address onBehalfOf, uint16 referralCode) external;
 
-    function withdraw(
-        address asset,
-        uint256 amount,
-        address to
-    ) external returns (uint256);
+    function withdraw(address asset, uint256 amount, address to) external returns (uint256);
 
-    function repay(
-        address asset,
-        uint256 amount,
-        uint256 rateMode,
-        address onBehalfOf
-    ) external returns (uint256);
+    function repay(address asset, uint256 amount, uint256 rateMode, address onBehalfOf) external returns (uint256);
 
-    function borrow(
-        address asset,
-        uint256 amount,
-        uint256 interestRateMode,
-        uint16 referralCode,
-        address onBehalfOf
-    ) external;
+    function borrow(address asset, uint256 amount, uint256 interestRateMode, uint16 referralCode, address onBehalfOf)
+        external;
 
     function flashLoan(
         address receiverAddress,
@@ -108,16 +83,11 @@ interface ILendingPool {
         uint16 referralCode
     ) external;
 
-    function setUserUseReserveAsCollateral(
-        address asset,
-        bool useAsCollateral
-    ) external;
+    function setUserUseReserveAsCollateral(address asset, bool useAsCollateral) external;
 
     function setUserEMode(uint8 category) external;
 
-    function getEModeCategoryData(
-        uint8 id
-    ) external returns (DataTypes.EModeData memory emodeData);
+    function getEModeCategoryData(uint8 id) external returns (DataTypes.EModeData memory emodeData);
 
     function getUserEMode(address user) external returns (uint256);
 
@@ -127,27 +97,17 @@ interface ILendingPool {
      * @return The state of the reserve
      *
      */
-    function getReserveData(
-        address asset
-    ) external view returns (DataTypes.ReserveData2 memory);
+    function getReserveData(address asset) external view returns (DataTypes.ReserveData2 memory);
 
-    function getReserveNormalizedIncome(
-        address asset
-    ) external view returns (uint256);
+    function getReserveNormalizedIncome(address asset) external view returns (uint256);
 }
 
 // Aave protocol data provider
 interface IProtocolDataProvider {
-    function getReserveTokensAddresses(
-        address asset
-    )
+    function getReserveTokensAddresses(address asset)
         external
         view
-        returns (
-            address aTokenAddress,
-            address stableDebtTokenAddress,
-            address variableDebtTokenAddress
-        );
+        returns (address aTokenAddress, address stableDebtTokenAddress, address variableDebtTokenAddress);
 }
 
 interface IFlashLoanReceiver {
@@ -170,10 +130,7 @@ interface IFlashLoanReceiver {
         bytes calldata params
     ) external returns (bool);
 
-    function ADDRESSES_PROVIDER()
-        external
-        view
-        returns (IPoolAddressesProvider);
+    function ADDRESSES_PROVIDER() external view returns (IPoolAddressesProvider);
 
     function POOL() external view returns (ILendingPool);
 }
@@ -216,10 +173,7 @@ interface IPoolAddressesProvider {
      * @param id The id
      * @param newImplementationAddress The address of the new implementation
      */
-    function setAddressAsProxy(
-        bytes32 id,
-        address newImplementationAddress
-    ) external;
+    function setAddressAsProxy(bytes32 id, address newImplementationAddress) external;
 
     /**
      * @notice Sets an address for an id replacing the address saved in the addresses map.
