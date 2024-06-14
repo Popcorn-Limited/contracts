@@ -51,12 +51,6 @@ abstract contract EnsoCompounder is EnsoConverter {
             // Make sure float stays in the strategy for withdrawals
             uint256 depositAmount = bal -
                 bal.mulDiv(10_000 - floatRatio, 10_000, Math.Rounding.Floor);
-
-            _postPushCall(
-                depositAmount,
-                convertToShares(depositAmount),
-                postPushData
-            );
         }
 
         emit Harvested();
