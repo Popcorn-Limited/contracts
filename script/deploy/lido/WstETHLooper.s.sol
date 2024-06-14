@@ -16,17 +16,10 @@ contract DeployStrategy is Script {
     IERC20 vdWETH;
 
     function run() public {
-        string memory json = vm.readFile(
-            string.concat(
-                vm.projectRoot(),
-                "./srcript/deploy/lido/WstETHLooperDeployConfig.json"
-            )
-        );
+        string memory json =
+            vm.readFile(string.concat(vm.projectRoot(), "./srcript/deploy/lido/WstETHLooperDeployConfig.json"));
 
-        LooperInitValues memory looperValues = abi.decode(
-            json.parseRaw(".strategyInit"),
-            (LooperInitValues)
-        );
+        LooperInitValues memory looperValues = abi.decode(json.parseRaw(".strategyInit"), (LooperInitValues));
 
         // Deploy Strategy
         WstETHLooper strategy = new WstETHLooper();

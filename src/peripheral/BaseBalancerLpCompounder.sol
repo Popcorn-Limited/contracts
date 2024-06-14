@@ -4,6 +4,7 @@
 pragma solidity ^0.8.25;
 
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 import {BaseBalancerCompounder, BalancerTradeLibrary, TradePath} from "./BaseBalancerCompounder.sol";
 
 struct HarvestValues {
@@ -16,6 +17,8 @@ struct HarvestValues {
 }
 
 abstract contract BaseBalancerLpCompounder is BaseBalancerCompounder {
+    using SafeERC20 for IERC20;
+    
     HarvestValues public harvestValues;
 
     error CompoundFailed();
@@ -52,10 +55,10 @@ abstract contract BaseBalancerLpCompounder is BaseBalancerCompounder {
 
         // Reset old base asset
         if (harvestValues.depositAsset != address(0)) {
-            IERC20(harvestValues.depositAsset).approve(address(balancerVault), 0);
+            IERC20(harvestValues.depositAsset).forceApprove(address(balancerVault), 0);
         }
         // approve and set new base asset
-        IERC20(harvestValues_.depositAsset).approve(newBalancerVault, type(uint256).max);
+        IERC20(harvestValues_.depositAsset).forceApprove(newBalancerVault, type(uint256).max);
 
         harvestValues = harvestValues_;
     }
