@@ -3,7 +3,7 @@
 
 pragma solidity ^0.8.25;
 
-import {CurveGaugeCompounder, IERC20, CurveSwap} from "../../../src/strategies/curve/CurveGaugeCompounder.sol";
+import {CurveGaugeCompounder, IERC20, CurveSwap} from "src/strategies/curve/CurveGaugeCompounder.sol";
 import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson} from "../BaseStrategyTest.sol";
 
 struct CurveGaugeInit {

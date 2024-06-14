@@ -3,7 +3,7 @@
 
 pragma solidity ^0.8.25;
 
-import {ConvexCompounder, IERC20, CurveSwap} from "../../../src/strategies/convex/ConvexCompounder.sol";
+import {ConvexCompounder, IERC20, CurveSwap} from "src/strategies/convex/ConvexCompounder.sol";
 import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson} from "../BaseStrategyTest.sol";
 
 struct ConvexInit {

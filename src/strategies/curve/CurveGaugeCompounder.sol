@@ -3,9 +3,9 @@
 
 pragma solidity ^0.8.25;
 
-import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math} from "../BaseStrategy.sol";
+import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math} from "src/strategies/BaseStrategy.sol";
 import {ICurveLp, IGauge, ICurveRouter, CurveSwap, IMinter} from "./ICurve.sol";
-import {BaseCurveLpCompounder} from "../../peripheral/BaseCurveLpCompounder.sol";
+import {BaseCurveLpCompounder} from "src/peripheral/BaseCurveLpCompounder.sol";
 
 /**
  * @title   Curve Child Gauge Adapter

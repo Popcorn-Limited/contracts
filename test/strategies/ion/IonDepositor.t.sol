@@ -5,8 +5,8 @@ pragma solidity ^0.8.15;
 
 import {Test} from "forge-std/Test.sol";
 
-import {IonDepositor, SafeERC20, IERC20} from "../../../src/strategies/ion/IonDepositor.sol";
-import {IIonPool, IWhitelist} from "../../../src/strategies/ion/IIonProtocol.sol";
+import {IonDepositor, SafeERC20, IERC20} from "src/strategies/ion/IonDepositor.sol";
+import {IIonPool, IWhitelist} from "src/strategies/ion/IIonProtocol.sol";
 import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson} from "../BaseStrategyTest.sol";
 
 contract IonDepositorTest is BaseStrategyTest {

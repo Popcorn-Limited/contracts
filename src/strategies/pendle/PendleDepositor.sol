@@ -3,8 +3,19 @@
 
 pragma solidity ^0.8.15;
 
-import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math} from "../BaseStrategy.sol";
-import {IPendleRouter, IPendleRouterStatic, IPendleMarket, IPendleSYToken, ISYTokenV3, ApproxParams, LimitOrderData, TokenInput, TokenOutput, SwapData} from "./IPendle.sol";
+import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math} from "src/strategies/BaseStrategy.sol";
+import {
+    IPendleRouter,
+    IPendleRouterStatic,
+    IPendleMarket,
+    IPendleSYToken,
+    ISYTokenV3,
+    ApproxParams,
+    LimitOrderData,
+    TokenInput,
+    TokenOutput,
+    SwapData
+} from "./IPendle.sol";
 
 /**
  * @title   ERC4626 Pendle Protocol Vault Adapter
@@ -40,42 +51,31 @@ contract PendleDepositor is BaseStrategy {
      * @param autoDeposit_ Controls if `protocolDeposit` gets called on deposit
      * @param strategyInitData_ Encoded data for this specific strategy
      */
-    function initialize(
-        address asset_,
-        address owner_,
-        bool autoDeposit_,
-        bytes memory strategyInitData_
-    ) external virtual initializer {
+    function initialize(address asset_, address owner_, bool autoDeposit_, bytes memory strategyInitData_)
+        external
+        virtual
+        initializer
+    {
         __PendleBase_init(asset_, owner_, autoDeposit_, strategyInitData_);
     }
 
-    function __PendleBase_init(
-        address asset_,
-        address owner_,
-        bool autoDeposit_,
-        bytes memory strategyInitData_
-    ) internal onlyInitializing {
+    function __PendleBase_init(address asset_, address owner_, bool autoDeposit_, bytes memory strategyInitData_)
+        internal
+        onlyInitializing
+    {
         __BaseStrategy_init(asset_, owner_, autoDeposit_);
 
-        _name = string.concat(
-            "VaultCraft Pendle ",
-            IERC20Metadata(asset_).name(),
-            " Adapter"
-        );
+        _name = string.concat("VaultCraft Pendle ", IERC20Metadata(asset_).name(), " Adapter");
         _symbol = string.concat("vcp-", IERC20Metadata(asset_).symbol());
 
-        (
-            address pendleMarket_,
-            address pendleRouter_,
-            address pendleRouterStat_
-        ) = abi.decode(strategyInitData_, (address, address, address));
+        (address pendleMarket_, address pendleRouter_, address pendleRouterStat_) =
+            abi.decode(strategyInitData_, (address, address, address));
 
         pendleRouter = IPendleRouter(pendleRouter_);
         pendleMarket = IPendleMarket(pendleMarket_);
         pendleRouterStatic = IPendleRouterStatic(pendleRouterStat_);
 
-        (address pendleSYToken_, , ) = IPendleMarket(pendleMarket_)
-            .readTokens();
+        (address pendleSYToken_,,) = IPendleMarket(pendleMarket_).readTokens();
         pendleSYToken = pendleSYToken_;
 
         // make sure base asset and market are compatible
@@ -88,21 +88,11 @@ contract PendleDepositor is BaseStrategy {
         IERC20(pendleMarket_).approve(pendleRouter_, type(uint256).max);
     }
 
-    function name()
-        public
-        view
-        override(IERC20Metadata, ERC20)
-        returns (string memory)
-    {
+    function name() public view override(IERC20Metadata, ERC20) returns (string memory) {
         return _name;
     }
 
-    function symbol()
-        public
-        view
-        override(IERC20Metadata, ERC20)
-        returns (string memory)
-    {
+    function symbol() public view override(IERC20Metadata, ERC20) returns (string memory) {
         return _symbol;
     }
 
@@ -119,12 +109,7 @@ contract PendleDepositor is BaseStrategy {
         try syToken.supplyCap() returns (uint256 supplyCap) {
             uint256 syCap = supplyCap - syToken.totalSupply();
 
-            return
-                syCap.mulDiv(
-                    syToken.exchangeRate(),
-                    (10 ** syToken.decimals()),
-                    Math.Rounding.Floor
-                );
+            return syCap.mulDiv(syToken.exchangeRate(), (10 ** syToken.decimals()), Math.Rounding.Floor);
         } catch {
             return super.maxDeposit(who);
         }
@@ -136,12 +121,7 @@ contract PendleDepositor is BaseStrategy {
         if (lpBalance == 0) {
             t = 0;
         } else {
-            (t, , , , , , , ) = pendleRouterStatic
-                .removeLiquiditySingleTokenStatic(
-                    address(pendleMarket),
-                    lpBalance,
-                    asset()
-                );
+            (t,,,,,,,) = pendleRouterStatic.removeLiquiditySingleTokenStatic(address(pendleMarket), lpBalance, asset());
         }
     }
 
@@ -150,13 +130,7 @@ contract PendleDepositor is BaseStrategy {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice The token rewarded from the pendle market
-    function rewardTokens()
-        external
-        view
-        virtual
-        override
-        returns (address[] memory)
-    {
+    function rewardTokens() external view virtual override returns (address[] memory) {
         return _getRewardTokens();
     }
 
@@ -171,19 +145,9 @@ contract PendleDepositor is BaseStrategy {
                           INTERNAL HOOKS LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function _protocolDeposit(
-        uint256 amount,
-        uint256,
-        bytes memory data
-    ) internal virtual override {
+    function _protocolDeposit(uint256 amount, uint256, bytes memory data) internal virtual override {
         // params suggested by docs
-        ApproxParams memory approxParams = ApproxParams(
-            0,
-            type(uint256).max,
-            0,
-            256,
-            1e14
-        );
+        ApproxParams memory approxParams = ApproxParams(0, type(uint256).max, 0, 256, 1e14);
 
         // Empty structs
         LimitOrderData memory limitOrderData;
@@ -192,13 +156,7 @@ contract PendleDepositor is BaseStrategy {
         // caching
         address asset = asset();
 
-        TokenInput memory tokenInput = TokenInput(
-            asset,
-            amount,
-            asset,
-            address(0),
-            swapData
-        );
+        TokenInput memory tokenInput = TokenInput(asset, amount, asset, address(0), swapData);
         pendleRouter.addLiquiditySingleToken(
             address(this),
             address(pendleMarket),
@@ -209,11 +167,7 @@ contract PendleDepositor is BaseStrategy {
         );
     }
 
-    function _protocolWithdraw(
-        uint256 amount,
-        uint256,
-        bytes memory
-    ) internal virtual override {
+    function _protocolWithdraw(uint256 amount, uint256, bytes memory) internal virtual override {
         // caching
         address asset = asset();
 
@@ -221,31 +175,17 @@ contract PendleDepositor is BaseStrategy {
         LimitOrderData memory limitOrderData;
         SwapData memory swapData;
 
-        TokenOutput memory tokenOutput = TokenOutput(
-            asset,
-            amount,
-            asset,
-            address(0),
-            swapData
-        );
+        TokenOutput memory tokenOutput = TokenOutput(asset, amount, asset, address(0), swapData);
 
         pendleRouter.removeLiquiditySingleToken(
-            address(this),
-            address(pendleMarket),
-            amountToLp(amount, _totalAssets()),
-            tokenOutput,
-            limitOrderData
+            address(this), address(pendleMarket), amountToLp(amount, _totalAssets()), tokenOutput, limitOrderData
         );
     }
 
-    function amountToLp(
-        uint256 amount,
-        uint256 totAssets
-    ) internal view returns (uint256 lpAmount) {
+    function amountToLp(uint256 amount, uint256 totAssets) internal view returns (uint256 lpAmount) {
         uint256 lpBalance = pendleMarket.balanceOf(address(this));
 
-        amount == totAssets ? lpAmount = lpBalance : lpAmount = lpBalance
-            .mulDiv(amount, totAssets, Math.Rounding.Ceil);
+        amount == totAssets ? lpAmount = lpBalance : lpAmount = lpBalance.mulDiv(amount, totAssets, Math.Rounding.Ceil);
     }
 
     function _validateAsset(address syToken, address baseAsset) internal view {

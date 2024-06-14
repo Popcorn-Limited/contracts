@@ -5,8 +5,8 @@ pragma solidity ^0.8.15;
 
 import {Test} from "forge-std/Test.sol";
 
-import {PeapodsDepositorUniswapV2Compounder, SwapStep} from "../../../src/strategies/peapods/PeapodsUniswapV2Compounder.sol";
-import {IStakedToken} from "../../../src/strategies/peapods/PeapodsStrategy.sol";
+import {PeapodsDepositorUniswapV2Compounder, SwapStep} from "src/strategies/peapods/PeapodsUniswapV2Compounder.sol";
+import {IStakedToken} from "src/strategies/peapods/PeapodsStrategy.sol";
 import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson, Math} from "../BaseStrategyTest.sol";
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "openzeppelin-contracts/token/ERC20/extensions/IERC20Metadata.sol";
@@ -29,57 +29,49 @@ contract PeapodsUniswapV2CompounderTest is BaseStrategyTest {
         returns (IBaseStrategy)
     {
         // Read strategy init values
-        stakingContract = json_.readAddress(string.concat(".configs[", index_, "].specific.init.stakingContract")); 
+        stakingContract = json_.readAddress(string.concat(".configs[", index_, "].specific.init.stakingContract"));
 
         // Deploy Strategy
         PeapodsDepositorUniswapV2Compounder strategy = new PeapodsDepositorUniswapV2Compounder();
 
-        strategy.initialize(
-            testConfig_.asset, 
-            address(this), 
-            true, 
-            abi.encode(stakingContract)
-        );
+        strategy.initialize(testConfig_.asset, address(this), true, abi.encode(stakingContract));
 
         // Set Harvest values
         address router = json_.readAddress(string.concat(".configs[", index_, "].specific.harvest.uniswapRouter"));
-        
-        // assets to buy with rewards and to add to liquidity 
-        depositAssets[0] = json_.readAddress(
-            string.concat(".configs[", index_, "].specific.harvest.depositAssets[0]")
-        );
-        depositAssets[1] = json_.readAddress(
-            string.concat(".configs[", index_, "].specific.harvest.depositAssets[1]")
-        ); 
+
+        // assets to buy with rewards and to add to liquidity
+        depositAssets[0] = json_.readAddress(string.concat(".configs[", index_, "].specific.harvest.depositAssets[0]"));
+        depositAssets[1] = json_.readAddress(string.concat(".configs[", index_, "].specific.harvest.depositAssets[1]"));
 
         // set Uniswap trade paths
         SwapStep[] memory swaps = new SwapStep[](2);
-        
-        uint256 lenSwap0 = json_.readUint(
-            string.concat(".configs[", index_, "].specific.harvest.tradePaths[0].length")
-        );
+
+        uint256 lenSwap0 = json_.readUint(string.concat(".configs[", index_, "].specific.harvest.tradePaths[0].length"));
         address[] memory swap0 = new address[](lenSwap0); // PEAS - WETH - DAI - pDAI
-        for(uint256 i=0; i<lenSwap0; i++) {
+        for (uint256 i = 0; i < lenSwap0; i++) {
             swap0[i] = json_.readAddress(
-                string.concat(".configs[", index_, "].specific.harvest.tradePaths[0].path[", vm.toString(i), "]"));
+                string.concat(".configs[", index_, "].specific.harvest.tradePaths[0].path[", vm.toString(i), "]")
+            );
         }
 
         uint256 lenSwap1 = json_.readUint(string.concat(".configs[", index_, "].specific.harvest.tradePaths[1].length"));
         address[] memory swap1 = new address[](lenSwap1); // PEAS - WETH - DAI
-        for(uint256 i=0; i<lenSwap1; i++) {
+        for (uint256 i = 0; i < lenSwap1; i++) {
             swap1[i] = json_.readAddress(
-                string.concat(".configs[", index_, "].specific.harvest.tradePaths[1].path[", vm.toString(i), "]"));
+                string.concat(".configs[", index_, "].specific.harvest.tradePaths[1].path[", vm.toString(i), "]")
+            );
         }
 
         swaps[0] = SwapStep(swap0);
         swaps[1] = SwapStep(swap1);
 
-        // rewards 
+        // rewards
         uint256 rewLen = json_.readUint(string.concat(".configs[", index_, "].specific.harvest.rewards.length"));
         address[] memory rewardTokens = new address[](rewLen);
-        for(uint256 i=0; i<rewLen; i++) {
+        for (uint256 i = 0; i < rewLen; i++) {
             rewardTokens[i] = json_.readAddress(
-                string.concat(".configs[", index_, "].specific.harvest.rewards.tokens[", vm.toString(i), "]"));
+                string.concat(".configs[", index_, "].specific.harvest.rewards.tokens[", vm.toString(i), "]")
+            );
         }
 
         strategy.setHarvestValues(rewardTokens, router, depositAssets, swaps);
@@ -97,17 +89,12 @@ contract PeapodsUniswapV2CompounderTest is BaseStrategyTest {
         string memory json = vm.readFile("./test/strategies/peapods/PeapodsUniV2Compounder.json");
 
         // Read strategy init values
-        address staking = json.readAddress(string.concat(".configs[0].specific.init.stakingContract")); 
+        address staking = json.readAddress(string.concat(".configs[0].specific.init.stakingContract"));
 
         // Deploy Strategy
         PeapodsDepositorUniswapV2Compounder strategy = new PeapodsDepositorUniswapV2Compounder();
 
-        strategy.initialize(
-            asset, 
-            address(this), 
-            true, 
-            abi.encode(staking)
-        );
+        strategy.initialize(asset, address(this), true, abi.encode(staking));
 
         assertEq(strategy.owner(), address(this), "owner");
 
@@ -147,7 +134,7 @@ contract PeapodsUniswapV2CompounderTest is BaseStrategyTest {
         uint256 totAssetsBefore = strategy.totalAssets();
 
         strategy.harvest(abi.encode(0));
-        
+
         // total assets have increased
         assertGt(strategy.totalAssets(), totAssetsBefore);
     }
@@ -166,7 +153,7 @@ contract PeapodsUniswapV2CompounderTest is BaseStrategyTest {
         assertEq(IERC20(depositAssets[1]).balanceOf(address(strategy)), 0.1 ether);
 
         strategyContract.withdrawDust(depositAssets[1]);
-        assertEq(IERC20(depositAssets[1]).balanceOf(address(strategy)), 0);       
+        assertEq(IERC20(depositAssets[1]).balanceOf(address(strategy)), 0);
     }
 
     function testFail_withdrawDust_invalidToken() public {

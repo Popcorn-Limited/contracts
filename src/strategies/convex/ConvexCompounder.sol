@@ -3,9 +3,9 @@
 
 pragma solidity ^0.8.25;
 
-import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math} from "../BaseStrategy.sol";
+import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math} from "src/strategies/BaseStrategy.sol";
 import {IConvexBooster, IConvexRewards} from "./IConvex.sol";
-import {BaseCurveLpCompounder, CurveSwap, ICurveLp} from "../../peripheral/BaseCurveLpCompounder.sol";
+import {BaseCurveLpCompounder, CurveSwap, ICurveLp} from "src/peripheral/BaseCurveLpCompounder.sol";
 
 /**
  * @title   Convex Compounder Adapter

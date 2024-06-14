@@ -2,7 +2,7 @@
 pragma solidity >=0.8.20;
 
 import {IERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
-import {DataTypes} from "./lib.sol";
+import {DataTypes} from "./DataTypes.sol";
 
 interface IScaledBalanceToken {
     /**

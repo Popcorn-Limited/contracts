@@ -10,7 +10,7 @@ import {Math} from "openzeppelin-contracts/utils/math/Math.sol";
 import {IERC20} from "openzeppelin-contracts/interfaces/IERC20.sol";
 import {IERC20Metadata} from "openzeppelin-contracts/interfaces/IERC20Metadata.sol";
 
-import {IBaseStrategy} from "../../src/interfaces/IBaseStrategy.sol";
+import {IBaseStrategy} from "src/interfaces/IBaseStrategy.sol";
 import {PropertyTest, TestConfig} from "./PropertyTest.prop.sol";
 
 abstract contract BaseStrategyTest is PropertyTest {

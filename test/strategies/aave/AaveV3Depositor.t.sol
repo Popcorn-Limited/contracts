@@ -3,7 +3,7 @@
 
 pragma solidity ^0.8.25;
 
-import {AaveV3Depositor, IERC20} from "../../../src/strategies/aave/aaveV3/AaveV3Depositor.sol";
+import {AaveV3Depositor, IERC20} from "src/strategies/aave/aaveV3/AaveV3Depositor.sol";
 import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson} from "../BaseStrategyTest.sol";
 
 contract AaveV3DepositorTest is BaseStrategyTest {
