@@ -1,4 +1,4 @@
-pragma solidity ^0.8.15;
+pragma solidity ^0.8.25;
 
 import {IERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 
@@ -41,25 +41,14 @@ interface IBalancerVault {
         uint256 deadline
     ) external returns (int256[] memory assetDeltas);
 
-    function getPoolTokens(
-        bytes32 poolId
-    )
+    function getPoolTokens(bytes32 poolId)
         external
         view
-        returns (
-            address[] memory tokens,
-            uint256[] memory balances,
-            uint256 lastChangeBlock
-        );
+        returns (address[] memory tokens, uint256[] memory balances, uint256 lastChangeBlock);
 
-    function getPool(
-        bytes32 poolId
-    ) external view returns (address lpToken, uint8 numTokens);
+    function getPool(bytes32 poolId) external view returns (address lpToken, uint8 numTokens);
 
-    function joinPool(
-        bytes32 poolId,
-        address sender,
-        address recipient,
-        JoinPoolRequest memory request
-    ) external payable;
+    function joinPool(bytes32 poolId, address sender, address recipient, JoinPoolRequest memory request)
+        external
+        payable;
 }
