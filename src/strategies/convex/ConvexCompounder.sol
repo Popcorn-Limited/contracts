@@ -92,7 +92,7 @@ contract ConvexCompounder is BaseStrategy, BaseCurveLpCompounder {
 
     /// @notice The token rewarded from the convex reward contract
     function rewardTokens() external view override returns (address[] memory) {
-        return _rewardTokens;
+        return _curveSellTokens;
     }
 
     /*//////////////////////////////////////////////////////////////

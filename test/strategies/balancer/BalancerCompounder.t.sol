@@ -9,7 +9,7 @@ import {
     HarvestValues,
     TradePath
 } from "../../../src/strategies/balancer/BalancerCompounder.sol";
-import {IAsset, BatchSwapStep} from "../../../src/interfaces/external/balancer/IBalancerVault.sol";
+import {IAsset, BatchSwapStep} from "../../../src/interfaces/external/balancer/IBalancer.sol";
 import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson} from "../BaseStrategyTest.sol";
 
 contract BalancerCompounderTest is BaseStrategyTest {

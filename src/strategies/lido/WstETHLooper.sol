@@ -16,7 +16,7 @@ import {
     IProtocolDataProvider,
     IPoolAddressesProvider,
     DataTypes
-} from "../../interfaces/external/aave/IAaveV3.sol";
+} from "../aave/aaveV3/IAaveV3.sol";
 
 struct LooperInitValues {
     address aaveDataProvider;

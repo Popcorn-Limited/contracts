@@ -4,7 +4,7 @@
 pragma solidity ^0.8.25;
 
 import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math} from "../BaseStrategy.sol";
-import {IMinter, IGauge} from "./IBalancer.sol";
+import {IMinter, IGauge} from "../../interfaces/external/balancer/IBalancer.sol";
 import {BaseBalancerLpCompounder, HarvestValues, TradePath} from "../../peripheral/BaseBalancerLpCompounder.sol";
 
 /**
@@ -76,7 +76,7 @@ contract BalancerCompounder is BaseStrategy, BaseBalancerLpCompounder {
 
     /// @notice The token rewarded
     function rewardTokens() external view override returns (address[] memory) {
-        return _rewardTokens;
+        return _balancerSellTokens;
     }
 
     /*//////////////////////////////////////////////////////////////

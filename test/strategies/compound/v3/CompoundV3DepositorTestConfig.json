@@ -1,0 +1,22 @@
+{
+  "length": 1,
+  "configs": [
+    {
+      "base": {
+        "asset": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        "blockNumber": 0,
+        "defaultAmount": 1000000,
+        "delta": 10,
+        "maxDeposit": 100000000,
+        "maxWithdraw": 100000000,
+        "minDeposit": 10000,
+        "minWithdraw": 10000,
+        "network": "mainnet",
+        "testId": "CompoundV3 Depositor"
+      },
+      "specific": {
+        "cToken": "0xc3d688B66703497DAA19211EEdff47f25384cdc3"
+      }
+    }
+  ]
+}

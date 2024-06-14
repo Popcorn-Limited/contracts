@@ -4,7 +4,7 @@
 pragma solidity ^0.8.25;
 
 import {AuraCompounder, HarvestValues, TradePath} from "../../../src/strategies/aura/AuraCompounder.sol";
-import {IAsset, BatchSwapStep} from "../../../src/interfaces/external/balancer/IBalancerVault.sol";
+import {IAsset, BatchSwapStep} from "../../../src/interfaces/external/balancer/IBalancer.sol";
 import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson} from "../BaseStrategyTest.sol";
 
 contract AuraCompounderTest is BaseStrategyTest {

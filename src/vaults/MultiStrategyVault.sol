@@ -3,13 +3,7 @@
 
 pragma solidity ^0.8.25;
 
-import {
-    ERC4626Upgradeable,
-    IERC20Metadata,
-    ERC20Upgradeable as ERC20,
-    IERC4626,
-    IERC20
-} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
+import {ERC4626Upgradeable, IERC20Metadata, ERC20Upgradeable as ERC20, IERC4626, IERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuardUpgradeable} from "openzeppelin-contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {PausableUpgradeable} from "openzeppelin-contracts-upgradeable/utils/PausableUpgradeable.sol";
@@ -21,6 +15,8 @@ struct Allocation {
     uint256 amount;
 }
 
+// TODO strategies and withdrawalQueue can be duplicates
+
 /**
  * @title   MultiStrategyVault
  * @author  RedVeil
@@ -31,7 +27,12 @@ struct Allocation {
  * It allows for multiple type of fees which are taken by issuing new vault shares.
  * Strategies and fees can be changed by the owner after a ragequit time.
  */
-contract MultiStrategyVault is ERC4626Upgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable, OwnedUpgradeable {
+contract MultiStrategyVault is
+    ERC4626Upgradeable,
+    ReentrancyGuardUpgradeable,
+    PausableUpgradeable,
+    OwnedUpgradeable
+{
     using SafeERC20 for IERC20;
     using Math for uint256;
 
@@ -70,7 +71,7 @@ contract MultiStrategyVault is ERC4626Upgradeable, ReentrancyGuardUpgradeable, P
         uint256 depositLimit_,
         address owner_
     ) external initializer {
-       __Pausable_init();
+        __Pausable_init();
         __ReentrancyGuard_init();
         __ERC4626_init(IERC20Metadata(address(asset_)));
         __Owned_init(owner_);
@@ -143,11 +144,21 @@ contract MultiStrategyVault is ERC4626Upgradeable, ReentrancyGuardUpgradeable, P
         emit VaultInitialized(contractName, address(asset_));
     }
 
-    function name() public view override(IERC20Metadata, ERC20) returns (string memory) {
+    function name()
+        public
+        view
+        override(IERC20Metadata, ERC20)
+        returns (string memory)
+    {
         return _name;
     }
 
-    function symbol() public view override(IERC20Metadata, ERC20) returns (string memory) {
+    function symbol()
+        public
+        view
+        override(IERC20Metadata, ERC20)
+        returns (string memory)
+    {
         return _symbol;
     }
 
@@ -213,12 +224,12 @@ contract MultiStrategyVault is ERC4626Upgradeable, ReentrancyGuardUpgradeable, P
     /**
      * @dev Deposit/mint common workflow.
      */
-    function _deposit(address caller, address receiver, uint256 assets, uint256 shares)
-        internal
-        override
-        nonReentrant
-        takeFees
-    {
+    function _deposit(
+        address caller,
+        address receiver,
+        uint256 assets,
+        uint256 shares
+    ) internal override nonReentrant takeFees {
         if (shares == 0 || assets == 0) revert ZeroAmount();
 
         // If _asset is ERC-777, `transferFrom` can trigger a reentrancy BEFORE the transfer happens through the
@@ -228,7 +239,12 @@ contract MultiStrategyVault is ERC4626Upgradeable, ReentrancyGuardUpgradeable, P
         // Conclusion: we need to do the transfer before we mint so that any reentrancy would happen before the
         // assets are transferred and before the shares are minted, which is a valid state.
         // slither-disable-next-line reentrancy-no-eth
-        SafeERC20.safeTransferFrom(IERC20(asset()), caller, address(this), assets);
+        SafeERC20.safeTransferFrom(
+            IERC20(asset()),
+            caller,
+            address(this),
+            assets
+        );
 
         // deposit into default index strategy or leave funds idle
         if (depositIndex != type(uint256).max) {
@@ -243,12 +259,13 @@ contract MultiStrategyVault is ERC4626Upgradeable, ReentrancyGuardUpgradeable, P
     /**
      * @dev Withdraw/redeem common workflow.
      */
-    function _withdraw(address caller, address receiver, address owner, uint256 assets, uint256 shares)
-        internal
-        override
-        nonReentrant
-        takeFees
-    {
+    function _withdraw(
+        address caller,
+        address receiver,
+        address owner,
+        uint256 assets,
+        uint256 shares
+    ) internal override nonReentrant takeFees {
         if (shares == 0 || assets == 0) revert ZeroAmount();
         if (caller != owner) {
             _spendAllowance(owner, caller, shares);
@@ -296,10 +313,8 @@ contract MultiStrategyVault is ERC4626Upgradeable, ReentrancyGuardUpgradeable, P
             );
 
             if (withdrawableAssets >= missing) {
-                try
-                    strategy.withdraw(missing, address(this), address(this))
-                {
-                break;
+                try strategy.withdraw(missing, address(this), address(this)) {
+                    break;
                 } catch {
                     emit StrategyWithdrawalFailed(address(strategy), missing);
                 }
@@ -313,7 +328,10 @@ contract MultiStrategyVault is ERC4626Upgradeable, ReentrancyGuardUpgradeable, P
                 {
                     float += withdrawableAssets;
                 } catch {
-                    emit StrategyWithdrawalFailed(address(strategy), withdrawableAssets);
+                    emit StrategyWithdrawalFailed(
+                        address(strategy),
+                        withdrawableAssets
+                    );
                 }
             }
         }
@@ -328,7 +346,9 @@ contract MultiStrategyVault is ERC4626Upgradeable, ReentrancyGuardUpgradeable, P
         uint256 assets = IERC20(asset()).balanceOf(address(this));
 
         for (uint8 i; i < strategies.length; i++) {
-            assets += strategies[i].convertToAssets(strategies[i].balanceOf(address(this)));
+            assets += strategies[i].convertToAssets(
+                strategies[i].balanceOf(address(this))
+            );
         }
         return assets;
     }
@@ -341,14 +361,18 @@ contract MultiStrategyVault is ERC4626Upgradeable, ReentrancyGuardUpgradeable, P
     function maxDeposit(address) public view override returns (uint256) {
         uint256 assets = totalAssets();
         uint256 depositLimit_ = depositLimit;
-        return (paused() || assets >= depositLimit_) ? 0 : depositLimit_ - assets;
+        return
+            (paused() || assets >= depositLimit_) ? 0 : depositLimit_ - assets;
     }
 
     /// @return Maximum amount of vault shares that may be minted to given address. Delegates to adapter.
     function maxMint(address) public view override returns (uint256) {
         uint256 assets = totalAssets();
         uint256 depositLimit_ = depositLimit;
-        return (paused() || assets >= depositLimit_) ? 0 : convertToShares(depositLimit_ - assets);
+        return
+            (paused() || assets >= depositLimit_)
+                ? 0
+                : convertToShares(depositLimit_ - assets);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -396,7 +420,7 @@ contract MultiStrategyVault is ERC4626Upgradeable, ReentrancyGuardUpgradeable, P
 
     /**
      * @notice Sets a new depositIndex. Caller must be Owner.
-     * @param index The index controls which strategy will be used on user deposits. 
+     * @param index The index controls which strategy will be used on user deposits.
      * @dev To simply transfer user assets into the vault without using a strategy set the index to `type(uint256).max`
      */
     function setDepositIndex(uint256 index) external onlyOwner {
@@ -546,7 +570,10 @@ contract MultiStrategyVault is ERC4626Upgradeable, ReentrancyGuardUpgradeable, P
     function pushFunds(Allocation[] calldata allocations) external onlyOwner {
         uint256 len = allocations.length;
         for (uint256 i; i < len; i++) {
-            strategies[allocations[i].index].deposit(allocations[i].amount, address(this));
+            strategies[allocations[i].index].deposit(
+                allocations[i].amount,
+                address(this)
+            );
         }
     }
 
@@ -558,7 +585,11 @@ contract MultiStrategyVault is ERC4626Upgradeable, ReentrancyGuardUpgradeable, P
         uint256 len = allocations.length;
         for (uint256 i; i < len; i++) {
             if (allocations[i].amount > 0) {
-                strategies[allocations[i].index].withdraw(allocations[i].amount, address(this), address(this));
+                strategies[allocations[i].index].withdraw(
+                    allocations[i].amount,
+                    address(this),
+                    address(this)
+                );
             }
         }
     }
@@ -570,7 +601,8 @@ contract MultiStrategyVault is ERC4626Upgradeable, ReentrancyGuardUpgradeable, P
     uint256 public performanceFee;
     uint256 public highWaterMark;
 
-    address public constant FEE_RECIPIENT = address(0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E);
+    address public constant FEE_RECIPIENT =
+        address(0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E);
 
     event PerformanceFeeChanged(uint256 oldFee, uint256 newFee);
 
@@ -587,9 +619,14 @@ contract MultiStrategyVault is ERC4626Upgradeable, ReentrancyGuardUpgradeable, P
         uint256 shareValue = convertToAssets(1e18);
         uint256 performanceFee_ = performanceFee;
 
-        return performanceFee_ > 0 && shareValue > highWaterMark_
-            ? performanceFee_.mulDiv((shareValue - highWaterMark_) * totalSupply(), 1e36, Math.Rounding.Ceil)
-            : 0;
+        return
+            performanceFee_ > 0 && shareValue > highWaterMark_
+                ? performanceFee_.mulDiv(
+                    (shareValue - highWaterMark_) * totalSupply(),
+                    1e36,
+                    Math.Rounding.Ceil
+                )
+                : 0;
     }
 
     /**
@@ -667,10 +704,15 @@ contract MultiStrategyVault is ERC4626Upgradeable, ReentrancyGuardUpgradeable, P
     error PermitDeadlineExpired(uint256 deadline);
     error InvalidSigner(address signer);
 
-    function permit(address owner, address spender, uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s)
-        public
-        virtual
-    {
+    function permit(
+        address owner,
+        address spender,
+        uint256 value,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) public virtual {
         if (deadline < block.timestamp) revert PermitDeadlineExpired(deadline);
 
         // Unchecked because the only math done is incrementing
@@ -709,18 +751,24 @@ contract MultiStrategyVault is ERC4626Upgradeable, ReentrancyGuardUpgradeable, P
     }
 
     function DOMAIN_SEPARATOR() public view returns (bytes32) {
-        return block.chainid == INITIAL_CHAIN_ID ? INITIAL_DOMAIN_SEPARATOR : computeDomainSeparator();
+        return
+            block.chainid == INITIAL_CHAIN_ID
+                ? INITIAL_DOMAIN_SEPARATOR
+                : computeDomainSeparator();
     }
 
     function computeDomainSeparator() internal view virtual returns (bytes32) {
-        return keccak256(
-            abi.encode(
-                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
-                keccak256(bytes(name())),
-                keccak256("1"),
-                block.chainid,
-                address(this)
-            )
-        );
+        return
+            keccak256(
+                abi.encode(
+                    keccak256(
+                        "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+                    ),
+                    keccak256(bytes(name())),
+                    keccak256("1"),
+                    block.chainid,
+                    address(this)
+                )
+            );
     }
 }

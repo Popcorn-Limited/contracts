@@ -1,0 +1,11 @@
+{
+  "baseInit": {
+    "asset": "",
+    "owner": "",
+    "autoHarvest": false
+  },
+  "strategyInit": {
+    "cToken": "0x5d3a536E4D6DbD6114cc1Ead35777bAB948E3643",
+    "comptroller": "0x3d9819210A31b4961b30EF54bE2aeD79B9c9Cd3B"
+  }
+}

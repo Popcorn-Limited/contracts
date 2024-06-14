@@ -81,7 +81,7 @@ contract AuraCompounder is BaseStrategy, BaseBalancerLpCompounder {
 
     /// @notice The token rewarded
     function rewardTokens() external view override returns (address[] memory) {
-        return _rewardTokens;
+        return _balancerSellTokens;
     }
 
     /*//////////////////////////////////////////////////////////////

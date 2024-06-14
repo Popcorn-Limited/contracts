@@ -1,0 +1,22 @@
+{
+  "length": 1,
+  "configs": [
+    {
+      "base": {
+        "asset": "0x06325440D014e39736583c165C2963BA99fAf14E",
+        "blockNumber": 17941201,
+        "defaultAmount": 1000000000000000000,
+        "delta": 10,
+        "maxDeposit": 1000000000000000000000,
+        "maxWithdraw": 1000000000000000000000,
+        "minDeposit": 1000000000000000,
+        "minWithdraw": 1000000000000000,
+        "network": "mainnet",
+        "testId": "Beefy Depositor"
+      },
+      "specific": {
+        "beefyVault": "0xa7739fd3d12ac7F16D8329AF3Ee407e19De10D8D"
+      }
+    }
+  ]
+}
