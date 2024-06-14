@@ -4,6 +4,7 @@ pragma solidity ^0.8.25;
 
 import {EnsoDepositor, IERC20} from "src/strategies/EnsoDepositor.sol";
 import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson} from "../BaseStrategyTest.sol";
+import "forge-std/console.sol";
 
 contract AaveOracle {
     function getQuote(
@@ -18,15 +19,16 @@ contract AaveOracle {
 contract EnsoAaveDepositorTest is BaseStrategyTest {
     using stdJson for string;
 
-    address underlying = 0x6B175474E89094C44Da98b954EedeAC495271d0F;
-    address aToken = 0x028171bCA77440897B824Ca71D1c56caC55b68A3;
-    address ensoRouter = 0x80EbA3855878739F4710233A8a19d89Bdd2ffB8E;
+    address aToken;
 
     bytes depositData =
         hex"b35d7e730000000000000000000000006b175474e89094c44da98b954eedeac495271d0f0000000000000000000000000000000000000000000000000de0b6b3a7640000000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000001a00000000000000000000000000000000000000000000000000000000000000008095ea7b3010001ffffffffff6b175474e89094c44da98b954eedeac495271d0f70a082310102ffffffffff00028171bca77440897b824ca71d1c56cac55b68a3e8eda9df0103010204ffffff7d2768de32b0b80b7a3454c06bdac94a69ddc7a970a082310102ffffffffff02028171bca77440897b824ca71d1c56cac55b68a3b67d77c5010200ffffffff02ca99eaa38e8f37a168214a3a57c9a45a58563ed5a9059cbb010502ffffffffff028171bca77440897b824ca71d1c56cac55b68a36e7a43a3010206ffffffff027e7d64d987cab6eed08a191c4c2459daf2f8ed0b241c59120102ffffffffffff7e7d64d987cab6eed08a191c4c2459daf2f8ed0b000000000000000000000000000000000000000000000000000000000000000700000000000000000000000000000000000000000000000000000000000000e00000000000000000000000000000000000000000000000000000000000000120000000000000000000000000000000000000000000000000000000000000016000000000000000000000000000000000000000000000000000000000000001a000000000000000000000000000000000000000000000000000000000000001e00000000000000000000000000000000000000000000000000000000000000220000000000000000000000000000000000000000000000000000000000000026000000000000000000000000000000000000000000000000000000000000000200000000000000000000000007d2768de32b0b80b7a3454c06bdac94a69ddc7a900000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000de0b6b3a764000000000000000000000000000000000000000000000000000000000000000000200000000000000000000000007d585b0e27bbb3d981b7757115ec11f47c47699400000000000000000000000000000000000000000000000000000000000000200000000000000000000000006b175474e89094c44da98b954eedeac495271d0f0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000200000000000000000000000005615deb798bb3e4dfa0139dfa1b3d433cc23b72f00000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000d7621dc58210000";
 
     bytes withdrawalData =
         hex"b35d7e73000000000000000000000000028171bca77440897b824ca71d1c56cac55b68a30000000000000000000000000000000000000000000000000de0b6b3a764000000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000180000000000000000000000000000000000000000000000000000000000000000770a082310100ffffffffff056b175474e89094c44da98b954eedeac495271d0f69328dec01010200ffffffff7d2768de32b0b80b7a3454c06bdac94a69ddc7a970a082310100ffffffffff006b175474e89094c44da98b954eedeac495271d0fb67d77c5010005ffffffff00ca99eaa38e8f37a168214a3a57c9a45a58563ed5a9059cbb010300ffffffffff6b175474e89094c44da98b954eedeac495271d0f6e7a43a3010004ffffffff007e7d64d987cab6eed08a191c4c2459daf2f8ed0b241c59120100ffffffffffff7e7d64d987cab6eed08a191c4c2459daf2f8ed0b000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000c000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000140000000000000000000000000000000000000000000000000000000000000018000000000000000000000000000000000000000000000000000000000000001c0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000200000000000000000000000007d585b0e27bbb3d981b7757115ec11f47c47699400000000000000000000000000000000000000000000000000000000000000200000000000000000000000006b175474e89094c44da98b954eedeac495271d0f00000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000de0b6b3a764000000000000000000000000000000000000000000000000000000000000000000200000000000000000000000005615deb798bb3e4dfa0139dfa1b3d433cc23b72f00000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000d7621dc582100000000000000000000000000000000000000000000000000000000000000000000";
+
+    bytes partialDepositData =
+        hex"b35d7e730000000000000000000000006b175474e89094c44da98b954eedeac495271d0f000000000000000000000000000000000000000000000000058d15e176280000000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000001a00000000000000000000000000000000000000000000000000000000000000008095ea7b3010001ffffffffff6b175474e89094c44da98b954eedeac495271d0f70a082310102ffffffffff00028171bca77440897b824ca71d1c56cac55b68a3e8eda9df0103010204ffffff7d2768de32b0b80b7a3454c06bdac94a69ddc7a970a082310102ffffffffff02028171bca77440897b824ca71d1c56cac55b68a3b67d77c5010200ffffffff02ca99eaa38e8f37a168214a3a57c9a45a58563ed5a9059cbb010502ffffffffff028171bca77440897b824ca71d1c56cac55b68a36e7a43a3010206ffffffff027e7d64d987cab6eed08a191c4c2459daf2f8ed0b241c59120102ffffffffffff7e7d64d987cab6eed08a191c4c2459daf2f8ed0b000000000000000000000000000000000000000000000000000000000000000700000000000000000000000000000000000000000000000000000000000000e00000000000000000000000000000000000000000000000000000000000000120000000000000000000000000000000000000000000000000000000000000016000000000000000000000000000000000000000000000000000000000000001a000000000000000000000000000000000000000000000000000000000000001e00000000000000000000000000000000000000000000000000000000000000220000000000000000000000000000000000000000000000000000000000000026000000000000000000000000000000000000000000000000000000000000000200000000000000000000000007d2768de32b0b80b7a3454c06bdac94a69ddc7a90000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000058d15e17628000000000000000000000000000000000000000000000000000000000000000000200000000000000000000000007d585b0e27bbb3d981b7757115ec11f47c47699400000000000000000000000000000000000000000000000000000000000000200000000000000000000000006b175474e89094c44da98b954eedeac495271d0f0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000200000000000000000000000005615deb798bb3e4dfa0139dfa1b3d433cc23b72f0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000056273f1bcda0000";
 
     function setUp() public {
         _setUpBaseTest(
@@ -43,13 +45,19 @@ contract EnsoAaveDepositorTest is BaseStrategyTest {
         EnsoDepositor strategy = new EnsoDepositor();
         AaveOracle oracle = new AaveOracle();
 
+        aToken = json_.readAddress(
+            string.concat(".configs[", index_, "].specific.aToken")
+        );
+
         strategy.initialize(
             testConfig_.asset,
             address(this),
             true,
             abi.encode(
                 aToken,
-                ensoRouter,
+                json_.readAddress(
+                    string.concat(".configs[", index_, "].specific.ensoRouter")
+                ),
                 address(oracle),
                 uint256(10),
                 uint256(0)
@@ -59,66 +67,109 @@ contract EnsoAaveDepositorTest is BaseStrategyTest {
         return IBaseStrategy(address(strategy));
     }
 
-    function test__basic() public {
-        _mintAssetAndApproveForStrategy(1e18, bob);
-
-        vm.prank(bob);
-        strategy.deposit(1e18, bob);
-
-        emit log_string("Balances after deposit:");
-        emit log_named_uint(
-            "aToken: ",
-            IERC20(aToken).balanceOf(address(strategy))
-        );
-        emit log_named_uint(
-            "asset: ",
-            IERC20(underlying).balanceOf(address(strategy))
-        );
-
-        strategy.pushFunds(0, depositData);
-
-        emit log_string("Balances after push:");
-        emit log_named_uint(
-            "aToken: ",
-            IERC20(aToken).balanceOf(address(strategy))
-        );
-        emit log_named_uint(
-            "asset: ",
-            IERC20(underlying).balanceOf(address(strategy))
-        );
-
-        strategy.pullFunds(0, withdrawalData);
-
-        emit log_string("Balances after pull:");
-        emit log_named_uint(
-            "aToken: ",
-            IERC20(aToken).balanceOf(address(strategy))
-        );
-        emit log_named_uint(
-            "asset: ",
-            IERC20(underlying).balanceOf(address(strategy))
-        );
-
-        vm.prank(bob);
-        strategy.withdraw(1e18, bob, bob);
-
-        emit log_string("Balances after withdraw:");
-        emit log_named_uint(
-            "aToken: ",
-            IERC20(aToken).balanceOf(address(strategy))
-        );
-        emit log_named_uint(
-            "asset: ",
-            IERC20(underlying).balanceOf(address(strategy))
+    function _increasePricePerShare(uint256 amount) internal override {
+        address aToken = address(EnsoDepositor(address(strategy)).yieldAsset());
+        deal(
+            testConfig.asset,
+            aToken,
+            IERC20(testConfig.asset).balanceOf(aToken) + amount
         );
     }
 
-    // function _increasePricePerShare(uint256 amount) internal override {
-    //     address aToken = address(AaveV3Depositor(address(strategy)).aToken());
-    //     deal(
-    //         testConfig.asset,
-    //         aToken,
-    //         IERC20(testConfig.asset).balanceOf(aToken) + amount
-    //     );
-    // }
+    /*//////////////////////////////////////////////////////////////
+                            AUTODEPOSIT
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev Partially withdraw assets directly from strategy and the underlying protocol
+    function test__withdraw_autoDeposit_partial() public override {
+        strategy.toggleAutoDeposit();
+        _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
+
+        vm.prank(bob);
+        strategy.deposit(testConfig.defaultAmount, bob);
+
+        // Push 40% the funds into the underlying protocol
+        strategy.pushFunds(0, partialDepositData);
+
+        // Withdraw 80% of deposit
+        vm.prank(bob);
+        vm.expectRevert();
+        strategy.withdraw((testConfig.defaultAmount / 5) * 4, bob, bob);
+    }
+
+    /// @dev Partially redeem assets directly from strategy and the underlying protocol
+    function test__redeem_autoDeposit_partial() public override {
+        strategy.toggleAutoDeposit();
+        _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
+
+        vm.prank(bob);
+        strategy.deposit(testConfig.defaultAmount, bob);
+
+        // Push 40% the funds into the underlying protocol
+        strategy.pushFunds(0, partialDepositData);
+
+        // Redeem 80% of deposit
+        vm.prank(bob);
+        vm.expectRevert();
+        strategy.redeem((testConfig.defaultAmount / 5) * 4, bob, bob);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            PUSH/PULL FUNDS
+    //////////////////////////////////////////////////////////////*/
+
+    function test__pushFunds() public override {
+        strategy.toggleAutoDeposit();
+        _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
+
+        vm.prank(bob);
+        strategy.deposit(testConfig.defaultAmount, bob);
+
+        uint256 oldTa = strategy.totalAssets();
+        uint256 oldTs = strategy.totalSupply();
+
+        strategy.pushFunds(0, depositData);
+
+        assertEq(
+            IERC20(aToken).balanceOf(address(strategy)),
+            testConfig.defaultAmount
+        );
+        assertEq(IERC20(testConfig.asset).balanceOf(address(strategy)), 0);
+
+        assertApproxEqAbs(strategy.totalAssets(), oldTa, _delta_, "ta");
+        assertApproxEqAbs(strategy.totalSupply(), oldTs, _delta_, "ts");
+        assertApproxEqAbs(
+            IERC20(_asset_).balanceOf(address(strategy)),
+            0,
+            _delta_,
+            "strategy asset bal"
+        );
+    }
+    function test__pullFunds() public override {
+        _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
+
+        vm.prank(bob);
+        strategy.deposit(testConfig.defaultAmount, bob);
+        strategy.pushFunds(0, depositData);
+
+        uint256 oldTa = strategy.totalAssets();
+        uint256 oldTs = strategy.totalSupply();
+
+        strategy.pullFunds(0, withdrawalData);
+
+        assertEq(IERC20(aToken).balanceOf(address(strategy)), 0);
+        assertEq(
+            IERC20(testConfig.asset).balanceOf(address(strategy)),
+            testConfig.defaultAmount
+        );
+
+        assertApproxEqAbs(strategy.totalAssets(), oldTa, _delta_, "ta");
+        assertApproxEqAbs(strategy.totalSupply(), oldTs, _delta_, "ts");
+        assertApproxEqAbs(
+            IERC20(_asset_).balanceOf(address(strategy)),
+            testConfig.defaultAmount,
+            _delta_,
+            "strategy asset bal"
+        );
+    }
 }

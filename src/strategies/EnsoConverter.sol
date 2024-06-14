@@ -99,21 +99,20 @@ abstract contract EnsoConverter is BaseStrategy {
 
     error SlippageTooHigh();
     error NotEnoughFloat();
+    error SwapFailed();
 
     function pushFunds(
         uint256,
         bytes memory data
     ) external override onlyKeeperOrOwner {
-        _pushViaEnso(data);
-    }
-
-    function _pushViaEnso(bytes memory data) internal {
         // caching
         address _asset = asset();
+        address _yieldAsset = yieldAsset;
         uint256 _floatRatio = floatRatio;
 
         uint256 ta = this.totalAssets();
         uint256 bal = IERC20(_asset).balanceOf(address(this));
+        uint256 yieldBal = IERC20(_yieldAsset).balanceOf(address(this));
 
         (bool success, ) = ensoRouter.call(data);
         if (success) {
@@ -128,6 +127,11 @@ abstract contract EnsoConverter is BaseStrategy {
                     ta.mulDiv(10_000 - _floatRatio, 10_000, Math.Rounding.Floor)
                 ) revert NotEnoughFloat();
             }
+
+            if (IERC20(_yieldAsset).balanceOf(address(this)) <= yieldBal)
+                revert SwapFailed();
+        } else {
+            revert SwapFailed();
         }
     }
 
@@ -135,11 +139,11 @@ abstract contract EnsoConverter is BaseStrategy {
         uint256,
         bytes memory data
     ) external override onlyKeeperOrOwner {
-        _pullViaEnso(data);
-    }
+        // caching
+        address _asset = asset();
 
-    function _pullViaEnso(bytes memory data) internal {
         uint256 ta = this.totalAssets();
+        uint256 bal = IERC20(_asset).balanceOf(address(this));
 
         (bool success, ) = ensoRouter.call(data);
         if (success) {
@@ -147,6 +151,11 @@ abstract contract EnsoConverter is BaseStrategy {
                 this.totalAssets() <
                 ta.mulDiv(10_000 - slippage, 10_000, Math.Rounding.Floor)
             ) revert SlippageTooHigh();
+
+            if (IERC20(_asset).balanceOf(address(this)) <= bal)
+                revert SwapFailed();
+        } else {
+            revert SwapFailed();
         }
     }
 

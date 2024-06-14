@@ -4,7 +4,7 @@
     {
       "base": {
         "asset": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
-        "blockNumber": 20061449,
+        "blockNumber": 20089694,
         "defaultAmount": 1000000000000000000,
         "delta": 10,
         "maxDeposit": 1000000000000000000000,
@@ -15,8 +15,8 @@
         "testId": "Enso AaveV3 Depositor"
       },
       "specific": {
-        "aaveDataProvider": "0x7B4EB56E7CD4b454BA8ff71E4518426369a138a3",
-        "aToken": "0x3Fe6a295459FAe07DF8A0ceCC36F37160FE86AA9"
+        "aToken": "0x028171bCA77440897B824Ca71D1c56caC55b68A3",
+        "ensoRouter": "0x80EbA3855878739F4710233A8a19d89Bdd2ffB8E"
       }
     }
   ]
