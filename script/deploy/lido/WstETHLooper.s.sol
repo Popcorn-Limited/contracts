@@ -17,7 +17,7 @@ contract DeployStrategy is Script {
 
     function run() public {
         string memory json =
-            vm.readFile(string.concat(vm.projectRoot(), "./srcript/deploy/lido/WstETHLooperDeployConfig.json"));
+            vm.readFile(string.concat(vm.projectRoot(), "./script/deploy/lido/WstETHLooperDeployConfig.json"));
 
         LooperInitValues memory looperValues = abi.decode(json.parseRaw(".strategyInit"), (LooperInitValues));
 

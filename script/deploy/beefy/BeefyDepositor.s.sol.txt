@@ -15,7 +15,7 @@ contract BeefyDepositorTest is Script {
         string memory json = vm.readFile(
             string.concat(
                 vm.projectRoot(),
-                "./srcript/deploy/beefy/BeefyDepositorDeployConfig.json"
+                "./script/deploy/beefy/BeefyDepositorDeployConfig.json"
             )
         );
 

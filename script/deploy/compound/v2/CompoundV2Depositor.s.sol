@@ -6,7 +6,7 @@ pragma solidity ^0.8.25;
 import {Script} from "forge-std/Script.sol";
 import {stdJson} from "forge-std/StdJson.sol";
 
-import {CompoundV2Depositor, IERC20} from "../../../../src/strategies/compound/v2/CompoundV2Depositor.sol";
+import {CompoundV2Depositor, IERC20} from "src/strategies/compound/v2/CompoundV2Depositor.sol";
 
 contract DeployStrategy is Script {
     using stdJson for string;
@@ -15,7 +15,7 @@ contract DeployStrategy is Script {
         string memory json = vm.readFile(
             string.concat(
                 vm.projectRoot(),
-                "./srcript/deploy/compound/v2/CompoundV2DepositorDeployConfig.json"
+                "./script/deploy/compound/v2/CompoundV2DepositorDeployConfig.json"
             )
         );
 
