@@ -6,8 +6,6 @@ import {Script, console} from "forge-std/Script.sol";
 import {MultiStrategyVault, IERC4626, IERC20} from "../../src/vaults/MultiStrategyVault.sol";
 
 contract DeployMultiStrategyVault is Script {
-    address deployer;
-
     IERC20 internal asset;
     IERC4626[] internal strategies;
     uint256 internal defaultDepositIndex;
@@ -15,34 +13,37 @@ contract DeployMultiStrategyVault is Script {
     uint256 internal depositLimit;
     address internal owner;
 
-    function run() public {
-        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
-        deployer = vm.addr(deployerPrivateKey);
-
-        vm.startBroadcast(deployerPrivateKey);
+    function run() public returns (MultiStrategyVault vault) {
+        vm.startBroadcast();
+        console.log("msg.sender:", msg.sender);
 
         // @dev edit this values below
-        asset = IERC20(0x17FC002b466eEc40DaE837Fc4bE5c67993ddBd6F);
+        asset = IERC20(0x4c9EDD5852cd905f086C759E8383e09bff1E68B3);
 
         strategies = [
-            IERC4626(0x61dCd1Da725c0Cdb2C6e67a0058E317cA819Cf5f),
-            IERC4626(0x9168AC3a83A31bd85c93F4429a84c05db2CaEF08),
-            IERC4626(0x2D0483FefAbA4325c7521539a3DFaCf94A19C472),
-            IERC4626(0x6076ebDFE17555ed3E6869CF9C373Bbd9aD55d38)
+            IERC4626(0x658a94eF990c5307707a428C927ADcB65B89BD8F),
+            IERC4626(0x1C9432248C5437C52A6cdff701259c247f870f88)
         ];
 
         defaultDepositIndex = uint256(0);
 
-        withdrawalQueue = [0, 1, 2, 3];
+        withdrawalQueue = [0, 1];
 
         depositLimit = type(uint256).max;
 
-        owner = deployer;
+        owner = msg.sender;
 
         // Actual deployment
-        MultiStrategyVault vault = new MultiStrategyVault();
+        vault = new MultiStrategyVault();
 
-        vault.initialize(asset, strategies, defaultDepositIndex, withdrawalQueue, depositLimit, deployer);
+        vault.initialize(
+            asset,
+            strategies,
+            defaultDepositIndex,
+            withdrawalQueue,
+            depositLimit,
+            owner
+        );
 
         vm.stopBroadcast();
     }

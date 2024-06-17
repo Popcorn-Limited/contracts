@@ -6,15 +6,11 @@ import {Script, console} from "forge-std/Script.sol";
 import {FeeRecipientProxy} from "../../src/utils/FeeRecipientProxy.sol";
 
 contract Deploy is Script {
-    address deployer;
-
     function run() public {
-        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
-        deployer = vm.addr(deployerPrivateKey);
+        vm.startBroadcast();
+        console.log("msg.sender:", msg.sender);
 
-        vm.startBroadcast(deployerPrivateKey);
-
-        new FeeRecipientProxy{salt: bytes32("FeeRecipientProxy")}(deployer);
+        new FeeRecipientProxy{salt: bytes32("FeeRecipientProxy")}(msg.sender);
 
         vm.stopBroadcast();
     }
