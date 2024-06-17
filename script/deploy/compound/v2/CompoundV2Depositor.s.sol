@@ -3,7 +3,7 @@
 
 pragma solidity ^0.8.25;
 
-import {Script} from "forge-std/Script.sol";
+import {Script, console} from "forge-std/Script.sol";
 import {stdJson} from "forge-std/StdJson.sol";
 
 import {CompoundV2Depositor, IERC20} from "src/strategies/compound/v2/CompoundV2Depositor.sol";
@@ -11,15 +11,18 @@ import {CompoundV2Depositor, IERC20} from "src/strategies/compound/v2/CompoundV2
 contract DeployStrategy is Script {
     using stdJson for string;
 
-    function run() public {
+    function run() public returns (CompoundV2Depositor strategy) {
         string memory json = vm.readFile(
             string.concat(
                 vm.projectRoot(),
-                "./script/deploy/compound/v2/CompoundV2DepositorDeployConfig.json"
+                "/script/deploy/compound/v2/CompoundV2DepositorDeployConfig.json"
             )
         );
 
-        CompoundV2Depositor strategy = new CompoundV2Depositor();
+        vm.startBroadcast();
+        console.log("msg.sender:", msg.sender);
+
+        strategy = new CompoundV2Depositor();
 
         strategy.initialize(
             json.readAddress(".baseInit.asset"),
@@ -30,5 +33,7 @@ contract DeployStrategy is Script {
                 json.readAddress(".strategyInit.comptroller")
             )
         );
+
+        vm.stopBroadcast();
     }
 }

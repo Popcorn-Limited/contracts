@@ -3,22 +3,25 @@
 
 pragma solidity ^0.8.25;
 
-import {Script} from "forge-std/Script.sol";
+import {Script, console} from "forge-std/Script.sol";
 import {stdJson} from "forge-std/StdJson.sol";
 import {AaveV3Depositor, IERC20} from "src/strategies/aave/aaveV3/AaveV3Depositor.sol";
 
 contract DeployStrategy is Script {
     using stdJson for string;
 
-    function run() public {
+    function run() public returns (AaveV3Depositor strategy) {
         string memory json = vm.readFile(
             string.concat(
                 vm.projectRoot(),
-                "./script/deploy/aave/AaveV3DepositorDeployConfig.json"
+                "/script/deploy/aave/AaveV3DepositorDeployConfig.json"
             )
         );
 
-        AaveV3Depositor strategy = new AaveV3Depositor();
+        vm.startBroadcast();
+        console.log("msg.sender:", msg.sender);
+
+        strategy = new AaveV3Depositor();
 
         strategy.initialize(
             json.readAddress(".baseInit.asset"),
@@ -26,5 +29,7 @@ contract DeployStrategy is Script {
             json.readBool(".baseInit.autoHarvest"),
             abi.encode(json.readAddress(".strategyInit.aaveDataProvider"))
         );
+
+        vm.stopBroadcast();
     }
 }

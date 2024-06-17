@@ -3,7 +3,7 @@
 
 pragma solidity ^0.8.25;
 
-import {Script} from "forge-std/Script.sol";
+import {Script, console} from "forge-std/Script.sol";
 import {stdJson} from "forge-std/StdJson.sol";
 
 import {ConvexCompounder, IERC20, CurveSwap} from "src/strategies/convex/ConvexCompounder.sol";
@@ -17,21 +17,24 @@ struct ConvexInit {
 contract DeployStrategy is Script {
     using stdJson for string;
 
-    function run() public {
+    function run() public returns (ConvexCompounder strategy) {
         string memory json = vm.readFile(
             string.concat(
                 vm.projectRoot(),
-                "./script/deploy/convex/ConvexCompounderDeployConfig.json"
+                "/script/deploy/convex/ConvexCompounderDeployConfig.json"
             )
         );
+
+        vm.startBroadcast();
+        console.log("msg.sender:", msg.sender);
+
+        // Deploy Strategy
+        strategy = new ConvexCompounder();
 
         ConvexInit memory convexInit = abi.decode(
             json.parseRaw(".strategyInit"),
             (ConvexInit)
         );
-
-        // Deploy Strategy
-        ConvexCompounder strategy = new ConvexCompounder();
 
         strategy.initialize(
             json.readAddress(".baseInit.asset"),
@@ -46,6 +49,8 @@ contract DeployStrategy is Script {
 
         // Set Harvest values
         _setHarvestValues(json, address(strategy));
+
+        vm.stopBroadcast();
     }
 
     function _setHarvestValues(string memory json, address strategy) internal {

@@ -3,7 +3,7 @@
 
 pragma solidity ^0.8.25;
 
-import {Script} from "forge-std/Script.sol";
+import {Script, console} from "forge-std/Script.sol";
 import {stdJson} from "forge-std/StdJson.sol";
 import {AuraCompounder, HarvestValues, TradePath} from "src/strategies/aura/AuraCompounder.sol";
 import {IAsset, BatchSwapStep} from "src/interfaces/external/balancer/IBalancer.sol";
@@ -11,16 +11,19 @@ import {IAsset, BatchSwapStep} from "src/interfaces/external/balancer/IBalancer.
 contract DeployStrategy is Script {
     using stdJson for string;
 
-    function run() public {
+    function run() public returns (AuraCompounder strategy) {
         string memory json = vm.readFile(
             string.concat(
                 vm.projectRoot(),
-                "./script/deploy/aura/AuraCompounderDeployConfig.json"
+                "/script/deploy/aura/AuraCompounderDeployConfig.json"
             )
         );
 
+        vm.startBroadcast();
+        console.log("msg.sender:", msg.sender);
+
         // Deploy Strategy
-        AuraCompounder strategy = new AuraCompounder();
+        strategy = new AuraCompounder();
 
         strategy.initialize(
             json.readAddress(".baseInit.asset"),
@@ -33,6 +36,8 @@ contract DeployStrategy is Script {
         );
 
         _setHarvestValues(json, address(strategy));
+
+        vm.stopBroadcast();
     }
 
     function _setHarvestValues(string memory json, address strategy) internal {

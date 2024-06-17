@@ -3,7 +3,7 @@
 
 pragma solidity ^0.8.25;
 
-import {Script} from "forge-std/Script.sol";
+import {Script, console} from "forge-std/Script.sol";
 import {stdJson} from "forge-std/StdJson.sol";
 
 import {CurveGaugeSingleAssetCompounder, IERC20, CurveSwap} from "src/strategies/curve/CurveGaugeSingleAssetCompounder.sol";
@@ -18,21 +18,24 @@ struct CurveGaugeInit {
 contract DeployStrategy is Script {
     using stdJson for string;
 
-    function run() public {
+    function run() public returns (CurveGaugeSingleAssetCompounder strategy) {
         string memory json = vm.readFile(
             string.concat(
                 vm.projectRoot(),
-                "./script/deploy/curve/CurveGaugeSingleAssetCompounderDeployConfig.json"
+                "/script/deploy/curve/CurveGaugeSingleAssetCompounderDeployConfig.json"
             )
         );
+
+        vm.startBroadcast();
+        console.log("msg.sender:", msg.sender);
+
+        // Deploy Strategy
+        strategy = new CurveGaugeSingleAssetCompounder();
 
         CurveGaugeInit memory curveInit = abi.decode(
             json.parseRaw(".strategyInit"),
             (CurveGaugeInit)
         );
-
-        // Deploy Strategy
-        CurveGaugeSingleAssetCompounder strategy = new CurveGaugeSingleAssetCompounder();
 
         strategy.initialize(
             json.readAddress(".baseInit.asset"),
@@ -48,6 +51,8 @@ contract DeployStrategy is Script {
 
         // Set Harvest values
         _setHarvestValues(json, address(strategy));
+
+        vm.stopBroadcast();
     }
 
     function _setHarvestValues(string memory json, address strategy) internal {

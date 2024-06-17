@@ -3,7 +3,7 @@
 
 pragma solidity ^0.8.15;
 
-import {Script} from "forge-std/Script.sol";
+import {Script, console} from "forge-std/Script.sol";
 import {stdJson} from "forge-std/StdJson.sol";
 
 import {IPendleRouter, IPendleSYToken, ISYTokenV3} from "src/strategies/pendle/IPendle.sol";
@@ -13,16 +13,19 @@ import {TradePath, IAsset, BatchSwapStep} from "src/peripheral/BaseBalancerCompo
 contract DeployStrategy is Script {
     using stdJson for string;
 
-    function run() public {
+    function run() public returns (PendleBalancerCurveCompounder strategy) {
         string memory json = vm.readFile(
             string.concat(
                 vm.projectRoot(),
-                "./script/deploy/pendle/PendleBalancerCurveCompounderDeployConfig.json"
+                "/script/deploy/pendle/PendleBalancerCurveCompounderDeployConfig.json"
             )
         );
 
+        vm.startBroadcast();
+        console.log("msg.sender:", msg.sender);
+
         // Deploy strategy
-        PendleBalancerCurveCompounder strategy = new PendleBalancerCurveCompounder();
+        strategy = new PendleBalancerCurveCompounder();
 
         strategy.initialize(
             json.readAddress(".baseInit.asset"),
@@ -36,6 +39,8 @@ contract DeployStrategy is Script {
         );
 
         _setHarvestValues(json, payable(address(strategy)));
+
+        vm.stopBroadcast();
     }
 
     function _setHarvestValues(

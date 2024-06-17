@@ -2,7 +2,7 @@
 // Docgen-SOLC: 0.8.15
 pragma solidity ^0.8.15;
 
-import {Script} from "forge-std/Script.sol";
+import {Script, console} from "forge-std/Script.sol";
 import {FeeRecipientProxy} from "../../src/utils/FeeRecipientProxy.sol";
 
 contract Deploy is Script {
