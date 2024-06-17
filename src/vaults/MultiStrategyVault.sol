@@ -46,9 +46,9 @@ contract MultiStrategyVault is
     error InvalidAsset();
     error Duplicate();
 
-    constructor() {
-        _disableInitializers();
-    }
+    // constructor() {
+    //     _disableInitializers();
+    // }
 
     /**
      * @notice Initialize a new Vault.
