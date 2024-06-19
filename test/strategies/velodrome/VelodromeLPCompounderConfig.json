@@ -1,0 +1,58 @@
+{
+    "length": 1,
+    "configs": [
+      {
+        "base": {
+          "asset": "0xbC26519f936A90E78fe2C9aA2A03CC208f041234",
+          "blockNumber": 121602748,
+          "defaultAmount": 1000000000000000000,
+          "delta": 10000000000000000,
+          "maxDeposit": 1000000000000000000000,
+          "maxWithdraw": 1000000000000000000000,
+          "minDeposit": 1000000000000000,
+          "minWithdraw": 1000000000000000,
+          "network": "optimism",
+          "testId": "Velodrome Compounder - optimism"
+        },
+        "specific": {
+          "init": {
+            "gauge": "0x0E4c56B4a766968b12c286f67aE341b11eDD8b8d"
+          },
+          "harvest": {
+            "velodromeRouter": "0xa062aE8A9c5e11aaA026fc2670B0D65cCc8B2858",
+             "rewards": {
+              "length": 1,
+              "tokens": [
+                "0x9560e827aF36c94D2Ac33a39bCE1Fe78631088Db"
+              ]
+             },
+             "tradePaths": [
+                {
+                  "length": "1",
+                  "routes": [
+                    {
+                      "from": "0x9560e827aF36c94D2Ac33a39bCE1Fe78631088Db",
+                      "to": "0x0b2c639c533813f4aa9d7837caf62653d097ff85",
+                      "stable": false,
+                      "factory": "0xF1046053aa5682b4F9a81b5481394DA16BE5FF5a"
+                    }
+                  ]
+                },
+                {
+                  "length": "1",
+                  "routes": [
+                    {
+                      "from": "0x9560e827aF36c94D2Ac33a39bCE1Fe78631088Db",
+                      "to": "0x8c6f28f2f1a3c87f0f938b96d27520d9751ec8d9",
+                      "stable": false,
+                      "factory": "0xF1046053aa5682b4F9a81b5481394DA16BE5FF5a"
+                    }
+                  ]
+                }
+             ]
+          }
+        }
+      }
+    ]
+  }
+  
