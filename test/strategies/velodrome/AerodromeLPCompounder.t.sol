@@ -20,7 +20,7 @@ contract VelodromeLPCompounderTest is BaseStrategyTest {
     address[] rewardTokens;
     
     function setUp() public {
-        _setUpBaseTest(0, "./test/strategies/velodrome/VelodromeLPCompounderConfig.json");
+        _setUpBaseTest(0, "./test/strategies/velodrome/AerodromeLPCompounderConfig.json");
     }
 
     function _setUpStrategy(string memory json_, string memory index_, TestConfig memory testConfig_)
@@ -173,14 +173,14 @@ contract VelodromeLPCompounderTest is BaseStrategyTest {
         VelodromeLPCompounder strategyContract = VelodromeLPCompounder(address(strategy));
 
         // distribute deposit tokens in the strategy
-        vm.prank(0xCF4B5A4c1299f5CbB422555b7D775e66d3eC9C62);
+        vm.prank(0xD34EA7278e6BD48DefE656bbE263aEf11101469c);
         IERC20(depositAssets[0]).transfer(address(strategy), 1 gwei);
         assertEq(IERC20(depositAssets[0]).balanceOf(address(strategy)), 1 gwei);
 
         strategyContract.withdrawDust(depositAssets[0]);
         assertEq(IERC20(depositAssets[0]).balanceOf(address(strategy)), 0);
 
-        vm.prank(0x4dc589Ee79EbB4C457c8D35555570CcFBD247e36);
+        vm.prank(0x2ae9DF02539887d4EbcE0230168a302d34784c82);
         IERC20(depositAssets[1]).transfer(address(strategy), 1 gwei);
         assertEq(IERC20(depositAssets[1]).balanceOf(address(strategy)), 1 gwei);
 

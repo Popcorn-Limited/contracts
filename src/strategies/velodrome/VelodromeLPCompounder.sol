@@ -15,7 +15,7 @@ import {BaseVelodromeLpCompounder, SwapStep, ILpToken} from "src/peripheral/Base
  * An ERC4626 compliant Wrapper for Velodrome protocol
  * Takes a pool LP token as deposit, compound rewards into more LP tokens.
  */
-contract VelodromeCompounder is BaseStrategy, BaseVelodromeLpCompounder {
+contract VelodromeLPCompounder is BaseStrategy, BaseVelodromeLpCompounder {
     using SafeERC20 for IERC20;
     using Math for uint256;
 

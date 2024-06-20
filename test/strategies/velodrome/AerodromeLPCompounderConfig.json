@@ -1,0 +1,58 @@
+{
+    "length": 1,
+    "configs": [
+      {
+        "base": {
+          "asset": "0xcDAC0d6c6C59727a65F871236188350531885C43",
+          "blockNumber": 16040622,
+          "defaultAmount": 1000000000000000000,
+          "delta": 10000000000000000,
+          "maxDeposit": 1000000000000000000000,
+          "maxWithdraw": 1000000000000000000000,
+          "minDeposit": 1000000000000000,
+          "minWithdraw": 1000000000000000,
+          "network": "base",
+          "testId": "Velodrome Compounder - Aerodrome base"
+        },
+        "specific": {
+          "init": {
+            "gauge": "0x519BBD1Dd8C6A94C46080E24f316c14Ee758C025"
+          },
+          "harvest": {
+            "velodromeRouter": "0xcF77a3Ba9A5CA399B7c97c74d54e5b1Beb874E43",
+             "rewards": {
+              "length": 1,
+              "tokens": [
+                "0x940181a94A35A4569E4529A3CDfB74e38FD98631"
+              ]
+             },
+             "tradePaths": [
+                {
+                  "length": "1",
+                  "routes": [
+                    {
+                      "from": "0x940181a94A35A4569E4529A3CDfB74e38FD98631",
+                      "to": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+                      "stable": false,
+                      "factory": "0x420DD381b31aEf6683db6B902084cB0FFECe40Da"
+                    }
+                  ]
+                },
+                {
+                  "length": "1",
+                  "routes": [
+                    {
+                      "from": "0x940181a94A35A4569E4529A3CDfB74e38FD98631",
+                      "to": "0x4200000000000000000000000000000000000006",
+                      "stable": false,
+                      "factory": "0x420DD381b31aEf6683db6B902084cB0FFECe40Da"
+                    }
+                  ]
+                }
+             ]
+          }
+        }
+      }
+    ]
+  }
+  
