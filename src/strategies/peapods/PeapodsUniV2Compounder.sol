@@ -14,7 +14,7 @@ import {BaseUniV2LpCompounder, SwapStep} from "src/peripheral/BaseUniV2LpCompoun
  * An ERC4626 compliant Wrapper for Peapods.
  * Implements harvest func that swaps via Uniswap V2
  */
-contract PeapodsDepositorUniswapV2Compounder is PeapodsDepositor, BaseUniV2LpCompounder {
+contract PeapodsUniV2Compounder is PeapodsDepositor, BaseUniV2LpCompounder {
     using SafeERC20 for IERC20;
 
     /*//////////////////////////////////////////////////////////////
