@@ -137,8 +137,8 @@ contract PendleBalancerCompounderTest is BaseStrategyTest {
         strategy.deposit(amount, bob);
         vm.stopPrank();
 
-        vm.roll(block.number + 1_000_000);
-        vm.warp(block.timestamp + 15_000_000);
+        vm.roll(block.number + 1_000_00);
+        vm.warp(block.timestamp + 1_500_000);
 
         uint256 totAssetsBefore = strategy.totalAssets();
 

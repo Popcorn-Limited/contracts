@@ -18,11 +18,11 @@ contract DeployMultiStrategyVault is Script {
         console.log("msg.sender:", msg.sender);
 
         // @dev edit this values below
-        asset = IERC20(0x4c9EDD5852cd905f086C759E8383e09bff1E68B3);
+        asset = IERC20(0x9D39A5DE30e57443BfF2A8307A4256c8797A3497);
 
         strategies = [
-            IERC4626(0x658a94eF990c5307707a428C927ADcB65B89BD8F),
-            IERC4626(0x1C9432248C5437C52A6cdff701259c247f870f88)
+            IERC4626(0xF82316c0cd110dB4c4a6c15F85dFaD7266551854),
+            IERC4626(0x377DFCC7B9ce9aDD96347f34b2303C9bD8067e01)
         ];
 
         defaultDepositIndex = uint256(0);
