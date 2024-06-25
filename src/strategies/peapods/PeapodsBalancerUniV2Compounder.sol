@@ -15,7 +15,11 @@ import {BaseUniV2Compounder, SwapStep} from "src/peripheral/BaseUniV2Compounder.
  * An ERC4626 compliant Wrapper for Peapods.
  * Implements harvest func that swaps via Balancer
  */
-contract PeapodsBalancerUniV2Compounder is PeapodsDepositor, BaseBalancerLpCompounder, BaseUniV2Compounder {
+contract PeapodsBalancerUniV2Compounder is
+    PeapodsDepositor,
+    BaseBalancerLpCompounder,
+    BaseUniV2Compounder
+{
     using SafeERC20 for IERC20;
 
     /*//////////////////////////////////////////////////////////////
@@ -29,11 +33,12 @@ contract PeapodsBalancerUniV2Compounder is PeapodsDepositor, BaseBalancerLpCompo
      * @param autoDeposit_ Controls if `protocolDeposit` gets called on deposit
      * @param strategyInitData_ Encoded data for this specific strategy
      */
-    function initialize(address asset_, address owner_, bool autoDeposit_, bytes memory strategyInitData_)
-        external
-        override
-        initializer
-    {
+    function initialize(
+        address asset_,
+        address owner_,
+        bool autoDeposit_,
+        bytes memory strategyInitData_
+    ) external override initializer {
         __PeapodsBase_init(asset_, owner_, autoDeposit_, strategyInitData_);
     }
 
@@ -79,7 +84,11 @@ contract PeapodsBalancerUniV2Compounder is PeapodsDepositor, BaseBalancerLpCompo
         address[] memory rewTokens,
         SwapStep[] memory newSwapSteps
     ) external onlyOwner {
+        setBalancerLpCompounderValues(
+            newBalancerVault,
+            newTradePaths,
+            harvestValues_
+        );
         setUniswapTradeValues(newUniswapRouter, rewTokens, newSwapSteps);
-        setBalancerLpCompounderValues(newBalancerVault, newTradePaths, harvestValues_);
     }
 }

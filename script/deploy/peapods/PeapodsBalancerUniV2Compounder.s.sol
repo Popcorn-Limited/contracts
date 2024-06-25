@@ -42,40 +42,25 @@ contract DeployStrategy is Script {
 
     function _setHarvestValues(string memory json_, address strategy) internal {
         address uniswapRouter = json_.readAddress(
-            string.concat(
-                ".configs[",
-                index_,
-                "].specific.harvest.uniswap.uniswapRouter"
-            )
+            ".harvest.uniswap.uniswapRouter"
         );
 
         // assets to buy with rewards and to add to liquidity
         address[] memory rewToken = new address[](1);
-        rewToken[0] = json_.readAddress(
-            string.concat(
-                ".configs[",
-                index_,
-                "].specific.harvest.uniswap.rewTokens[0]"
-            )
-        );
+        rewToken[0] = json_.readAddress(".harvest.uniswap.rewTokens[0]");
 
         // set Uniswap trade paths
         SwapStep[] memory swaps = new SwapStep[](1);
 
         uint256 lenSwap0 = json_.readUint(
-            string.concat(
-                ".configs[",
-                index_,
-                "].specific.harvest.uniswap.tradePaths[0].length"
-            )
+            ".harvest.uniswap.tradePaths[0].length"
         );
+
         address[] memory swap0 = new address[](lenSwap0); // PEAS - WETH
         for (uint256 i = 0; i < lenSwap0; i++) {
             swap0[i] = json_.readAddress(
                 string.concat(
-                    ".configs[",
-                    index_,
-                    "].specific.harvest.uniswap.tradePaths[0].path[",
+                    ".harvest.uniswap.tradePaths[0].path[",
                     vm.toString(i),
                     "]"
                 )
@@ -86,25 +71,15 @@ contract DeployStrategy is Script {
 
         // BALANCER HARVEST VALUES
         address balancerVault_ = json_.readAddress(
-            string.concat(
-                ".configs[",
-                index_,
-                "].specific.harvest.balancer.balancerVault"
-            )
+            ".harvest.balancer.balancerVault"
         );
 
         HarvestValues memory harvestValues_ = abi.decode(
-            json_.parseRaw(
-                string.concat(
-                    ".configs[",
-                    index_,
-                    "].specific.harvest.balancer.harvestValues"
-                )
-            ),
+            json_.parseRaw(".harvest.balancer.harvestValues"),
             (HarvestValues)
         );
 
-        TradePath[] memory tradePaths_ = _getBalancerTradePaths(json_, index_);
+        TradePath[] memory tradePaths_ = _getBalancerTradePaths(json_);
 
         PeapodsBalancerUniV2Compounder(strategy).setHarvestValues(
             balancerVault_,
@@ -130,7 +105,7 @@ contract DeployStrategy is Script {
             (HarvestValues)
         );
 
-        TradePath[] memory tradePaths_ = _getBalancerTradePaths(json_, index_);
+        TradePath[] memory tradePaths_ = _getBalancerTradePaths(json_);
 
         // Set harvest values
         BalancerCompounder(strategy).setHarvestValues(
