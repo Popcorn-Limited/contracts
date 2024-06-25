@@ -2,7 +2,7 @@
   "baseInit": {
     "asset": "",
     "owner": "",
-    "autoHarvest": false
+    "autoDeposit": false
   },
   "strategyInit": {
     "auraBooster": "0xA57b8d98dAE62B26Ec3bcC4a365338157060B234",

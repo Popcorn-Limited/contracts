@@ -2,7 +2,7 @@
   "baseInit": {
     "asset": "0x9d39a5de30e57443bff2a8307a4256c8797a3497",
     "owner": "0x2C3B135cd7dc6C673b358BEF214843DAb3464278",
-    "autoHarvest": false
+    "autoDeposit": false
   },
   "strategyInit": {
     "pendleMarket": "0xd1d7d99764f8a52aff007b7831cc02748b2013b5",

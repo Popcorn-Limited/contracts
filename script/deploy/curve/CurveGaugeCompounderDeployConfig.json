@@ -2,7 +2,7 @@
   "baseInit": {
     "asset": "",
     "owner": "",
-    "autoHarvest": false
+    "autoDeposit": false
   },
   "strategyInit": {
     "gauge": "0xf69Fb60B79E463384b40dbFDFB633AB5a863C9A2",

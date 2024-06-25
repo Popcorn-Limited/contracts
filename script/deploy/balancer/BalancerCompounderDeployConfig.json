@@ -2,7 +2,7 @@
   "baseInit": {
     "asset": "",
     "owner": "",
-    "autoHarvest": false
+    "autoDeposit": false
   },
   "strategyInit": {
     "minter": "0x239e55F427D44C3cc793f49bFB507ebe76638a2b",

@@ -2,7 +2,7 @@
   "baseInit": {
     "asset": "",
     "owner": "",
-    "autoHarvest": false
+    "autoDeposit": false
   },
   "strategyInit": {
     "beefyVault": "0xa7739fd3d12ac7F16D8329AF3Ee407e19De10D8D"

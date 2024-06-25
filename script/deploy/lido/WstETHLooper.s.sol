@@ -39,7 +39,7 @@ contract DeployStrategy is Script {
         strategy.initialize(
             asset,
             json.readAddress(".baseInit.owner"),
-            json.readBool(".baseInit.autoHarvest"),
+            json.readBool(".baseInit.autoDeposit"),
             abi.encode(
                 looperValues.aaveDataProvider,
                 looperValues.curvePool,

@@ -31,7 +31,7 @@ contract DeployStrategy is Script {
         strategy.initialize(
             json.readAddress(".baseInit.asset"),
             json.readAddress(".baseInit.owner"),
-            json.readBool(".baseInit.autoHarvest"),
+            json.readBool(".baseInit.autoDeposit"),
             abi.encode(json.readAddress(".strategyInit.stakingContract"))
         );
 

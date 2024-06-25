@@ -2,7 +2,7 @@
   "baseInit": {
     "asset": "",
     "owner": "",
-    "autoHarvest": false
+    "autoDeposit": false
   },
   "strategyInit": {
     "aaveDataProvider": "0x7B4EB56E7CD4b454BA8ff71E4518426369a138a3"
