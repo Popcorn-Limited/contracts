@@ -10,6 +10,13 @@ enum SwapKind {
     GIVEN_OUT
 }
 
+enum UserBalanceOpKind { 
+    DEPOSIT_INTERNAL, 
+    WITHDRAW_INTERNAL, 
+    TRANSFER_INTERNAL, 
+    TRANSFER_EXTERNAL 
+}
+
 interface IAsset {}
 
 struct SingleSwap {
@@ -43,6 +50,31 @@ struct JoinPoolRequest {
     bool fromInternalBalance;
 }
 
+struct ExitPoolRequest {
+    address[] assets;
+    uint256[] minAmountsOut;
+    bytes userData;
+    bool toInternalBalance;
+}
+
+struct UserBalanceOp {
+    UserBalanceOpKind kind;
+    IAsset asset;
+    uint256 amount;
+    address sender;
+    address payable recipient;
+}
+
+// Deployed at 0xE39B5e3B6D74016b2F6A9673D7d7493B6DF549d5 on all chains.
+interface IBalancerQueries {
+    function queryExit(
+        bytes32 poolId,
+        address sender,
+        address recipient,
+        ExitPoolRequest memory request
+    ) external returns (uint256 bptIn, uint256[] memory amountsOut);
+}
+
 interface IBalancerVault {
     function batchSwap(
         SwapKind kind,
@@ -63,12 +95,32 @@ interface IBalancerVault {
     function joinPool(bytes32 poolId, address sender, address recipient, JoinPoolRequest memory request)
         external
         payable;
+
+    function exitPool(
+        bytes32 poolId,
+        address sender,
+        address recipient,
+        ExitPoolRequest memory request
+    ) external;
+
+    /**
+     * @dev Performs a set of user balance operations, which involve Internal Balance (deposit, withdraw or transfer)
+     * and plain ERC20 transfers using the Vault's allowance. This last feature is particularly useful for relayers, as
+     * it lets integrators reuse a user's Vault allowance.
+     *
+     * For each operation, if the caller is not `sender`, it must be an authorized relayer for them.
+     */
+    function manageUserBalance(UserBalanceOp[] memory ops) external payable;
 }
 
 interface IBalancerRouter {
     function swap(SingleSwap memory singleSwap, FundManagement memory funds, uint256 limit, uint256 deadline)
         external
         returns (uint256 amountCalculated);
+}
+
+interface IPool {
+    function getVault() external view returns (address balancerVault);
 }
 
 interface IGauge {
