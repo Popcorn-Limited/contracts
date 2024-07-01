@@ -1,4 +1,3 @@
-
 // SPDX-License-Identifier: GPL-3.0
 // Docgen-SOLC: 0.8.25
 
@@ -33,11 +32,11 @@ struct TestConfig {
  * Before you deploy a vault, add the Vault, Strategy, and asset you're going to use to this
  * test and it will run all kinds of integration tests to verify that everything works as expected
  */
-
 contract DeploymentTest is Test {
     using stdJson for string;
+
     string internal json;
-    uint internal configLength;
+    uint256 internal configLength;
 
     TestConfig internal testConfig;
     // only works with MultiStrategyVault for now
@@ -48,9 +47,7 @@ contract DeploymentTest is Test {
     address bob = address(0xDCBA);
 
     // should only be called within `_setUpTest()`.
-    function _setUpStrategy(
-        string memory _index
-    ) internal returns (IERC4626) {
+    function _setUpStrategy(string memory _index) internal returns (IERC4626) {
         // create and initialize strategy and return it
         AaveV3Depositor strategy = new AaveV3Depositor();
 
@@ -68,9 +65,8 @@ contract DeploymentTest is Test {
 
     // should be called with index (0, configLength] in every test function
     // through a for loop
-    function _setUpTest(uint index) internal {
-        testConfig =
-            abi.decode(json.parseRaw(string.concat(".configs[", vm.toString(index), "].base")), (TestConfig));
+    function _setUpTest(uint256 index) internal {
+        testConfig = abi.decode(json.parseRaw(string.concat(".configs[", vm.toString(index), "].base")), (TestConfig));
         asset = IERC20(testConfig.asset);
 
         // Setup fork environment
@@ -87,11 +83,9 @@ contract DeploymentTest is Test {
         IERC4626[] memory strategies = new IERC4626[](1);
         strategies[0] = strategy;
 
-        uint[] memory withdrawalQueue = new uint[](1);
+        uint256[] memory withdrawalQueue = new uint256[](1);
 
-        vault.initialize(
-            IERC20(asset), strategies, uint(0), withdrawalQueue, type(uint).max, address(this)
-        );
+        vault.initialize(IERC20(asset), strategies, uint256(0), withdrawalQueue, type(uint256).max, address(this));
 
         vm.label(address(vault), "vault");
         vm.label(address(asset), "asset");
@@ -111,8 +105,8 @@ contract DeploymentTest is Test {
     }
 
     function test__deposit_withdraw(uint128 depositAmount) public {
-        uint amount = bound(uint(depositAmount), 1, 100_000e18);
-        for (uint i; i < configLength; ++i) {
+        uint256 amount = bound(uint256(depositAmount), 1, 100_000e18);
+        for (uint256 i; i < configLength; ++i) {
             _setUpTest(i);
 
             deal(address(asset), alice, amount);
@@ -127,29 +121,54 @@ contract DeploymentTest is Test {
             uint256 shares = vault.deposit(amount, alice);
 
             assertEq(amount, shares);
-            assertApproxEqAbs(vault.previewWithdraw(amount), shares, testConfig.delta, "previewWithdraw should match share amount");
-            assertApproxEqAbs(vault.previewDeposit(amount), shares, testConfig.delta, "previewDeposit should match share amount");
-            assertApproxEqAbs(vault.totalSupply(), shares, testConfig.delta, "totalSupply should be equal to minted shares");
-            assertApproxEqAbs(vault.totalAssets(), amount, testConfig.delta, "totalAssets should be equal to deposited amount");
-            assertApproxEqAbs(vault.balanceOf(alice), shares, testConfig.delta, "alice should own all the minted vault shares");
-            assertApproxEqAbs(vault.convertToAssets(vault.balanceOf(alice)), amount, testConfig.delta,"minted shares should be convertable to deposited amount of assets");
-            assertApproxEqAbs(asset.balanceOf(alice), alicePreDepositBal - amount, testConfig.delta, "should have transferred assets from alice to vault");
+            assertApproxEqAbs(
+                vault.previewWithdraw(amount), shares, testConfig.delta, "previewWithdraw should match share amount"
+            );
+            assertApproxEqAbs(
+                vault.previewDeposit(amount), shares, testConfig.delta, "previewDeposit should match share amount"
+            );
+            assertApproxEqAbs(
+                vault.totalSupply(), shares, testConfig.delta, "totalSupply should be equal to minted shares"
+            );
+            assertApproxEqAbs(
+                vault.totalAssets(), amount, testConfig.delta, "totalAssets should be equal to deposited amount"
+            );
+            assertApproxEqAbs(
+                vault.balanceOf(alice), shares, testConfig.delta, "alice should own all the minted vault shares"
+            );
+            assertApproxEqAbs(
+                vault.convertToAssets(vault.balanceOf(alice)),
+                amount,
+                testConfig.delta,
+                "minted shares should be convertable to deposited amount of assets"
+            );
+            assertApproxEqAbs(
+                asset.balanceOf(alice),
+                alicePreDepositBal - amount,
+                testConfig.delta,
+                "should have transferred assets from alice to vault"
+            );
 
-            uint withdrawAmount = vault.maxWithdraw(alice);
+            uint256 withdrawAmount = vault.maxWithdraw(alice);
             vm.prank(alice);
             vault.withdraw(withdrawAmount, alice, alice);
 
             assertEq(vault.totalAssets(), 0);
             assertEq(vault.balanceOf(alice), 0);
             assertEq(vault.convertToAssets(vault.balanceOf(alice)), 0);
-            assertApproxEqAbs(asset.balanceOf(alice), alicePreDepositBal, testConfig.delta, "should should have same amount of assets after withdrawal");
+            assertApproxEqAbs(
+                asset.balanceOf(alice),
+                alicePreDepositBal,
+                testConfig.delta,
+                "should should have same amount of assets after withdrawal"
+            );
         }
     }
 
     function test__mint_redeem() public {
-        uint amount = 1e18;
+        uint256 amount = 1e18;
         amount = bound(amount, 1, 100_000e18);
-        for (uint i; i < configLength; ++i) {
+        for (uint256 i; i < configLength; ++i) {
             _setUpTest(i);
 
             deal(address(asset), alice, amount);
@@ -168,12 +187,12 @@ contract DeploymentTest is Test {
             assertApproxEqAbs(vault.previewWithdraw(aliceAssetAmount), amount, 1, "pw");
             assertApproxEqAbs(vault.previewDeposit(aliceAssetAmount), amount, 1, "pd");
             assertEq(vault.totalSupply(), amount, "ts");
-            assertApproxEqAbs(vault.totalAssets(), aliceAssetAmount, testConfig.delta ,"ta");
+            assertApproxEqAbs(vault.totalAssets(), aliceAssetAmount, testConfig.delta, "ta");
             assertEq(vault.balanceOf(alice), amount, "bal");
             assertApproxEqAbs(vault.convertToAssets(vault.balanceOf(alice)), aliceAssetAmount, 1, "convert");
             assertEq(asset.balanceOf(alice), alicePreDepositBal - aliceAssetAmount, "a bal");
 
-            uint redeemAmount = vault.maxRedeem(alice);
+            uint256 redeemAmount = vault.maxRedeem(alice);
             vm.prank(alice);
             vault.redeem(redeemAmount, alice, alice);
 
@@ -185,7 +204,7 @@ contract DeploymentTest is Test {
     }
 
     function test__interactions_for_someone_else() public {
-        for (uint i; i < configLength; ++i) {
+        for (uint256 i; i < configLength; ++i) {
             _setUpTest(i);
 
             // init 2 users with a 1e18 balance
@@ -232,7 +251,7 @@ contract DeploymentTest is Test {
     }
 
     function test__changeStrategies() public {
-        for (uint i; i < configLength; ++i) {
+        for (uint256 i; i < configLength; ++i) {
             _setUpTest(i);
 
             IERC4626[] memory newStrategies = new IERC4626[](1);
@@ -290,7 +309,7 @@ contract DeploymentTest is Test {
     }
 
     function test__changeStrategies_to_no_strategies() public {
-        for (uint i; i < configLength; ++i) {
+        for (uint256 i; i < configLength; ++i) {
             _setUpTest(i);
 
             IERC4626[] memory newStrategies;
@@ -339,7 +358,7 @@ contract DeploymentTest is Test {
     }
 
     function test__pause() public {
-        for (uint i; i < configLength; ++i) {
+        for (uint256 i; i < configLength; ++i) {
             _setUpTest(i);
             uint256 depositAmount = 1 ether;
 
@@ -371,7 +390,7 @@ contract DeploymentTest is Test {
     }
 
     function test__unpause() public {
-        for (uint i; i < configLength; ++i) {
+        for (uint256 i; i < configLength; ++i) {
             _setUpTest(i);
             uint256 depositAmount = 1 ether;
 
@@ -395,7 +414,7 @@ contract DeploymentTest is Test {
             vm.prank(alice);
             vault.withdraw(depositAmount, alice, alice);
 
-            uint redeemAmount = vault.maxRedeem(alice);
+            uint256 redeemAmount = vault.maxRedeem(alice);
             vm.prank(alice);
             vault.redeem(redeemAmount, alice, alice);
         }
