@@ -1,0 +1,24 @@
+{
+  "length": 1,
+  "configs": [
+    {
+      "base": {
+        "asset": "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85",
+        "blockNumber": 0,
+        "defaultAmount": 1000000,
+        "delta": 10,
+        "maxDeposit": 100000000,
+        "maxWithdraw": 100000000,
+        "minDeposit": 10000,
+        "minWithdraw": 10000,
+        "network": "optimism",
+        "testId": "CompoundV3 Compounder"
+      },
+      "specific": {
+        "cToken": "0x2e44e174f7D53F0212823acC11C01A11d58c5bCB",
+        "rewarder": "0x443EA0340cb75a160F31A440722dec7b5bc3C2E9",
+        "rewardToken": "0x7e7d4467112689329f7E06571eD0E8CbAd4910eE"
+      }
+    }
+  ]
+}

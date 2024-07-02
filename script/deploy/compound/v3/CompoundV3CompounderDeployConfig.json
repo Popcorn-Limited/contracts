@@ -1,0 +1,12 @@
+{
+  "baseInit": {
+    "asset": "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85",
+    "owner": "",
+    "autoDeposit": true
+  },
+  "strategyInit": {
+    "cToken": "0x2e44e174f7D53F0212823acC11C01A11d58c5bCB",
+    "rewarder": "0x443EA0340cb75a160F31A440722dec7b5bc3C2E9",
+    "rewardToken": "0x7e7d4467112689329f7E06571eD0E8CbAd4910eE"
+  }
+}
