@@ -1,23 +1,18 @@
 {
-  "length": 1,
-  "configs": [
-    {
-      "base": {
-        "asset": "0x5f98805A4E8be255a32880FDeC7F6728C6568bA0",
-        "blockNumber": 0,
-        "defaultAmount": 1000000000000000000,
-        "delta": 10,
-        "maxDeposit": 100000000000000000000000,
-        "maxWithdraw": 100000000000000000000000,
-        "minDeposit": 1000000000000,
-        "minWithdraw": 1000000000000,
-        "network": "arbitrum",
-        "testId": "Deployment Test"
-      },
-      "specific": {
-        "aaveDataProvider": "0x7B4EB56E7CD4b454BA8ff71E4518426369a138a3",
-        "aToken": "0x3Fe6a295459FAe07DF8A0ceCC36F37160FE86AA9"
-      }
-    }
-  ]
+    "length": 1,
+    "configs": [
+        {
+            "asset": "0xA1290d69c65A6Fe4DF752f95823fae25cB99e5A7",
+            "blockNumber": 0,
+            "defaultAmount": 1000000000000000000,
+            "delta": 10,
+            "maxDeposit": 100000000000000000000000,
+            "maxWithdraw": 100000000000000000000000,
+            "minDeposit": 1000000000000,
+            "minWithdraw": 1000000000000,
+            "network": "mainnet",
+            "strategies": ["0xF6Fe643cb8DCc3E379Cdc6DB88818B09fdF2200d"],
+            "testId": "Deployment Test"
+        }
+    ]
 }

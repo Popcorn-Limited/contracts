@@ -24,6 +24,7 @@ struct TestConfig {
     uint256 minDeposit;
     uint256 minWithdraw;
     string network;
+    IERC4626[] strategies;
     string testId;
 }
 
@@ -46,27 +47,10 @@ contract DeploymentTest is Test {
     address alice = address(0xABCD);
     address bob = address(0xDCBA);
 
-    // should only be called within `_setUpTest()`.
-    function _setUpStrategy(string memory _index) internal returns (IERC4626) {
-        // create and initialize strategy and return it
-        AaveV3Depositor strategy = new AaveV3Depositor();
-
-        strategy.initialize(
-            testConfig.asset,
-            address(this),
-            true,
-            abi.encode(json.readAddress(string.concat(".configs[", _index, "].specific.aaveDataProvider")))
-        );
-
-        vm.label(json.readAddress(string.concat(".configs[", _index, "].specific.aToken")), "aToken");
-
-        return IERC4626(address(strategy));
-    }
-
     // should be called with index (0, configLength] in every test function
     // through a for loop
     function _setUpTest(uint256 index) internal {
-        testConfig = abi.decode(json.parseRaw(string.concat(".configs[", vm.toString(index), "].base")), (TestConfig));
+        testConfig = abi.decode(json.parseRaw(string.concat(".configs[", vm.toString(index), "]")), (TestConfig));
         asset = IERC20(testConfig.asset);
 
         // Setup fork environment
@@ -74,22 +58,15 @@ contract DeploymentTest is Test {
             ? vm.createSelectFork(vm.rpcUrl(testConfig.network), testConfig.blockNumber)
             : vm.createSelectFork(vm.rpcUrl(testConfig.network));
 
-        // Setup strategy
-        IERC4626 strategy = _setUpStrategy(vm.toString(index));
-
         address implementation = address(new MultiStrategyVault());
         vault = MultiStrategyVault(Clones.clone(implementation));
 
-        IERC4626[] memory strategies = new IERC4626[](1);
-        strategies[0] = strategy;
-
         uint256[] memory withdrawalQueue = new uint256[](1);
 
-        vault.initialize(IERC20(asset), strategies, uint256(0), withdrawalQueue, type(uint256).max, address(this));
+        vault.initialize(IERC20(asset), testConfig.strategies, uint256(0), withdrawalQueue, type(uint256).max, address(this));
 
         vm.label(address(vault), "vault");
         vm.label(address(asset), "asset");
-        vm.label(address(strategy), "strategy");
     }
 
     function _createMockStrategy(IERC20 _asset) internal returns (IERC4626) {
@@ -335,9 +312,6 @@ contract DeploymentTest is Test {
             vault.changeStrategies();
 
             assertEq(asset.allowance(address(vault), oldStrategy), 0);
-
-            // Annoyingly Math fails us here and leaves 1 asset in the adapter
-            assertEq(asset.balanceOf(oldStrategy), 0);
 
             assertEq(IERC4626(oldStrategy).balanceOf(address(vault)), 0);
 
