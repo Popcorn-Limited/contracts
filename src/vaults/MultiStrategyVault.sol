@@ -359,7 +359,7 @@ contract MultiStrategyVault is
                      DEPOSIT/WITHDRAWAL LIMIT LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    /// @return Maximum amount of underlying `asset` token that may be deposited for a given address. Delegates to adapter.
+    /// @return Maximum amount of underlying `asset` token that may be deposited for a given address.
     function maxDeposit(address) public view override returns (uint256) {
         uint256 assets = totalAssets();
         uint256 depositLimit_ = depositLimit;
@@ -367,14 +367,18 @@ contract MultiStrategyVault is
             (paused() || assets >= depositLimit_) ? 0 : depositLimit_ - assets;
     }
 
-    /// @return Maximum amount of vault shares that may be minted to given address. Delegates to adapter.
+    /// @return Maximum amount of vault shares that may be minted to given address.
+    /// @dev if maxUint return maxUint, overflows if depositLimit is close to maxUint
     function maxMint(address) public view override returns (uint256) {
         uint256 assets = totalAssets();
         uint256 depositLimit_ = depositLimit;
-        return
-            (paused() || assets >= depositLimit_)
-                ? 0
-                : convertToShares(depositLimit_ - assets);
+        if(paused() || assets >= depositLimit_)
+            return 0;
+
+        if(depositLimit_ == type(uint256).max) 
+            return depositLimit_;
+
+        return convertToShares(depositLimit_ - assets);
     }
 
     /*//////////////////////////////////////////////////////////////
