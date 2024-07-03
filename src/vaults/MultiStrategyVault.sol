@@ -60,6 +60,7 @@ contract MultiStrategyVault is
      * @param owner_ Owner of the contract. Controls management functions.
      * @dev This function is called by the factory contract when deploying a new vault.
      * @dev Usually the adapter should already be pre configured. Otherwise a new one can only be added after a ragequit time.
+     * @dev overflows if depositLimit is close to maxUint (convertToShares multiplies depositLimit with totalSupply)
      */
     function initialize(
         IERC20 asset_,
@@ -368,7 +369,7 @@ contract MultiStrategyVault is
     }
 
     /// @return Maximum amount of vault shares that may be minted to given address.
-    /// @dev if maxUint return maxUint, overflows if depositLimit is close to maxUint
+    /// @dev overflows if depositLimit is close to maxUint (convertToShares multiplies depositLimit with totalSupply)
     function maxMint(address) public view override returns (uint256) {
         uint256 assets = totalAssets();
         uint256 depositLimit_ = depositLimit;

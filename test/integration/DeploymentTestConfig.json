@@ -1,18 +1,20 @@
 {
-    "length": 1,
-    "configs": [
-        {
-            "asset": "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85",
-            "blockNumber": 0,
-            "defaultAmount": 1000000,
-            "delta": 10,
-            "maxDeposit": 10000000000,
-            "maxWithdraw": 10000000000,
-            "minDeposit": 1000000,
-            "minWithdraw": 1000000,
-            "network": "optimism",
-            "strategies": ["0xc4c7b3fefecbd07b4174bb7a49701d508a633733"],
-            "testId": "Deployment Test"
-        }
+    "asset": "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85",
+    "blockNumber": 0,
+    "defaultAmount": 1000000,
+    "delta": 10,
+    "depositIndex": 0,
+    "depositLimit": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "maxDeposit": 10000000000,
+    "maxWithdraw": 10000000000,
+    "minDeposit": 1000000,
+    "minWithdraw": 1000000,
+    "network": "optimism",
+    "owner": "",
+    "strategies": [
+        ""
+    ],
+    "withdrawalQueue": [
+        0
     ]
 }
