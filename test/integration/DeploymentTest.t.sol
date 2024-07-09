@@ -15,17 +15,20 @@ import {MultiStrategyVault} from "src/vaults/MultiStrategyVault.sol";
 import {AaveV3Depositor, IERC20} from "src/strategies/aave/aaveV3/AaveV3Depositor.sol";
 
 struct TestConfig {
-    address asset;
     uint256 blockNumber;
     uint256 defaultAmount;
     uint256 delta;
-    uint256 depositIndex;
-    uint256 depositLimit;
     uint256 maxDeposit;
     uint256 maxWithdraw;
     uint256 minDeposit;
     uint256 minWithdraw;
     string network;
+}
+
+struct DeployConfig {
+    address asset;
+    uint256 depositIndex;
+    uint256 depositLimit;
     address owner;
     IERC4626[] strategies;
     uint256[] withdrawalQueue;
@@ -42,6 +45,8 @@ contract DeploymentTest is Test {
     string internal json;
 
     TestConfig internal testConfig;
+    DeployConfig internal deployConfig;
+
     // only works with MultiStrategyVault for now
     MultiStrategyVault vault;
     IERC20 asset;
@@ -52,8 +57,13 @@ contract DeploymentTest is Test {
     function setUp() public {
         json = vm.readFile("./test/integration/DeploymentTestConfig.json");
 
-        testConfig = abi.decode(json.parseRaw("."), (TestConfig));
-        asset = IERC20(testConfig.asset);
+        testConfig = abi.decode(json.parseRaw(".testConfig"), (TestConfig));
+        deployConfig = abi.decode(
+            json.parseRaw(".deployConfig"),
+            (DeployConfig)
+        );
+
+        asset = IERC20(deployConfig.asset);
 
         // Setup fork environment
         testConfig.blockNumber > 0
@@ -68,16 +78,16 @@ contract DeploymentTest is Test {
 
         vault.initialize(
             IERC20(asset),
-            testConfig.strategies,
-            testConfig.depositIndex,
-            testConfig.withdrawalQueue,
-            testConfig.depositLimit,
-            testConfig.owner
+            deployConfig.strategies,
+            deployConfig.depositIndex,
+            deployConfig.withdrawalQueue,
+            deployConfig.depositLimit,
+            deployConfig.owner
         );
 
         vm.label(address(vault), "vault");
         vm.label(address(asset), "asset");
-        vm.label(testConfig.owner, "owner");
+        vm.label(deployConfig.owner, "owner");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -92,7 +102,7 @@ contract DeploymentTest is Test {
         // USDC on mainnet cant be dealt (find(StdStorage): Slot(s) not found) therefore we transfer from a whale
         if (
             block.chainid == 1 &&
-            testConfig.asset == 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48
+            address(asset) == 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48
         ) {
             vm.prank(0x4B16c5dE96EB2117bBE5fd171E4d203624B014aa);
             IERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48).transfer(
@@ -103,7 +113,7 @@ contract DeploymentTest is Test {
         // USDC on optimism cant be dealt (find(StdStorage): Slot(s) not found) therefore we transfer from a whale
         else if (
             block.chainid == 10 &&
-            testConfig.asset == 0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85
+            address(asset) == 0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85
         ) {
             vm.prank(0xf89d7b9c864f589bbF53a82105107622B35EaA40);
             IERC20(0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85).transfer(
@@ -111,7 +121,7 @@ contract DeploymentTest is Test {
                 amount
             );
         } else {
-            _mintAsset(testConfig.asset, receiver, amount);
+            deal(address(asset), receiver, amount);
         }
     }
 
@@ -338,6 +348,7 @@ contract DeploymentTest is Test {
         address oldStrategy = address(vault.strategies(0));
 
         // Preparation to change the strategies
+        vm.prank(deployConfig.owner);
         vault.proposeStrategies(newStrategies, newWithdrawalQueue, uint256(0));
 
         vm.warp(block.timestamp + 3 days);
@@ -392,6 +403,7 @@ contract DeploymentTest is Test {
         address oldStrategy = address(vault.strategies(0));
 
         // Preparation to change the strategies
+        vm.prank(deployConfig.owner);
         vault.proposeStrategies(
             newStrategies,
             newWithdrawalQueue,
@@ -431,6 +443,7 @@ contract DeploymentTest is Test {
         vault.deposit(depositAmount * 3, alice);
         vm.stopPrank();
 
+        vm.prank(deployConfig.owner);
         vault.pause();
 
         assertTrue(vault.paused());
@@ -458,8 +471,10 @@ contract DeploymentTest is Test {
         vm.prank(alice);
         asset.approve(address(vault), depositAmount * 3);
 
+        vm.prank(deployConfig.owner);
         vault.pause();
 
+        vm.prank(deployConfig.owner);
         vault.unpause();
 
         assertFalse(vault.paused());
