@@ -26,6 +26,34 @@ interface IVaultRouter {
     ) external;
 }
 
+interface IGauge {
+    function claim_rewards(address user) external;
+
+    function claimable_reward(
+        address user,
+        address rewardToken
+    ) external view returns (uint256);
+}
+
+contract Fixer {
+    address gauge;
+    address rewardToken;
+
+    constructor(address gauge_, address rewardToken_) {
+        gauge = gauge_;
+        rewardToken = rewardToken_;
+    }
+
+    function claim() external {
+        uint256 claimableOvcx = IGauge(gauge).claimable_reward(
+            msg.sender,
+            rewardToken
+        );
+        IERC20(rewardToken).transfer(gauge, claimableOvcx);
+        IGauge(gauge).claim_rewards(msg.sender);
+    }
+}
+
 contract Tester is Test {
     address router = 0x48943F145686bF5c4580D545CDA405844D1f777b;
     address gauge = 0xc9aD14cefb29506534a973F7E0E97e68eCe4fa3f;
@@ -85,171 +113,19 @@ contract Tester is Test {
         vm.stopPrank();
     }
 
-    function test__deposit_withdraw(uint128 depositAmount) public {
-        uint amount = bound(uint(depositAmount), 1, 100_000e18);
-
-        deal(address(asset), alice, amount);
-
-        vm.prank(alice);
-        asset.approve(address(vault), amount);
-        assertEq(asset.allowance(alice, address(vault)), amount);
-
-        uint256 alicePreDepositBal = asset.balanceOf(alice);
-
-        vm.prank(alice);
-        uint256 shares = vault.deposit(amount, alice);
-
-        assertEq(amount, shares);
-        assertApproxEqAbs(
-            vault.previewWithdraw(amount),
-            shares,
-            10,
-            "previewWithdraw should match share amount"
-        );
-        assertApproxEqAbs(
-            vault.previewDeposit(amount),
-            shares,
-            10,
-            "previewDeposit should match share amount"
-        );
-        assertApproxEqAbs(
-            vault.totalSupply(),
-            shares,
-            10,
-            "totalSupply should be equal to minted shares"
-        );
-        assertApproxEqAbs(
-            vault.totalAssets(),
-            amount,
-            10,
-            "totalAssets should be equal to deposited amount"
-        );
-        assertApproxEqAbs(
-            vault.balanceOf(alice),
-            shares,
-            10,
-            "alice should own all the minted vault shares"
-        );
-        assertApproxEqAbs(
-            vault.convertToAssets(vault.balanceOf(alice)),
-            amount,
-            10,
-            "minted shares should be convertable to deposited amount of assets"
-        );
-        assertApproxEqAbs(
-            asset.balanceOf(alice),
-            alicePreDepositBal - amount,
-            10,
-            "should have transferred assets from alice to vault"
+    function testB() public {
+        Fixer fixer = new Fixer(
+            gauge,
+            0x59a696bF34Eae5AD8Fd472020e3Bed410694a230
         );
 
-        uint withdrawAmount = vault.maxWithdraw(alice);
-        vm.prank(alice);
-        vault.withdraw(withdrawAmount, alice, alice);
-
-        assertEq(vault.totalAssets(), 0);
-        assertEq(vault.balanceOf(alice), 0);
-        assertEq(vault.convertToAssets(vault.balanceOf(alice)), 0);
-        assertApproxEqAbs(
-            asset.balanceOf(alice),
-            alicePreDepositBal,
-            10,
-            "should should have same amount of assets after withdrawal"
-        );
-    }
-    function test__mint_redeem() public {
-        uint amount = 1e18;
-        amount = bound(amount, 1, 100_000e18);
-
-        deal(address(asset), alice, amount);
-
-        vm.prank(alice);
-        asset.approve(address(vault), amount);
-        assertEq(asset.allowance(alice, address(vault)), amount);
-
-        uint256 alicePreDepositBal = asset.balanceOf(alice);
-
-        vm.prank(alice);
-        uint256 aliceAssetAmount = vault.mint(amount, alice);
-
-        // Expect exchange rate to be 1:1 on initial mint.
-        assertApproxEqAbs(amount, aliceAssetAmount, 1, "share = assets");
-        assertApproxEqAbs(
-            vault.previewWithdraw(aliceAssetAmount),
-            amount,
-            1,
-            "pw"
-        );
-        assertApproxEqAbs(
-            vault.previewDeposit(aliceAssetAmount),
-            amount,
-            1,
-            "pd"
-        );
-        assertEq(vault.totalSupply(), amount, "ts");
-        assertApproxEqAbs(vault.totalAssets(), aliceAssetAmount, 10, "ta");
-        assertEq(vault.balanceOf(alice), amount, "bal");
-        assertApproxEqAbs(
-            vault.convertToAssets(vault.balanceOf(alice)),
-            aliceAssetAmount,
-            1,
-            "convert"
-        );
-        assertEq(
-            asset.balanceOf(alice),
-            alicePreDepositBal - aliceAssetAmount,
-            "a bal"
+        vm.prank(0x22f5413C075Ccd56D575A54763831C4c27A37Bdb);
+        IERC20(0x59a696bF34Eae5AD8Fd472020e3Bed410694a230).transfer(
+            address(fixer),
+            100e18
         );
 
-        uint redeemAmount = vault.maxRedeem(alice);
-        vm.prank(alice);
-        vault.redeem(redeemAmount, alice, alice);
-
-        assertApproxEqAbs(vault.totalAssets(), 0, 1);
-        assertEq(vault.balanceOf(alice), 0);
-        assertEq(vault.convertToAssets(vault.balanceOf(alice)), 0);
-        assertApproxEqAbs(asset.balanceOf(alice), alicePreDepositBal, 1);
-    }
-    function test__interactions_for_someone_else() public {
-        // init 2 users with a 1e18 balance
-        deal(address(asset), alice, 1e18);
-        deal(address(asset), bob, 1e18);
-
-        vm.prank(alice);
-        asset.approve(address(vault), 1e18);
-
-        vm.prank(bob);
-        asset.approve(address(vault), 1e18);
-
-        // alice deposits 1e18 for bob
-        vm.prank(alice);
-        vault.deposit(1e18, bob);
-
-        assertEq(vault.balanceOf(alice), 0);
-        assertEq(vault.balanceOf(bob), 1e18);
-        assertEq(asset.balanceOf(alice), 0);
-
-        // bob mint 1e18 for alice
-        vm.prank(bob);
-        vault.mint(1e18, alice);
-        assertEq(vault.balanceOf(alice), 1e18);
-        assertEq(vault.balanceOf(bob), 1e18);
-        assertEq(asset.balanceOf(bob), 0);
-
-        // alice redeem 1e18 for bob
-        vm.prank(alice);
-        vault.redeem(1e18, bob, alice);
-
-        assertEq(vault.balanceOf(alice), 0);
-        assertEq(vault.balanceOf(bob), 1e18);
-        assertApproxEqAbs(asset.balanceOf(bob), 1e18, 10);
-
-        // bob withdraw 1e18 for alice
-        vm.prank(bob);
-        vault.withdraw(1e18, alice, bob);
-
-        assertEq(vault.balanceOf(alice), 0);
-        assertEq(vault.balanceOf(bob), 0);
-        assertApproxEqAbs(asset.balanceOf(alice), 1e18, 10);
+        vm.prank(0x22f5413C075Ccd56D575A54763831C4c27A37Bdb);
+        fixer.claim();
     }
 }

@@ -1,18 +1,18 @@
 {
-    "asset": "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85",
+    "asset": "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1",
     "blockNumber": 0,
-    "defaultAmount": 1000000,
+    "defaultAmount": 1000000000000000000,
     "delta": 10,
     "depositIndex": 0,
     "depositLimit": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-    "maxDeposit": 10000000000,
-    "maxWithdraw": 10000000000,
-    "minDeposit": 1000000,
-    "minWithdraw": 1000000,
-    "network": "optimism",
-    "owner": "",
+    "maxDeposit": 1000000000000000000000,
+    "maxWithdraw": 1000000000000000000000,
+    "minDeposit": 1000000000000000000,
+    "minWithdraw": 1000000000000000000,
+    "network": "arbitrum",
+    "owner": "0x2C3B135cd7dc6C673b358BEF214843DAb3464278",
     "strategies": [
-        ""
+        "0x067e4c15B052C73998689D7A0e19D0B2910819dc"
     ],
     "withdrawalQueue": [
         0
