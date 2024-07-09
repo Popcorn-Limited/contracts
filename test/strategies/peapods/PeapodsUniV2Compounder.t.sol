@@ -86,6 +86,43 @@ contract PeapodsUniV2CompounderTest is BaseStrategyTest {
 
         // set Uniswap trade paths
         SwapStep[] memory swaps = new SwapStep[](2);
+        swaps = _getTradePaths(json_, index_);
+   
+        // rewards
+        uint256 rewLen = json_.readUint(
+            string.concat(
+                ".configs[",
+                index_,
+                "].specific.harvest.rewards.length"
+            )
+        );
+        address[] memory rewardTokens = new address[](rewLen);
+        for (uint256 i = 0; i < rewLen; i++) {
+            rewardTokens[i] = json_.readAddress(
+                string.concat(
+                    ".configs[",
+                    index_,
+                    "].specific.harvest.rewards.tokens[",
+                    vm.toString(i),
+                    "]"
+                )
+            );
+        }
+
+        PeapodsUniV2Compounder(strategy).setHarvestValues(
+            rewardTokens,
+            router,
+            depositAssets,
+            swaps
+        );
+    }
+
+    function _getTradePaths(
+        string memory json_,
+        string memory index_
+    ) internal pure returns (SwapStep[] memory swaps) {
+        // set Uniswap trade paths
+        swaps = new SwapStep[](2);
 
         uint256 lenSwap0 = json_.readUint(
             string.concat(
@@ -129,34 +166,6 @@ contract PeapodsUniV2CompounderTest is BaseStrategyTest {
 
         swaps[0] = SwapStep(swap0);
         swaps[1] = SwapStep(swap1);
-
-        // rewards
-        uint256 rewLen = json_.readUint(
-            string.concat(
-                ".configs[",
-                index_,
-                "].specific.harvest.rewards.length"
-            )
-        );
-        address[] memory rewardTokens = new address[](rewLen);
-        for (uint256 i = 0; i < rewLen; i++) {
-            rewardTokens[i] = json_.readAddress(
-                string.concat(
-                    ".configs[",
-                    index_,
-                    "].specific.harvest.rewards.tokens[",
-                    vm.toString(i),
-                    "]"
-                )
-            );
-        }
-
-        PeapodsUniV2Compounder(strategy).setHarvestValues(
-            rewardTokens,
-            router,
-            depositAssets,
-            swaps
-        );
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -283,6 +292,52 @@ contract PeapodsUniV2CompounderTest is BaseStrategyTest {
         vm.startPrank(bob);
         strategyContract.withdrawDust(depositAssets[0]);
         vm.stopPrank();
+    }
+
+    function test_reset_harvest_values() public {
+        // get Uniswap trade paths
+        SwapStep[] memory swaps = new SwapStep[](2);
+        swaps = _getTradePaths(json, "0");
+
+        // rewards
+        uint256 rewLen = json.readUint(
+            string.concat(
+                ".configs[0].specific.harvest.rewards.length"
+            )
+        );
+        address[] memory rewardTokens = new address[](rewLen);
+        for (uint256 i = 0; i < rewLen; i++) {
+            rewardTokens[i] = json.readAddress(
+                string.concat(
+                    ".configs[0].specific.harvest.rewards.tokens[",
+                    vm.toString(i),
+                    "]"
+                )
+            );
+        }  
+
+
+        address oldRouter = json.readAddress(
+            string.concat(
+                ".configs[0].specific.harvest.uniswapRouter"
+            )
+        );
+        address mockRouter = address(0x1234);
+        
+        PeapodsUniV2Compounder(address(strategy)).setHarvestValues(
+            rewardTokens,
+            mockRouter,
+            depositAssets,
+            swaps
+        );
+        
+        // old router allowance is reset
+        assertEq(IERC20(depositAssets[0]).allowance(address(strategy), oldRouter), 0);
+        assertEq(IERC20(depositAssets[1]).allowance(address(strategy), oldRouter), 0);
+
+        // new router allowance is max
+        assertEq(IERC20(depositAssets[0]).allowance(address(strategy), mockRouter), type(uint256).max);
+        assertEq(IERC20(depositAssets[1]).allowance(address(strategy), mockRouter), type(uint256).max);
     }
 
     function verify_strategyInit() public {

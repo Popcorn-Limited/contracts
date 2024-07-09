@@ -66,7 +66,7 @@ contract PeapodsDepositor is BaseStrategy {
         poolRewards = IPoolRewards(stakedToken.poolRewards());
 
         // approve peapods staking contract
-        IERC20(asset_).approve(staking_, type(uint256).max);
+        IERC20(asset_).forceApprove(staking_, type(uint256).max);
     }
 
     function name() public view override(IERC20Metadata, ERC20) returns (string memory) {
