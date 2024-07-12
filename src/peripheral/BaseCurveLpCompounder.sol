@@ -22,9 +22,11 @@ abstract contract BaseCurveLpCompounder is BaseCurveCompounder {
 
         uint256 amount = IERC20(depositAsset).balanceOf(address(this));
 
+        uint256 amountLPBefore = IERC20(vaultAsset).balanceOf(address(this));
+
         CurveTradeLibrary.addLiquidity(poolAddress, nCoins, uint256(uint128(indexIn)), amount, 0);
 
-        amount = IERC20(vaultAsset).balanceOf(address(this));
+        amount = IERC20(vaultAsset).balanceOf(address(this)) - amountLPBefore;
         uint256 minOut = abi.decode(data, (uint256));
         if (amount < minOut) revert CompoundFailed();
     }

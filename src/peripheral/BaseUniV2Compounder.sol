@@ -34,7 +34,7 @@ abstract contract BaseUniV2Compounder {
 
             // sell half for tokenA
             uint256 decimals = IERC20Metadata(sellTokens[i]).decimals();
-            uint256 amount = totAmount.mulDiv(10 ** decimals, 20 ** decimals, Math.Rounding.Floor);
+            uint256 amount = totAmount.mulDiv(10 ** decimals, 2 * (10 ** decimals), Math.Rounding.Floor);
 
             swap = sellSwaps[2 * i];
 

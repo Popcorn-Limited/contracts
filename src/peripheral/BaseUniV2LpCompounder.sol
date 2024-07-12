@@ -27,11 +27,13 @@ abstract contract BaseUniV2LpCompounder is BaseUniV2Compounder {
         uint256 amountB = IERC20(tokenB).balanceOf(address(this));
 
         if (amountA > 0 && amountB > 0) {
+            uint256 amountLPBefore = IERC20(vaultAsset).balanceOf(address(this));
+
             UniswapV2TradeLibrary.addLiquidity(
                 uniswapRouter, depositAssets[0], depositAssets[1], amountA, amountB, 0, 0, to, deadline
             );
 
-            uint256 amountLP = IERC20(vaultAsset).balanceOf(address(this));
+            uint256 amountLP = IERC20(vaultAsset).balanceOf(address(this)) - amountLPBefore;
             uint256 minOut = abi.decode(data, (uint256));
             if (amountLP < minOut) revert CompoundFailed();
         }
@@ -43,11 +45,6 @@ abstract contract BaseUniV2LpCompounder is BaseUniV2Compounder {
         address[] memory rewardTokens,
         SwapStep[] memory newSwaps
     ) internal {
-        setUniswapTradeValues(newRouter, rewardTokens, newSwaps);
-
-        address tokenA = newDepositAssets[0];
-        address tokenB = newDepositAssets[1];
-
         address oldTokenA = depositAssets[0];
         address oldTokenB = depositAssets[1];
 
@@ -57,6 +54,12 @@ abstract contract BaseUniV2LpCompounder is BaseUniV2Compounder {
         if (oldTokenB != address(0)) {
             IERC20(oldTokenB).forceApprove(address(uniswapRouter), 0);
         }
+
+        // sets the uniswapRouter
+        setUniswapTradeValues(newRouter, rewardTokens, newSwaps);
+
+        address tokenA = newDepositAssets[0];
+        address tokenB = newDepositAssets[1];
 
         IERC20(tokenA).forceApprove(address(uniswapRouter), type(uint256).max);
         IERC20(tokenB).forceApprove(address(uniswapRouter), type(uint256).max);
