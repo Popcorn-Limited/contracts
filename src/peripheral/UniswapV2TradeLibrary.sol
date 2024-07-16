@@ -13,8 +13,8 @@ library UniswapV2TradeLibrary {
         uint256 deadline,
         uint256 amount,
         uint256 minOut
-    ) internal returns (uint256[] memory amounts) {
-        amounts = router.swapExactTokensForTokens(amount, minOut, path, receiver, deadline);
+    ) internal {
+        router.swapExactTokensForTokensSupportingFeeOnTransferTokens(amount, minOut, path, receiver, deadline);
     }
 
     function addLiquidity(
