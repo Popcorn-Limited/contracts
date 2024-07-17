@@ -267,30 +267,50 @@ abstract contract AnyConverter is BaseStrategy {
     uint256 public totalReservedAssets;
     uint256 public totalReservedYieldAssets;
 
-    mapping(address => mapping(address => Reserved)) public reserved;
+    mapping(address => mapping(address => Reserved[])) public reserved;
+
+    function claimReserved(uint index) external {
+        address _asset = asset();
+        address _yieldAsset = yieldAsset;
+
+        _claimReserved(_asset, _yieldAsset, index, false);
+        _claimReserved(_yieldAsset, _asset, index, true);
+    }
 
     function claimReserved() external {
         address _asset = asset();
         address _yieldAsset = yieldAsset;
 
-        _claimReserved(_asset, _yieldAsset, false);
-        _claimReserved(_yieldAsset, _asset, true);
+        // since the array will be modified in each iteration, we need to cache the length
+        // and just supply 0 as the index. The last element will be popped off the array
+        // in each iteration.
+        uint length = reserved[msg.sender][_asset].length;
+        for (uint i = 0; i < length; ++i) {
+            _claimReserved(_asset, _yieldAsset, 0, false);
+        }
+
+        length = reserved[msg.sender][_yieldAsset].length;
+        for (uint i = 0; i < length; ++i) {
+            _claimReserved(_yieldAsset, _asset, 0, true);
+        }
     }
 
     function _claimReserved(
         address base,
         address quote,
+        uint index,
         bool isYieldAsset
     ) internal {
-        Reserved memory _reserved = reserved[msg.sender][base];
-        if (_reserved.unlockTime < block.timestamp) {
+        Reserved[] storage _reserved = reserved[msg.sender][base];
+        if (_reserved[index].unlockTime < block.timestamp) {
             uint256 withdrawable = Math.min(
-                oracle.getQuote(_reserved.deposited, base, quote),
-                _reserved.withdrawable
+                oracle.getQuote(_reserved[index].deposited, base, quote),
+                _reserved[index].withdrawable
             );
 
             if (withdrawable > 0) {
-                delete reserved[msg.sender][base];
+                _reserved[index] = _reserved[_reserved.length - 1];
+                _reserved.pop();
 
                 if (isYieldAsset) {
                     totalReservedYieldAssets -= withdrawable;
@@ -300,7 +320,7 @@ abstract contract AnyConverter is BaseStrategy {
 
                 IERC20(base).transfer(msg.sender, withdrawable);
             }
-            emit ReserveClaimed(msg.sender, base, _reserved.withdrawable);
+            emit ReserveClaimed(msg.sender, base, _reserved[index].withdrawable);
         }
     }
 
@@ -310,13 +330,13 @@ abstract contract AnyConverter is BaseStrategy {
         address token,
         bool isYieldAsset
     ) internal {
-        Reserved memory _reserved = reserved[msg.sender][token];
+        Reserved[] storage _reserved = reserved[msg.sender][token];
 
-        _reserved.deposited += amount;
-        _reserved.withdrawable += withdrawable;
-        _reserved.unlockTime = block.timestamp + 1 days;
-
-        reserved[msg.sender][token] = _reserved;
+        _reserved.push(Reserved({
+            deposited: amount,
+            withdrawable: withdrawable,
+            unlockTime: block.timestamp + 1 days
+        }));
 
         if (isYieldAsset) {
             totalReservedYieldAssets += amount;
