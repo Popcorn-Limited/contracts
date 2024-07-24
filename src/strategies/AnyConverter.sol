@@ -192,6 +192,8 @@ abstract contract AnyConverter is BaseStrategy {
     event SlippageChanged(uint256 oldSlippage, uint256 newSlippage);
     event FloatRatioProposed(uint256 ratio);
     event FloatRatioChanged(uint256 oldRatio, uint256 newRatio);
+    event UnlockTimeProposed(uint256 unlockTime);
+    event UnlockTimeChanged(uint256 oldUnlockTime, uint256 newUnlockTime);
 
     error Misconfigured();
 
@@ -205,6 +207,9 @@ abstract contract AnyConverter is BaseStrategy {
 
     ProposedChange public proposedFloatRatio;
     uint256 public floatRatio;
+
+    ProposedChange public proposedUnlockTime;
+    uint256 public unlockTime;
 
     function proposeSlippage(uint256 slippage_) external onlyOwner {
         if (slippage_ > 10_000) revert Misconfigured();
@@ -251,6 +256,30 @@ abstract contract AnyConverter is BaseStrategy {
 
         delete proposedFloatRatio;
     }
+
+    function proposeUnlockTime(uint256 unlockTime_) external onlyOwner {
+        if (unlockTime_ < 1 days) revert Misconfigured();
+
+        proposedUnlockTime = ProposedChange({
+            value: unlockTime_,
+            changeTime: block.timestamp + 3 days
+        });
+
+        emit UnlockTimeProposed(unlockTime_);
+    }
+
+    function changeUnlockTime() external onlyOwner {
+        ProposedChange memory _proposedUnlockTime = proposedUnlockTime;
+
+        if (_proposedUnlockTime.changeTime == 0) revert Misconfigured();
+
+        emit UnlockTimeChanged(unlockTime, _proposedUnlockTime.value);
+
+        unlockTime = _proposedUnlockTime.value;
+
+        delete proposedUnlockTime;
+    }
+
 
     /*//////////////////////////////////////////////////////////////
                             RESERVE LOGIC
@@ -335,7 +364,7 @@ abstract contract AnyConverter is BaseStrategy {
         _reserved.push(Reserved({
             deposited: amount,
             withdrawable: withdrawable,
-            unlockTime: block.timestamp + 1 days
+            unlockTime: block.timestamp + unlockTime
         }));
 
         if (isYieldAsset) {
