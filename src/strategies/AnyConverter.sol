@@ -225,7 +225,7 @@ abstract contract AnyConverter is BaseStrategy {
     function changeSlippage() external onlyOwner {
         ProposedChange memory _proposedSlippage = proposedSlippage;
 
-        if (_proposedSlippage.changeTime == 0) revert Misconfigured();
+        if (_proposedSlippage.changeTime == 0 || block.timestamp > _proposedSlippage.changeTime) revert Misconfigured();
 
         emit SlippageChanged(slippage, _proposedSlippage.value);
 
@@ -248,7 +248,7 @@ abstract contract AnyConverter is BaseStrategy {
     function changeFloatRatio() external onlyOwner {
         ProposedChange memory _proposedFloatRatio = proposedFloatRatio;
 
-        if (_proposedFloatRatio.changeTime == 0) revert Misconfigured();
+        if (_proposedFloatRatio.changeTime == 0 || block.timestamp > _proposedFloatRatio.changeTime) revert Misconfigured();
 
         emit FloatRatioChanged(slippage, _proposedFloatRatio.value);
 
@@ -271,7 +271,7 @@ abstract contract AnyConverter is BaseStrategy {
     function changeUnlockTime() external onlyOwner {
         ProposedChange memory _proposedUnlockTime = proposedUnlockTime;
 
-        if (_proposedUnlockTime.changeTime == 0) revert Misconfigured();
+        if (_proposedUnlockTime.changeTime == 0 || block.timestamp > _proposedUnlockTime.changeTime) revert Misconfigured();
 
         emit UnlockTimeChanged(unlockTime, _proposedUnlockTime.value);
 
