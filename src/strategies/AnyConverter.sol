@@ -286,6 +286,9 @@ abstract contract AnyConverter is BaseStrategy {
     //////////////////////////////////////////////////////////////*/
 
     event ReserveClaimed(address user, address token, uint256 withdrawn);
+    // we don't emit the block number because that's already part of the event log
+    // e.g. see https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_getlogs
+    event ReserveAdded(address indexed user, address indexed asset, uint256 unlockTime, uint256 amount, uint256 withdrawable);
 
     struct Reserved {
         uint256 unlockTime;
@@ -296,50 +299,35 @@ abstract contract AnyConverter is BaseStrategy {
     uint256 public totalReservedAssets;
     uint256 public totalReservedYieldAssets;
 
-    mapping(address => mapping(address => Reserved[])) public reserved;
+    // we only allow 1 reserve per block so we can use that as the 
+    // primary key to differentiate between multiple reserves.
+    //
+    // user address => asset address => block number => Reserved
+    mapping(address => mapping(address => mapping(uint256 => Reserved))) public reserved;
 
-    function claimReserved(uint index) external {
+    function claimReserved(uint blockNumber) external {
         address _asset = asset();
         address _yieldAsset = yieldAsset;
 
-        _claimReserved(_asset, _yieldAsset, index, false);
-        _claimReserved(_yieldAsset, _asset, index, true);
-    }
-
-    function claimReserved() external {
-        address _asset = asset();
-        address _yieldAsset = yieldAsset;
-
-        // since the array will be modified in each iteration, we need to cache the length
-        // and just supply 0 as the index. The last element will be popped off the array
-        // in each iteration.
-        uint length = reserved[msg.sender][_asset].length;
-        for (uint i = 0; i < length; ++i) {
-            _claimReserved(_asset, _yieldAsset, 0, false);
-        }
-
-        length = reserved[msg.sender][_yieldAsset].length;
-        for (uint i = 0; i < length; ++i) {
-            _claimReserved(_yieldAsset, _asset, 0, true);
-        }
+        _claimReserved(_asset, _yieldAsset, blockNumber, false);
+        _claimReserved(_yieldAsset, _asset, blockNumber, true);
     }
 
     function _claimReserved(
         address base,
         address quote,
-        uint index,
+        uint blockNumber,
         bool isYieldAsset
     ) internal {
-        Reserved[] storage _reserved = reserved[msg.sender][base];
-        if (_reserved[index].unlockTime < block.timestamp) {
+        Reserved memory _reserved = reserved[msg.sender][base][blockNumber];
+        if (_reserved.unlockTime != 0 && _reserved.unlockTime < block.timestamp) {
             uint256 withdrawable = Math.min(
-                oracle.getQuote(_reserved[index].deposited, base, quote),
-                _reserved[index].withdrawable
+                oracle.getQuote(_reserved.deposited, base, quote),
+                _reserved.withdrawable
             );
 
             if (withdrawable > 0) {
-                _reserved[index] = _reserved[_reserved.length - 1];
-                _reserved.pop();
+                delete reserved[msg.sender][base][blockNumber];
 
                 if (isYieldAsset) {
                     totalReservedYieldAssets -= withdrawable;
@@ -349,7 +337,7 @@ abstract contract AnyConverter is BaseStrategy {
 
                 IERC20(base).transfer(msg.sender, withdrawable);
             }
-            emit ReserveClaimed(msg.sender, base, _reserved[index].withdrawable);
+            emit ReserveClaimed(msg.sender, base, _reserved.withdrawable);
         }
     }
 
@@ -359,18 +347,21 @@ abstract contract AnyConverter is BaseStrategy {
         address token,
         bool isYieldAsset
     ) internal {
-        Reserved[] storage _reserved = reserved[msg.sender][token];
+        if (reserved[msg.sender][token][block.number].deposited > 0) revert("Already reserved");
 
-        _reserved.push(Reserved({
+        uint _unlockTime = block.timestamp + unlockTime;
+        reserved[msg.sender][token][block.number] = Reserved({
             deposited: amount,
             withdrawable: withdrawable,
-            unlockTime: block.timestamp + unlockTime
-        }));
+            unlockTime: _unlockTime
+        });
 
         if (isYieldAsset) {
             totalReservedYieldAssets += amount;
         } else {
             totalReservedAssets += amount;
         }
+
+        emit ReserveAdded(msg.sender, token, _unlockTime, amount, withdrawable);
     }
 }
