@@ -258,8 +258,6 @@ abstract contract AnyConverter is BaseStrategy {
     }
 
     function proposeUnlockTime(uint256 unlockTime_) external onlyOwner {
-        if (unlockTime_ < 1 days) revert Misconfigured();
-
         proposedUnlockTime = ProposedChange({
             value: unlockTime_,
             changeTime: block.timestamp + 3 days
