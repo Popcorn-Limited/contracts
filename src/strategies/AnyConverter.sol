@@ -192,6 +192,8 @@ abstract contract AnyConverter is BaseStrategy {
     event SlippageChanged(uint256 oldSlippage, uint256 newSlippage);
     event FloatRatioProposed(uint256 ratio);
     event FloatRatioChanged(uint256 oldRatio, uint256 newRatio);
+    event UnlockTimeProposed(uint256 unlockTime);
+    event UnlockTimeChanged(uint256 oldUnlockTime, uint256 newUnlockTime);
 
     error Misconfigured();
 
@@ -205,6 +207,9 @@ abstract contract AnyConverter is BaseStrategy {
 
     ProposedChange public proposedFloatRatio;
     uint256 public floatRatio;
+
+    ProposedChange public proposedUnlockTime;
+    uint256 public unlockTime;
 
     function proposeSlippage(uint256 slippage_) external onlyOwner {
         if (slippage_ > 10_000) revert Misconfigured();
@@ -220,7 +225,7 @@ abstract contract AnyConverter is BaseStrategy {
     function changeSlippage() external onlyOwner {
         ProposedChange memory _proposedSlippage = proposedSlippage;
 
-        if (_proposedSlippage.changeTime == 0) revert Misconfigured();
+        if (_proposedSlippage.changeTime == 0 || block.timestamp > _proposedSlippage.changeTime) revert Misconfigured();
 
         emit SlippageChanged(slippage, _proposedSlippage.value);
 
@@ -243,7 +248,7 @@ abstract contract AnyConverter is BaseStrategy {
     function changeFloatRatio() external onlyOwner {
         ProposedChange memory _proposedFloatRatio = proposedFloatRatio;
 
-        if (_proposedFloatRatio.changeTime == 0) revert Misconfigured();
+        if (_proposedFloatRatio.changeTime == 0 || block.timestamp > _proposedFloatRatio.changeTime) revert Misconfigured();
 
         emit FloatRatioChanged(slippage, _proposedFloatRatio.value);
 
@@ -252,11 +257,36 @@ abstract contract AnyConverter is BaseStrategy {
         delete proposedFloatRatio;
     }
 
+    function proposeUnlockTime(uint256 unlockTime_) external onlyOwner {
+        proposedUnlockTime = ProposedChange({
+            value: unlockTime_,
+            changeTime: block.timestamp + 3 days
+        });
+
+        emit UnlockTimeProposed(unlockTime_);
+    }
+
+    function changeUnlockTime() external onlyOwner {
+        ProposedChange memory _proposedUnlockTime = proposedUnlockTime;
+
+        if (_proposedUnlockTime.changeTime == 0 || block.timestamp > _proposedUnlockTime.changeTime) revert Misconfigured();
+
+        emit UnlockTimeChanged(unlockTime, _proposedUnlockTime.value);
+
+        unlockTime = _proposedUnlockTime.value;
+
+        delete proposedUnlockTime;
+    }
+
+
     /*//////////////////////////////////////////////////////////////
                             RESERVE LOGIC
     //////////////////////////////////////////////////////////////*/
 
     event ReserveClaimed(address user, address token, uint256 withdrawn);
+    // we don't emit the block number because that's already part of the event log
+    // e.g. see https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_getlogs
+    event ReserveAdded(address indexed user, address indexed asset, uint256 unlockTime, uint256 amount, uint256 withdrawable);
 
     struct Reserved {
         uint256 unlockTime;
@@ -267,30 +297,35 @@ abstract contract AnyConverter is BaseStrategy {
     uint256 public totalReservedAssets;
     uint256 public totalReservedYieldAssets;
 
-    mapping(address => mapping(address => Reserved)) public reserved;
+    // we only allow 1 reserve per block so we can use that as the 
+    // primary key to differentiate between multiple reserves.
+    //
+    // user address => asset address => block number => Reserved
+    mapping(address => mapping(address => mapping(uint256 => Reserved))) public reserved;
 
-    function claimReserved() external {
+    function claimReserved(uint blockNumber) external {
         address _asset = asset();
         address _yieldAsset = yieldAsset;
 
-        _claimReserved(_asset, _yieldAsset, false);
-        _claimReserved(_yieldAsset, _asset, true);
+        _claimReserved(_asset, _yieldAsset, blockNumber, false);
+        _claimReserved(_yieldAsset, _asset, blockNumber, true);
     }
 
     function _claimReserved(
         address base,
         address quote,
+        uint blockNumber,
         bool isYieldAsset
     ) internal {
-        Reserved memory _reserved = reserved[msg.sender][base];
-        if (_reserved.unlockTime < block.timestamp) {
+        Reserved memory _reserved = reserved[msg.sender][base][blockNumber];
+        if (_reserved.unlockTime != 0 && _reserved.unlockTime < block.timestamp) {
             uint256 withdrawable = Math.min(
                 oracle.getQuote(_reserved.deposited, base, quote),
                 _reserved.withdrawable
             );
 
             if (withdrawable > 0) {
-                delete reserved[msg.sender][base];
+                delete reserved[msg.sender][base][blockNumber];
 
                 if (isYieldAsset) {
                     totalReservedYieldAssets -= withdrawable;
@@ -310,18 +345,21 @@ abstract contract AnyConverter is BaseStrategy {
         address token,
         bool isYieldAsset
     ) internal {
-        Reserved memory _reserved = reserved[msg.sender][token];
+        if (reserved[msg.sender][token][block.number].deposited > 0) revert("Already reserved");
 
-        _reserved.deposited += amount;
-        _reserved.withdrawable += withdrawable;
-        _reserved.unlockTime = block.timestamp + 1 days;
-
-        reserved[msg.sender][token] = _reserved;
+        uint _unlockTime = block.timestamp + unlockTime;
+        reserved[msg.sender][token][block.number] = Reserved({
+            deposited: amount,
+            withdrawable: withdrawable,
+            unlockTime: _unlockTime
+        });
 
         if (isYieldAsset) {
             totalReservedYieldAssets += amount;
         } else {
             totalReservedAssets += amount;
         }
+
+        emit ReserveAdded(msg.sender, token, _unlockTime, amount, withdrawable);
     }
 }
