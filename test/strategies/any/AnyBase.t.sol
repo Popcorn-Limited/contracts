@@ -2,58 +2,16 @@
 // Docgen-SOLC: 0.8.0
 pragma solidity ^0.8.25;
 
-import {AnyDepositor, IERC20} from "src/strategies/AnyDepositor.sol";
-import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson} from "../BaseStrategyTest.sol";
+import {AnyConverter} from "src/strategies/AnyConverter.sol";
+import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson, IERC20} from "../BaseStrategyTest.sol";
 import "forge-std/console.sol";
 
-contract AaveOracle {
-    function getQuote(
-        uint256 inAmount,
-        address base,
-        address quote
-    ) external view returns (uint256) {
-        return inAmount;
-    }
-}
-
-contract AnyAaveDepositorTest is BaseStrategyTest {
+abstract contract AnyBaseTest is BaseStrategyTest {
     using stdJson for string;
 
     address yieldAsset;
 
-    function setUp() public {
-        _setUpBaseTest(
-            0,
-            "./test/strategies/any/AnyAaveDepositorTestConfig.json"
-        );
-    }
-
-    function _setUpStrategy(
-        string memory json_,
-        string memory index_,
-        TestConfig memory testConfig_
-    ) internal override returns (IBaseStrategy) {
-        AnyDepositor strategy = new AnyDepositor();
-        AaveOracle oracle = new AaveOracle();
-
-        yieldAsset = json_.readAddress(
-            string.concat(".configs[", index_, "].specific.yieldAsset")
-        );
-
-        strategy.initialize(
-            testConfig_.asset,
-            address(this),
-            true,
-            abi.encode(yieldAsset, address(oracle), uint256(10), uint256(0))
-        );
-
-        return IBaseStrategy(address(strategy));
-    }
-
     function _increasePricePerShare(uint256 amount) internal override {
-        address yieldAsset = address(
-            AnyDepositor(address(strategy)).yieldAsset()
-        );
         deal(
             testConfig.asset,
             yieldAsset,
@@ -112,11 +70,11 @@ contract AnyAaveDepositorTest is BaseStrategyTest {
         );
         console.log(
             "reserved assets",
-            AnyDepositor(address(strategy)).totalReservedAssets()
+            AnyConverter(address(strategy)).totalReservedAssets()
         );
         console.log(
             "reserved yieldAssets",
-            AnyDepositor(address(strategy)).totalReservedYieldAssets()
+            AnyConverter(address(strategy)).totalReservedYieldAssets()
         );
         console.log("total assets", strategy.totalAssets());
 
@@ -220,7 +178,7 @@ contract AnyAaveDepositorTest is BaseStrategyTest {
 
         strategy.pushFunds(testConfig.defaultAmount, bytes(""));
 
-        uint256 reserved = AnyDepositor(address(strategy))
+        uint256 reserved = AnyConverter(address(strategy))
             .totalReservedAssets();
 
         assertEq(
@@ -257,9 +215,9 @@ contract AnyAaveDepositorTest is BaseStrategyTest {
         _prepareConversion(testConfig.asset, testConfig.defaultAmount);
         strategy.pullFunds(testConfig.defaultAmount, bytes(""));
 
-        uint256 reservedAssets = AnyDepositor(address(strategy))
+        uint256 reservedAssets = AnyConverter(address(strategy))
             .totalReservedAssets();
-        uint256 reservedYieldAsset = AnyDepositor(address(strategy))
+        uint256 reservedYieldAsset = AnyConverter(address(strategy))
             .totalReservedYieldAssets();
 
         assertEq(
@@ -282,4 +240,4 @@ contract AnyAaveDepositorTest is BaseStrategyTest {
             "strategy asset bal"
         );
     }
-}
+}       
