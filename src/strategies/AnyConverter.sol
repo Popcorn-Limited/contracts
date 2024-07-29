@@ -225,7 +225,10 @@ abstract contract AnyConverter is BaseStrategy {
     function changeSlippage() external onlyOwner {
         ProposedChange memory _proposedSlippage = proposedSlippage;
 
-        if (_proposedSlippage.changeTime == 0 || block.timestamp > _proposedSlippage.changeTime) revert Misconfigured();
+        if (
+            _proposedSlippage.changeTime == 0 ||
+            block.timestamp > _proposedSlippage.changeTime
+        ) revert Misconfigured();
 
         emit SlippageChanged(slippage, _proposedSlippage.value);
 
@@ -248,7 +251,10 @@ abstract contract AnyConverter is BaseStrategy {
     function changeFloatRatio() external onlyOwner {
         ProposedChange memory _proposedFloatRatio = proposedFloatRatio;
 
-        if (_proposedFloatRatio.changeTime == 0 || block.timestamp > _proposedFloatRatio.changeTime) revert Misconfigured();
+        if (
+            _proposedFloatRatio.changeTime == 0 ||
+            block.timestamp > _proposedFloatRatio.changeTime
+        ) revert Misconfigured();
 
         emit FloatRatioChanged(slippage, _proposedFloatRatio.value);
 
@@ -269,7 +275,10 @@ abstract contract AnyConverter is BaseStrategy {
     function changeUnlockTime() external onlyOwner {
         ProposedChange memory _proposedUnlockTime = proposedUnlockTime;
 
-        if (_proposedUnlockTime.changeTime == 0 || block.timestamp > _proposedUnlockTime.changeTime) revert Misconfigured();
+        if (
+            _proposedUnlockTime.changeTime == 0 ||
+            block.timestamp > _proposedUnlockTime.changeTime
+        ) revert Misconfigured();
 
         emit UnlockTimeChanged(unlockTime, _proposedUnlockTime.value);
 
@@ -278,7 +287,6 @@ abstract contract AnyConverter is BaseStrategy {
         delete proposedUnlockTime;
     }
 
-
     /*//////////////////////////////////////////////////////////////
                             RESERVE LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -286,7 +294,13 @@ abstract contract AnyConverter is BaseStrategy {
     event ReserveClaimed(address user, address token, uint256 withdrawn);
     // we don't emit the block number because that's already part of the event log
     // e.g. see https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_getlogs
-    event ReserveAdded(address indexed user, address indexed asset, uint256 unlockTime, uint256 amount, uint256 withdrawable);
+    event ReserveAdded(
+        address indexed user,
+        address indexed asset,
+        uint256 unlockTime,
+        uint256 amount,
+        uint256 withdrawable
+    );
 
     struct Reserved {
         uint256 unlockTime;
@@ -297,11 +311,12 @@ abstract contract AnyConverter is BaseStrategy {
     uint256 public totalReservedAssets;
     uint256 public totalReservedYieldAssets;
 
-    // we only allow 1 reserve per block so we can use that as the 
+    // we only allow 1 reserve per block so we can use that as the
     // primary key to differentiate between multiple reserves.
     //
     // user address => asset address => block number => Reserved
-    mapping(address => mapping(address => mapping(uint256 => Reserved))) public reserved;
+    mapping(address => mapping(address => mapping(uint256 => Reserved)))
+        public reserved;
 
     function claimReserved(uint blockNumber) external {
         address _asset = asset();
@@ -318,7 +333,9 @@ abstract contract AnyConverter is BaseStrategy {
         bool isYieldAsset
     ) internal {
         Reserved memory _reserved = reserved[msg.sender][base][blockNumber];
-        if (_reserved.unlockTime != 0 && _reserved.unlockTime < block.timestamp) {
+        if (
+            _reserved.unlockTime != 0 && _reserved.unlockTime < block.timestamp
+        ) {
             uint256 withdrawable = Math.min(
                 oracle.getQuote(_reserved.deposited, base, quote),
                 _reserved.withdrawable
@@ -345,7 +362,8 @@ abstract contract AnyConverter is BaseStrategy {
         address token,
         bool isYieldAsset
     ) internal {
-        if (reserved[msg.sender][token][block.number].deposited > 0) revert("Already reserved");
+        if (reserved[msg.sender][token][block.number].deposited > 0)
+            revert("Already reserved");
 
         uint _unlockTime = block.timestamp + unlockTime;
         reserved[msg.sender][token][block.number] = Reserved({
@@ -361,5 +379,18 @@ abstract contract AnyConverter is BaseStrategy {
         }
 
         emit ReserveAdded(msg.sender, token, _unlockTime, amount, withdrawable);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            RESERVE LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    function rescueToken(address token) external onlyOwner {
+        for (uint i; i < tokens.length; i++) {
+            if(tokens[i] === token) revert Misconfigured();
+        }
+
+        uint256 bal = IERC20(token).balanceOf(address(this));
+        IERC20(token).transfer(owner,bal);
     }
 }

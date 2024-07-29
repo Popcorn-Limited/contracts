@@ -39,11 +39,14 @@ abstract contract AnyCompounderNaive is AnyConverter {
      * @notice Claim rewards and compound them into the vault
      */
     function harvest(bytes memory data) external override onlyKeeperOrOwner {
-        claim();
+        (address claimContract, bytes claimCall, uint256 assets) = abi.decode(
+            data,
+            (address, bytes, uint256)
+        );
+
+        (bool success, bytes memory data) = claimContract.call(claimCall);
 
         uint256 ta = this.totalAssets();
-
-        uint256 assets = abi.decode(data, (uint256));
 
         IERC20(yieldAsset).transferFrom(msg.sender, address(this), assets);
 
