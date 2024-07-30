@@ -387,7 +387,7 @@ abstract contract AnyConverter is BaseStrategy {
 
     function rescueToken(address token) external onlyOwner {
         for (uint i; i < tokens.length; i++) {
-            if(tokens[i] === token) revert Misconfigured();
+            if(tokens[i] == token) revert Misconfigured();
         }
 
         uint256 bal = IERC20(token).balanceOf(address(this));
