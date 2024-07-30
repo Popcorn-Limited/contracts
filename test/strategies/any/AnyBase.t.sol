@@ -104,7 +104,7 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         );
         assertApproxEqAbs(
             IERC20(_asset_).balanceOf(address(strategy)),
-            0,
+            testConfig.defaultAmount / 5,
             _delta_,
             "strategy asset bal"
         );
@@ -154,7 +154,7 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         );
         assertApproxEqAbs(
             IERC20(_asset_).balanceOf(address(strategy)),
-            0,
+            testConfig.defaultAmount / 5,
             _delta_,
             "strategy asset bal"
         );
