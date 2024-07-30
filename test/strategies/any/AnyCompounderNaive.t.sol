@@ -48,7 +48,7 @@ contract AnyCompounderNaiveTest is AnyBaseTest {
         TestConfig memory testConfig_
     ) internal override returns (IBaseStrategy) {
         AnyCompounderNaiveImpl _strategy = new AnyCompounderNaiveImpl();
-        MockOracle oracle = new MockOracle();
+        oracle = new MockOracle();
 
         yieldAsset = json_.readAddress(
             string.concat(".configs[", index_, "].specific.yieldAsset")

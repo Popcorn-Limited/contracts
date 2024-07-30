@@ -4,12 +4,14 @@ pragma solidity ^0.8.25;
 
 import {AnyConverter} from "src/strategies/AnyConverter.sol";
 import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson, IERC20} from "../BaseStrategyTest.sol";
+import {MockOracle} from "test/utils/mocks/MockOracle.sol";
 import "forge-std/console.sol";
 
 abstract contract AnyBaseTest is BaseStrategyTest {
     using stdJson for string;
 
     address yieldAsset;
+    MockOracle oracle;
 
     function _increasePricePerShare(uint256 amount) internal override {
         deal(
@@ -240,4 +242,62 @@ abstract contract AnyBaseTest is BaseStrategyTest {
             "strategy asset bal"
         );
     }
+
+    /*//////////////////////////////////////////////////////////////
+                            CLAIM RESERVES
+    //////////////////////////////////////////////////////////////*/
+
+
+    function test__should_use_new_favorable_quote() public {
+        // price of asset went down after the keeper reserved the funds
+        strategy.toggleAutoDeposit();
+        _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
+
+        vm.prank(bob);
+        strategy.deposit(testConfig.defaultAmount, bob);
+
+        _prepareConversion(yieldAsset, testConfig.defaultAmount);
+        strategy.pushFunds(testConfig.defaultAmount, bytes(""));
+
+        oracle.setPrice(testConfig.defaultAmount * 9_000 / 10_000);
+
+        uint ta = strategy.totalAssets();
+
+        // claim needs to be unlocked
+        vm.warp(block.timestamp + 2 days);
+
+        AnyConverter(address(strategy)).claimReserved(block.number);
+    
+        // while the user had 1e18 of asset reserved, they are only able to withdraw
+        // 9e17 of it. Thus, 1e17 is left in the contract and added to the total assets
+        // after the claim. Thus, total assets increases
+        assertGt(strategy.totalAssets(), ta, "total assets should increase because of the new favorable quote");
+        assertEq(IERC20(_asset_).balanceOf(address(this)), testConfig.defaultAmount * 9_000 / 10_000, "should receive assets with old favorable quote");
+    }
+
+    function test__should_use_old_favorable_quote() public {
+        // price of asset went up after the keeper reserved the funds
+        strategy.toggleAutoDeposit();
+        _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
+
+        vm.prank(bob);
+        strategy.deposit(testConfig.defaultAmount, bob);
+
+        _prepareConversion(yieldAsset, testConfig.defaultAmount);
+        strategy.pushFunds(testConfig.defaultAmount, bytes(""));
+
+        oracle.setPrice(testConfig.defaultAmount * 11_000 / 10_000);
+
+        uint ta = strategy.totalAssets();
+
+        // claim needs to be unlocked
+        vm.warp(block.timestamp + 2 days);
+
+        AnyConverter(address(strategy)).claimReserved(block.number);
+    
+        assertEq(strategy.totalAssets(), ta, "total assets should not change if price increases");
+        assertEq(IERC20(_asset_).balanceOf(address(this)), testConfig.defaultAmount, "should receive assets with old favorable quote");
+    }
+
+    function test__should_use_old_favorable_quote_with_multiple_reserves() public {}
 }       

@@ -25,7 +25,7 @@ contract AnyDepositorTest is AnyBaseTest {
         TestConfig memory testConfig_
     ) internal override returns (IBaseStrategy) {
         AnyDepositor _strategy = new AnyDepositor();
-        MockOracle oracle = new MockOracle();
+        oracle = new MockOracle();
 
         yieldAsset = json_.readAddress(
             string.concat(".configs[", index_, "].specific.yieldAsset")
