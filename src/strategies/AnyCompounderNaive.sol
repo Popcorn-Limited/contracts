@@ -39,12 +39,13 @@ abstract contract AnyCompounderNaive is AnyConverter {
      * @notice Claim rewards and compound them into the vault
      */
     function harvest(bytes memory data) external override onlyKeeperOrOwner {
-        (address claimContract, bytes claimCall, uint256 assets) = abi.decode(
+        (address claimContract, bytes memory claimCall, uint256 assets) = abi.decode(
             data,
             (address, bytes, uint256)
         );
 
-        (bool success, bytes memory data) = claimContract.call(claimCall);
+        (bool success, ) = claimContract.call(claimCall);
+        require(success, "Claim failed");
 
         uint256 ta = totalAssets();
 
