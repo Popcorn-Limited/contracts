@@ -16,7 +16,11 @@
             },
             "specific": {
                 "yieldAsset": "0x028171bCA77440897B824Ca71D1c56caC55b68A3",
-                "whale": "0x07ede94cf6316f4809f2b725f5d79ad303fb4dc8"
+                "whale": "0x07ede94cf6316f4809f2b725f5d79ad303fb4dc8",
+                "rewardTokens": [
+                    "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+                    "0xcE246eEa10988C495B4A90a905Ee9237a0f91543"
+                ]
             }
         }
     ]

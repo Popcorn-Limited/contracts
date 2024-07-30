@@ -19,7 +19,6 @@ contract AnyCompounderNaiveImpl is AnyCompounderNaive {
     }
 }
 
-
 contract AnyCompounderNaiveTest is AnyBaseTest {
     using stdJson for string;
 
@@ -29,7 +28,7 @@ contract AnyCompounderNaiveTest is AnyBaseTest {
             "./test/strategies/any/AnyCompounderNaiveTestConfig.json"
         );
     }
-    
+
     function _setUpStrategy(
         string memory json_,
         string memory index_,
@@ -49,7 +48,56 @@ contract AnyCompounderNaiveTest is AnyBaseTest {
             abi.encode(yieldAsset, address(oracle), uint256(10), uint256(0))
         );
 
+        _strategy.setRewardTokens(json.readAddressArray(string.concat(".configs[", index_, "].specific.rewardTokens")));
+
         return IBaseStrategy(address(_strategy));
     }
 
+    function test_harvest_should_increase_total_assets() public {
+        // base code to have != total assets
+        strategy.toggleAutoDeposit();
+        _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
+
+        vm.prank(bob);
+        strategy.deposit(testConfig.defaultAmount, bob);
+    
+        uint totalAssets = strategy.totalAssets();
+        uint totalSupply = strategy.totalSupply();
+
+        // we give the strategy reward tokens to simulate a harvest
+        address[] memory rewardTokens = strategy.rewardTokens();
+        for (uint i; i < rewardTokens.length; i++) {
+            deal(rewardTokens[i], address(strategy), 1e18);
+        }
+        
+        // give this contract yield assets and allow the strategy to pull them
+        _prepareConversion(yieldAsset, testConfig.defaultAmount);
+
+        strategy.harvest(abi.encode(testConfig.defaultAmount));
+
+        assertGt(strategy.totalAssets(), totalAssets, "total assets should increase");
+        assertEq(strategy.totalSupply(), totalSupply, "total supply should not change");
+    }
+
+    function test_harvest_should_fail_if_total_assets_does_not_increase() public {
+        // base code to have != total assets
+        strategy.toggleAutoDeposit();
+        _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
+
+        vm.prank(bob);
+        strategy.deposit(testConfig.defaultAmount, bob);
+    
+        // we give the strategy reward tokens to simulate a harvest
+        address[] memory rewardTokens = strategy.rewardTokens();
+        for (uint i; i < rewardTokens.length; i++) {
+            deal(rewardTokens[i], address(strategy), 1e18);
+        }
+        
+        // give this contract yield assets and allow the strategy to pull them
+        _prepareConversion(yieldAsset, testConfig.defaultAmount);
+
+        vm.expectRevert(AnyCompounderNaive.HarvestFailed.selector);
+        strategy.harvest(abi.encode(0));
+    }
 }
+
