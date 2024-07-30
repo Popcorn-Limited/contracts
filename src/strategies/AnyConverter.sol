@@ -338,6 +338,9 @@ abstract contract AnyConverter is BaseStrategy {
         if (
             _reserved.unlockTime != 0 && _reserved.unlockTime < block.timestamp
         ) {
+            // if the assets value went down after the keeper reserved the funds,
+            // we want to use the new favorable quote.
+            // If the assets value went up, we want to use the old favorable quote.
             uint256 withdrawable = Math.min(
                 oracle.getQuote(_reserved.deposited, base, quote),
                 _reserved.withdrawable
@@ -347,9 +350,9 @@ abstract contract AnyConverter is BaseStrategy {
                 delete reserved[msg.sender][base][blockNumber];
 
                 if (isYieldAsset) {
-                    totalReservedYieldAssets -= withdrawable;
+                    totalReservedYieldAssets -= _reserved.deposited;
                 } else {
-                    totalReservedAssets -= withdrawable;
+                    totalReservedAssets -= _reserved.deposited;
                 }
 
                 IERC20(base).transfer(msg.sender, withdrawable);
