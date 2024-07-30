@@ -247,7 +247,6 @@ abstract contract AnyBaseTest is BaseStrategyTest {
                             CLAIM RESERVES
     //////////////////////////////////////////////////////////////*/
 
-
     function test__should_use_new_favorable_quote() public {
         // price of asset went down after the keeper reserved the funds
         strategy.toggleAutoDeposit();
@@ -259,7 +258,7 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         _prepareConversion(yieldAsset, testConfig.defaultAmount);
         strategy.pushFunds(testConfig.defaultAmount, bytes(""));
 
-        oracle.setPrice(testConfig.defaultAmount * 9_000 / 10_000);
+        oracle.setPrice((testConfig.defaultAmount * 9_000) / 10_000);
 
         uint ta = strategy.totalAssets();
 
@@ -267,12 +266,20 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         vm.warp(block.timestamp + 2 days);
 
         AnyConverter(address(strategy)).claimReserved(block.number);
-    
+
         // while the user had 1e18 of asset reserved, they are only able to withdraw
         // 9e17 of it. Thus, 1e17 is left in the contract and added to the total assets
         // after the claim. Thus, total assets increases
-        assertGt(strategy.totalAssets(), ta, "total assets should increase because of the new favorable quote");
-        assertEq(IERC20(_asset_).balanceOf(address(this)), testConfig.defaultAmount * 9_000 / 10_000, "should receive assets with old favorable quote");
+        assertGt(
+            strategy.totalAssets(),
+            ta,
+            "total assets should increase because of the new favorable quote"
+        );
+        assertEq(
+            IERC20(_asset_).balanceOf(address(this)),
+            (testConfig.defaultAmount * 9_000) / 10_000,
+            "should receive assets with old favorable quote"
+        );
     }
 
     function test__should_use_old_favorable_quote() public {
@@ -286,7 +293,7 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         _prepareConversion(yieldAsset, testConfig.defaultAmount);
         strategy.pushFunds(testConfig.defaultAmount, bytes(""));
 
-        oracle.setPrice(testConfig.defaultAmount * 11_000 / 10_000);
+        oracle.setPrice((testConfig.defaultAmount * 11_000) / 10_000);
 
         uint ta = strategy.totalAssets();
 
@@ -294,10 +301,58 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         vm.warp(block.timestamp + 2 days);
 
         AnyConverter(address(strategy)).claimReserved(block.number);
-    
-        assertEq(strategy.totalAssets(), ta, "total assets should not change if price increases");
-        assertEq(IERC20(_asset_).balanceOf(address(this)), testConfig.defaultAmount, "should receive assets with old favorable quote");
+
+        assertEq(
+            strategy.totalAssets(),
+            ta,
+            "total assets should not change if price increases"
+        );
+        assertEq(
+            IERC20(_asset_).balanceOf(address(this)),
+            testConfig.defaultAmount,
+            "should receive assets with old favorable quote"
+        );
     }
 
-    function test__should_use_old_favorable_quote_with_multiple_reserves() public {}
-}       
+    function test__should_use_old_favorable_quote_with_multiple_reserves()
+        public
+    {}
+
+    /*//////////////////////////////////////////////////////////////
+                            RESCUE TOKEN
+    //////////////////////////////////////////////////////////////*/
+
+    function test__rescueToken() public {
+        IERC20 rescueToken = IERC20(
+            json.readAddress(string.concat(".configs[0].specific.rescueToken"))
+        );
+        uint256 rescueAmount = 10e18;
+        deal(address(rescueToken), bob, rescueAmount);
+
+        vm.prank(bob);
+        rescueToken.transfer(address(strategy), rescueAmount);
+        
+        AnyConverter(address(strategy)).rescueToken(address(rescueToken));
+
+        assertEq(rescueToken.balanceOf(address(strategy)), 0);
+        assertEq(rescueToken.balanceOf(address(this)), rescueAmount);
+    }
+
+    function testFail__rescueToken_non_owner() public {
+        IERC20 rescueToken = IERC20(
+            json.readAddress(string.concat(".configs[0].specific.rescueToken"))
+        );
+        uint256 rescueAmount = 10e18;
+        deal(address(rescueToken), bob, rescueAmount);
+
+        vm.prank(bob);
+        rescueToken.transfer(address(strategy), rescueAmount);
+
+        vm.prank(bob);
+        AnyConverter(address(strategy)).rescueToken(address(rescueToken));
+    }
+
+    function testFail__rescueToken_token_is_in_tokens() public {
+        AnyConverter(address(strategy)).rescueToken(testConfig.asset);
+    }
+}

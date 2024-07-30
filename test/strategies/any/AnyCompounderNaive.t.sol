@@ -25,9 +25,12 @@ contract ClaimContract {
         rewardTokens = _rewardTokens;
     }
 
-    fallback() external {
+    function claim() external {
         for (uint i; i < rewardTokens.length; i++) {
-            IERC20(rewardTokens[i]).transfer(msg.sender, IERC20(rewardTokens[i]).balanceOf(address(this)));
+            IERC20(rewardTokens[i]).transfer(
+                msg.sender,
+                IERC20(rewardTokens[i]).balanceOf(address(this))
+            );
         }
     }
 }
@@ -61,7 +64,11 @@ contract AnyCompounderNaiveTest is AnyBaseTest {
             abi.encode(yieldAsset, address(oracle), uint256(10), uint256(0))
         );
 
-        _strategy.setRewardTokens(json.readAddressArray(string.concat(".configs[", index_, "].specific.rewardTokens")));
+        _strategy.setRewardTokens(
+            json.readAddressArray(
+                string.concat(".configs[", index_, "].specific.rewardTokens")
+            )
+        );
 
         return IBaseStrategy(address(_strategy));
     }
@@ -73,7 +80,7 @@ contract AnyCompounderNaiveTest is AnyBaseTest {
 
         vm.prank(bob);
         strategy.deposit(testConfig.defaultAmount, bob);
-    
+
         uint totalAssets = strategy.totalAssets();
         uint totalSupply = strategy.totalSupply();
 
@@ -82,46 +89,59 @@ contract AnyCompounderNaiveTest is AnyBaseTest {
         for (uint i; i < rewardTokens.length; i++) {
             deal(rewardTokens[i], address(strategy), 1e18);
         }
-        
+
         // give this contract yield assets and allow the strategy to pull them
         _prepareConversion(yieldAsset, testConfig.defaultAmount);
 
         ClaimContract claimContract = new ClaimContract(rewardTokens);
-        strategy.harvest(abi.encode(
-            claimContract,
-            bytes(""),
-            testConfig.defaultAmount
-        ));
+        strategy.harvest(
+            abi.encode(
+                claimContract,
+                abi.encodeWithSelector(ClaimContract.claim.selector),
+                testConfig.defaultAmount
+            )
+        );
 
-        assertGt(strategy.totalAssets(), totalAssets, "total assets should increase");
-        assertEq(strategy.totalSupply(), totalSupply, "total supply should not change");
+        assertGt(
+            strategy.totalAssets(),
+            totalAssets,
+            "total assets should increase"
+        );
+        assertEq(
+            strategy.totalSupply(),
+            totalSupply,
+            "total supply should not change"
+        );
     }
 
-    function test_harvest_should_fail_if_total_assets_does_not_increase() public {
+    function test_harvest_should_fail_if_total_assets_does_not_increase()
+        public
+    {
         // base code to have != total assets
         strategy.toggleAutoDeposit();
         _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
 
         vm.prank(bob);
         strategy.deposit(testConfig.defaultAmount, bob);
-    
+
         // we give the strategy reward tokens to simulate a harvest
         address[] memory rewardTokens = strategy.rewardTokens();
         for (uint i; i < rewardTokens.length; i++) {
             deal(rewardTokens[i], address(strategy), 1e18);
         }
-        
+
         // give this contract yield assets and allow the strategy to pull them
         _prepareConversion(yieldAsset, testConfig.defaultAmount);
 
         ClaimContract claimContract = new ClaimContract(rewardTokens);
 
         vm.expectRevert(AnyCompounderNaive.HarvestFailed.selector);
-        strategy.harvest(abi.encode(
-            claimContract,
-            bytes(""),
-            0
-        ));
+        strategy.harvest(
+            abi.encode(
+                claimContract,
+                abi.encodeWithSelector(ClaimContract.claim.selector),
+                0
+            )
+        );
     }
 }
-

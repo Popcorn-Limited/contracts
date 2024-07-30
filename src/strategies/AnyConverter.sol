@@ -20,7 +20,7 @@ abstract contract AnyConverter is BaseStrategy {
     using Math for uint256;
 
     address public yieldAsset;
-    address[] internal tokens;
+    address[] public tokens;
 
     IPriceOracle public oracle;
 
@@ -392,10 +392,10 @@ abstract contract AnyConverter is BaseStrategy {
 
     function rescueToken(address token) external onlyOwner {
         for (uint i; i < tokens.length; i++) {
-            if(tokens[i] == token) revert Misconfigured();
+            if (tokens[i] == token) revert Misconfigured();
         }
 
         uint256 bal = IERC20(token).balanceOf(address(this));
-        IERC20(token).transfer(owner,bal);
+        IERC20(token).transfer(owner, bal);
     }
 }
