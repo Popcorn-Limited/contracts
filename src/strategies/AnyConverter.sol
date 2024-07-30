@@ -65,10 +65,12 @@ abstract contract AnyConverter is BaseStrategy {
     function totalAssets() public view virtual override returns (uint256) {
         uint256 bal = IERC20(asset()).balanceOf(address(this));
         uint256 _totalReservedAssets = totalReservedAssets;
+        // yieldAssetBal is the total amount of yieldAssets that are held by the contract
+        // priced in the underlying asset token
         uint256 yieldAssetBal = _totalAssets();
 
-        if (bal <= _totalReservedAssets) return yieldAssetBal;
-        return (bal - totalReservedAssets) + yieldAssetBal;
+        if (bal + yieldAssetBal <= _totalReservedAssets) return 0;
+        return (bal + yieldAssetBal - totalReservedAssets);
     }
 
     /// @notice Calculates the total amount of underlying tokens the Vault holds.
