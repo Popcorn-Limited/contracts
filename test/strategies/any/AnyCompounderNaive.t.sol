@@ -19,6 +19,19 @@ contract AnyCompounderNaiveImpl is AnyCompounderNaive {
     }
 }
 
+contract ClaimContract {
+    address[] public rewardTokens;
+    constructor(address[] memory _rewardTokens) {
+        rewardTokens = _rewardTokens;
+    }
+
+    fallback() external {
+        for (uint i; i < rewardTokens.length; i++) {
+            IERC20(rewardTokens[i]).transfer(msg.sender, IERC20(rewardTokens[i]).balanceOf(address(this)));
+        }
+    }
+}
+
 contract AnyCompounderNaiveTest is AnyBaseTest {
     using stdJson for string;
 
@@ -73,7 +86,12 @@ contract AnyCompounderNaiveTest is AnyBaseTest {
         // give this contract yield assets and allow the strategy to pull them
         _prepareConversion(yieldAsset, testConfig.defaultAmount);
 
-        strategy.harvest(abi.encode(testConfig.defaultAmount));
+        ClaimContract claimContract = new ClaimContract(rewardTokens);
+        strategy.harvest(abi.encode(
+            claimContract,
+            bytes(""),
+            testConfig.defaultAmount
+        ));
 
         assertGt(strategy.totalAssets(), totalAssets, "total assets should increase");
         assertEq(strategy.totalSupply(), totalSupply, "total supply should not change");
@@ -96,8 +114,14 @@ contract AnyCompounderNaiveTest is AnyBaseTest {
         // give this contract yield assets and allow the strategy to pull them
         _prepareConversion(yieldAsset, testConfig.defaultAmount);
 
+        ClaimContract claimContract = new ClaimContract(rewardTokens);
+
         vm.expectRevert(AnyCompounderNaive.HarvestFailed.selector);
-        strategy.harvest(abi.encode(0));
+        strategy.harvest(abi.encode(
+            claimContract,
+            bytes(""),
+            0
+        ));
     }
 }
 
