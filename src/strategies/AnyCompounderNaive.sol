@@ -46,11 +46,11 @@ abstract contract AnyCompounderNaive is AnyConverter {
 
         (bool success, bytes memory data) = claimContract.call(claimCall);
 
-        uint256 ta = this.totalAssets();
+        uint256 ta = totalAssets();
 
         IERC20(yieldAsset).transferFrom(msg.sender, address(this), assets);
 
-        uint256 postTa = this.totalAssets();
+        uint256 postTa = totalAssets();
 
         if (ta >= postTa) revert HarvestFailed();
 
