@@ -129,12 +129,12 @@ abstract contract AnyConverter is BaseStrategy {
         address _yieldAsset = yieldAsset;
         uint256 _floatRatio = floatRatio;
 
-        uint256 ta = this.totalAssets();
+        uint256 ta = totalAssets();
         uint256 bal = IERC20(_asset).balanceOf(address(this));
 
         IERC20(_yieldAsset).transferFrom(msg.sender, address(this), assets);
 
-        uint256 postTa = this.totalAssets();
+        uint256 postTa = totalAssets();
 
         uint256 withdrawable = oracle.getQuote(assets, _yieldAsset, _asset);
 
@@ -168,11 +168,11 @@ abstract contract AnyConverter is BaseStrategy {
         address _asset = asset();
         address _yieldAsset = yieldAsset;
 
-        uint256 ta = this.totalAssets();
+        uint256 ta = totalAssets();
 
         IERC20(_asset).transferFrom(msg.sender, address(this), assets);
 
-        uint256 postTa = this.totalAssets();
+        uint256 postTa = totalAssets();
 
         uint256 withdrawable = oracle.getQuote(assets, _yieldAsset, _asset);
 

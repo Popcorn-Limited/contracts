@@ -78,7 +78,7 @@ abstract contract AnyCompounder is AnyConverter, ContinousDutchAuction {
     function harvest(bytes memory data) external override nonReentrant {
         claim();
 
-        uint256 ta = this.totalAssets();
+        uint256 ta = totalAssets();
 
         (
             address[] memory assets,
@@ -90,7 +90,7 @@ abstract contract AnyCompounder is AnyConverter, ContinousDutchAuction {
 
         buy(assets, assetsReceiver, epochId, deadline, maxPaymentTokenAmount);
 
-        uint256 postTa = this.totalAssets();
+        uint256 postTa = totalAssets();
 
         if (ta >= postTa) revert HarvestFailed();
 
