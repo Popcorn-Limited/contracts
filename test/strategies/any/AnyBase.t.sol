@@ -259,7 +259,7 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         _prepareConversion(yieldAsset, testConfig.defaultAmount);
         strategy.pushFunds(testConfig.defaultAmount, bytes(""));
 
-        oracle.setPrice(testConfig.defaultAmount * 9_000 / 10_000);
+        oracle.setPrice(_asset_, yieldAsset, testConfig.defaultAmount * 9_000 / 10_000);
 
         uint ta = strategy.totalAssets();
 
@@ -286,7 +286,7 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         _prepareConversion(yieldAsset, testConfig.defaultAmount);
         strategy.pushFunds(testConfig.defaultAmount, bytes(""));
 
-        oracle.setPrice(testConfig.defaultAmount * 11_000 / 10_000);
+        oracle.setPrice(_asset_, yieldAsset, testConfig.defaultAmount * 11_000 / 10_000);
 
         uint ta = strategy.totalAssets();
 
@@ -295,7 +295,7 @@ abstract contract AnyBaseTest is BaseStrategyTest {
 
         AnyConverter(address(strategy)).claimReserved(block.number);
     
-        assertEq(strategy.totalAssets(), ta, "total assets should not change if price increases");
+        assertGt(strategy.totalAssets(), ta, "total assets should increase because of the new favorable quote");
         assertEq(IERC20(_asset_).balanceOf(address(this)), testConfig.defaultAmount, "should receive assets with old favorable quote");
     }
 

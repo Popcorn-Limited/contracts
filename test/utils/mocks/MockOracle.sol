@@ -4,13 +4,13 @@
 pragma solidity ^0.8.25;
 
 contract MockOracle {
-    uint256 public price;
+    mapping(address => mapping(address => uint256)) public prices;
 
-    function setPrice(uint256 price_) external {
-        price = price_;
+    function setPrice(address base, address quote, uint256 price) external {
+        prices[base][quote] = price;
     }
 
     function getQuote(uint inAmount, address base, address quote) external view returns (uint) {
-        return price == 0 ? inAmount : price;
+        return prices[base][quote] == 0 ? inAmount : prices[base][quote];
     }
 }
