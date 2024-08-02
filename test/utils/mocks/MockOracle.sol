@@ -7,8 +7,13 @@ contract MockOracle {
     mapping(address => mapping(address => uint256)) public prices;
 
     function setPrice(address base, address quote, uint256 price) external {
-        prices[base][quote] = price;
-        prices[quote][base] = 1e18 * 1e18 / price;
+        if (price == 0) {
+            prices[base][quote] = 0;
+            prices[quote][base] = 0;
+        } else {
+            prices[base][quote] = price;
+            prices[quote][base] = 1e18 * 1e18 / price;
+        }
     }
 
     function getQuote(uint inAmount, address base, address quote) external view returns (uint) {
