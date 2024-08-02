@@ -130,14 +130,15 @@ abstract contract AnyConverter is BaseStrategy {
         uint256 _floatRatio = floatRatio;
 
         uint256 ta = totalAssets();
+        // TODO: should take into account the reserved assets
         uint256 bal = IERC20(_asset).balanceOf(address(this));
 
         IERC20(_yieldAsset).transferFrom(msg.sender, address(this), assets);
 
-        uint256 postTa = totalAssets();
-
         uint256 withdrawable = oracle.getQuote(assets, _yieldAsset, _asset);
 
+        // TODO: we should probably revert if we don't have enough funds
+        // to cover the withdrawable amount
         if (_floatRatio > 0) {
             uint256 float = ta.mulDiv(
                 10_000 - _floatRatio,
@@ -150,12 +151,13 @@ abstract contract AnyConverter is BaseStrategy {
             if (bal < withdrawable) withdrawable = bal;
         }
 
+        _reserveToken(assets, withdrawable, _asset, false);
+        uint256 postTa = totalAssets();
+
         if (
-            postTa - withdrawable <
+            postTa <
             ta.mulDiv(10_000 - slippage, 10_000, Math.Rounding.Floor)
         ) revert SlippageTooHigh();
-
-        _reserveToken(assets, withdrawable, _asset, false);
 
         emit PushedFunds(assets, withdrawable);
     }
