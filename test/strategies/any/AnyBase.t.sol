@@ -259,7 +259,7 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         _prepareConversion(yieldAsset, testConfig.defaultAmount);
         strategy.pushFunds(testConfig.defaultAmount, bytes(""));
 
-        oracle.setPrice(_asset_, yieldAsset, testConfig.defaultAmount * 9_000 / 10_000);
+        oracle.setPrice(yieldAsset, _asset_, testConfig.defaultAmount * 9_000 / 10_000);
 
         uint ta = strategy.totalAssets();
 
@@ -286,7 +286,7 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         _prepareConversion(yieldAsset, testConfig.defaultAmount);
         strategy.pushFunds(testConfig.defaultAmount, bytes(""));
 
-        oracle.setPrice(_asset_, yieldAsset, testConfig.defaultAmount * 11_000 / 10_000);
+        oracle.setPrice(yieldAsset, _asset_, testConfig.defaultAmount * 11_000 / 10_000);
 
         uint ta = strategy.totalAssets();
 
@@ -299,5 +299,36 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         assertEq(IERC20(_asset_).balanceOf(address(this)), testConfig.defaultAmount, "should receive assets with old favorable quote");
     }
 
-    function test__should_use_old_favorable_quote_with_multiple_reserves() public {}
+    function test__should_use_old_favorable_quote_with_multiple_reserves() public {
+         strategy.toggleAutoDeposit();
+        uint amount = 1e18;
+        _mintAssetAndApproveForStrategy(amount * 3, bob);
+        vm.prank(bob);
+        strategy.deposit(amount * 3, bob);
+
+        uint ta = strategy.totalAssets();
+
+        // the keeper will push the funds three times
+        // Each time they push the price will have changed. We'll check whether the 
+        // correct prices are used for the claiming of the keeper's reserves
+        
+        _prepareConversion(yieldAsset, amount * 3);
+        strategy.pushFunds(amount, bytes(""));
+
+        // price increase by 10%
+        vm.roll(block.number + 1);
+        oracle.setPrice(yieldAsset, _asset_, amount * 11_000 / 10_000);
+        console.log("total assets before second push", strategy.totalAssets());
+        strategy.pushFunds(1e18, bytes(""));
+        console.log("total assets after second push", strategy.totalAssets());
+
+        assertEq(strategy.totalAssets(), 3.2e18, "ta is wrong");
+
+        // price decrease by 20%
+        vm.roll(block.number + 1);
+        oracle.setPrice(yieldAsset, _asset_, amount * 9_000 / 10_000);
+        console.log("total assets before third push", strategy.totalAssets());
+        strategy.pushFunds(1e18, bytes(""));
+        console.log("total assets after third push", strategy.totalAssets());
+    }
 }       
