@@ -203,8 +203,9 @@ contract MultiStrategyVault is
     event StrategyWithdrawalFailed(address strategy, uint256 amount);
 
     error ZeroAmount();
+    error Misconfigured();
 
-    function deposit(uint256 assets) public returns (uint256) {
+    function deposit(uint256 assets) external returns (uint256) {
         return deposit(assets, msg.sender);
     }
 
@@ -212,12 +213,69 @@ contract MultiStrategyVault is
         return mint(shares, msg.sender);
     }
 
-    function withdraw(uint256 assets) public returns (uint256) {
+    function withdraw(uint256 assets) external returns (uint256) {
         return withdraw(assets, msg.sender, msg.sender);
+    }
+
+    function withdraw(
+        uint256 assets,
+        Allocation[] calldata allocations
+    ) external returns (uint256) {
+        return withdraw(assets, msg.sender, msg.sender, allocations);
+    }
+
+    function withdraw(
+        uint256 assets,
+        address owner,
+        address recipient,
+        Allocation[] calldata allocations
+    ) public returns (uint256) {
+        // TODO is this check needed?
+        _checkPullAllocation(assets, allocations);
+
+        _pullFunds(allocations);
+
+        return withdraw(assets, owner, recipient);
     }
 
     function redeem(uint256 shares) external returns (uint256) {
         return redeem(shares, msg.sender, msg.sender);
+    }
+
+    function redeem(
+        uint256 shares,
+        Allocation[] calldata allocations
+    ) external returns (uint256) {
+        return redeem(shares, msg.sender, msg.sender, allocations);
+    }
+
+    function redeem(
+        uint256 shares,
+        address owner,
+        address recipient,
+        Allocation[] calldata allocations
+    ) public returns (uint256) {
+        // TODO is this check needed?
+        uint256 assets = convertToAssets(shares);
+        _checkPullAllocation(assets, allocations);
+
+        _pullFunds(allocations);
+
+        return redeem(shares, owner, recipient);
+    }
+
+    function _checkPullAllocation(
+        uint256 assets,
+        Allocation[] calldata allocations
+    ) internal {
+        uint256 len = allocations.length;
+        if (len > strategies.length) revert Misconfigured();
+
+        uint256 pullAmount = IERC20(asset()).balanceOf(address(this));
+        for (uint256 i; i < len; i++) {
+            pullAmount += allocations[i].amount;
+        }
+        if (pullAmount > assets) revert Misconfigured();
     }
 
     /**
@@ -373,11 +431,9 @@ contract MultiStrategyVault is
     function maxMint(address) public view override returns (uint256) {
         uint256 assets = totalAssets();
         uint256 depositLimit_ = depositLimit;
-        if(paused() || assets >= depositLimit_)
-            return 0;
+        if (paused() || assets >= depositLimit_) return 0;
 
-        if(depositLimit_ == type(uint256).max) 
-            return depositLimit_;
+        if (depositLimit_ == type(uint256).max) return depositLimit_;
 
         return convertToShares(depositLimit_ - assets);
     }
@@ -589,6 +645,10 @@ contract MultiStrategyVault is
      * @param allocations An array of structs each including the strategyIndex to withdraw from and the amount of assets
      */
     function pullFunds(Allocation[] calldata allocations) external onlyOwner {
+        _pullFunds(allocations);
+    }
+
+    function _pullFunds(Allocation[] calldata allocations) internal {
         uint256 len = allocations.length;
         for (uint256 i; i < len; i++) {
             if (allocations[i].amount > 0) {
