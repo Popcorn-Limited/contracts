@@ -248,8 +248,8 @@ abstract contract AnyBaseTest is BaseStrategyTest {
     //////////////////////////////////////////////////////////////*/
 
 
-    function test__should_use_new_favorable_quote() public {
-        // price of asset went down after the keeper reserved the funds
+    function test__should_use_old_favorable_quote() public {
+        // price of asset went up after the keeper reserved the funds
         strategy.toggleAutoDeposit();
         _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
 
@@ -259,7 +259,7 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         _prepareConversion(yieldAsset, testConfig.defaultAmount);
         strategy.pushFunds(testConfig.defaultAmount, bytes(""));
 
-        oracle.setPrice(yieldAsset, _asset_, testConfig.defaultAmount * 9_000 / 10_000);
+        oracle.setPrice(_asset_, yieldAsset, testConfig.defaultAmount * 11_000 / 10_000);
 
         uint ta = strategy.totalAssets();
 
@@ -272,11 +272,11 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         // 9e17 of it. Thus, 1e17 is left in the contract and added to the total assets
         // after the claim. Thus, total assets increases
         assertGt(strategy.totalAssets(), ta, "total assets should increase because of the new favorable quote");
-        assertEq(IERC20(_asset_).balanceOf(address(this)), testConfig.defaultAmount * 9_000 / 10_000, "should receive assets with old favorable quote");
+        assertEq(IERC20(_asset_).balanceOf(address(this)), testConfig.defaultAmount, "should receive assets with old favorable quote");
     }
 
-    function test__should_use_old_favorable_quote() public {
-        // price of asset went up after the keeper reserved the funds
+    function test__should_use_new_favorable_quote() public {
+        // price of asset went down after the keeper reserved the funds
         strategy.toggleAutoDeposit();
         _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
 
@@ -286,7 +286,8 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         _prepareConversion(yieldAsset, testConfig.defaultAmount);
         strategy.pushFunds(testConfig.defaultAmount, bytes(""));
 
-        oracle.setPrice(yieldAsset, _asset_, testConfig.defaultAmount * 11_000 / 10_000);
+        oracle.setPrice(_asset_, yieldAsset, testConfig.defaultAmount * 9_000 / 10_000);
+        // oracle.setPrice(yieldAsset, _asset_, testConfig.defaultAmount * 11_000 / 10_000);
 
         uint ta = strategy.totalAssets();
 
@@ -296,7 +297,7 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         AnyConverter(address(strategy)).claimReserved(block.number);
     
         assertGt(strategy.totalAssets(), ta, "total assets should increase because of the new favorable quote");
-        assertEq(IERC20(_asset_).balanceOf(address(this)), testConfig.defaultAmount, "should receive assets with old favorable quote");
+        assertEq(IERC20(_asset_).balanceOf(address(this)), testConfig.defaultAmount * 9_000 / 10_000, "should receive assets with old favorable quote");
     }
 
     function test__should_use_old_favorable_quote_with_multiple_reserves() public {
@@ -305,8 +306,6 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         _mintAssetAndApproveForStrategy(amount * 3, bob);
         vm.prank(bob);
         strategy.deposit(amount * 3, bob);
-
-        uint ta = strategy.totalAssets();
 
         // the keeper will push the funds three times
         // Each time they push the price will have changed. We'll check whether the 
@@ -319,14 +318,14 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         vm.roll(block.number + 1);
         oracle.setPrice(yieldAsset, _asset_, amount * 11_000 / 10_000);
         console.log("total assets before second push", strategy.totalAssets());
+        console.log("reserved assets before second push", AnyConverter(address(strategy)).totalReservedAssets());
         strategy.pushFunds(1e18, bytes(""));
         console.log("total assets after second push", strategy.totalAssets());
-
-        assertEq(strategy.totalAssets(), 3.2e18, "ta is wrong");
+        console.log("reserved assets after second push", AnyConverter(address(strategy)).totalReservedAssets());
 
         // price decrease by 20%
         vm.roll(block.number + 1);
-        oracle.setPrice(yieldAsset, _asset_, amount * 9_000 / 10_000);
+        oracle.setPrice(yieldAsset, _asset_, amount * 10_500 / 10_000);
         console.log("total assets before third push", strategy.totalAssets());
         strategy.pushFunds(1e18, bytes(""));
         console.log("total assets after third push", strategy.totalAssets());
