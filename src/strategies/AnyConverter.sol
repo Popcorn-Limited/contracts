@@ -352,9 +352,9 @@ abstract contract AnyConverter is BaseStrategy {
                 delete reserved[msg.sender][base][blockNumber];
 
                 if (isYieldAsset) {
-                    totalReservedYieldAssets -= _reserved.deposited;
+                    totalReservedYieldAssets -= _reserved.withdrawable;
                 } else {
-                    totalReservedAssets -= _reserved.deposited;
+                    totalReservedAssets -= _reserved.withdrawable;
                 }
 
                 IERC20(base).transfer(msg.sender, withdrawable);
@@ -380,9 +380,9 @@ abstract contract AnyConverter is BaseStrategy {
         });
 
         if (isYieldAsset) {
-            totalReservedYieldAssets += amount;
+            totalReservedYieldAssets += withdrawable;
         } else {
-            totalReservedAssets += amount;
+            totalReservedAssets += withdrawable;
         }
 
         emit ReserveAdded(msg.sender, token, _unlockTime, amount, withdrawable);
