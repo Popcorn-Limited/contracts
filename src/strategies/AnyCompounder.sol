@@ -28,12 +28,10 @@ abstract contract AnyCompounder is AnyConverter, ContinousDutchAuction {
      * @param autoDeposit_ Controls if `protocolDeposit` gets called on deposit
      * @param strategyInitData_ Encoded data for this specific strategy
      */
-    function __AnyCompounder_init(
-        address asset_,
-        address owner_,
-        bool autoDeposit_,
-        bytes memory strategyInitData_
-    ) internal onlyInitializing {
+    function __AnyCompounder_init(address asset_, address owner_, bool autoDeposit_, bytes memory strategyInitData_)
+        internal
+        onlyInitializing
+    {
         (
             bytes memory baseStrategyData,
             uint256 initPrice_,
@@ -42,18 +40,10 @@ abstract contract AnyCompounder is AnyConverter, ContinousDutchAuction {
             uint256 epochPeriod_,
             uint256 priceMultiplier_,
             uint256 minInitPrice_
-        ) = abi.decode(
-                strategyInitData_,
-                (bytes, uint256, address, address, uint256, uint256, uint256)
-            );
+        ) = abi.decode(strategyInitData_, (bytes, uint256, address, address, uint256, uint256, uint256));
         __AnyConverter_init(asset_, owner_, autoDeposit_, baseStrategyData);
         __ContinousDutchAuction_init(
-            initPrice_,
-            paymentToken_,
-            paymentReceiver_,
-            epochPeriod_,
-            priceMultiplier_,
-            minInitPrice_
+            initPrice_, paymentToken_, paymentReceiver_, epochPeriod_, priceMultiplier_, minInitPrice_
         );
     }
 
@@ -103,15 +93,10 @@ abstract contract AnyCompounder is AnyConverter, ContinousDutchAuction {
 
     error WrongToken();
 
-    function setRewardTokens(
-        address[] memory newRewardTokens
-    ) external onlyOwner {
+    function setRewardTokens(address[] memory newRewardTokens) external onlyOwner {
         uint256 len = newRewardTokens.length;
         for (uint256 i; i < len; i++) {
-            if (
-                newRewardTokens[i] == asset() ||
-                newRewardTokens[i] == yieldAsset
-            ) revert WrongToken();
+            if (newRewardTokens[i] == asset() || newRewardTokens[i] == yieldAsset) revert WrongToken();
         }
 
         _rewardTokens = newRewardTokens;
