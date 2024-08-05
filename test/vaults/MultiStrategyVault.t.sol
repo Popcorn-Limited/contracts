@@ -525,25 +525,149 @@ contract MultiStrategyVaultTest is Test {
                           WITHDRAW WITH ALLOCATIONS
     //////////////////////////////////////////////////////////////*/
 
-    function test__withdraw_with_allocations() public {}
+    function test__withdraw_with_allocations() public {
+        _depositIntoVault(bob, 10e18);
 
-    function test__withdraw_with_duplicate_allocations() public {}
+        // Per default the strategy would withdraw from strategy 0 anyways so we need to move funds around to test the functionality
+        // Move funds into the second strategy
+        Allocation[] memory allocations = new Allocation[](1);
+        allocations[0] = Allocation({index: 0, amount: 5e18});
+        vault.pullFunds(allocations);
+        allocations[0] = Allocation({index: 1, amount: 5e18});
+        vault.pushFunds(allocations);
 
-    function testFail__withdraw_pullAmount_too_high() public {}
+        // Actual Test
+        Allocation[] memory withdrawAllocations = new Allocation[](2);
+        withdrawAllocations[0] = Allocation({index: 0, amount: 1e18});
+        withdrawAllocations[1] = Allocation({index: 1, amount: 2e18});
 
-    function testFail__withdraw_too_many_allocations() public {}
+        vm.prank(bob);
+        vault.withdraw(3e18, withdrawAllocations);
+
+        assertEq(asset.balanceOf(bob), 3e18);
+        assertEq(vault.balanceOf(bob), 7e18);
+        assertEq(asset.balanceOf(address(strategies[0])), 4e18);
+        assertEq(asset.balanceOf(address(strategies[1])), 3e18);
+    }
+
+    function test__withdraw_with_duplicate_allocations() public {
+        _depositIntoVault(bob, 10e18);
+
+        // Per default the strategy would withdraw from strategy 0 anyways so we need to move funds around to test the functionality
+        // Move funds into the second strategy
+        Allocation[] memory allocations = new Allocation[](1);
+        allocations[0] = Allocation({index: 0, amount: 5e18});
+        vault.pullFunds(allocations);
+        allocations[0] = Allocation({index: 1, amount: 5e18});
+        vault.pushFunds(allocations);
+
+        // Actual Test
+        Allocation[] memory withdrawAllocations = new Allocation[](2);
+        withdrawAllocations[0] = Allocation({index: 1, amount: 1e18});
+        withdrawAllocations[1] = Allocation({index: 1, amount: 2e18});
+
+        vm.prank(bob);
+        vault.withdraw(3e18, withdrawAllocations);
+
+        assertEq(asset.balanceOf(bob), 3e18);
+        assertEq(vault.balanceOf(bob), 7e18);
+        assertEq(asset.balanceOf(address(strategies[0])), 5e18);
+        assertEq(asset.balanceOf(address(strategies[1])), 2e18);
+    }
+
+    function testFail__withdraw_pullAmount_too_high() public {
+        _depositIntoVault(bob, 10e18);
+
+        Allocation[] memory withdrawAllocations = new Allocation[](2);
+        withdrawAllocations[0] = Allocation({index: 0, amount: 4e18});
+
+        vm.prank(bob);
+        vault.withdraw(3e18, withdrawAllocations);
+    }
+
+    function testFail__withdraw_too_many_allocations() public {
+        _depositIntoVault(bob, 10e18);
+
+        Allocation[] memory withdrawAllocations = new Allocation[](3);
+        withdrawAllocations[0] = Allocation({index: 0, amount: 3e18});
+
+        vm.prank(bob);
+        vault.withdraw(3e18, withdrawAllocations);
+    }
 
     /*//////////////////////////////////////////////////////////////
                           REDEEM WITH ALLOCATIONS
     //////////////////////////////////////////////////////////////*/
 
-    function test__redeem_with_allocations() public {}
+    function test__redeem_with_allocations() public {
+        _depositIntoVault(bob, 10e18);
 
-    function test__redeem_with_duplicate_allocations() public {}
+        // Per default the strategy would withdraw from strategy 0 anyways so we need to move funds around to test the functionality
+        // Move funds into the second strategy
+        Allocation[] memory allocations = new Allocation[](1);
+        allocations[0] = Allocation({index: 0, amount: 5e18});
+        vault.pullFunds(allocations);
+        allocations[0] = Allocation({index: 1, amount: 5e18});
+        vault.pushFunds(allocations);
 
-    function testFail__redeem_pullAmount_too_high() public {}
+        // Actual Test
+        Allocation[] memory withdrawAllocations = new Allocation[](2);
+        withdrawAllocations[0] = Allocation({index: 0, amount: 1e18});
+        withdrawAllocations[1] = Allocation({index: 1, amount: 2e18});
 
-    function testFail__redeem_too_many_allocations() public {}
+        vm.prank(bob);
+        vault.redeem(3e18, withdrawAllocations);
+
+        assertEq(asset.balanceOf(bob), 3e18);
+        assertEq(vault.balanceOf(bob), 7e18);
+        assertEq(asset.balanceOf(address(strategies[0])), 4e18);
+        assertEq(asset.balanceOf(address(strategies[1])), 3e18);
+    }
+
+    function test__redeem_with_duplicate_allocations() public {
+        _depositIntoVault(bob, 10e18);
+
+        // Per default the strategy would withdraw from strategy 0 anyways so we need to move funds around to test the functionality
+        // Move funds into the second strategy
+        Allocation[] memory allocations = new Allocation[](1);
+        allocations[0] = Allocation({index: 0, amount: 5e18});
+        vault.pullFunds(allocations);
+        allocations[0] = Allocation({index: 1, amount: 5e18});
+        vault.pushFunds(allocations);
+
+        // Actual Test
+        Allocation[] memory withdrawAllocations = new Allocation[](2);
+        withdrawAllocations[0] = Allocation({index: 1, amount: 1e18});
+        withdrawAllocations[1] = Allocation({index: 1, amount: 2e18});
+
+        vm.prank(bob);
+        vault.redeem(3e18, withdrawAllocations);
+
+        assertEq(asset.balanceOf(bob), 3e18);
+        assertEq(vault.balanceOf(bob), 7e18);
+        assertEq(asset.balanceOf(address(strategies[0])), 5e18);
+        assertEq(asset.balanceOf(address(strategies[1])), 2e18);
+    }
+
+    function testFail__redeem_pullAmount_too_high() public {
+        _depositIntoVault(bob, 10e18);
+
+        Allocation[] memory withdrawAllocations = new Allocation[](2);
+        withdrawAllocations[0] = Allocation({index: 0, amount: 4e18});
+
+        vm.prank(bob);
+        vault.redeem(3e18, withdrawAllocations);
+    }
+
+    function testFail__redeem_too_many_allocations() public {
+        _depositIntoVault(bob, 10e18);
+
+        Allocation[] memory withdrawAllocations = new Allocation[](3);
+        withdrawAllocations[0] = Allocation({index: 0, amount: 3e18});
+
+        vm.prank(bob);
+        vault.redeem(3e18, withdrawAllocations);
+    }
 
     /*//////////////////////////////////////////////////////////////
                           NO STRATEGIES
