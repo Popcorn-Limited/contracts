@@ -13,79 +13,97 @@ struct Order {
     address buyToken;
     // Should be 0 and will be set to 0 on creation
     uint256 buyAmount;
-    // Limit order if maxPrice = 0 or if maxPrice == minPrice
-    uint256 maxPrice;
+    // Limit order if decayPerSec == 0
+    uint256 decayPerSec;
     uint256 minPrice;
-    uint256 startTime;
     uint256 endTime;
     bool partialFillable;
     bytes optionalData;
 }
 
-// TODO split into storage and router
+// TODO split into storage and router ?
 contract AsyncConverter is Owned {
     address ETH_PROXY_ADDRESS = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
-
-    error ZeroAmount();
 
     uint256 totalOrders;
     mapping(uint256 => Order) public orders;
 
+    event OrderAdded(uint256 id, Order order);
+    event OrderRemoved(uint256 id, Order order);
+    event OrderFilled(
+        uint256 id,
+        uint256 buyAmount,
+        uint256 sellAmount,
+        uint256 price
+    );
+
+    error ZeroAmount();
+
     constructor(address _owner) Owned(_owner) {}
 
     function addOrder(Order calldata order) external payable {
+        // No zero addresses
+        if (
+            order.sellToken == address(0) ||
+            order.buyToken == address(0) ||
+            order.owner == address(0)
+        ) revert ZeroAmount();
         // Empty order doesnt make sense
         if (order.sellAmount == 0) revert ZeroAmount();
         // Protect from wrong price settings
-        if (
-            (order.minPrice == 0 && order.maxPrice == 0) ||
-            order.maxPrice < order.minPrice
-        ) revert ZeroAmount();
+        if (order.minPrice == 0 && order.decayPerSec == 0) revert ZeroAmount();
 
-                // Adjust maxPrice for limit orders
-        if (order.maxPrice == 0) order.maxPrice = order.minPrice;
-
-        // Adjust startTime if not set
-        if (order.startTime == 0) order.startTime = block.timestamp;
-
-
-        // Make sure enough eth have been send if used as sell token
-        if (
-            order.sellToken == ETH_PROXY_ADDRESS && msg.value < order.sellAmount
-        ) revert ZeroAmount();
-
-
-        if (order.sellToken != ETH_PROXY_ADDRESS)
+        if (order.sellToken == ETH_PROXY_ADDRESS) {
+            // Make sure enough eth have been send if used as sell token
+            if (msg.value != order.sellAmount) revert ZeroAmount();
+        } else {
             IERC20(order.sellToken).transferFrom(
                 msg.sender,
                 address(this),
                 order.sellAmount
             );
+        }
 
-        order.buyAmount = 0;
+        // Adjust buyAmount if > 0
+        if (order.buyAmount != 0) order.buyAmount = 0;
 
         uint256 orderId = totalOrders + 1;
         orders[orderId] = order;
 
-        // TODO - add event
+        emit OrderAdded(orderId, order);
     }
 
     function removeOrder(uint256 id) external {
         Order memory order = orders[id];
 
+        // Only the order-owner can remove orders
         if (order.owner != msg.sender) revert ZeroAmount();
 
         // Refund unused sell tokens
-        if (order.sellAmount > 0)
-            IERC20(order.sellToken).transfer(order.owner, order.sellAmount);
+        if (order.sellAmount > 0) {
+            if (order.sellToken == ETH_PROXY_ADDRESS) {
+                (bool success, ) = order.owner.call{value: order.sellAmount}(
+                    ""
+                );
+                if (!success) revert ZeroAmount();
+            } else {
+                IERC20(order.sellToken).transfer(order.owner, order.sellAmount);
+            }
+        }
 
         // Cash out buy tokens
-        if (order.buyAmount > 0)
-            IERC20(order.buyToken).transfer(order.owner, order.buyAmount);
+        if (order.buyAmount > 0) {
+            if (order.buyToken == ETH_PROXY_ADDRESS) {
+                (bool success, ) = order.owner.call{value: order.buyAmount}("");
+                if (!success) revert ZeroAmount();
+            } else {
+                IERC20(order.buyToken).transfer(order.owner, order.buyAmount);
+            }
+        }
 
-        delete orders[id]
+        delete orders[id];
 
-        // TODO - add event
+        emit OrderRemoved(id, order);
     }
 
     function fulfillOrderPreciseIn(
@@ -95,38 +113,37 @@ contract AsyncConverter is Owned {
         Order memory order = orders[id];
 
         // Order doesnt exist
-        if (order.startTime == 0) revert ZeroAmount();
+        if (order.endTime == 0) revert ZeroAmount();
         // Order is over
         if (order.endTime >= block.timestamp) revert ZeroAmount();
 
-        // TODO - add price function
+        uint256 price = _getOrderPrice(order);
         uint256 sellAmount = buyAmount / price;
 
         // Buying more than are offered
         if (sellAmount > order.sellAmount) revert ZeroAmount();
 
-        if (order.partialFillable) {} else {
-            // Order needs be filled whole
-            if (sellAmount < order.sellAmount) revert ZeroAmount();
+        // Order needs be filled whole
+        if (!order.partialFillable && sellAmount < order.sellAmount)
+            revert ZeroAmount();
+
+        if (order.buyToken == ETH_PROXY_ADDRESS) {
+            // Make sure enough eth have been send if used as buy token
+            if (msg.value != buyAmount) revert ZeroAmount();
+        } else {
+            IERC20(order.buyToken).transferFrom(
+                msg.sender,
+                address(this),
+                buyAmount
+            );
         }
-    	
-        if (
-            order.buyToken == ETH_PROXY_ADDRESS) {
-                if(msg.value < order.buyAmount) revert ZeroAmount();
-} else {
-IERC20(order.buyToken).transferFrom(
-            msg.sender,
-            address(this),
-            buyAmount
-        );
-}
-        
+
         IERC20(order.sellToken).transfer(msg.sender, sellAmount);
 
         order.sellAmount -= sellAmount;
         order.buyAmount += buyAmount;
 
-        // TODO - add event
+        emit OrderFilled(id, buyAmount, sellAmount, price);
     }
 
     function fulfillOrderPreciseOut(
@@ -136,47 +153,55 @@ IERC20(order.buyToken).transferFrom(
         Order memory order = orders[id];
 
         // Order doesnt exist
-        if (order.startTime == 0) revert ZeroAmount();
+        if (order.endTime == 0) revert ZeroAmount();
         // Order is over
         if (order.endTime >= block.timestamp) revert ZeroAmount();
         // Buying more than are offered
         if (sellAmount > order.sellAmount) revert ZeroAmount();
 
-        if (order.partialFillable) {} else {
-            // Order needs be filled whole
-            if (sellAmount < order.sellAmount) revert ZeroAmount();
-        }
+        // Order needs be filled whole
+        if (!order.partialFillable && sellAmount < order.sellAmount)
+            revert ZeroAmount();
 
-        // TODO - add price function
+        uint256 price = _getOrderPrice(order);
         uint256 buyAmount = sellAmount * price;
 
-        IERC20(order.buyToken).transferFrom(
-            msg.sender,
-            address(this),
-            buyAmount
-        );
+        if (order.buyToken == ETH_PROXY_ADDRESS) {
+            // Make sure enough eth have been send if used as buy token
+            if (msg.value != buyAmount) revert ZeroAmount();
+        } else {
+            IERC20(order.buyToken).transferFrom(
+                msg.sender,
+                address(this),
+                buyAmount
+            );
+        }
+
         IERC20(order.sellToken).transfer(msg.sender, sellAmount);
 
         order.sellAmount -= sellAmount;
         order.buyAmount += buyAmount;
 
-        // TODO - add event
+        emit OrderFilled(id, buyAmount, sellAmount, price);
     }
 
-    function price(uint256 id) public view returns (uint256){
-                Order memory order = orders[id];
-                        // Order doesnt exist
-        if (order.startTime == 0) revert ZeroAmount();
+    function getOrderPrice(uint256 id) public view returns (uint256) {
+        Order memory order = orders[id];
+        // Order doesnt exist
+        if (order.endTime == 0) revert ZeroAmount();
         // Order is over
+        if (order.endTime >= block.timestamp) revert ZeroAmount();
 
-                        if(order.endTime >= block.timestamp) revert ZeroAmount();
-
-
+        return _getOrderPrice(order);
     }
 
-    function _price(Order memory order) internal view returns (uint256){
-        uint256 timeDiff = block.timestamp - order.startTime;
-        uint256 decayPerSec = order.endTime - order.startTime;
-        return 0;
+    function _getOrderPrice(
+        Order memory order
+    ) internal view returns (uint256) {
+        if (order.decayPerSec == 0) return order.minPrice;
+
+        uint256 timeDiff = order.endTime - block.timestamp;
+
+        return order.minPrice + (timeDiff * decayPerSec);
     }
 }
