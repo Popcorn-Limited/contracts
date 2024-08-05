@@ -1301,13 +1301,93 @@ contract MultiStrategyVaultTest is Test {
         vault.setFees(0, 2e17);
     }
 
-    function test__take_performanceFee() public {}
+    function test__take_performanceFee() public {
+        _depositIntoVault(bob, 10e18);
+        vault.setFees(1e17, 0);
 
-    function test__take_performanceFee_after_change() public {}
+        // Inflate vault value
+        asset.mint(address(vault), 10e18);
 
-    function test__take_managementFee() public {}
+        assertEq(vault.accruedPerformanceFee(), 5e18);
 
-    function test__take_managementFee_after_change() public {}
+        vault.takeFees();
+
+        // TODO update the expected value
+        assertEq(
+            vault.balanceOf(0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E),
+            1
+        );
+        assertEq(vault.highWaterMark(), 2);
+        assertEq(vault.accruedPerformanceFee(), 0);
+    }
+
+    function test__take_performanceFee_after_change() public {
+        _depositIntoVault(bob, 10e18);
+        vault.setFees(1e17, 0);
+
+        // Inflate vault value
+        asset.mint(address(vault), 10e18);
+
+        assertEq(vault.accruedPerformanceFee(), 5e18);
+
+        vault.setFees(2e17, 0);
+
+        // TODO update the expected value
+        assertEq(
+            vault.balanceOf(0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E),
+            1
+        );
+        assertEq(vault.highWaterMark(), 2);
+        assertEq(vault.accruedPerformanceFee(), 0);
+    }
+
+    function test__take_managementFee() public {
+        _depositIntoVault(bob, 10e18);
+        vault.setFees(0, 1e16);
+
+        vm.skip(365.25 days);
+
+        assertEq(vault.accruedManagementFee(), 1e17);
+
+        vm.skip((365.25 days) / 2);
+
+        assertEq(vault.accruedManagementFee(), 1.5e17);
+
+        _depositIntoVault(bob, 10e18);
+
+        vm.skip(365.25 days);
+
+        assertEq(vault.accruedManagementFee(), 3.5e17);
+
+        vault.takeFees();
+
+        // TODO update the expected value
+        assertEq(
+            vault.balanceOf(0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E),
+            1
+        );
+        assertEq(vault.feesUpdatedAt(), 2);
+        assertEq(vault.accruedManagementFee(), 0);
+    }
+
+    function test__take_managementFee_after_change() public {
+        _depositIntoVault(bob, 10e18);
+        vault.setFees(0, 1e16);
+
+        vm.skip(365.25 days);
+
+        assertEq(vault.accruedManagementFee(), 1e17);
+
+        vault.setFees(0, 1e17);
+
+        // TODO update the expected value
+        assertEq(
+            vault.balanceOf(0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E),
+            1
+        );
+        assertEq(vault.feesUpdatedAt(), 2);
+        assertEq(vault.accruedManagementFee(), 0);
+    }
 
     /*//////////////////////////////////////////////////////////////
                           SET DEPOSIT LIMIT

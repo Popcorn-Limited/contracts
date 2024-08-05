@@ -693,6 +693,10 @@ contract MultiStrategyVault is
         managementFee = managementFee_;
     }
 
+    function takeFees() external {
+        _takeFees();
+    }
+
     function _takeFees() internal {
         uint256 fee = accruedPerformanceFee() + accruedManagementFee();
         uint256 shareValue = convertToAssets(1e18);
