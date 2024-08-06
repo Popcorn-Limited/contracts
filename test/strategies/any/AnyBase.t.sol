@@ -173,7 +173,7 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         _prepareConversion(yieldAsset, testConfig.defaultAmount);
         strategy.pushFunds(testConfig.defaultAmount, bytes(""));
 
-        oracle.setPrice(_asset_, yieldAsset, testConfig.defaultAmount * 11_000 / 10_000);
+        oracle.setPrice(yieldAsset, _asset_, 1e18 * 12_500 / 10_000);
 
         uint256 ta = strategy.totalAssets();
 
@@ -182,10 +182,7 @@ abstract contract AnyBaseTest is BaseStrategyTest {
 
         AnyConverter(address(strategy)).claimReserved(block.number);
 
-        // while the user had 1e18 of asset reserved, they are only able to withdraw
-        // 9e17 of it. Thus, 1e17 is left in the contract and added to the total assets
-        // after the claim. Thus, total assets increases
-        assertGt(strategy.totalAssets(), ta, "total assets should increase because of the new favorable quote");
+        assertGt(strategy.totalAssets(), ta, "total assets should increase because of the old favorable quote");
         assertEq(
             IERC20(_asset_).balanceOf(address(this)),
             testConfig.defaultAmount,
@@ -204,8 +201,7 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         _prepareConversion(yieldAsset, testConfig.defaultAmount);
         strategy.pushFunds(testConfig.defaultAmount, bytes(""));
 
-        oracle.setPrice(_asset_, yieldAsset, testConfig.defaultAmount * 9_000 / 10_000);
-        // oracle.setPrice(yieldAsset, _asset_, testConfig.defaultAmount * 11_000 / 10_000);
+        oracle.setPrice(yieldAsset, _asset_, 1e18 * 9_000 / 10_000);
 
         uint256 ta = strategy.totalAssets();
 
@@ -214,16 +210,65 @@ abstract contract AnyBaseTest is BaseStrategyTest {
 
         AnyConverter(address(strategy)).claimReserved(block.number);
 
+
+        // while the user had 1e18 of asset reserved, they are only able to withdraw
+        // 9e17 of it. Thus, 1e17 is left in the contract and added to the total assets
+        // after the claim. Thus, total assets increases
         assertGt(strategy.totalAssets(), ta, "total assets should increase because of the new favorable quote");
         assertEq(
             IERC20(_asset_).balanceOf(address(this)),
             testConfig.defaultAmount * 9_000 / 10_000,
-            "should receive assets with old favorable quote"
+            "should receive assets with new favorable quote"
         );
     }
 
     function test__should_use_old_favorable_quote_with_multiple_reserves() public {
         strategy.toggleAutoDeposit();
+        // changing amount will break the assertions
+        uint256 amount = 1e18;
+        _mintAssetAndApproveForStrategy(amount * 5, bob);
+        vm.prank(bob);
+        strategy.deposit(amount * 5, bob);
+
+        // the keeper will push the funds three times
+        // Each time they push the price will have changed. We'll check whether the
+        // correct prices are used for the claiming of the keeper's reserves
+
+        _prepareConversion(yieldAsset, amount * 3);
+        strategy.pushFunds(amount, bytes(""));
+
+        vm.roll(block.number + 1);
+        oracle.setPrice(yieldAsset, _asset_, 1e18 * 12_500 / 10_000);
+        strategy.pushFunds(1e18, bytes(""));
+
+        vm.roll(block.number + 1);
+        oracle.setPrice(yieldAsset, _asset_, 1e18 * 16_000 / 10_000);
+        strategy.pushFunds(1e18, bytes(""));
+
+        vm.warp(block.timestamp + 2 days);
+
+
+        // at the time this claim was reserved the ratio was 1:1
+        AnyConverter(address(strategy)).claimReserved(block.number - 2);
+        // 1.25:1 in favor of the yield asset
+        AnyConverter(address(strategy)).claimReserved(block.number - 1);
+        // 1.6:1 in favor of the yield asset
+        AnyConverter(address(strategy)).claimReserved(block.number);
+
+        // so we need to receive
+        // 1. 1e18 * 1e18 / 1e18 = 1e18 asset
+        // 2. 1e18 * 1.25e18 / 1e18 = 1.25e18 asset
+        // 3. 1e18 * 1.6e18 / 1e18 = 1.6e18 asset
+        // so in total we need to receive 1e18 + 1.25e18 + 1.6e18 = 3.85e18 asset
+
+        // need to hardcode value cause of precision
+        assertEq(strategy.totalAssets(), 5951818035113561382, "total assets not correct");
+        assertEq(IERC20(_asset_).balanceOf(address(this)), 3.85e18, "asset balance not correct");
+    }
+
+    function test__should_use_new_favorable_quote_with_multiple_reserves() public {
+        strategy.toggleAutoDeposit();
+        // changing amount will break the assertions
         uint256 amount = 1e18;
         _mintAssetAndApproveForStrategy(amount * 3, bob);
         vm.prank(bob);
@@ -236,20 +281,32 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         _prepareConversion(yieldAsset, amount * 3);
         strategy.pushFunds(amount, bytes(""));
 
-        // price increase by 10%
         vm.roll(block.number + 1);
-        oracle.setPrice(yieldAsset, _asset_, amount * 11_000 / 10_000);
-        console.log("total assets before second push", strategy.totalAssets());
-        console.log("reserved assets before second push", AnyConverter(address(strategy)).totalReservedAssets());
+        oracle.setPrice(yieldAsset, _asset_, 1e18 * 7_500/ 10_000);
         strategy.pushFunds(1e18, bytes(""));
-        console.log("total assets after second push", strategy.totalAssets());
-        console.log("reserved assets after second push", AnyConverter(address(strategy)).totalReservedAssets());
 
-        // price decrease by 20%
         vm.roll(block.number + 1);
-        oracle.setPrice(yieldAsset, _asset_, amount * 10_500 / 10_000);
-        console.log("total assets before third push", strategy.totalAssets());
+        oracle.setPrice(yieldAsset, _asset_, 1e18 * 4_000 / 10_000);
         strategy.pushFunds(1e18, bytes(""));
-        console.log("total assets after third push", strategy.totalAssets());
+
+        vm.warp(block.timestamp + 2 days);
+
+
+        // at the time this claim was reserved the ratio was 1:1
+        AnyConverter(address(strategy)).claimReserved(block.number - 2);
+        // 0.75:1 in favor of the asset
+        AnyConverter(address(strategy)).claimReserved(block.number - 1);
+        // 0.4:1 in favor of the asset
+        AnyConverter(address(strategy)).claimReserved(block.number);
+
+        // so we need to receive
+        // 1. 1e18 * 0.4e18 / 1e18 = 0.4e18 asset
+        // 1. 1e18 * 0.4e18 / 1e18 = 0.4e18 asset
+        // 1. 1e18 * 0.4e18 / 1e18 = 0.4e18 asset
+        // so in total we need to receive 0.4e18 + 0.4e18 + 0.4e18 = 1.2e18
+
+        // need to hardcode value cause of precision
+        assertEq(strategy.totalAssets(), 3000454508778390345, "total assets not correct");
+        assertEq(IERC20(_asset_).balanceOf(address(this)), 1.2e18, "asset balance not correct");
     }
 }
