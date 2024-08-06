@@ -103,7 +103,7 @@ abstract contract AnyConverter is BaseStrategy {
     error SlippageTooHigh();
     error NotEnoughFloat();
 
-    function pushFunds(uint256 assets, bytes memory) external override onlyKeeperOrOwner {
+    function pushFunds(uint256 yieldAssets, bytes memory) external override onlyKeeperOrOwner {
         // caching
         address _asset = asset();
         address _yieldAsset = yieldAsset;
@@ -113,9 +113,9 @@ abstract contract AnyConverter is BaseStrategy {
         // TODO: should take into account the reserved assets
         uint256 bal = IERC20(_asset).balanceOf(address(this));
 
-        IERC20(_yieldAsset).transferFrom(msg.sender, address(this), assets);
+        IERC20(_yieldAsset).transferFrom(msg.sender, address(this), yieldAssets);
 
-        uint256 withdrawable = oracle.getQuote(assets, _yieldAsset, _asset);
+        uint256 withdrawable = oracle.getQuote(yieldAssets, _yieldAsset, _asset);
 
         // TODO: we should probably revert if we don't have enough funds
         // to cover the withdrawable amount
@@ -127,12 +127,12 @@ abstract contract AnyConverter is BaseStrategy {
             if (bal < withdrawable) withdrawable = bal;
         }
 
-        _reserveToken(assets, withdrawable, _asset, false);
+        _reserveToken(yieldAssets, withdrawable, _yieldAsset, false);
         uint256 postTa = totalAssets();
 
         if (postTa < ta.mulDiv(10_000 - slippage, 10_000, Math.Rounding.Floor)) revert SlippageTooHigh();
 
-        emit PushedFunds(assets, withdrawable);
+        emit PushedFunds(yieldAssets, withdrawable);
     }
 
     function pullFunds(uint256 assets, bytes memory) external override onlyKeeperOrOwner {
@@ -150,7 +150,7 @@ abstract contract AnyConverter is BaseStrategy {
 
         if (postTa - withdrawable < ta.mulDiv(10_000 - slippage, 10_000, Math.Rounding.Floor)) revert SlippageTooHigh();
 
-        _reserveToken(assets, withdrawable, _yieldAsset, true);
+        _reserveToken(assets, withdrawable, _asset, true);
 
         emit PulledFunds(assets, withdrawable);
     }
@@ -274,8 +274,8 @@ abstract contract AnyConverter is BaseStrategy {
         address _asset = asset();
         address _yieldAsset = yieldAsset;
 
-        _claimReserved(_asset, _yieldAsset, blockNumber, false);
-        _claimReserved(_yieldAsset, _asset, blockNumber, true);
+        _claimReserved(_asset, _yieldAsset, blockNumber, true);
+        _claimReserved(_yieldAsset, _asset, blockNumber, false);
     }
 
     function _claimReserved(address base, address quote, uint256 blockNumber, bool isYieldAsset) internal {
@@ -295,7 +295,7 @@ abstract contract AnyConverter is BaseStrategy {
                     totalReservedAssets -= _reserved.withdrawable;
                 }
 
-                IERC20(base).transfer(msg.sender, withdrawable);
+                IERC20(quote).transfer(msg.sender, withdrawable);
             }
             emit ReserveClaimed(msg.sender, base, _reserved.withdrawable);
         }
