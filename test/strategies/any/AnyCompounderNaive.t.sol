@@ -75,7 +75,7 @@ contract AnyCompounderNaiveTest is AnyBaseTest {
         }
 
         // give this contract yield assets and allow the strategy to pull them
-        _prepareConversion(yieldAsset, testConfig.defaultAmount);
+        _mintYieldAsset(testConfig.defaultAmount, address(this));
 
         ClaimContract claimContract = new ClaimContract(rewardTokens);
         strategy.harvest(abi.encode(claimContract, bytes(""), testConfig.defaultAmount));
@@ -99,7 +99,7 @@ contract AnyCompounderNaiveTest is AnyBaseTest {
         }
 
         // give this contract yield assets and allow the strategy to pull them
-        _prepareConversion(yieldAsset, testConfig.defaultAmount);
+        _mintYieldAsset(testConfig.defaultAmount, address(this));
 
         ClaimContract claimContract = new ClaimContract(rewardTokens);
 

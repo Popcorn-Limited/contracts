@@ -17,15 +17,12 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         deal(testConfig.asset, yieldAsset, IERC20(testConfig.asset).balanceOf(yieldAsset) + amount);
     }
 
-    function _prepareConversion(address token, uint256 amount) internal {
-        if (token == yieldAsset) {
-            vm.prank(json.readAddress(string.concat(".configs[0].specific.whale")));
-            IERC20(token).transfer(address(this), amount);
-        } else {
-            deal(token, address(this), amount);
-        }
+    function _mintYieldAsset(uint256 amount, address receiver) internal virtual {
+        vm.prank(json.readAddress(string.concat(".configs[0].specific.whale")));
+        IERC20(yieldAsset).transfer(receiver, amount);
 
-        IERC20(token).approve(address(strategy), amount);
+        vm.prank(receiver);
+        IERC20(yieldAsset).approve(address(strategy), amount);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -45,7 +42,7 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         console.log("pushAmount", pushAmount);
         console.log("defaultAmount", testConfig.defaultAmount);
 
-        _prepareConversion(yieldAsset, pushAmount);
+        _mintYieldAsset(pushAmount, address(this));
 
         // Push 40% the funds into the underlying protocol
         strategy.pushFunds(pushAmount, bytes(""));
@@ -80,7 +77,7 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         strategy.deposit(testConfig.defaultAmount, bob);
 
         uint256 pushAmount = (testConfig.defaultAmount / 5) * 2;
-        _prepareConversion(yieldAsset, pushAmount);
+        _mintYieldAsset(pushAmount, address(this));
 
         // Push 40% the funds into the underlying protocol
         strategy.pushFunds(pushAmount, bytes(""));
@@ -112,7 +109,7 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         uint256 oldTa = strategy.totalAssets();
         uint256 oldTs = strategy.totalSupply();
 
-        _prepareConversion(yieldAsset, testConfig.defaultAmount);
+        _mintYieldAsset(testConfig.defaultAmount, address(this));
 
         strategy.pushFunds(testConfig.defaultAmount, bytes(""));
 
@@ -133,13 +130,13 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         vm.prank(bob);
         strategy.deposit(testConfig.defaultAmount, bob);
 
-        _prepareConversion(yieldAsset, testConfig.defaultAmount);
+        _mintYieldAsset(testConfig.defaultAmount, address(this));
         strategy.pushFunds(testConfig.defaultAmount, bytes(""));
 
         uint256 oldTa = strategy.totalAssets();
         uint256 oldTs = strategy.totalSupply();
 
-        _prepareConversion(testConfig.asset, testConfig.defaultAmount);
+        _mintAsset(testConfig.defaultAmount, address(this));
         strategy.pullFunds(testConfig.defaultAmount, bytes(""));
 
         uint256 reservedAssets = AnyConverter(address(strategy)).totalReservedAssets();
@@ -170,7 +167,7 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         vm.prank(bob);
         strategy.deposit(testConfig.defaultAmount, bob);
 
-        _prepareConversion(yieldAsset, testConfig.defaultAmount);
+        _mintYieldAsset(testConfig.defaultAmount, address(this));
         strategy.pushFunds(testConfig.defaultAmount, bytes(""));
 
         oracle.setPrice(yieldAsset, _asset_, 1e18 * 12_500 / 10_000);
@@ -198,7 +195,7 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         vm.prank(bob);
         strategy.deposit(testConfig.defaultAmount, bob);
 
-        _prepareConversion(yieldAsset, testConfig.defaultAmount);
+        _mintYieldAsset(testConfig.defaultAmount, address(this));
         strategy.pushFunds(testConfig.defaultAmount, bytes(""));
 
         oracle.setPrice(yieldAsset, _asset_, 1e18 * 9_000 / 10_000);
@@ -234,7 +231,7 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         // Each time they push the price will have changed. We'll check whether the
         // correct prices are used for the claiming of the keeper's reserves
 
-        _prepareConversion(yieldAsset, amount * 3);
+        _mintYieldAsset(amount * 3, address(this));
         strategy.pushFunds(amount, bytes(""));
 
         vm.roll(block.number + 1);
@@ -278,7 +275,7 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         // Each time they push the price will have changed. We'll check whether the
         // correct prices are used for the claiming of the keeper's reserves
 
-        _prepareConversion(yieldAsset, amount * 3);
+        _mintYieldAsset(amount * 3, address(this));
         strategy.pushFunds(amount, bytes(""));
 
         vm.roll(block.number + 1);
@@ -308,5 +305,9 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         // need to hardcode value cause of precision
         assertEq(strategy.totalAssets(), 3000454508778390345, "total assets not correct");
         assertEq(IERC20(_asset_).balanceOf(address(this)), 1.2e18, "asset balance not correct");
+    }
+
+    function test__pull_funds_should_use_old_favorable_quote() public {
+        _mintAsset(testConfig.defaultAmount, address(this));
     }
 }
