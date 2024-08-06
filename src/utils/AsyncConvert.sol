@@ -22,10 +22,14 @@ struct Order {
 }
 
 // TODO split into storage and router ?
+// TODO transfer directly to the order.owner
+// TODO remove non-removed orders in actions to reduce gas cost of transaction?
+// TODO only revert `partialFillable` if after timeout the order wasnt filled
 contract AsyncConverter is Owned {
-    address ETH_PROXY_ADDRESS = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+    address private ETH_PROXY_ADDRESS =
+        0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
 
-    uint256 totalOrders;
+    uint256 private totalOrders;
     mapping(uint256 => Order) public orders;
 
     event OrderAdded(uint256 id, Order order);
@@ -37,9 +41,19 @@ contract AsyncConverter is Owned {
         uint256 price
     );
 
+    error ZeroAddress();
     error ZeroAmount();
+    error ZeroPrice();
+    error InsufficientAmount();
+    error TimeOut();
+    error NotOwner();
+    error NoOrder();
 
     constructor(address _owner) Owned(_owner) {}
+
+    /*//////////////////////////////////////////////////////////////
+                           ADD/REMOVE ORDER
+    //////////////////////////////////////////////////////////////*/
 
     function addOrder(Order calldata order) external payable {
         // No zero addresses
@@ -47,15 +61,19 @@ contract AsyncConverter is Owned {
             order.sellToken == address(0) ||
             order.buyToken == address(0) ||
             order.owner == address(0)
-        ) revert ZeroAmount();
+        ) {
+            revert ZeroAddress();
+        }
         // Empty order doesnt make sense
         if (order.sellAmount == 0) revert ZeroAmount();
         // Protect from wrong price settings
-        if (order.minPrice == 0 && order.decayPerSec == 0) revert ZeroAmount();
+        if (order.minPrice == 0 && order.decayPerSec == 0) revert ZeroPrice();
+        // Order end time cant be in the past
+        if (order.endTime <= block.timestamp) revert TimeOut();
 
         if (order.sellToken == ETH_PROXY_ADDRESS) {
             // Make sure enough eth have been send if used as sell token
-            if (msg.value != order.sellAmount) revert ZeroAmount();
+            if (msg.value != order.sellAmount) revert InsufficientAmount();
         } else {
             IERC20(order.sellToken).transferFrom(
                 msg.sender,
@@ -67,8 +85,9 @@ contract AsyncConverter is Owned {
         // Adjust buyAmount if > 0
         if (order.buyAmount != 0) order.buyAmount = 0;
 
-        uint256 orderId = totalOrders + 1;
+        uint256 orderId = totalOrders;
         orders[orderId] = order;
+        totalOrders = orderId + 1;
 
         emit OrderAdded(orderId, order);
     }
@@ -76,8 +95,11 @@ contract AsyncConverter is Owned {
     function removeOrder(uint256 id) external {
         Order memory order = orders[id];
 
-        // Only the order-owner can remove orders
-        if (order.owner != msg.sender) revert ZeroAmount();
+        // Order doesnt exist
+        if (order.endTime == 0) revert NoOrder();
+        // Only the order-owner can remove orders before they time out
+        if (order.endTime < block.timestamp && order.owner != msg.sender)
+            revert NotOwner();
 
         // Refund unused sell tokens
         if (order.sellAmount > 0) {
@@ -85,7 +107,7 @@ contract AsyncConverter is Owned {
                 (bool success, ) = order.owner.call{value: order.sellAmount}(
                     ""
                 );
-                if (!success) revert ZeroAmount();
+                if (!success) revert InsufficientAmount();
             } else {
                 IERC20(order.sellToken).transfer(order.owner, order.sellAmount);
             }
@@ -95,7 +117,7 @@ contract AsyncConverter is Owned {
         if (order.buyAmount > 0) {
             if (order.buyToken == ETH_PROXY_ADDRESS) {
                 (bool success, ) = order.owner.call{value: order.buyAmount}("");
-                if (!success) revert ZeroAmount();
+                if (!success) revert InsufficientAmount();
             } else {
                 IERC20(order.buyToken).transfer(order.owner, order.buyAmount);
             }
@@ -106,6 +128,10 @@ contract AsyncConverter is Owned {
         emit OrderRemoved(id, order);
     }
 
+    /*//////////////////////////////////////////////////////////////
+                            FULFILL ORDER
+    //////////////////////////////////////////////////////////////*/
+
     function fulfillOrderPreciseIn(
         uint256 id,
         uint256 buyAmount
@@ -113,23 +139,26 @@ contract AsyncConverter is Owned {
         Order memory order = orders[id];
 
         // Order doesnt exist
-        if (order.endTime == 0) revert ZeroAmount();
+        if (order.endTime == 0) revert NoOrder();
         // Order is over
-        if (order.endTime >= block.timestamp) revert ZeroAmount();
+        if (order.endTime >= block.timestamp) revert TimeOut();
 
         uint256 price = _getOrderPrice(order);
         uint256 sellAmount = buyAmount / price;
 
-        // Buying more than are offered
-        if (sellAmount > order.sellAmount) revert ZeroAmount();
+        if (sellAmount > order.sellAmount) {
+            sellAmount = order.sellAmount;
+            buyAmount = order.sellAmount * price;
+        }
 
         // Order needs be filled whole
-        if (!order.partialFillable && sellAmount < order.sellAmount)
-            revert ZeroAmount();
+        if (!order.partialFillable && sellAmount < order.sellAmount) {
+            revert InsufficientAmount();
+        }
 
         if (order.buyToken == ETH_PROXY_ADDRESS) {
             // Make sure enough eth have been send if used as buy token
-            if (msg.value != buyAmount) revert ZeroAmount();
+            if (msg.value != buyAmount) revert InsufficientAmount();
         } else {
             IERC20(order.buyToken).transferFrom(
                 msg.sender,
@@ -156,12 +185,13 @@ contract AsyncConverter is Owned {
         if (order.endTime == 0) revert ZeroAmount();
         // Order is over
         if (order.endTime >= block.timestamp) revert ZeroAmount();
-        // Buying more than are offered
-        if (sellAmount > order.sellAmount) revert ZeroAmount();
 
         // Order needs be filled whole
-        if (!order.partialFillable && sellAmount < order.sellAmount)
+        if (!order.partialFillable && sellAmount < order.sellAmount) {
             revert ZeroAmount();
+        }
+
+        if (sellAmount > order.sellAmount) sellAmount = order.sellAmount;
 
         uint256 price = _getOrderPrice(order);
         uint256 buyAmount = sellAmount * price;
@@ -185,12 +215,16 @@ contract AsyncConverter is Owned {
         emit OrderFilled(id, buyAmount, sellAmount, price);
     }
 
+    /*//////////////////////////////////////////////////////////////
+                            ORDER PRICE
+    //////////////////////////////////////////////////////////////*/
+
     function getOrderPrice(uint256 id) public view returns (uint256) {
         Order memory order = orders[id];
         // Order doesnt exist
-        if (order.endTime == 0) revert ZeroAmount();
+        if (order.endTime == 0) revert NoOrder();
         // Order is over
-        if (order.endTime >= block.timestamp) revert ZeroAmount();
+        if (order.endTime >= block.timestamp) revert TimeOut();
 
         return _getOrderPrice(order);
     }
