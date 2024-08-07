@@ -21,12 +21,13 @@ contract AnyCompounderNaiveImpl is AnyCompounderNaive {
 
 contract ClaimContract {
     address[] public rewardTokens;
+
     constructor(address[] memory _rewardTokens) {
         rewardTokens = _rewardTokens;
     }
 
-    function claim() external {
-        for (uint i; i < rewardTokens.length; i++) {
+    fallback() external {
+        for (uint256 i; i < rewardTokens.length; i++) {
             IERC20(rewardTokens[i]).transfer(
                 msg.sender,
                 IERC20(rewardTokens[i]).balanceOf(address(this))
@@ -81,25 +82,21 @@ contract AnyCompounderNaiveTest is AnyBaseTest {
         vm.prank(bob);
         strategy.deposit(testConfig.defaultAmount, bob);
 
-        uint totalAssets = strategy.totalAssets();
-        uint totalSupply = strategy.totalSupply();
+        uint256 totalAssets = strategy.totalAssets();
+        uint256 totalSupply = strategy.totalSupply();
 
         // we give the strategy reward tokens to simulate a harvest
         address[] memory rewardTokens = strategy.rewardTokens();
-        for (uint i; i < rewardTokens.length; i++) {
+        for (uint256 i; i < rewardTokens.length; i++) {
             deal(rewardTokens[i], address(strategy), 1e18);
         }
 
         // give this contract yield assets and allow the strategy to pull them
-        _prepareConversion(yieldAsset, testConfig.defaultAmount);
+        _mintYieldAsset(testConfig.defaultAmount, address(this));
 
         ClaimContract claimContract = new ClaimContract(rewardTokens);
         strategy.harvest(
-            abi.encode(
-                claimContract,
-                abi.encodeWithSelector(ClaimContract.claim.selector),
-                testConfig.defaultAmount
-            )
+            abi.encode(claimContract, bytes(""), testConfig.defaultAmount)
         );
 
         assertGt(
@@ -126,22 +123,16 @@ contract AnyCompounderNaiveTest is AnyBaseTest {
 
         // we give the strategy reward tokens to simulate a harvest
         address[] memory rewardTokens = strategy.rewardTokens();
-        for (uint i; i < rewardTokens.length; i++) {
+        for (uint256 i; i < rewardTokens.length; i++) {
             deal(rewardTokens[i], address(strategy), 1e18);
         }
 
         // give this contract yield assets and allow the strategy to pull them
-        _prepareConversion(yieldAsset, testConfig.defaultAmount);
+        _mintYieldAsset(testConfig.defaultAmount, address(this));
 
         ClaimContract claimContract = new ClaimContract(rewardTokens);
 
         vm.expectRevert(AnyCompounderNaive.HarvestFailed.selector);
-        strategy.harvest(
-            abi.encode(
-                claimContract,
-                abi.encodeWithSelector(ClaimContract.claim.selector),
-                0
-            )
-        );
+        strategy.harvest(abi.encode(claimContract, bytes(""), 0));
     }
 }

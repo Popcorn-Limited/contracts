@@ -121,7 +121,7 @@ abstract contract AnyConverter is BaseStrategy {
     error NotEnoughFloat();
 
     function pushFunds(
-        uint256 assets,
+        uint256 yieldAssets,
         bytes memory
     ) external override onlyKeeperOrOwner {
         // caching
@@ -129,15 +129,24 @@ abstract contract AnyConverter is BaseStrategy {
         address _yieldAsset = yieldAsset;
         uint256 _floatRatio = floatRatio;
 
-        uint256 ta = this.totalAssets();
+        uint256 ta = totalAssets();
+        // TODO: should take into account the reserved assets
         uint256 bal = IERC20(_asset).balanceOf(address(this));
 
-        IERC20(_yieldAsset).transferFrom(msg.sender, address(this), assets);
+        IERC20(_yieldAsset).transferFrom(
+            msg.sender,
+            address(this),
+            yieldAssets
+        );
 
-        uint256 postTa = this.totalAssets();
+        uint256 withdrawable = oracle.getQuote(
+            yieldAssets,
+            _yieldAsset,
+            _asset
+        );
 
-        uint256 withdrawable = oracle.getQuote(assets, _yieldAsset, _asset);
-
+        // TODO: we should probably revert if we don't have enough funds
+        // to cover the withdrawable amount
         if (_floatRatio > 0) {
             uint256 float = ta.mulDiv(
                 10_000 - _floatRatio,
@@ -150,14 +159,13 @@ abstract contract AnyConverter is BaseStrategy {
             if (bal < withdrawable) withdrawable = bal;
         }
 
-        if (
-            postTa - withdrawable <
-            ta.mulDiv(10_000 - slippage, 10_000, Math.Rounding.Floor)
-        ) revert SlippageTooHigh();
+        _reserveToken(yieldAssets, withdrawable, _yieldAsset, false);
+        uint256 postTa = totalAssets();
 
-        _reserveToken(assets, withdrawable, _asset, false);
+        if (postTa < ta.mulDiv(10_000 - slippage, 10_000, Math.Rounding.Floor))
+            revert SlippageTooHigh();
 
-        emit PushedFunds(assets, withdrawable);
+        emit PushedFunds(yieldAssets, withdrawable);
     }
 
     function pullFunds(
@@ -168,20 +176,17 @@ abstract contract AnyConverter is BaseStrategy {
         address _asset = asset();
         address _yieldAsset = yieldAsset;
 
-        uint256 ta = this.totalAssets();
+        uint256 ta = totalAssets();
 
         IERC20(_asset).transferFrom(msg.sender, address(this), assets);
 
-        uint256 postTa = this.totalAssets();
+        uint256 withdrawable = oracle.getQuote(assets, _asset, _yieldAsset);
+        _reserveToken(assets, withdrawable, _asset, true);
 
-        uint256 withdrawable = oracle.getQuote(assets, _yieldAsset, _asset);
+        uint256 postTa = totalAssets();
 
-        if (
-            postTa - withdrawable <
-            ta.mulDiv(10_000 - slippage, 10_000, Math.Rounding.Floor)
-        ) revert SlippageTooHigh();
-
-        _reserveToken(assets, withdrawable, _yieldAsset, true);
+        if (postTa < ta.mulDiv(10_000 - slippage, 10_000, Math.Rounding.Floor))
+            revert SlippageTooHigh();
 
         emit PulledFunds(assets, withdrawable);
     }
@@ -256,7 +261,9 @@ abstract contract AnyConverter is BaseStrategy {
         if (
             _proposedFloatRatio.changeTime == 0 ||
             block.timestamp > _proposedFloatRatio.changeTime
-        ) revert Misconfigured();
+        ) {
+            revert Misconfigured();
+        }
 
         emit FloatRatioChanged(slippage, _proposedFloatRatio.value);
 
@@ -280,7 +287,9 @@ abstract contract AnyConverter is BaseStrategy {
         if (
             _proposedUnlockTime.changeTime == 0 ||
             block.timestamp > _proposedUnlockTime.changeTime
-        ) revert Misconfigured();
+        ) {
+            revert Misconfigured();
+        }
 
         emit UnlockTimeChanged(unlockTime, _proposedUnlockTime.value);
 
@@ -320,18 +329,18 @@ abstract contract AnyConverter is BaseStrategy {
     mapping(address => mapping(address => mapping(uint256 => Reserved)))
         public reserved;
 
-    function claimReserved(uint blockNumber) external {
+    function claimReserved(uint256 blockNumber) external {
         address _asset = asset();
         address _yieldAsset = yieldAsset;
 
-        _claimReserved(_asset, _yieldAsset, blockNumber, false);
-        _claimReserved(_yieldAsset, _asset, blockNumber, true);
+        _claimReserved(_asset, _yieldAsset, blockNumber, true);
+        _claimReserved(_yieldAsset, _asset, blockNumber, false);
     }
 
     function _claimReserved(
         address base,
         address quote,
-        uint blockNumber,
+        uint256 blockNumber,
         bool isYieldAsset
     ) internal {
         Reserved memory _reserved = reserved[msg.sender][base][blockNumber];
@@ -350,12 +359,12 @@ abstract contract AnyConverter is BaseStrategy {
                 delete reserved[msg.sender][base][blockNumber];
 
                 if (isYieldAsset) {
-                    totalReservedYieldAssets -= _reserved.deposited;
+                    totalReservedYieldAssets -= _reserved.withdrawable;
                 } else {
-                    totalReservedAssets -= _reserved.deposited;
+                    totalReservedAssets -= _reserved.withdrawable;
                 }
 
-                IERC20(base).transfer(msg.sender, withdrawable);
+                IERC20(quote).transfer(msg.sender, withdrawable);
             }
             emit ReserveClaimed(msg.sender, base, _reserved.withdrawable);
         }
@@ -367,10 +376,11 @@ abstract contract AnyConverter is BaseStrategy {
         address token,
         bool isYieldAsset
     ) internal {
-        if (reserved[msg.sender][token][block.number].deposited > 0)
+        if (reserved[msg.sender][token][block.number].deposited > 0) {
             revert("Already reserved");
+        }
 
-        uint _unlockTime = block.timestamp + unlockTime;
+        uint256 _unlockTime = block.timestamp + unlockTime;
         reserved[msg.sender][token][block.number] = Reserved({
             deposited: amount,
             withdrawable: withdrawable,
@@ -378,9 +388,9 @@ abstract contract AnyConverter is BaseStrategy {
         });
 
         if (isYieldAsset) {
-            totalReservedYieldAssets += amount;
+            totalReservedYieldAssets += withdrawable;
         } else {
-            totalReservedAssets += amount;
+            totalReservedAssets += withdrawable;
         }
 
         emit ReserveAdded(msg.sender, token, _unlockTime, amount, withdrawable);
@@ -391,7 +401,7 @@ abstract contract AnyConverter is BaseStrategy {
     //////////////////////////////////////////////////////////////*/
 
     function rescueToken(address token) external onlyOwner {
-        for (uint i; i < tokens.length; i++) {
+        for (uint256 i; i < tokens.length; i++) {
             if (tokens[i] == token) revert Misconfigured();
         }
 
