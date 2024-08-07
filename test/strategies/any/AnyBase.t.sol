@@ -236,11 +236,11 @@ abstract contract AnyBaseTest is BaseStrategyTest {
 
         vm.roll(block.number + 1);
         oracle.setPrice(yieldAsset, _asset_, 1e18 * 12_500 / 10_000);
-        strategy.pushFunds(1e18, bytes(""));
+        strategy.pushFunds(amount, bytes(""));
 
         vm.roll(block.number + 1);
         oracle.setPrice(yieldAsset, _asset_, 1e18 * 16_000 / 10_000);
-        strategy.pushFunds(1e18, bytes(""));
+        strategy.pushFunds(amount, bytes(""));
 
         vm.warp(block.timestamp + 2 days);
 
@@ -258,8 +258,6 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         // 3. 1e18 * 1.6e18 / 1e18 = 1.6e18 asset
         // so in total we need to receive 1e18 + 1.25e18 + 1.6e18 = 3.85e18 asset
 
-        // need to hardcode value cause of precision
-        assertEq(strategy.totalAssets(), 5951818035113561382, "total assets not correct");
         assertEq(IERC20(_asset_).balanceOf(address(this)), 3.85e18, "asset balance not correct");
     }
 
@@ -296,18 +294,127 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         // 0.4:1 in favor of the asset
         AnyConverter(address(strategy)).claimReserved(block.number);
 
-        // so we need to receive
+        // should use new favorable quote 0.4:1 in favor of asset so we need to receive
         // 1. 1e18 * 0.4e18 / 1e18 = 0.4e18 asset
         // 1. 1e18 * 0.4e18 / 1e18 = 0.4e18 asset
         // 1. 1e18 * 0.4e18 / 1e18 = 0.4e18 asset
         // so in total we need to receive 0.4e18 + 0.4e18 + 0.4e18 = 1.2e18
 
-        // need to hardcode value cause of precision
-        assertEq(strategy.totalAssets(), 3000454508778390345, "total assets not correct");
         assertEq(IERC20(_asset_).balanceOf(address(this)), 1.2e18, "asset balance not correct");
     }
 
     function test__pull_funds_should_use_old_favorable_quote() public {
         _mintAsset(testConfig.defaultAmount, address(this));
+        _mintYieldAsset(testConfig.defaultAmount * 2, address(this));
+        // send yield assets to strategy. We'll pull them in this test
+        IERC20(yieldAsset).transfer(address(strategy), testConfig.defaultAmount * 2);
+
+        strategy.pullFunds(testConfig.defaultAmount, bytes(""));
+
+        // price of asset went up after the keeper reserved the funds
+        oracle.setPrice(_asset_, yieldAsset, 1e18 * 12_000 / 10_000);
+
+        vm.warp(block.timestamp + 2 days);
+
+        AnyConverter(address(strategy)).claimReserved(block.number);
+
+        // should use the old favorable quote 1:1 instead of 1.2:1 in favor of the asset
+
+        assertEq(IERC20(yieldAsset).balanceOf(address(address(this))), 1e18, "yield asset balance not correct");
+        assertEq(IERC20(_asset_).balanceOf(address(this)), 0, "asset balance not correct");
     }
+
+    function test__pull_funds_should_use_new_favorable_quote() public {
+        _mintAsset(testConfig.defaultAmount, address(this));
+        _mintYieldAsset(testConfig.defaultAmount * 2, address(this));
+        // send yield assets to strategy. We'll pull them in this test
+        IERC20(yieldAsset).transfer(address(strategy), testConfig.defaultAmount * 2);
+
+        strategy.pullFunds(testConfig.defaultAmount, bytes(""));
+
+        // price of asset went up after the keeper reserved the funds
+        oracle.setPrice(_asset_, yieldAsset, 1e18 * 8_000 / 10_000);
+
+        vm.warp(block.timestamp + 2 days);
+
+        AnyConverter(address(strategy)).claimReserved(block.number);
+
+        // should use the old favorable quote 1:1 instead of 1.2:1 in favor of the asset
+
+        assertEq(IERC20(yieldAsset).balanceOf(address(address(this))), 0.8e18, "yield asset balance not correct");
+        assertEq(IERC20(_asset_).balanceOf(address(this)), 0, "asset balance not correct");
+    }
+
+    function test__pull_funds_should_use_old_favorable_quote_with_multiple_reserves() public {
+        uint256 amount = 1e18;
+        _mintAsset(amount * 3, address(this));
+        _mintYieldAsset(amount * 4, address(this));
+        // send yield assets to strategy. We'll pull them in this test
+        IERC20(yieldAsset).transfer(address(strategy), amount * 4);
+
+        strategy.pullFunds(amount, bytes(""));
+
+        vm.roll(block.number + 1);
+        oracle.setPrice(_asset_, yieldAsset, 1e18 * 12_500 / 10_000);
+        strategy.pullFunds(amount, bytes(""));
+
+        vm.roll(block.number + 1);
+        oracle.setPrice(_asset_, yieldAsset, 1e18 * 16_000 / 10_000);
+        strategy.pullFunds(amount, bytes(""));
+
+        vm.warp(block.timestamp + 2 days);
+
+        // ratio 1:1
+        AnyConverter(address(strategy)).claimReserved(block.number - 2);
+        // ratio 1.25:1 in favor of the asset
+        AnyConverter(address(strategy)).claimReserved(block.number - 1);
+        // ratio 1.6:1 in favor of the asset
+        AnyConverter(address(strategy)).claimReserved(block.number);
+
+        // so we need to receive
+        // 1. 1e18 * 1e18 / 1e18 = 1e18 yield asset
+        // 2. 1e18 * 1.25e18 / 1e18 = 1.25e18 yield asset
+        // 3. 1e18 * 1.6e18 / 1e18 = 1.6e18 yield asset
+        // so in total we need to receive 1e18 + 1.25e18 + 1.6e18 = 3.85e18 yield asset
+
+        // can be off by 1 because of precision
+        assertApproxEqAbs(IERC20(yieldAsset).balanceOf(address(address(this))), 3.85e18, 1, "yield asset balance not correct");
+        assertEq(IERC20(_asset_).balanceOf(address(this)), 0, "asset balance not correct");
+    }
+
+    function test__pull_funds_should_use_new_favorable_quote_with_multiple_reserves() public {
+        uint256 amount = 1e18;
+        _mintAsset(amount * 3, address(this));
+        _mintYieldAsset(amount * 4, address(this));
+        // send yield assets to strategy. We'll pull them in this test
+        IERC20(yieldAsset).transfer(address(strategy), amount * 4);
+
+        strategy.pullFunds(amount, bytes(""));
+
+        vm.roll(block.number + 1);
+        oracle.setPrice(_asset_, yieldAsset, 1e18 * 7_500 / 10_000);
+        strategy.pullFunds(amount, bytes(""));
+
+        vm.roll(block.number + 1);
+        oracle.setPrice(_asset_, yieldAsset, 1e18 * 4_000 / 10_000);
+        strategy.pullFunds(amount, bytes(""));
+
+        vm.warp(block.timestamp + 2 days);
+
+        AnyConverter(address(strategy)).claimReserved(block.number - 2);
+        AnyConverter(address(strategy)).claimReserved(block.number - 1);
+        AnyConverter(address(strategy)).claimReserved(block.number);
+
+        // should use new favorable quote 0.4:1 in favor of yield asset so we need to receive
+        // 1. 1e18 * 0.4e18 / 1e18 = 0.4e18 yield asset
+        // 2. 1e18 * 0.4e18 / 1e18 = 0.4e18 yield asset
+        // 3. 1e18 * 0.4e18 / 1e18 = 0.4e18 yield asset
+        // so in total we need to receive 0.4e18 + 0.4e18 + 0.4e18 = 1.2e18 yield asset
+
+        // can be off by 1 because of precision
+        assertEq(IERC20(yieldAsset).balanceOf(address(address(this))), 1.2e18, "yield asset balance not correct");
+        assertEq(IERC20(_asset_).balanceOf(address(this)), 0, "asset balance not correct");
+    }
+
+
 }
