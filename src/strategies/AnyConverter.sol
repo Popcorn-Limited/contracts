@@ -133,7 +133,7 @@ abstract contract AnyConverter is BaseStrategy {
         // TODO: should take into account the reserved assets
         uint256 bal = IERC20(_asset).balanceOf(address(this));
 
-        IERC20(_yieldAsset).transferFrom(
+        IERC20(_yieldAsset).safeTransferFrom(
             msg.sender,
             address(this),
             yieldAssets
@@ -178,7 +178,7 @@ abstract contract AnyConverter is BaseStrategy {
 
         uint256 ta = totalAssets();
 
-        IERC20(_asset).transferFrom(msg.sender, address(this), assets);
+        IERC20(_asset).safeTransferFrom(msg.sender, address(this), assets);
 
         uint256 withdrawable = oracle.getQuote(assets, _asset, _yieldAsset);
         _reserveToken(assets, withdrawable, _asset, true);
@@ -364,7 +364,7 @@ abstract contract AnyConverter is BaseStrategy {
                     totalReservedAssets -= _reserved.withdrawable;
                 }
 
-                IERC20(quote).transfer(msg.sender, withdrawable);
+                IERC20(quote).safeTransfer(msg.sender, withdrawable);
             }
             emit ReserveClaimed(msg.sender, base, _reserved.withdrawable);
         }
@@ -406,6 +406,6 @@ abstract contract AnyConverter is BaseStrategy {
         }
 
         uint256 bal = IERC20(token).balanceOf(address(this));
-        IERC20(token).transfer(owner, bal);
+        IERC20(token).safeTransfer(owner, bal);
     }
 }

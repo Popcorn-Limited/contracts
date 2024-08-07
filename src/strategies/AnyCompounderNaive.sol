@@ -46,7 +46,7 @@ abstract contract AnyCompounderNaive is AnyConverter {
 
         uint256 ta = totalAssets();
 
-        IERC20(yieldAsset).transferFrom(msg.sender, address(this), assets);
+        IERC20(yieldAsset).safeTransferFrom(msg.sender, address(this), assets);
 
         uint256 postTa = totalAssets();
 
@@ -54,7 +54,7 @@ abstract contract AnyCompounderNaive is AnyConverter {
 
         uint256 len = _rewardTokens.length;
         for (uint256 i; i < len; i++) {
-            IERC20(_rewardTokens[i]).transfer(msg.sender, IERC20(_rewardTokens[i]).balanceOf(address(this)));
+            IERC20(_rewardTokens[i]).safeTransfer(msg.sender, IERC20(_rewardTokens[i]).balanceOf(address(this)));
         }
 
         emit Harvested();
