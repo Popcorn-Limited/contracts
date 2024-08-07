@@ -144,13 +144,12 @@ abstract contract AnyConverter is BaseStrategy {
 
         IERC20(_asset).transferFrom(msg.sender, address(this), assets);
 
+        uint256 withdrawable = oracle.getQuote(assets, _asset, _yieldAsset);
+        _reserveToken(assets, withdrawable, _asset, true);
+
         uint256 postTa = totalAssets();
 
-        uint256 withdrawable = oracle.getQuote(assets, _yieldAsset, _asset);
-
-        if (postTa - withdrawable < ta.mulDiv(10_000 - slippage, 10_000, Math.Rounding.Floor)) revert SlippageTooHigh();
-
-        _reserveToken(assets, withdrawable, _asset, true);
+        if (postTa < ta.mulDiv(10_000 - slippage, 10_000, Math.Rounding.Floor)) revert SlippageTooHigh();
 
         emit PulledFunds(assets, withdrawable);
     }
