@@ -331,7 +331,7 @@ abstract contract AnyBaseTest is BaseStrategyTest {
 
         vm.prank(bob);
         rescueToken.transfer(address(strategy), rescueAmount);
-        
+
         AnyConverter(address(strategy)).rescueToken(address(rescueToken));
 
         assertEq(rescueToken.balanceOf(address(strategy)), 0);
@@ -353,6 +353,7 @@ abstract contract AnyBaseTest is BaseStrategyTest {
     }
 
     function testFail__rescueToken_token_is_in_tokens() public {
+        vm.expectRevert(AnyConverter.Misconfigured.selector);
         AnyConverter(address(strategy)).rescueToken(testConfig.asset);
     }
 }
