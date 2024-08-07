@@ -373,11 +373,9 @@ contract MultiStrategyVault is
     function maxMint(address) public view override returns (uint256) {
         uint256 assets = totalAssets();
         uint256 depositLimit_ = depositLimit;
-        if(paused() || assets >= depositLimit_)
-            return 0;
+        if (paused() || assets >= depositLimit_) return 0;
 
-        if(depositLimit_ == type(uint256).max) 
-            return depositLimit_;
+        if (depositLimit_ == type(uint256).max) return depositLimit_;
 
         return convertToShares(depositLimit_ - assets);
     }
@@ -608,12 +606,21 @@ contract MultiStrategyVault is
     uint256 public performanceFee;
     uint256 public highWaterMark;
 
+    uint256 public managementFee;
+    uint256 public feesUpdatedAt;
+
     address public constant FEE_RECIPIENT =
         address(0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E);
+    uint256 internal constant SECONDS_PER_YEAR = 365.25 days;
 
-    event PerformanceFeeChanged(uint256 oldFee, uint256 newFee);
+    event FeesChanged(
+        uint256 oldPerformanceFee,
+        uint256 newPerformanceFee,
+        uint256 oldManagementFee,
+        uint256 newManagementFee
+    );
 
-    error InvalidPerformanceFee(uint256 fee);
+    error InvalidFee(uint256 fee);
 
     /**
      * @notice Performance fee that has accrued since last fee harvest.
@@ -637,28 +644,68 @@ contract MultiStrategyVault is
     }
 
     /**
-     * @notice Set a new performance fee for this adapter. Caller must be owner.
-     * @param newFee performance fee in 1e18.
-     * @dev Fees can be 0 but never more than 2e17 (1e18 = 100%, 1e14 = 1 BPS)
+     * @notice Management fee that has accrued since last fee harvest.
+     * @return Accrued management fee in underlying `asset` token.
+     * @dev Management fee is annualized per minute, based on 525,600 minutes per year. Total assets are calculated using
+     *  the average of their current value and the value at the previous fee harvest checkpoint. This method is similar to
+     *  calculating a definite integral using the trapezoid rule.
      */
-    function setPerformanceFee(uint256 newFee) public onlyOwner {
+    function accruedManagementFee() public view returns (uint256) {
+        uint256 managementFee_ = managementFee;
+
+        return
+            managementFee_ > 0
+                ? managementFee_.mulDiv(
+                    totalAssets() * (block.timestamp - feesUpdatedAt),
+                    SECONDS_PER_YEAR,
+                    Math.Rounding.Floor
+                ) / 1e18
+                : 0;
+    }
+
+    /**
+     * @notice Set a new performance fee for this adapter. Caller must be owner.
+     * @param performanceFee_ performance fee in 1e18.
+     * @param managementFee_ management fee in 1e18.
+     * @dev Performance fee can be 0 but never more than 2e17 (1e18 = 100%, 1e14 = 1 BPS)
+     * @dev Management fee can be 0 but never more than 1e17 (1e18 = 100%, 1e14 = 1 BPS)
+     */
+    function setFees(
+        uint256 performanceFee_,
+        uint256 managementFee_
+    ) public onlyOwner {
+        // TODO check these values
         // Dont take more than 20% performanceFee
-        if (newFee > 2e17) revert InvalidPerformanceFee(newFee);
+        if (performanceFee_ > 2e17) revert InvalidFee(performanceFee_);
+        // Dont take more than 10% managementFee
+        if (managementFee_ > 1e17) revert InvalidFee(managementFee_);
 
         _takeFees();
 
-        emit PerformanceFeeChanged(performanceFee, newFee);
+        emit FeesChanged(
+            performanceFee,
+            performanceFee_,
+            managementFee,
+            managementFee_
+        );
 
-        performanceFee = newFee;
+        performanceFee = performanceFee_;
+        managementFee = managementFee_;
+    }
+
+    function takeFees() external {
+        _takeFees();
     }
 
     function _takeFees() internal {
-        uint256 fee = accruedPerformanceFee();
+        uint256 fee = accruedPerformanceFee() + accruedManagementFee();
         uint256 shareValue = convertToAssets(1e18);
 
         if (shareValue > highWaterMark) highWaterMark = shareValue;
 
         if (fee > 0) _mint(FEE_RECIPIENT, convertToShares(fee));
+
+        feesUpdatedAt = block.timestamp;
     }
 
     /*//////////////////////////////////////////////////////////////
