@@ -30,13 +30,9 @@ contract VaultRouter {
                     SYNCHRONOUS INTERACTION LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function depositAndStake(
-        address vault,
-        address gauge,
-        uint256 assetAmount,
-        uint256 minOut,
-        address receiver
-    ) external {
+    function depositAndStake(address vault, address gauge, uint256 assetAmount, uint256 minOut, address receiver)
+        external
+    {
         IERC20 asset = IERC20(IERC4626(vault).asset());
         asset.safeTransferFrom(msg.sender, address(this), assetAmount);
         asset.approve(address(vault), assetAmount);
@@ -49,22 +45,14 @@ contract VaultRouter {
         ICurveGauge(gauge).deposit(shares, receiver);
     }
 
-    function unstakeAndWithdraw(
-        address vault,
-        address gauge,
-        uint256 burnAmount,
-        uint256 minOut,
-        address receiver
-    ) external {
+    function unstakeAndWithdraw(address vault, address gauge, uint256 burnAmount, uint256 minOut, address receiver)
+        external
+    {
         IERC20(gauge).safeTransferFrom(msg.sender, address(this), burnAmount);
 
         ICurveGauge(gauge).withdraw(burnAmount);
 
-        uint256 assets = IERC4626(vault).redeem(
-            burnAmount,
-            receiver,
-            address(this)
-        );
+        uint256 assets = IERC4626(vault).redeem(burnAmount, receiver, address(this));
 
         if (assets < minOut) revert SlippageTooHigh();
     }
@@ -105,48 +93,19 @@ contract VaultRouter {
         _requestWithdrawal(vault, burnAmount, minOut, receiver);
     }
 
-    function requestWithdrawal(
-        address vault,
-        uint256 burnAmount,
-        uint256 minOut,
-        address receiver
-    ) external {
+    function requestWithdrawal(address vault, uint256 burnAmount, uint256 minOut, address receiver) external {
         IERC20(vault).safeTransferFrom(msg.sender, address(this), burnAmount);
         _requestWithdrawal(vault, burnAmount, minOut, receiver);
     }
 
-    function _requestWithdrawal(
-        address vault,
-        uint256 burnAmount,
-        uint256 minOut,
-        address receiver
-    ) internal {
-        bytes32 requestId = keccak256(
-            abi.encodePacked(
-                vault,
-                burnAmount,
-                minOut,
-                receiver,
-                msg.sender,
-                block.timestamp
-            )
-        );
-        IdToRequest[requestId] = WithdrawalRequest({
-            vault: vault,
-            burnAmount: burnAmount,
-            minOut: minOut,
-            receiver: receiver
-        });
+    function _requestWithdrawal(address vault, uint256 burnAmount, uint256 minOut, address receiver) internal {
+        bytes32 requestId =
+            keccak256(abi.encodePacked(vault, burnAmount, minOut, receiver, msg.sender, block.timestamp));
+        IdToRequest[requestId] =
+            WithdrawalRequest({vault: vault, burnAmount: burnAmount, minOut: minOut, receiver: receiver});
         requestIds.push(requestId);
 
-        emit RequestedWithdrawal(
-            msg.sender,
-            vault,
-            receiver,
-            burnAmount,
-            minOut,
-            requestId
-        );
+        emit RequestedWithdrawal(msg.sender, vault, receiver, burnAmount, minOut, requestId);
     }
 
     function fullfillWithdrawal(bytes32 requestId) external {
@@ -163,19 +122,11 @@ contract VaultRouter {
         for (uint256 i; i < len; i++) {
             request = IdToRequest[requestIds[i]];
 
-            _fullfillWithdrawal(
-                requestIds[i],
-                request,
-                IERC20(IERC4626(request.vault).asset())
-            );
+            _fullfillWithdrawal(requestIds[i], request, IERC20(IERC4626(request.vault).asset()));
         }
     }
 
-    function _fullfillWithdrawal(
-        bytes32 requestId,
-        WithdrawalRequest memory request,
-        IERC20 asset
-    ) internal {
+    function _fullfillWithdrawal(bytes32 requestId, WithdrawalRequest memory request, IERC20 asset) internal {
         asset.safeTransferFrom(msg.sender, request.receiver, request.minOut);
 
         IERC20(request.vault).transfer(msg.sender, request.burnAmount);

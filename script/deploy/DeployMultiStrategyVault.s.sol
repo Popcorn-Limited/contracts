@@ -20,10 +20,8 @@ contract DeployMultiStrategyVault is Script {
         // @dev edit this values below
         asset = IERC20(0x9D39A5DE30e57443BfF2A8307A4256c8797A3497);
 
-        strategies = [
-            IERC4626(0xF82316c0cd110dB4c4a6c15F85dFaD7266551854),
-            IERC4626(0x377DFCC7B9ce9aDD96347f34b2303C9bD8067e01)
-        ];
+        strategies =
+            [IERC4626(0xF82316c0cd110dB4c4a6c15F85dFaD7266551854), IERC4626(0x377DFCC7B9ce9aDD96347f34b2303C9bD8067e01)];
 
         defaultDepositIndex = uint256(0);
 
@@ -36,14 +34,7 @@ contract DeployMultiStrategyVault is Script {
         // Actual deployment
         vault = new MultiStrategyVault();
 
-        vault.initialize(
-            asset,
-            strategies,
-            defaultDepositIndex,
-            withdrawalQueue,
-            depositLimit,
-            owner
-        );
+        vault.initialize(asset, strategies, defaultDepositIndex, withdrawalQueue, depositLimit, owner);
 
         vm.stopBroadcast();
     }

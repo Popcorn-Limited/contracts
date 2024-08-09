@@ -16,12 +16,8 @@ contract DeployStrategy is Script {
     IERC20 vdWETH;
 
     function run() public returns (WstETHLooper strategy) {
-        string memory json = vm.readFile(
-            string.concat(
-                vm.projectRoot(),
-                "/script/deploy/lido/WstETHLooperDeployConfig.json"
-            )
-        );
+        string memory json =
+            vm.readFile(string.concat(vm.projectRoot(), "/script/deploy/lido/WstETHLooperDeployConfig.json"));
 
         vm.startBroadcast();
         console.log("msg.sender:", msg.sender);
@@ -29,10 +25,7 @@ contract DeployStrategy is Script {
         // Deploy Strategy
         strategy = new WstETHLooper();
 
-        LooperInitValues memory looperValues = abi.decode(
-            json.parseRaw(".strategyInit"),
-            (LooperInitValues)
-        );
+        LooperInitValues memory looperValues = abi.decode(json.parseRaw(".strategyInit"), (LooperInitValues));
 
         address asset = json.readAddress(".baseInit.asset");
 

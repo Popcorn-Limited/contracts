@@ -9,12 +9,10 @@ import {AnyBaseTest} from "./AnyBase.t.sol";
 import "forge-std/console.sol";
 
 contract AnyCompounderNaiveImpl is AnyCompounderNaive {
-    function initialize(
-        address asset_,
-        address owner_,
-        bool autoDeposit_,
-        bytes memory strategyInitData_
-    ) external initializer {
+    function initialize(address asset_, address owner_, bool autoDeposit_, bytes memory strategyInitData_)
+        external
+        initializer
+    {
         __AnyConverter_init(asset_, owner_, autoDeposit_, strategyInitData_);
     }
 }
@@ -28,10 +26,7 @@ contract ClaimContract {
 
     fallback() external {
         for (uint256 i; i < rewardTokens.length; i++) {
-            IERC20(rewardTokens[i]).transfer(
-                msg.sender,
-                IERC20(rewardTokens[i]).balanceOf(address(this))
-            );
+            IERC20(rewardTokens[i]).transfer(msg.sender, IERC20(rewardTokens[i]).balanceOf(address(this)));
         }
     }
 }
@@ -40,36 +35,24 @@ contract AnyCompounderNaiveTest is AnyBaseTest {
     using stdJson for string;
 
     function setUp() public {
-        _setUpBaseTest(
-            0,
-            "./test/strategies/any/AnyCompounderNaiveTestConfig.json"
-        );
+        _setUpBaseTest(0, "./test/strategies/any/AnyCompounderNaiveTestConfig.json");
     }
 
-    function _setUpStrategy(
-        string memory json_,
-        string memory index_,
-        TestConfig memory testConfig_
-    ) internal override returns (IBaseStrategy) {
+    function _setUpStrategy(string memory json_, string memory index_, TestConfig memory testConfig_)
+        internal
+        override
+        returns (IBaseStrategy)
+    {
         AnyCompounderNaiveImpl _strategy = new AnyCompounderNaiveImpl();
         oracle = new MockOracle();
 
-        yieldAsset = json_.readAddress(
-            string.concat(".configs[", index_, "].specific.yieldAsset")
-        );
+        yieldAsset = json_.readAddress(string.concat(".configs[", index_, "].specific.yieldAsset"));
 
         _strategy.initialize(
-            testConfig_.asset,
-            address(this),
-            true,
-            abi.encode(yieldAsset, address(oracle), uint256(10), uint256(0))
+            testConfig_.asset, address(this), true, abi.encode(yieldAsset, address(oracle), uint256(10), uint256(0))
         );
 
-        _strategy.setRewardTokens(
-            json.readAddressArray(
-                string.concat(".configs[", index_, "].specific.rewardTokens")
-            )
-        );
+        _strategy.setRewardTokens(json.readAddressArray(string.concat(".configs[", index_, "].specific.rewardTokens")));
 
         return IBaseStrategy(address(_strategy));
     }
@@ -95,25 +78,13 @@ contract AnyCompounderNaiveTest is AnyBaseTest {
         _mintYieldAsset(testConfig.defaultAmount, address(this));
 
         ClaimContract claimContract = new ClaimContract(rewardTokens);
-        strategy.harvest(
-            abi.encode(claimContract, bytes(""), testConfig.defaultAmount)
-        );
+        strategy.harvest(abi.encode(claimContract, bytes(""), testConfig.defaultAmount));
 
-        assertGt(
-            strategy.totalAssets(),
-            totalAssets,
-            "total assets should increase"
-        );
-        assertEq(
-            strategy.totalSupply(),
-            totalSupply,
-            "total supply should not change"
-        );
+        assertGt(strategy.totalAssets(), totalAssets, "total assets should increase");
+        assertEq(strategy.totalSupply(), totalSupply, "total supply should not change");
     }
 
-    function test_harvest_should_fail_if_total_assets_does_not_increase()
-        public
-    {
+    function test_harvest_should_fail_if_total_assets_does_not_increase() public {
         // base code to have != total assets
         strategy.toggleAutoDeposit();
         _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);

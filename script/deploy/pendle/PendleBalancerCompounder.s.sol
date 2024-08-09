@@ -15,10 +15,7 @@ contract DeployStrategy is Script {
 
     function run() public returns (PendleBalancerCompounder strategy) {
         string memory json = vm.readFile(
-            string.concat(
-                vm.projectRoot(),
-                "/script/deploy/pendle/PendleBalancerCompounderDeployConfig.json"
-            )
+            string.concat(vm.projectRoot(), "/script/deploy/pendle/PendleBalancerCompounderDeployConfig.json")
         );
 
         vm.startBroadcast();
@@ -43,66 +40,38 @@ contract DeployStrategy is Script {
         vm.stopBroadcast();
     }
 
-    function _setHarvestValues(
-        string memory json,
-        address payable strategy
-    ) internal {
+    function _setHarvestValues(string memory json, address payable strategy) internal {
         // Read harvest values
         address balancerVault_ = json.readAddress(".harvest.balancerVault");
 
         TradePath[] memory tradePaths_ = _getTradePaths(json);
 
         // Set harvest values
-        PendleBalancerCompounder(strategy).setHarvestValues(
-            balancerVault_,
-            tradePaths_
-        );
+        PendleBalancerCompounder(strategy).setHarvestValues(balancerVault_, tradePaths_);
     }
 
-    function _getTradePaths(
-        string memory json
-    ) internal pure returns (TradePath[] memory) {
+    function _getTradePaths(string memory json) internal pure returns (TradePath[] memory) {
         uint256 swapLen = json.readUint(".harvest.tradePaths.length");
 
         TradePath[] memory tradePaths_ = new TradePath[](swapLen);
         for (uint256 i; i < swapLen; i++) {
             // Read route and convert dynamic into fixed size array
-            address[] memory assetAddresses = json.readAddressArray(
-                string.concat(
-                    ".harvest.tradePaths.structs[",
-                    vm.toString(i),
-                    "].assets"
-                )
-            );
+            address[] memory assetAddresses =
+                json.readAddressArray(string.concat(".harvest.tradePaths.structs[", vm.toString(i), "].assets"));
             IAsset[] memory assets = new IAsset[](assetAddresses.length);
             for (uint256 n; n < assetAddresses.length; n++) {
                 assets[n] = IAsset(assetAddresses[n]);
             }
 
-            int256[] memory limits = json.readIntArray(
-                string.concat(
-                    ".harvest.tradePaths.structs[",
-                    vm.toString(i),
-                    "].limits"
-                )
-            );
+            int256[] memory limits =
+                json.readIntArray(string.concat(".harvest.tradePaths.structs[", vm.toString(i), "].limits"));
 
             BatchSwapStep[] memory swapSteps = abi.decode(
-                json.parseRaw(
-                    string.concat(
-                        ".harvest.tradePaths.structs[",
-                        vm.toString(i),
-                        "].swaps"
-                    )
-                ),
+                json.parseRaw(string.concat(".harvest.tradePaths.structs[", vm.toString(i), "].swaps")),
                 (BatchSwapStep[])
             );
 
-            tradePaths_[i] = TradePath({
-                assets: assets,
-                limits: limits,
-                swaps: abi.encode(swapSteps)
-            });
+            tradePaths_[i] = TradePath({assets: assets, limits: limits, swaps: abi.encode(swapSteps)});
         }
 
         return tradePaths_;

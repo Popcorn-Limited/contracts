@@ -27,8 +27,7 @@ contract MainOracle is Owned, IPriceOracle {
 
     /// @notice PriceOracle configured per asset pair.
     /// @dev The keys are lexicographically sorted (asset0 < asset1).
-    mapping(address asset0 => mapping(address asset1 => address oracle))
-        internal oracles;
+    mapping(address asset0 => mapping(address asset1 => address oracle)) internal oracles;
 
     /// @notice Configure a PriceOracle to resolve an asset pair.
     /// @param asset0 The address first in lexicographic order.
@@ -36,11 +35,7 @@ contract MainOracle is Owned, IPriceOracle {
     /// @param oracle The address of the PriceOracle that resolves the pair.
     /// @dev If `oracle` is `address(0)` then the configuration was removed.
     /// The keys are lexicographically sorted (asset0 < asset1).
-    event ConfigSet(
-        address indexed asset0,
-        address indexed asset1,
-        address indexed oracle
-    );
+    event ConfigSet(address indexed asset0, address indexed asset1, address indexed oracle);
 
     /// @notice Set a PriceOracle as a fallback resolver.
     /// @param fallbackOracle The address of the PriceOracle that is called when base/quote is not configured.
@@ -65,11 +60,7 @@ contract MainOracle is Owned, IPriceOracle {
     /// @param quote The address of the quote token.
     /// @param oracle The address of the PriceOracle to resolve the pair.
     /// @dev Callable only by the governor.
-    function govSetConfig(
-        address base,
-        address quote,
-        address oracle
-    ) external onlyOwner {
+    function govSetConfig(address base, address quote, address oracle) external onlyOwner {
         // This case is handled by `resolveOracle`.
         if (base == quote) revert PriceOracle_InvalidConfiguration();
         (address asset0, address asset1) = _sort(base, quote);
@@ -97,11 +88,7 @@ contract MainOracle is Owned, IPriceOracle {
     }
 
     /// @inheritdoc IPriceOracle
-    function getQuote(
-        uint256 inAmount,
-        address base,
-        address quote
-    ) external view returns (uint256) {
+    function getQuote(uint256 inAmount, address base, address quote) external view returns (uint256) {
         address oracle;
         (inAmount, base, quote, oracle) = resolveOracle(inAmount, base, quote);
         if (base == quote) return inAmount;
@@ -109,11 +96,7 @@ contract MainOracle is Owned, IPriceOracle {
     }
 
     /// @inheritdoc IPriceOracle
-    function getQuotes(
-        uint256 inAmount,
-        address base,
-        address quote
-    ) external view returns (uint256, uint256) {
+    function getQuotes(uint256 inAmount, address base, address quote) external view returns (uint256, uint256) {
         address oracle;
         (inAmount, base, quote, oracle) = resolveOracle(inAmount, base, quote);
         if (base == quote) return (inAmount, inAmount);
@@ -124,10 +107,7 @@ contract MainOracle is Owned, IPriceOracle {
     /// @param base The address of the base token.
     /// @param quote The address of the quote token.
     /// @return The configured `PriceOracle` for the pair or `address(0)` if no oracle is configured.
-    function getConfiguredOracle(
-        address base,
-        address quote
-    ) public view returns (address) {
+    function getConfiguredOracle(address base, address quote) public view returns (address) {
         (address asset0, address asset1) = _sort(base, quote);
         return oracles[asset0][asset1];
     }
@@ -147,18 +127,17 @@ contract MainOracle is Owned, IPriceOracle {
     /// @return The resolved base.
     /// @return The resolved quote.
     /// @return The resolved PriceOracle to call.
-    function resolveOracle(
-        uint256 inAmount,
-        address base,
-        address quote
-    )
+    function resolveOracle(uint256 inAmount, address base, address quote)
         public
         view
         returns (
             uint256,
-            /* resolvedAmount */ address,
-            /* base */ address,
-            /* quote */ address /* oracle */
+            /* resolvedAmount */
+            address,
+            /* base */
+            address,
+            /* quote */
+            address /* oracle */
         )
     {
         // 1. Check the base case.
@@ -187,10 +166,7 @@ contract MainOracle is Owned, IPriceOracle {
     /// @param assetB The other asset in the pair.
     /// @return The address first in lexicographic order.
     /// @return The address second in lexicographic order.
-    function _sort(
-        address assetA,
-        address assetB
-    ) internal pure returns (address, address) {
+    function _sort(address assetA, address assetB) internal pure returns (address, address) {
         return assetA < assetB ? (assetA, assetB) : (assetB, assetA);
     }
 }

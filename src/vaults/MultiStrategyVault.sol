@@ -3,7 +3,13 @@
 
 pragma solidity ^0.8.25;
 
-import {ERC4626Upgradeable, IERC20Metadata, ERC20Upgradeable as ERC20, IERC4626, IERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
+import {
+    ERC4626Upgradeable,
+    IERC20Metadata,
+    ERC20Upgradeable as ERC20,
+    IERC4626,
+    IERC20
+} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuardUpgradeable} from "openzeppelin-contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {PausableUpgradeable} from "openzeppelin-contracts-upgradeable/utils/PausableUpgradeable.sol";
@@ -25,12 +31,7 @@ struct Allocation {
  * It allows for multiple type of fees which are taken by issuing new vault shares.
  * Strategies and fees can be changed by the owner after a ragequit time.
  */
-contract MultiStrategyVault is
-    ERC4626Upgradeable,
-    ReentrancyGuardUpgradeable,
-    PausableUpgradeable,
-    OwnedUpgradeable
-{
+contract MultiStrategyVault is ERC4626Upgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable, OwnedUpgradeable {
     using SafeERC20 for IERC20;
     using Math for uint256;
 
@@ -88,13 +89,7 @@ contract MultiStrategyVault is
         if (len > 0) {
             // Verify strategies and withdrawal queue + approve asset for strategies
             for (uint256 i; i < len; i++) {
-                _verifyStrategyAndWithdrawalQueue(
-                    i,
-                    len,
-                    address(asset_),
-                    strategies_,
-                    withdrawalQueue_
-                );
+                _verifyStrategyAndWithdrawalQueue(i, len, address(asset_), strategies_, withdrawalQueue_);
 
                 // Approve asset for strategy
                 // Doing this inside this loop instead of its own loop for gas savings
@@ -123,19 +118,10 @@ contract MultiStrategyVault is
         depositLimit = depositLimit_;
         highWaterMark = convertToAssets(1e18);
 
-        _name = string.concat(
-            "VaultCraft ",
-            IERC20Metadata(address(asset_)).name(),
-            " Vault"
-        );
-        _symbol = string.concat(
-            "vc-",
-            IERC20Metadata(address(asset_)).symbol()
-        );
+        _name = string.concat("VaultCraft ", IERC20Metadata(address(asset_)).name(), " Vault");
+        _symbol = string.concat("vc-", IERC20Metadata(address(asset_)).symbol());
 
-        contractName = keccak256(
-            abi.encodePacked("VaultCraft ", name(), block.timestamp, "Vault")
-        );
+        contractName = keccak256(abi.encodePacked("VaultCraft ", name(), block.timestamp, "Vault"));
 
         INITIAL_CHAIN_ID = block.chainid;
         INITIAL_DOMAIN_SEPARATOR = computeDomainSeparator();
@@ -143,21 +129,11 @@ contract MultiStrategyVault is
         emit VaultInitialized(contractName, address(asset_));
     }
 
-    function name()
-        public
-        view
-        override(IERC20Metadata, ERC20)
-        returns (string memory)
-    {
+    function name() public view override(IERC20Metadata, ERC20) returns (string memory) {
         return _name;
     }
 
-    function symbol()
-        public
-        view
-        override(IERC20Metadata, ERC20)
-        returns (string memory)
-    {
+    function symbol() public view override(IERC20Metadata, ERC20) returns (string memory) {
         return _symbol;
     }
 
@@ -186,10 +162,7 @@ contract MultiStrategyVault is
         // Check for duplicates
         for (uint256 n; n < len; n++) {
             if (n != i) {
-                if (
-                    address(strategy) == address(strategies_[n]) ||
-                    index == withdrawalQueue_[n]
-                ) {
+                if (address(strategy) == address(strategies_[n]) || index == withdrawalQueue_[n]) {
                     revert Duplicate();
                 }
             }
@@ -200,7 +173,7 @@ contract MultiStrategyVault is
                         DEPOSIT/WITHDRAWAL LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    uint withdrawalLeewayBps = 100;
+    uint256 withdrawalLeewayBps = 100;
 
     event StrategyWithdrawalFailed(address strategy, uint256 amount);
     event WithdrawalLeeWayUpdated(uint256 oldLeeway, uint256 newLeeway);
@@ -208,13 +181,12 @@ contract MultiStrategyVault is
     error ZeroAmount();
     error Misconfigured();
 
-    function setWithdrawalLeeway(uint _withdrawalLeewayBps) external onlyOwner {
+    function setWithdrawalLeeway(uint256 _withdrawalLeewayBps) external onlyOwner {
         require(_withdrawalLeewayBps <= 10_000, "Invalid withdrawal leeway");
-        uint oldLeeway = withdrawalLeewayBps;
+        uint256 oldLeeway = withdrawalLeewayBps;
         withdrawalLeewayBps = _withdrawalLeewayBps;
         emit WithdrawalLeeWayUpdated(oldLeeway, _withdrawalLeewayBps);
     }
-
 
     function deposit(uint256 assets) external returns (uint256) {
         return deposit(assets, msg.sender);
@@ -228,19 +200,14 @@ contract MultiStrategyVault is
         return withdraw(assets, msg.sender, msg.sender);
     }
 
-    function withdraw(
-        uint256 assets,
-        Allocation[] calldata allocations
-    ) external returns (uint256) {
+    function withdraw(uint256 assets, Allocation[] calldata allocations) external returns (uint256) {
         return withdraw(assets, msg.sender, msg.sender, allocations);
     }
 
-    function withdraw(
-        uint256 assets,
-        address owner,
-        address recipient,
-        Allocation[] calldata allocations
-    ) public returns (uint256) {
+    function withdraw(uint256 assets, address owner, address recipient, Allocation[] calldata allocations)
+        public
+        returns (uint256)
+    {
         // TODO is this check needed?
         _checkPullAllocation(assets, allocations);
 
@@ -253,19 +220,14 @@ contract MultiStrategyVault is
         return redeem(shares, msg.sender, msg.sender);
     }
 
-    function redeem(
-        uint256 shares,
-        Allocation[] calldata allocations
-    ) external returns (uint256) {
+    function redeem(uint256 shares, Allocation[] calldata allocations) external returns (uint256) {
         return redeem(shares, msg.sender, msg.sender, allocations);
     }
 
-    function redeem(
-        uint256 shares,
-        address owner,
-        address recipient,
-        Allocation[] calldata allocations
-    ) public returns (uint256) {
+    function redeem(uint256 shares, address owner, address recipient, Allocation[] calldata allocations)
+        public
+        returns (uint256)
+    {
         // TODO is this check needed?
         uint256 assets = convertToAssets(shares);
         _checkPullAllocation(assets, allocations);
@@ -275,10 +237,7 @@ contract MultiStrategyVault is
         return redeem(shares, owner, recipient);
     }
 
-    function _checkPullAllocation(
-        uint256 assets,
-        Allocation[] calldata allocations
-    ) internal view {
+    function _checkPullAllocation(uint256 assets, Allocation[] calldata allocations) internal view {
         uint256 len = allocations.length;
         if (len > strategies.length) revert Misconfigured();
 
@@ -286,19 +245,19 @@ contract MultiStrategyVault is
         for (uint256 i; i < len; i++) {
             pullAmount += allocations[i].amount;
         }
-        if ((assets + assets * withdrawalLeewayBps / 10_000) > pullAmount)
+        if ((assets + assets * withdrawalLeewayBps / 10_000) > pullAmount) {
             revert Misconfigured();
+        }
     }
 
     /**
      * @dev Deposit/mint common workflow.
      */
-    function _deposit(
-        address caller,
-        address receiver,
-        uint256 assets,
-        uint256 shares
-    ) internal override nonReentrant {
+    function _deposit(address caller, address receiver, uint256 assets, uint256 shares)
+        internal
+        override
+        nonReentrant
+    {
         if (shares == 0 || assets == 0) revert ZeroAmount();
 
         // If _asset is ERC-777, `transferFrom` can trigger a reentrancy BEFORE the transfer happens through the
@@ -308,12 +267,7 @@ contract MultiStrategyVault is
         // Conclusion: we need to do the transfer before we mint so that any reentrancy would happen before the
         // assets are transferred and before the shares are minted, which is a valid state.
         // slither-disable-next-line reentrancy-no-eth
-        SafeERC20.safeTransferFrom(
-            IERC20(asset()),
-            caller,
-            address(this),
-            assets
-        );
+        SafeERC20.safeTransferFrom(IERC20(asset()), caller, address(this), assets);
 
         // deposit into default index strategy or leave funds idle
         if (depositIndex != type(uint256).max) {
@@ -330,13 +284,11 @@ contract MultiStrategyVault is
     /**
      * @dev Withdraw/redeem common workflow.
      */
-    function _withdraw(
-        address caller,
-        address receiver,
-        address owner,
-        uint256 assets,
-        uint256 shares
-    ) internal override nonReentrant {
+    function _withdraw(address caller, address receiver, address owner, uint256 assets, uint256 shares)
+        internal
+        override
+        nonReentrant
+    {
         if (shares == 0 || assets == 0) revert ZeroAmount();
         if (caller != owner) {
             _spendAllowance(owner, caller, shares);
@@ -368,11 +320,7 @@ contract MultiStrategyVault is
         emit Withdraw(caller, receiver, owner, assets, shares);
     }
 
-    function _withdrawStrategyFunds(
-        uint256 amount,
-        uint256 float,
-        uint256[] memory queue
-    ) internal {
+    function _withdrawStrategyFunds(uint256 amount, uint256 float, uint256[] memory queue) internal {
         // Iterate the withdrawal queue and get indexes
         // Will revert due to underflow if we empty the stack before pulling the desired amount.
         uint256 len = queue.length;
@@ -381,9 +329,7 @@ contract MultiStrategyVault is
 
             IERC4626 strategy = strategies[queue[i]];
 
-            uint256 withdrawableAssets = strategy.previewRedeem(
-                strategy.balanceOf(address(this))
-            );
+            uint256 withdrawableAssets = strategy.previewRedeem(strategy.balanceOf(address(this)));
 
             if (withdrawableAssets >= missing) {
                 try strategy.withdraw(missing, address(this), address(this)) {
@@ -392,19 +338,10 @@ contract MultiStrategyVault is
                     emit StrategyWithdrawalFailed(address(strategy), missing);
                 }
             } else if (withdrawableAssets > 0) {
-                try
-                    strategy.withdraw(
-                        withdrawableAssets,
-                        address(this),
-                        address(this)
-                    )
-                {
+                try strategy.withdraw(withdrawableAssets, address(this), address(this)) {
                     float += withdrawableAssets;
                 } catch {
-                    emit StrategyWithdrawalFailed(
-                        address(strategy),
-                        withdrawableAssets
-                    );
+                    emit StrategyWithdrawalFailed(address(strategy), withdrawableAssets);
                 }
             }
         }
@@ -419,9 +356,7 @@ contract MultiStrategyVault is
         uint256 assets = IERC20(asset()).balanceOf(address(this));
 
         for (uint8 i; i < strategies.length; i++) {
-            assets += strategies[i].convertToAssets(
-                strategies[i].balanceOf(address(this))
-            );
+            assets += strategies[i].convertToAssets(strategies[i].balanceOf(address(this)));
         }
         return assets;
     }
@@ -434,8 +369,7 @@ contract MultiStrategyVault is
     function maxDeposit(address) public view override returns (uint256) {
         uint256 assets = totalAssets();
         uint256 depositLimit_ = depositLimit;
-        return
-            (paused() || assets >= depositLimit_) ? 0 : depositLimit_ - assets;
+        return (paused() || assets >= depositLimit_) ? 0 : depositLimit_ - assets;
     }
 
     /// @return Maximum amount of vault shares that may be minted to given address.
@@ -485,11 +419,7 @@ contract MultiStrategyVault is
         return withdrawalQueue;
     }
 
-    function getProposedWithdrawalQueue()
-        external
-        view
-        returns (uint256[] memory)
-    {
+    function getProposedWithdrawalQueue() external view returns (uint256[] memory) {
         return proposedWithdrawalQueue;
     }
 
@@ -566,13 +496,7 @@ contract MultiStrategyVault is
 
             // Verify strategies and withdrawal queue
             for (uint256 i; i < len; i++) {
-                _verifyStrategyAndWithdrawalQueue(
-                    i,
-                    len,
-                    asset_,
-                    strategies_,
-                    withdrawalQueue_
-                );
+                _verifyStrategyAndWithdrawalQueue(i, len, asset_, strategies_, withdrawalQueue_);
             }
         } else {
             // Validate depositIndex
@@ -596,10 +520,7 @@ contract MultiStrategyVault is
      * @dev Additionally it will zero old allowances and set new ones
      */
     function changeStrategies() external {
-        if (
-            proposedStrategyTime == 0 ||
-            block.timestamp < proposedStrategyTime + quitPeriod
-        ) {
+        if (proposedStrategyTime == 0 || block.timestamp < proposedStrategyTime + quitPeriod) {
             revert NotPassedQuitPeriod(quitPeriod);
         }
 
@@ -607,11 +528,7 @@ contract MultiStrategyVault is
         uint256 len = strategies.length;
         if (len > 0) {
             for (uint256 i; i < len; i++) {
-                strategies[i].redeem(
-                    strategies[i].balanceOf(address(this)),
-                    address(this),
-                    address(this)
-                );
+                strategies[i].redeem(strategies[i].balanceOf(address(this)), address(this), address(this));
                 IERC20(asset_).approve(address(strategies[i]), 0);
             }
         }
@@ -619,10 +536,7 @@ contract MultiStrategyVault is
         len = proposedStrategies.length;
         if (len > 0) {
             for (uint256 i; i < len; i++) {
-                IERC20(asset_).approve(
-                    address(proposedStrategies[i]),
-                    type(uint256).max
-                );
+                IERC20(asset_).approve(address(proposedStrategies[i]), type(uint256).max);
             }
         }
 
@@ -645,10 +559,7 @@ contract MultiStrategyVault is
     function pushFunds(Allocation[] calldata allocations) external onlyOwner {
         uint256 len = allocations.length;
         for (uint256 i; i < len; i++) {
-            strategies[allocations[i].index].deposit(
-                allocations[i].amount,
-                address(this)
-            );
+            strategies[allocations[i].index].deposit(allocations[i].amount, address(this));
         }
     }
 
@@ -664,11 +575,7 @@ contract MultiStrategyVault is
         uint256 len = allocations.length;
         for (uint256 i; i < len; i++) {
             if (allocations[i].amount > 0) {
-                strategies[allocations[i].index].withdraw(
-                    allocations[i].amount,
-                    address(this),
-                    address(this)
-                );
+                strategies[allocations[i].index].withdraw(allocations[i].amount, address(this), address(this));
             }
         }
     }
@@ -683,15 +590,11 @@ contract MultiStrategyVault is
     uint256 public managementFee;
     uint256 public feesUpdatedAt;
 
-    address public constant FEE_RECIPIENT =
-        address(0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E);
+    address public constant FEE_RECIPIENT = address(0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E);
     uint256 internal constant SECONDS_PER_YEAR = 365.25 days;
 
     event FeesChanged(
-        uint256 oldPerformanceFee,
-        uint256 newPerformanceFee,
-        uint256 oldManagementFee,
-        uint256 newManagementFee
+        uint256 oldPerformanceFee, uint256 newPerformanceFee, uint256 oldManagementFee, uint256 newManagementFee
     );
 
     error InvalidFee(uint256 fee);
@@ -707,14 +610,9 @@ contract MultiStrategyVault is
         uint256 shareValue = convertToAssets(1e18);
         uint256 performanceFee_ = performanceFee;
 
-        return
-            performanceFee_ > 0 && shareValue > highWaterMark_
-                ? performanceFee_.mulDiv(
-                    (shareValue - highWaterMark_) * totalSupply(),
-                    1e36,
-                    Math.Rounding.Ceil
-                )
-                : 0;
+        return performanceFee_ > 0 && shareValue > highWaterMark_
+            ? performanceFee_.mulDiv((shareValue - highWaterMark_) * totalSupply(), 1e36, Math.Rounding.Ceil)
+            : 0;
     }
 
     /**
@@ -727,14 +625,11 @@ contract MultiStrategyVault is
     function accruedManagementFee() public view returns (uint256) {
         uint256 managementFee_ = managementFee;
 
-        return
-            managementFee_ > 0
-                ? managementFee_.mulDiv(
-                    totalAssets() * (block.timestamp - feesUpdatedAt),
-                    SECONDS_PER_YEAR,
-                    Math.Rounding.Floor
-                ) / 1e18
-                : 0;
+        return managementFee_ > 0
+            ? managementFee_.mulDiv(
+                totalAssets() * (block.timestamp - feesUpdatedAt), SECONDS_PER_YEAR, Math.Rounding.Floor
+            ) / 1e18
+            : 0;
     }
 
     /**
@@ -744,10 +639,7 @@ contract MultiStrategyVault is
      * @dev Performance fee can be 0 but never more than 2e17 (1e18 = 100%, 1e14 = 1 BPS)
      * @dev Management fee can be 0 but never more than 1e17 (1e18 = 100%, 1e14 = 1 BPS)
      */
-    function setFees(
-        uint256 performanceFee_,
-        uint256 managementFee_
-    ) public onlyOwner {
+    function setFees(uint256 performanceFee_, uint256 managementFee_) public onlyOwner {
         // TODO check these values
         // Dont take more than 20% performanceFee
         if (performanceFee_ > 2e17) revert InvalidFee(performanceFee_);
@@ -756,12 +648,7 @@ contract MultiStrategyVault is
 
         _takeFees();
 
-        emit FeesChanged(
-            performanceFee,
-            performanceFee_,
-            managementFee,
-            managementFee_
-        );
+        emit FeesChanged(performanceFee, performanceFee_, managementFee, managementFee_);
 
         performanceFee = performanceFee_;
         managementFee = managementFee_;
@@ -826,15 +713,10 @@ contract MultiStrategyVault is
     error PermitDeadlineExpired(uint256 deadline);
     error InvalidSigner(address signer);
 
-    function permit(
-        address owner,
-        address spender,
-        uint256 value,
-        uint256 deadline,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
-    ) public virtual {
+    function permit(address owner, address spender, uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s)
+        public
+        virtual
+    {
         if (deadline < block.timestamp) revert PermitDeadlineExpired(deadline);
 
         // Unchecked because the only math done is incrementing
@@ -873,24 +755,18 @@ contract MultiStrategyVault is
     }
 
     function DOMAIN_SEPARATOR() public view returns (bytes32) {
-        return
-            block.chainid == INITIAL_CHAIN_ID
-                ? INITIAL_DOMAIN_SEPARATOR
-                : computeDomainSeparator();
+        return block.chainid == INITIAL_CHAIN_ID ? INITIAL_DOMAIN_SEPARATOR : computeDomainSeparator();
     }
 
     function computeDomainSeparator() internal view virtual returns (bytes32) {
-        return
-            keccak256(
-                abi.encode(
-                    keccak256(
-                        "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
-                    ),
-                    keccak256(bytes(name())),
-                    keccak256("1"),
-                    block.chainid,
-                    address(this)
-                )
-            );
+        return keccak256(
+            abi.encode(
+                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+                keccak256(bytes(name())),
+                keccak256("1"),
+                block.chainid,
+                address(this)
+            )
+        );
     }
 }

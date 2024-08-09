@@ -19,7 +19,7 @@ import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
  */
 abstract contract AnyConverter is BaseStrategy {
     using Math for uint256;
-    using SafeERC20 for IERC20; 
+    using SafeERC20 for IERC20;
 
     address public yieldAsset;
     address[] public tokens;
@@ -37,19 +37,15 @@ abstract contract AnyConverter is BaseStrategy {
      * @param autoDeposit_ Controls if `protocolDeposit` gets called on deposit
      * @param strategyInitData_ Encoded data for this specific strategy
      */
-    function __AnyConverter_init(
-        address asset_,
-        address owner_,
-        bool autoDeposit_,
-        bytes memory strategyInitData_
-    ) internal onlyInitializing {
+    function __AnyConverter_init(address asset_, address owner_, bool autoDeposit_, bytes memory strategyInitData_)
+        internal
+        onlyInitializing
+    {
         __BaseStrategy_init(asset_, owner_, autoDeposit_);
 
         address oracle_;
-        (yieldAsset, oracle_, slippage, floatRatio) = abi.decode(
-            strategyInitData_,
-            (address, address, uint256, uint256)
-        );
+        (yieldAsset, oracle_, slippage, floatRatio) =
+            abi.decode(strategyInitData_, (address, address, uint256, uint256));
         oracle = IPriceOracle(oracle_);
 
         tokens.push(asset_);
@@ -82,12 +78,7 @@ abstract contract AnyConverter is BaseStrategy {
         uint256 _totalReservedYieldAssets = totalReservedYieldAssets;
 
         if (yieldBal <= _totalReservedYieldAssets) return 0;
-        return
-            oracle.getQuote(
-                yieldBal - _totalReservedYieldAssets,
-                yieldAsset,
-                asset()
-            );
+        return oracle.getQuote(yieldBal - _totalReservedYieldAssets, yieldAsset, asset());
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -95,20 +86,12 @@ abstract contract AnyConverter is BaseStrategy {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice deposit into the underlying protocol.
-    function _protocolDeposit(
-        uint256 assets,
-        uint256 shares,
-        bytes memory data
-    ) internal override {
+    function _protocolDeposit(uint256 assets, uint256 shares, bytes memory data) internal override {
         // stay empty
     }
 
     /// @notice Withdraw from the underlying protocol.
-    function _protocolWithdraw(
-        uint256 assets,
-        uint256 shares,
-        bytes memory data
-    ) internal override {
+    function _protocolWithdraw(uint256 assets, uint256 shares, bytes memory data) internal override {
         // stay empty
     }
 
@@ -123,10 +106,7 @@ abstract contract AnyConverter is BaseStrategy {
     error NotEnoughFloat();
     error BalanceTooLow();
 
-    function pushFunds(
-        uint256 yieldAssets,
-        bytes memory
-    ) external override onlyKeeperOrOwner {
+    function pushFunds(uint256 yieldAssets, bytes memory) external override onlyKeeperOrOwner {
         // caching
         address _asset = asset();
         address _yieldAsset = yieldAsset;
@@ -136,27 +116,15 @@ abstract contract AnyConverter is BaseStrategy {
         // TODO: should take into account the reserved assets
         uint256 bal = IERC20(_asset).balanceOf(address(this)) - totalReservedAssets;
 
-        IERC20(_yieldAsset).safeTransferFrom(
-            msg.sender,
-            address(this),
-            yieldAssets
-        );
+        IERC20(_yieldAsset).safeTransferFrom(msg.sender, address(this), yieldAssets);
 
-        uint256 withdrawable = oracle.getQuote(
-            yieldAssets,
-            _yieldAsset,
-            _asset
-        );
+        uint256 withdrawable = oracle.getQuote(yieldAssets, _yieldAsset, _asset);
 
         // we revert if:
         // 1. we don't have enough funds to cover the withdrawable amount
         // 2. we don't have enough float after the withdrawal (if floatRatio > 0)
         if (_floatRatio > 0) {
-            uint256 float = ta.mulDiv(
-                _floatRatio,
-                10_000,
-                Math.Rounding.Floor
-            );
+            uint256 float = ta.mulDiv(_floatRatio, 10_000, Math.Rounding.Floor);
             if (float > bal) {
                 revert NotEnoughFloat();
             } else {
@@ -170,16 +138,14 @@ abstract contract AnyConverter is BaseStrategy {
         _reserveToken(yieldAssets, withdrawable, _yieldAsset, false);
         uint256 postTa = totalAssets();
 
-        if (postTa < ta.mulDiv(10_000 - slippage, 10_000, Math.Rounding.Floor))
+        if (postTa < ta.mulDiv(10_000 - slippage, 10_000, Math.Rounding.Floor)) {
             revert SlippageTooHigh();
+        }
 
         emit PushedFunds(yieldAssets, withdrawable);
     }
 
-    function pullFunds(
-        uint256 assets,
-        bytes memory
-    ) external override onlyKeeperOrOwner {
+    function pullFunds(uint256 assets, bytes memory) external override onlyKeeperOrOwner {
         // caching
         address _asset = asset();
         address _yieldAsset = yieldAsset;
@@ -193,8 +159,9 @@ abstract contract AnyConverter is BaseStrategy {
 
         uint256 postTa = totalAssets();
 
-        if (postTa < ta.mulDiv(10_000 - slippage, 10_000, Math.Rounding.Floor))
+        if (postTa < ta.mulDiv(10_000 - slippage, 10_000, Math.Rounding.Floor)) {
             revert SlippageTooHigh();
+        }
 
         emit PulledFunds(assets, withdrawable);
     }
@@ -229,10 +196,7 @@ abstract contract AnyConverter is BaseStrategy {
     function proposeSlippage(uint256 slippage_) external onlyOwner {
         if (slippage_ > 10_000) revert Misconfigured();
 
-        proposedSlippage = ProposedChange({
-            value: slippage_,
-            changeTime: block.timestamp + 3 days
-        });
+        proposedSlippage = ProposedChange({value: slippage_, changeTime: block.timestamp + 3 days});
 
         emit SlippageProposed(slippage_);
     }
@@ -240,10 +204,7 @@ abstract contract AnyConverter is BaseStrategy {
     function changeSlippage() external onlyOwner {
         ProposedChange memory _proposedSlippage = proposedSlippage;
 
-        if (
-            _proposedSlippage.changeTime == 0 ||
-            block.timestamp > _proposedSlippage.changeTime
-        ) revert Misconfigured();
+        if (_proposedSlippage.changeTime == 0 || block.timestamp > _proposedSlippage.changeTime) revert Misconfigured();
 
         emit SlippageChanged(slippage, _proposedSlippage.value);
 
@@ -255,10 +216,7 @@ abstract contract AnyConverter is BaseStrategy {
     function proposeFloatRatio(uint256 ratio_) external onlyOwner {
         if (ratio_ > 10_000) revert Misconfigured();
 
-        proposedFloatRatio = ProposedChange({
-            value: ratio_,
-            changeTime: block.timestamp + 3 days
-        });
+        proposedFloatRatio = ProposedChange({value: ratio_, changeTime: block.timestamp + 3 days});
 
         emit FloatRatioProposed(ratio_);
     }
@@ -266,10 +224,7 @@ abstract contract AnyConverter is BaseStrategy {
     function changeFloatRatio() external onlyOwner {
         ProposedChange memory _proposedFloatRatio = proposedFloatRatio;
 
-        if (
-            _proposedFloatRatio.changeTime == 0 ||
-            block.timestamp > _proposedFloatRatio.changeTime
-        ) {
+        if (_proposedFloatRatio.changeTime == 0 || block.timestamp > _proposedFloatRatio.changeTime) {
             revert Misconfigured();
         }
 
@@ -281,10 +236,7 @@ abstract contract AnyConverter is BaseStrategy {
     }
 
     function proposeUnlockTime(uint256 unlockTime_) external onlyOwner {
-        proposedUnlockTime = ProposedChange({
-            value: unlockTime_,
-            changeTime: block.timestamp + 3 days
-        });
+        proposedUnlockTime = ProposedChange({value: unlockTime_, changeTime: block.timestamp + 3 days});
 
         emit UnlockTimeProposed(unlockTime_);
     }
@@ -292,10 +244,7 @@ abstract contract AnyConverter is BaseStrategy {
     function changeUnlockTime() external onlyOwner {
         ProposedChange memory _proposedUnlockTime = proposedUnlockTime;
 
-        if (
-            _proposedUnlockTime.changeTime == 0 ||
-            block.timestamp > _proposedUnlockTime.changeTime
-        ) {
+        if (_proposedUnlockTime.changeTime == 0 || block.timestamp > _proposedUnlockTime.changeTime) {
             revert Misconfigured();
         }
 
@@ -314,11 +263,7 @@ abstract contract AnyConverter is BaseStrategy {
     // we don't emit the block number because that's already part of the event log
     // e.g. see https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_getlogs
     event ReserveAdded(
-        address indexed user,
-        address indexed asset,
-        uint256 unlockTime,
-        uint256 amount,
-        uint256 withdrawable
+        address indexed user, address indexed asset, uint256 unlockTime, uint256 amount, uint256 withdrawable
     );
 
     struct Reserved {
@@ -334,27 +279,18 @@ abstract contract AnyConverter is BaseStrategy {
     // primary key to differentiate between multiple reserves.
     //
     // user address => asset address => block number => Reserved
-    mapping(address => mapping(address => mapping(uint256 => Reserved)))
-        public reserved;
+    mapping(address => mapping(address => mapping(uint256 => Reserved))) public reserved;
 
-    function claimReserved(
-        uint256 blockNumber,
-        bool isYieldAsset
-    ) external {
+    function claimReserved(uint256 blockNumber, bool isYieldAsset) external {
         address base = isYieldAsset ? asset() : yieldAsset;
         address quote = isYieldAsset ? yieldAsset : asset();
 
         Reserved memory _reserved = reserved[msg.sender][base][blockNumber];
-        if (
-            _reserved.unlockTime != 0 && _reserved.unlockTime < block.timestamp
-        ) {
+        if (_reserved.unlockTime != 0 && _reserved.unlockTime < block.timestamp) {
             // if the assets value went down after the keeper reserved the funds,
             // we want to use the new favorable quote.
             // If the assets value went up, we want to use the old favorable quote.
-            uint256 withdrawable = Math.min(
-                oracle.getQuote(_reserved.deposited, base, quote),
-                _reserved.withdrawable
-            );
+            uint256 withdrawable = Math.min(oracle.getQuote(_reserved.deposited, base, quote), _reserved.withdrawable);
 
             if (withdrawable > 0) {
                 delete reserved[msg.sender][base][blockNumber];
@@ -371,22 +307,14 @@ abstract contract AnyConverter is BaseStrategy {
         }
     }
 
-    function _reserveToken(
-        uint256 amount,
-        uint256 withdrawable,
-        address token,
-        bool isYieldAsset
-    ) internal {
+    function _reserveToken(uint256 amount, uint256 withdrawable, address token, bool isYieldAsset) internal {
         if (reserved[msg.sender][token][block.number].deposited > 0) {
             revert("Already reserved");
         }
 
         uint256 _unlockTime = block.timestamp + unlockTime;
-        reserved[msg.sender][token][block.number] = Reserved({
-            deposited: amount,
-            withdrawable: withdrawable,
-            unlockTime: _unlockTime
-        });
+        reserved[msg.sender][token][block.number] =
+            Reserved({deposited: amount, withdrawable: withdrawable, unlockTime: _unlockTime});
 
         if (isYieldAsset) {
             totalReservedYieldAssets += withdrawable;

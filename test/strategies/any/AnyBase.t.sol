@@ -14,17 +14,10 @@ abstract contract AnyBaseTest is BaseStrategyTest {
     MockOracle oracle;
 
     function _increasePricePerShare(uint256 amount) internal override {
-        deal(
-            testConfig.asset,
-            yieldAsset,
-            IERC20(testConfig.asset).balanceOf(yieldAsset) + amount
-        );
+        deal(testConfig.asset, yieldAsset, IERC20(testConfig.asset).balanceOf(yieldAsset) + amount);
     }
 
-    function _mintYieldAsset(
-        uint256 amount,
-        address receiver
-    ) internal virtual {
+    function _mintYieldAsset(uint256 amount, address receiver) internal virtual {
         vm.prank(json.readAddress(string.concat(".configs[0].specific.whale")));
         IERC20(yieldAsset).transfer(receiver, amount);
 
@@ -60,53 +53,18 @@ abstract contract AnyBaseTest is BaseStrategyTest {
 
         console.log("withdraw", (testConfig.defaultAmount / 5) * 4);
 
-        console.log(
-            "asset bal",
-            IERC20(testConfig.asset).balanceOf(address(strategy))
-        );
-        console.log(
-            "yieldAsset bal",
-            IERC20(yieldAsset).balanceOf(address(strategy))
-        );
-        console.log(
-            "reserved assets",
-            AnyConverter(address(strategy)).totalReservedAssets()
-        );
-        console.log(
-            "reserved yieldAssets",
-            AnyConverter(address(strategy)).totalReservedYieldAssets()
-        );
+        console.log("asset bal", IERC20(testConfig.asset).balanceOf(address(strategy)));
+        console.log("yieldAsset bal", IERC20(yieldAsset).balanceOf(address(strategy)));
+        console.log("reserved assets", AnyConverter(address(strategy)).totalReservedAssets());
+        console.log("reserved yieldAssets", AnyConverter(address(strategy)).totalReservedYieldAssets());
         console.log("total assets", strategy.totalAssets());
 
+        assertApproxEqAbs(strategy.totalAssets(), testConfig.defaultAmount / 5, _delta_, "ta");
+        assertApproxEqAbs(strategy.totalSupply(), testConfig.defaultAmount / 5, _delta_, "ts");
+        assertApproxEqAbs(strategy.balanceOf(bob), testConfig.defaultAmount / 5, _delta_, "share bal");
+        assertApproxEqAbs(IERC20(_asset_).balanceOf(bob), (testConfig.defaultAmount / 5) * 4, _delta_, "asset bal");
         assertApproxEqAbs(
-            strategy.totalAssets(),
-            testConfig.defaultAmount / 5,
-            _delta_,
-            "ta"
-        );
-        assertApproxEqAbs(
-            strategy.totalSupply(),
-            testConfig.defaultAmount / 5,
-            _delta_,
-            "ts"
-        );
-        assertApproxEqAbs(
-            strategy.balanceOf(bob),
-            testConfig.defaultAmount / 5,
-            _delta_,
-            "share bal"
-        );
-        assertApproxEqAbs(
-            IERC20(_asset_).balanceOf(bob),
-            (testConfig.defaultAmount / 5) * 4,
-            _delta_,
-            "asset bal"
-        );
-        assertApproxEqAbs(
-            IERC20(_asset_).balanceOf(address(strategy)),
-            testConfig.defaultAmount / 5,
-            _delta_,
-            "strategy asset bal"
+            IERC20(_asset_).balanceOf(address(strategy)), testConfig.defaultAmount / 5, _delta_, "strategy asset bal"
         );
     }
 
@@ -128,35 +86,12 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         vm.prank(bob);
         strategy.redeem((testConfig.defaultAmount / 5) * 4, bob, bob);
 
+        assertApproxEqAbs(strategy.totalAssets(), testConfig.defaultAmount / 5, _delta_, "ta");
+        assertApproxEqAbs(strategy.totalSupply(), testConfig.defaultAmount / 5, _delta_, "ts");
+        assertApproxEqAbs(strategy.balanceOf(bob), testConfig.defaultAmount / 5, _delta_, "share bal");
+        assertApproxEqAbs(IERC20(_asset_).balanceOf(bob), (testConfig.defaultAmount / 5) * 4, _delta_, "asset bal");
         assertApproxEqAbs(
-            strategy.totalAssets(),
-            testConfig.defaultAmount / 5,
-            _delta_,
-            "ta"
-        );
-        assertApproxEqAbs(
-            strategy.totalSupply(),
-            testConfig.defaultAmount / 5,
-            _delta_,
-            "ts"
-        );
-        assertApproxEqAbs(
-            strategy.balanceOf(bob),
-            testConfig.defaultAmount / 5,
-            _delta_,
-            "share bal"
-        );
-        assertApproxEqAbs(
-            IERC20(_asset_).balanceOf(bob),
-            (testConfig.defaultAmount / 5) * 4,
-            _delta_,
-            "asset bal"
-        );
-        assertApproxEqAbs(
-            IERC20(_asset_).balanceOf(address(strategy)),
-            testConfig.defaultAmount / 5,
-            _delta_,
-            "strategy asset bal"
+            IERC20(_asset_).balanceOf(address(strategy)), testConfig.defaultAmount / 5, _delta_, "strategy asset bal"
         );
     }
 
@@ -178,27 +113,15 @@ abstract contract AnyBaseTest is BaseStrategyTest {
 
         strategy.pushFunds(testConfig.defaultAmount, bytes(""));
 
-        uint256 reserved = AnyConverter(address(strategy))
-            .totalReservedAssets();
+        uint256 reserved = AnyConverter(address(strategy)).totalReservedAssets();
 
-        assertEq(
-            IERC20(yieldAsset).balanceOf(address(strategy)),
-            testConfig.defaultAmount
-        );
-        assertEq(
-            IERC20(testConfig.asset).balanceOf(address(strategy)) - reserved,
-            0
-        );
+        assertEq(IERC20(yieldAsset).balanceOf(address(strategy)), testConfig.defaultAmount);
+        assertEq(IERC20(testConfig.asset).balanceOf(address(strategy)) - reserved, 0);
         assertEq(reserved, testConfig.defaultAmount);
 
         assertApproxEqAbs(strategy.totalAssets(), oldTa, _delta_, "ta");
         assertApproxEqAbs(strategy.totalSupply(), oldTs, _delta_, "ts");
-        assertApproxEqAbs(
-            IERC20(_asset_).balanceOf(address(strategy)) - reserved,
-            0,
-            _delta_,
-            "strategy asset bal"
-        );
+        assertApproxEqAbs(IERC20(_asset_).balanceOf(address(strategy)) - reserved, 0, _delta_, "strategy asset bal");
     }
 
     function test__pullFunds() public override {
@@ -216,21 +139,11 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         _mintAsset(testConfig.defaultAmount, address(this));
         strategy.pullFunds(testConfig.defaultAmount, bytes(""));
 
-        uint256 reservedAssets = AnyConverter(address(strategy))
-            .totalReservedAssets();
-        uint256 reservedYieldAsset = AnyConverter(address(strategy))
-            .totalReservedYieldAssets();
+        uint256 reservedAssets = AnyConverter(address(strategy)).totalReservedAssets();
+        uint256 reservedYieldAsset = AnyConverter(address(strategy)).totalReservedYieldAssets();
 
-        assertEq(
-            IERC20(yieldAsset).balanceOf(address(strategy)) -
-                reservedYieldAsset,
-            0
-        );
-        assertEq(
-            IERC20(testConfig.asset).balanceOf(address(strategy)) -
-                reservedAssets,
-            testConfig.defaultAmount
-        );
+        assertEq(IERC20(yieldAsset).balanceOf(address(strategy)) - reservedYieldAsset, 0);
+        assertEq(IERC20(testConfig.asset).balanceOf(address(strategy)) - reservedAssets, testConfig.defaultAmount);
 
         assertApproxEqAbs(strategy.totalAssets(), oldTa, _delta_, "ta");
         assertApproxEqAbs(strategy.totalSupply(), oldTs, _delta_, "ts");
@@ -266,11 +179,7 @@ abstract contract AnyBaseTest is BaseStrategyTest {
 
         AnyConverter(address(strategy)).claimReserved(block.number, false);
 
-        assertGt(
-            strategy.totalAssets(),
-            ta,
-            "total assets should increase because of the old favorable quote"
-        );
+        assertGt(strategy.totalAssets(), ta, "total assets should increase because of the old favorable quote");
         assertEq(
             IERC20(_asset_).balanceOf(address(this)),
             testConfig.defaultAmount,
@@ -301,11 +210,7 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         // while the user had 1e18 of asset reserved, they are only able to withdraw
         // 9e17 of it. Thus, 1e17 is left in the contract and added to the total assets
         // after the claim. Thus, total assets increases
-        assertGt(
-            strategy.totalAssets(),
-            ta,
-            "total assets should increase because of the new favorable quote"
-        );
+        assertGt(strategy.totalAssets(), ta, "total assets should increase because of the new favorable quote");
         assertEq(
             IERC20(_asset_).balanceOf(address(this)),
             (testConfig.defaultAmount * 9_000) / 10_000,
@@ -313,9 +218,7 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         );
     }
 
-    function test__should_use_old_favorable_quote_with_multiple_reserves()
-        public
-    {
+    function test__should_use_old_favorable_quote_with_multiple_reserves() public {
         strategy.toggleAutoDeposit();
         // changing amount will break the assertions
         uint256 amount = 1e18;
@@ -353,16 +256,10 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         // 3. 1e18 * 1.6e18 / 1e18 = 1.6e18 asset
         // so in total we need to receive 1e18 + 1.25e18 + 1.6e18 = 3.85e18 asset
 
-        assertEq(
-            IERC20(_asset_).balanceOf(address(this)),
-            3.85e18,
-            "asset balance not correct"
-        );
+        assertEq(IERC20(_asset_).balanceOf(address(this)), 3.85e18, "asset balance not correct");
     }
 
-    function test__should_use_new_favorable_quote_with_multiple_reserves()
-        public
-    {
+    function test__should_use_new_favorable_quote_with_multiple_reserves() public {
         strategy.toggleAutoDeposit();
         // changing amount will break the assertions
         uint256 amount = 1e18;
@@ -400,21 +297,14 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         // 1. 1e18 * 0.4e18 / 1e18 = 0.4e18 asset
         // so in total we need to receive 0.4e18 + 0.4e18 + 0.4e18 = 1.2e18
 
-        assertEq(
-            IERC20(_asset_).balanceOf(address(this)),
-            1.2e18,
-            "asset balance not correct"
-        );
+        assertEq(IERC20(_asset_).balanceOf(address(this)), 1.2e18, "asset balance not correct");
     }
 
     function test__pull_funds_should_use_old_favorable_quote() public {
         _mintAsset(testConfig.defaultAmount, address(this));
         _mintYieldAsset(testConfig.defaultAmount * 2, address(this));
         // send yield assets to strategy. We'll pull them in this test
-        IERC20(yieldAsset).transfer(
-            address(strategy),
-            testConfig.defaultAmount * 2
-        );
+        IERC20(yieldAsset).transfer(address(strategy), testConfig.defaultAmount * 2);
 
         strategy.pullFunds(testConfig.defaultAmount, bytes(""));
 
@@ -427,26 +317,15 @@ abstract contract AnyBaseTest is BaseStrategyTest {
 
         // should use the old favorable quote 1:1 instead of 1.2:1 in favor of the asset
 
-        assertEq(
-            IERC20(yieldAsset).balanceOf(address(address(this))),
-            1e18,
-            "yield asset balance not correct"
-        );
-        assertEq(
-            IERC20(_asset_).balanceOf(address(this)),
-            0,
-            "asset balance not correct"
-        );
+        assertEq(IERC20(yieldAsset).balanceOf(address(address(this))), 1e18, "yield asset balance not correct");
+        assertEq(IERC20(_asset_).balanceOf(address(this)), 0, "asset balance not correct");
     }
 
     function test__pull_funds_should_use_new_favorable_quote() public {
         _mintAsset(testConfig.defaultAmount, address(this));
         _mintYieldAsset(testConfig.defaultAmount * 2, address(this));
         // send yield assets to strategy. We'll pull them in this test
-        IERC20(yieldAsset).transfer(
-            address(strategy),
-            testConfig.defaultAmount * 2
-        );
+        IERC20(yieldAsset).transfer(address(strategy), testConfig.defaultAmount * 2);
 
         strategy.pullFunds(testConfig.defaultAmount, bytes(""));
 
@@ -459,21 +338,11 @@ abstract contract AnyBaseTest is BaseStrategyTest {
 
         // should use the old favorable quote 1:1 instead of 1.2:1 in favor of the asset
 
-        assertEq(
-            IERC20(yieldAsset).balanceOf(address(address(this))),
-            0.8e18,
-            "yield asset balance not correct"
-        );
-        assertEq(
-            IERC20(_asset_).balanceOf(address(this)),
-            0,
-            "asset balance not correct"
-        );
+        assertEq(IERC20(yieldAsset).balanceOf(address(address(this))), 0.8e18, "yield asset balance not correct");
+        assertEq(IERC20(_asset_).balanceOf(address(this)), 0, "asset balance not correct");
     }
 
-    function test__pull_funds_should_use_old_favorable_quote_with_multiple_reserves()
-        public
-    {
+    function test__pull_funds_should_use_old_favorable_quote_with_multiple_reserves() public {
         uint256 amount = 1e18;
         _mintAsset(amount * 3, address(this));
         _mintYieldAsset(amount * 4, address(this));
@@ -507,21 +376,12 @@ abstract contract AnyBaseTest is BaseStrategyTest {
 
         // can be off by 1 because of precision
         assertApproxEqAbs(
-            IERC20(yieldAsset).balanceOf(address(address(this))),
-            3.85e18,
-            1,
-            "yield asset balance not correct"
+            IERC20(yieldAsset).balanceOf(address(address(this))), 3.85e18, 1, "yield asset balance not correct"
         );
-        assertEq(
-            IERC20(_asset_).balanceOf(address(this)),
-            0,
-            "asset balance not correct"
-        );
+        assertEq(IERC20(_asset_).balanceOf(address(this)), 0, "asset balance not correct");
     }
 
-    function test__pull_funds_should_use_new_favorable_quote_with_multiple_reserves()
-        public
-    {
+    function test__pull_funds_should_use_new_favorable_quote_with_multiple_reserves() public {
         uint256 amount = 1e18;
         _mintAsset(amount * 3, address(this));
         _mintYieldAsset(amount * 4, address(this));
@@ -551,16 +411,8 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         // so in total we need to receive 0.4e18 + 0.4e18 + 0.4e18 = 1.2e18 yield asset
 
         // can be off by 1 because of precision
-        assertEq(
-            IERC20(yieldAsset).balanceOf(address(address(this))),
-            1.2e18,
-            "yield asset balance not correct"
-        );
-        assertEq(
-            IERC20(_asset_).balanceOf(address(this)),
-            0,
-            "asset balance not correct"
-        );
+        assertEq(IERC20(yieldAsset).balanceOf(address(address(this))), 1.2e18, "yield asset balance not correct");
+        assertEq(IERC20(_asset_).balanceOf(address(this)), 0, "asset balance not correct");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -568,9 +420,7 @@ abstract contract AnyBaseTest is BaseStrategyTest {
     //////////////////////////////////////////////////////////////*/
 
     function test__rescueToken() public {
-        IERC20 rescueToken = IERC20(
-            json.readAddress(string.concat(".configs[0].specific.rescueToken"))
-        );
+        IERC20 rescueToken = IERC20(json.readAddress(string.concat(".configs[0].specific.rescueToken")));
         uint256 rescueAmount = 10e18;
         deal(address(rescueToken), bob, rescueAmount);
 
@@ -584,9 +434,7 @@ abstract contract AnyBaseTest is BaseStrategyTest {
     }
 
     function testFail__rescueToken_non_owner() public {
-        IERC20 rescueToken = IERC20(
-            json.readAddress(string.concat(".configs[0].specific.rescueToken"))
-        );
+        IERC20 rescueToken = IERC20(json.readAddress(string.concat(".configs[0].specific.rescueToken")));
         uint256 rescueAmount = 10e18;
         deal(address(rescueToken), bob, rescueAmount);
 

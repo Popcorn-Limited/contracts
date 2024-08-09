@@ -16,33 +16,23 @@ contract CurveGaugeCompounderTest is BaseStrategyTest {
     using stdJson for string;
 
     function setUp() public {
-        _setUpBaseTest(
-            0,
-            "./test/strategies/curve/CurveGaugeCompounderTestConfig.json"
-        );
+        _setUpBaseTest(0, "./test/strategies/curve/CurveGaugeCompounderTestConfig.json");
     }
 
-    function _setUpStrategy(
-        string memory json_,
-        string memory index_,
-        TestConfig memory testConfig_
-    ) internal override returns (IBaseStrategy) {
+    function _setUpStrategy(string memory json_, string memory index_, TestConfig memory testConfig_)
+        internal
+        override
+        returns (IBaseStrategy)
+    {
         // Read strategy init values
-        CurveGaugeInit memory curveInit = abi.decode(
-            json_.parseRaw(
-                string.concat(".configs[", index_, "].specific.init")
-            ),
-            (CurveGaugeInit)
-        );
+        CurveGaugeInit memory curveInit =
+            abi.decode(json_.parseRaw(string.concat(".configs[", index_, "].specific.init")), (CurveGaugeInit));
 
         // Deploy Strategy
         CurveGaugeCompounder strategy = new CurveGaugeCompounder();
 
         strategy.initialize(
-            testConfig_.asset,
-            address(this),
-            true,
-            abi.encode(curveInit.gauge, curveInit.pool, curveInit.minter)
+            testConfig_.asset, address(this), true, abi.encode(curveInit.gauge, curveInit.pool, curveInit.minter)
         );
 
         // Set Harvest values
@@ -51,64 +41,29 @@ contract CurveGaugeCompounderTest is BaseStrategyTest {
         return IBaseStrategy(address(strategy));
     }
 
-    function _setHarvestValues(
-        string memory json_,
-        string memory index_,
-        address strategy
-    ) internal {
+    function _setHarvestValues(string memory json_, string memory index_, address strategy) internal {
         // Read harvest values
-        address curveRouter_ = abi.decode(
-            json_.parseRaw(
-                string.concat(
-                    ".configs[",
-                    index_,
-                    "].specific.harvest.curveRouter"
-                )
-            ),
-            (address)
-        );
+        address curveRouter_ =
+            abi.decode(json_.parseRaw(string.concat(".configs[", index_, "].specific.harvest.curveRouter")), (address));
 
-        int128 indexIn_ = abi.decode(
-            json_.parseRaw(
-                string.concat(".configs[", index_, "].specific.harvest.indexIn")
-            ),
-            (int128)
-        );
+        int128 indexIn_ =
+            abi.decode(json_.parseRaw(string.concat(".configs[", index_, "].specific.harvest.indexIn")), (int128));
 
         //Construct CurveSwap structs
         CurveSwap[] memory swaps_ = _getCurveSwaps(json_, index_);
 
         // Set harvest values
-        CurveGaugeCompounder(strategy).setHarvestValues(
-            curveRouter_,
-            swaps_,
-            indexIn_
-        );
+        CurveGaugeCompounder(strategy).setHarvestValues(curveRouter_, swaps_, indexIn_);
     }
 
-    function _getCurveSwaps(
-        string memory json_,
-        string memory index_
-    ) internal pure returns (CurveSwap[] memory) {
-        uint256 swapLen = json_.readUint(
-            string.concat(
-                ".configs[",
-                index_,
-                "].specific.harvest.swaps.length"
-            )
-        );
+    function _getCurveSwaps(string memory json_, string memory index_) internal pure returns (CurveSwap[] memory) {
+        uint256 swapLen = json_.readUint(string.concat(".configs[", index_, "].specific.harvest.swaps.length"));
 
         CurveSwap[] memory swaps_ = new CurveSwap[](swapLen);
         for (uint256 i; i < swapLen; i++) {
             // Read route and convert dynamic into fixed size array
             address[] memory route_ = json_.readAddressArray(
-                string.concat(
-                    ".configs[",
-                    index_,
-                    "].specific.harvest.swaps.structs[",
-                    vm.toString(i),
-                    "].route"
-                )
+                string.concat(".configs[", index_, "].specific.harvest.swaps.structs[", vm.toString(i), "].route")
             );
             address[11] memory route;
             for (uint256 n; n < 11; n++) {
@@ -136,13 +91,7 @@ contract CurveGaugeCompounderTest is BaseStrategyTest {
 
             // Read pools and convert dynamic into fixed size array
             address[] memory pools_ = json_.readAddressArray(
-                string.concat(
-                    ".configs[",
-                    index_,
-                    "].specific.harvest.swaps.structs[",
-                    vm.toString(i),
-                    "].pools"
-                )
+                string.concat(".configs[", index_, "].specific.harvest.swaps.structs[", vm.toString(i), "].pools")
             );
             address[5] memory pools;
             for (uint256 n = 0; n < 5; n++) {
@@ -150,11 +99,7 @@ contract CurveGaugeCompounderTest is BaseStrategyTest {
             }
 
             // Construct the struct
-            swaps_[i] = CurveSwap({
-                route: route,
-                swapParams: swapParams,
-                pools: pools
-            });
+            swaps_[i] = CurveSwap({route: route, swapParams: swapParams, pools: pools});
         }
         return swaps_;
     }

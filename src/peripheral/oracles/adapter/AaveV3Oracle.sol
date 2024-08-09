@@ -21,19 +21,14 @@ contract AaveV3Oracle is BaseAdapter {
     /// @param base The token that is being priced. Either `aToken` or `underlying`.
     /// @param quote The token that is the unit of account. Either `underlying` or `aToken`.
     /// @return The converted amount.
-    function _getQuote(
-        uint256 inAmount,
-        address base,
-        address quote
-    ) internal view override returns (uint256) {
-        try IAToken(base).UNDERLYING_ASSET_ADDRESS() returns (
-            address underlying
-        ) {
+    function _getQuote(uint256 inAmount, address base, address quote) internal view override returns (uint256) {
+        try IAToken(base).UNDERLYING_ASSET_ADDRESS() returns (address underlying) {
             if (underlying != quote) revert WrongAsset();
             return inAmount;
         } catch {
-            if (IAToken(quote).UNDERLYING_ASSET_ADDRESS() != base)
+            if (IAToken(quote).UNDERLYING_ASSET_ADDRESS() != base) {
                 revert WrongAsset();
+            }
             return inAmount;
         }
 

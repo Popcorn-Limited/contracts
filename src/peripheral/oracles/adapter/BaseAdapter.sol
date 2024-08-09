@@ -11,21 +11,13 @@ import {Errors} from "src/lib/euler/Errors.sol";
 /// @notice Abstract adapter with virtual bid/ask pricing.
 abstract contract BaseAdapter is IPriceOracle {
     /// @inheritdoc IPriceOracle
-    function getQuote(
-        uint256 inAmount,
-        address base,
-        address quote
-    ) external view returns (uint256) {
+    function getQuote(uint256 inAmount, address base, address quote) external view returns (uint256) {
         return _getQuote(inAmount, base, quote);
     }
 
     /// @inheritdoc IPriceOracle
     /// @dev Does not support true bid/ask pricing.
-    function getQuotes(
-        uint256 inAmount,
-        address base,
-        address quote
-    ) external view returns (uint256, uint256) {
+    function getQuotes(uint256 inAmount, address base, address quote) external view returns (uint256, uint256) {
         uint256 outAmount = _getQuote(inAmount, base, quote);
         return (outAmount, outAmount);
     }
@@ -38,17 +30,11 @@ abstract contract BaseAdapter is IPriceOracle {
     /// - a contract that does not implement `decimals()`.
     /// @return The decimals of the asset.
     function _getDecimals(address asset) internal view returns (uint8) {
-        (bool success, bytes memory data) = address(asset).staticcall(
-            abi.encodeCall(IERC20Metadata.decimals, ())
-        );
+        (bool success, bytes memory data) = address(asset).staticcall(abi.encodeCall(IERC20Metadata.decimals, ()));
         return success && data.length == 32 ? abi.decode(data, (uint8)) : 18;
     }
 
     /// @notice Return the quote for the given price query.
     /// @dev Must be overridden in the inheriting contract.
-    function _getQuote(
-        uint256,
-        address,
-        address
-    ) internal view virtual returns (uint256);
+    function _getQuote(uint256, address, address) internal view virtual returns (uint256);
 }

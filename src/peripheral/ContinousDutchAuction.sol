@@ -31,13 +31,10 @@ abstract contract ContinousDutchAuction is Initializable {
         uint192 initPrice;
         uint40 startTime;
     }
+
     Slot0 internal slot0;
 
-    event Buy(
-        address indexed buyer,
-        address indexed assetsReceiver,
-        uint256 paymentAmount
-    );
+    event Buy(address indexed buyer, address indexed assetsReceiver, uint256 paymentAmount);
 
     error InitPriceBelowMin();
     error InitPriceExceedsMax();
@@ -73,13 +70,16 @@ abstract contract ContinousDutchAuction is Initializable {
         if (initPrice > ABS_MAX_INIT_PRICE) revert InitPriceExceedsMax();
         if (epochPeriod_ < MIN_EPOCH_PERIOD) revert EpochPeriodBelowMin();
         if (epochPeriod_ > MAX_EPOCH_PERIOD) revert EpochPeriodExceedsMax();
-        if (priceMultiplier_ < MIN_PRICE_MULTIPLIER)
+        if (priceMultiplier_ < MIN_PRICE_MULTIPLIER) {
             revert PriceMultiplierBelowMin();
-        if (priceMultiplier_ > MAX_PRICE_MULTIPLIER)
+        }
+        if (priceMultiplier_ > MAX_PRICE_MULTIPLIER) {
             revert PriceMultiplierExceedsMax();
+        }
         if (minInitPrice_ < ABS_MIN_INIT_PRICE) revert MinInitPriceBelowMin();
-        if (minInitPrice_ > ABS_MAX_INIT_PRICE)
+        if (minInitPrice_ > ABS_MAX_INIT_PRICE) {
             revert MinInitPriceExceedsAbsMaxInitPrice();
+        }
         if (paymentReceiver_ == address(this)) revert PaymentReceiverIsThis();
 
         slot0.initPrice = uint192(initPrice);
@@ -117,15 +117,12 @@ abstract contract ContinousDutchAuction is Initializable {
 
         paymentAmount = getPriceFromCache(slot0Cache);
 
-        if (paymentAmount > maxPaymentTokenAmount)
+        if (paymentAmount > maxPaymentTokenAmount) {
             revert MaxPaymentTokenAmountExceeded();
+        }
 
         if (paymentAmount > 0) {
-            paymentToken.safeTransferFrom(
-                msg.sender,
-                paymentReceiver,
-                paymentAmount
-            );
+            paymentToken.safeTransferFrom(msg.sender, paymentReceiver, paymentAmount);
         }
 
         for (uint256 i = 0; i < assets.length; ++i) {
@@ -135,8 +132,7 @@ abstract contract ContinousDutchAuction is Initializable {
         }
 
         // Setup new auction
-        uint256 newInitPrice = (paymentAmount * priceMultiplier) /
-            PRICE_MULTIPLIER_SCALE;
+        uint256 newInitPrice = (paymentAmount * priceMultiplier) / PRICE_MULTIPLIER_SCALE;
 
         if (newInitPrice > ABS_MAX_INIT_PRICE) {
             newInitPrice = ABS_MAX_INIT_PRICE;
@@ -164,19 +160,14 @@ abstract contract ContinousDutchAuction is Initializable {
     /// @return price The current price calculated based on the elapsed time and the initial price.
     /// @notice This function calculates the current price by subtracting a fraction of the initial price based on the elapsed time.
     // If the elapsed time exceeds the epoch period, the price will be 0.
-    function getPriceFromCache(
-        Slot0 memory slot0Cache
-    ) internal view returns (uint256) {
+    function getPriceFromCache(Slot0 memory slot0Cache) internal view returns (uint256) {
         uint256 timePassed = block.timestamp - slot0Cache.startTime;
 
         if (timePassed > epochPeriod) {
             return 0;
         }
 
-        return
-            slot0Cache.initPrice -
-            (slot0Cache.initPrice * timePassed) /
-            epochPeriod;
+        return slot0Cache.initPrice - (slot0Cache.initPrice * timePassed) / epochPeriod;
     }
 
     /// @dev Calculates the current price

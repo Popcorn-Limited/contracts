@@ -20,8 +20,7 @@ contract CrossOracle is BaseAdapter, Owned {
     string public constant name = "CrossAdapter";
 
     mapping(address => mapping(address => OracleStep[])) public oraclePath;
-    mapping(address => mapping(address => OracleStep[]))
-        public proposedOraclePath;
+    mapping(address => mapping(address => OracleStep[])) public proposedOraclePath;
     mapping(address => mapping(address => uint256)) public proposedTime;
 
     event OracleAdded(address base, address quote);
@@ -43,32 +42,20 @@ contract CrossOracle is BaseAdapter, Owned {
     /// @param base The token that is being priced.
     /// @param quote The token that is the unit of account.
     /// @return The converted amount by chaining the cross oracles.
-    function _getQuote(
-        uint256 inAmount,
-        address base,
-        address quote
-    ) internal view override returns (uint256) {
+    function _getQuote(uint256 inAmount, address base, address quote) internal view override returns (uint256) {
         OracleStep[] memory oracleSteps = oraclePath[base][quote];
 
         uint256 len = oracleSteps.length;
         if (len == 0) revert Errors.PriceOracle_NotSupported(base, quote);
 
         for (uint256 i; i < len; i++) {
-            inAmount = IPriceOracle(oracleSteps[i].oracle).getQuote(
-                inAmount,
-                oracleSteps[i].base,
-                oracleSteps[i].quote
-            );
+            inAmount = IPriceOracle(oracleSteps[i].oracle).getQuote(inAmount, oracleSteps[i].base, oracleSteps[i].quote);
         }
 
         return inAmount;
     }
 
-    function addOraclePath(
-        address base,
-        address quote,
-        OracleStep[] memory oracleSteps
-    ) external onlyOwner {
+    function addOraclePath(address base, address quote, OracleStep[] memory oracleSteps) external onlyOwner {
         if (oraclePath[base][quote].length > 0) revert OracleExists();
 
         uint256 len = oracleSteps.length;
@@ -81,11 +68,7 @@ contract CrossOracle is BaseAdapter, Owned {
         emit OracleAdded(base, quote);
     }
 
-    function proposeOraclePath(
-        address base,
-        address quote,
-        OracleStep[] memory oracleSteps
-    ) external onlyOwner {
+    function proposeOraclePath(address base, address quote, OracleStep[] memory oracleSteps) external onlyOwner {
         delete proposedOraclePath[base][quote];
 
         uint256 len = oracleSteps.length;
@@ -101,17 +84,16 @@ contract CrossOracle is BaseAdapter, Owned {
     }
 
     function changeOraclePath(address base, address quote) external onlyOwner {
-        if (block.timestamp < proposedTime[base][quote])
+        if (block.timestamp < proposedTime[base][quote]) {
             revert RespectTimeLock();
+        }
 
         delete oraclePath[base][quote];
 
         uint256 len = proposedOraclePath[base][quote].length;
         if (len > 0) {
             for (uint256 i; i < len; i++) {
-                oraclePath[base][quote].push(
-                    proposedOraclePath[base][quote][i]
-                );
+                oraclePath[base][quote].push(proposedOraclePath[base][quote][i]);
             }
         }
 

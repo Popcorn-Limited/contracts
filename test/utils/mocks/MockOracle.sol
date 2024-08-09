@@ -16,7 +16,7 @@ contract MockOracle {
         }
     }
 
-    function getQuote(uint inAmount, address base, address quote) external view returns (uint) {
+    function getQuote(uint256 inAmount, address base, address quote) external view returns (uint256) {
         return prices[base][quote] == 0 ? inAmount : prices[base][quote] * inAmount / 1e18;
     }
 }
