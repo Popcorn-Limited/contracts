@@ -9,7 +9,7 @@ import {Math} from "openzeppelin-contracts/utils/math/Math.sol";
 import {IERC20} from "openzeppelin-contracts/interfaces/IERC20.sol";
 import {IERC20Metadata} from "openzeppelin-contracts/interfaces/IERC20Metadata.sol";
 
-import {IBaseStrategy} from "../../src/interfaces/IBaseStrategy.sol";
+import {IBaseStrategy} from "src/interfaces/IBaseStrategy.sol";
 import {PropertyTest, TestConfig} from "./PropertyTest.prop.sol";
 
 abstract contract BaseStrategyTest is PropertyTest {
@@ -86,6 +86,17 @@ abstract contract BaseStrategyTest is PropertyTest {
         ) {
             vm.prank(0x4B16c5dE96EB2117bBE5fd171E4d203624B014aa);
             IERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48).transfer(
+                receiver,
+                amount
+            );
+        }
+        // USDC on optimism cant be dealt (find(StdStorage): Slot(s) not found) therefore we transfer from a whale
+        else if (
+            block.chainid == 10 &&
+            testConfig.asset == 0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85
+        ) {
+            vm.prank(0xf89d7b9c864f589bbF53a82105107622B35EaA40);
+            IERC20(0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85).transfer(
                 receiver,
                 amount
             );

@@ -6,7 +6,7 @@ pragma solidity ^0.8.15;
 import {Test} from "forge-std/Test.sol";
 import {MockERC20} from "../utils/mocks/MockERC20.sol";
 import {MockERC4626} from "../utils/mocks/MockERC4626.sol";
-import {MultiStrategyVault, Allocation} from "../../src/vaults/MultiStrategyVault.sol";
+import {MultiStrategyVault, Allocation} from "src/vaults/MultiStrategyVault.sol";
 import {IERC4626, IERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
 import {Clones} from "openzeppelin-contracts/proxy/Clones.sol";
@@ -519,6 +519,154 @@ contract MultiStrategyVaultTest is Test {
         assertEq(vault.balanceOf(alice), 0);
         assertEq(vault.balanceOf(bob), 0);
         assertEq(asset.balanceOf(alice), 1e18);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                          WITHDRAW WITH ALLOCATIONS
+    //////////////////////////////////////////////////////////////*/
+
+    function test__withdraw_with_allocations() public {
+        _depositIntoVault(bob, 10e18);
+
+        // Per default the strategy would withdraw from strategy 0 anyways so we need to move funds around to test the functionality
+        // Move funds into the second strategy
+        Allocation[] memory allocations = new Allocation[](1);
+        allocations[0] = Allocation({index: 0, amount: 5e18});
+        vault.pullFunds(allocations);
+        allocations[0] = Allocation({index: 1, amount: 5e18});
+        vault.pushFunds(allocations);
+
+        // Actual Test
+        Allocation[] memory withdrawAllocations = new Allocation[](2);
+        withdrawAllocations[0] = Allocation({index: 0, amount: 1e18});
+        withdrawAllocations[1] = Allocation({index: 1, amount: 2e18});
+
+        vm.prank(bob);
+        vault.withdraw(3e18, withdrawAllocations);
+
+        assertEq(asset.balanceOf(bob), 3e18);
+        assertEq(vault.balanceOf(bob), 7e18);
+        assertEq(asset.balanceOf(address(strategies[0])), 4e18);
+        assertEq(asset.balanceOf(address(strategies[1])), 3e18);
+    }
+
+    function test__withdraw_with_duplicate_allocations() public {
+        _depositIntoVault(bob, 10e18);
+
+        // Per default the strategy would withdraw from strategy 0 anyways so we need to move funds around to test the functionality
+        // Move funds into the second strategy
+        Allocation[] memory allocations = new Allocation[](1);
+        allocations[0] = Allocation({index: 0, amount: 5e18});
+        vault.pullFunds(allocations);
+        allocations[0] = Allocation({index: 1, amount: 5e18});
+        vault.pushFunds(allocations);
+
+        // Actual Test
+        Allocation[] memory withdrawAllocations = new Allocation[](2);
+        withdrawAllocations[0] = Allocation({index: 1, amount: 1e18});
+        withdrawAllocations[1] = Allocation({index: 1, amount: 2e18});
+
+        vm.prank(bob);
+        vault.withdraw(3e18, withdrawAllocations);
+
+        assertEq(asset.balanceOf(bob), 3e18);
+        assertEq(vault.balanceOf(bob), 7e18);
+        assertEq(asset.balanceOf(address(strategies[0])), 5e18);
+        assertEq(asset.balanceOf(address(strategies[1])), 2e18);
+    }
+
+    function testFail__withdraw_pullAmount_too_high() public {
+        _depositIntoVault(bob, 10e18);
+
+        Allocation[] memory withdrawAllocations = new Allocation[](2);
+        withdrawAllocations[0] = Allocation({index: 0, amount: 4e18});
+
+        vm.prank(bob);
+        vault.withdraw(3e18, withdrawAllocations);
+    }
+
+    function testFail__withdraw_too_many_allocations() public {
+        _depositIntoVault(bob, 10e18);
+
+        Allocation[] memory withdrawAllocations = new Allocation[](3);
+        withdrawAllocations[0] = Allocation({index: 0, amount: 3e18});
+
+        vm.prank(bob);
+        vault.withdraw(3e18, withdrawAllocations);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                          REDEEM WITH ALLOCATIONS
+    //////////////////////////////////////////////////////////////*/
+
+    function test__redeem_with_allocations() public {
+        _depositIntoVault(bob, 10e18);
+
+        // Per default the strategy would withdraw from strategy 0 anyways so we need to move funds around to test the functionality
+        // Move funds into the second strategy
+        Allocation[] memory allocations = new Allocation[](1);
+        allocations[0] = Allocation({index: 0, amount: 5e18});
+        vault.pullFunds(allocations);
+        allocations[0] = Allocation({index: 1, amount: 5e18});
+        vault.pushFunds(allocations);
+
+        // Actual Test
+        Allocation[] memory withdrawAllocations = new Allocation[](2);
+        withdrawAllocations[0] = Allocation({index: 0, amount: 1e18});
+        withdrawAllocations[1] = Allocation({index: 1, amount: 2e18});
+
+        vm.prank(bob);
+        vault.redeem(3e18, withdrawAllocations);
+
+        assertEq(asset.balanceOf(bob), 3e18);
+        assertEq(vault.balanceOf(bob), 7e18);
+        assertEq(asset.balanceOf(address(strategies[0])), 4e18);
+        assertEq(asset.balanceOf(address(strategies[1])), 3e18);
+    }
+
+    function test__redeem_with_duplicate_allocations() public {
+        _depositIntoVault(bob, 10e18);
+
+        // Per default the strategy would withdraw from strategy 0 anyways so we need to move funds around to test the functionality
+        // Move funds into the second strategy
+        Allocation[] memory allocations = new Allocation[](1);
+        allocations[0] = Allocation({index: 0, amount: 5e18});
+        vault.pullFunds(allocations);
+        allocations[0] = Allocation({index: 1, amount: 5e18});
+        vault.pushFunds(allocations);
+
+        // Actual Test
+        Allocation[] memory withdrawAllocations = new Allocation[](2);
+        withdrawAllocations[0] = Allocation({index: 1, amount: 1e18});
+        withdrawAllocations[1] = Allocation({index: 1, amount: 2e18});
+
+        vm.prank(bob);
+        vault.redeem(3e18, withdrawAllocations);
+
+        assertEq(asset.balanceOf(bob), 3e18);
+        assertEq(vault.balanceOf(bob), 7e18);
+        assertEq(asset.balanceOf(address(strategies[0])), 5e18);
+        assertEq(asset.balanceOf(address(strategies[1])), 2e18);
+    }
+
+    function testFail__redeem_pullAmount_too_high() public {
+        _depositIntoVault(bob, 10e18);
+
+        Allocation[] memory withdrawAllocations = new Allocation[](2);
+        withdrawAllocations[0] = Allocation({index: 0, amount: 4e18});
+
+        vm.prank(bob);
+        vault.redeem(3e18, withdrawAllocations);
+    }
+
+    function testFail__redeem_too_many_allocations() public {
+        _depositIntoVault(bob, 10e18);
+
+        Allocation[] memory withdrawAllocations = new Allocation[](3);
+        withdrawAllocations[0] = Allocation({index: 0, amount: 3e18});
+
+        vm.prank(bob);
+        vault.redeem(3e18, withdrawAllocations);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -1074,7 +1222,7 @@ contract MultiStrategyVaultTest is Test {
 
     function test_deposit_fundsIdle() public {
         // set default index to be type max
-        vault.setdepositIndex(type(uint256).max);
+        vault.setDepositIndex(type(uint256).max);
 
         uint256 amount = 1e18;
         _depositIntoVault(bob, amount);
@@ -1086,7 +1234,7 @@ contract MultiStrategyVaultTest is Test {
 
     function test_withdrawIdleFunds() public {
         // set default index to be type max
-        vault.setdepositIndex(type(uint256).max);
+        vault.setDepositIndex(type(uint256).max);
 
         uint256 amount = 1e18;
         _depositIntoVault(bob, amount);
@@ -1140,7 +1288,7 @@ contract MultiStrategyVaultTest is Test {
     }
 
     function testFail_setDefaultIndex_invalidIndex() public {
-        vault.setdepositIndex(5);
+        vault.setDepositIndex(5);
     }
 
     function _depositIntoVault(address user, uint256 amount) internal {
@@ -1257,26 +1405,136 @@ contract MultiStrategyVaultTest is Test {
     }
 
     /*//////////////////////////////////////////////////////////////
-                        PERFORMANCE FEE
+                            FEE LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    event PerformanceFeeChanged(uint256 oldFee, uint256 newFee);
+    event FeesChanged(
+        uint256 oldPerformanceFee,
+        uint256 newPerformanceFee,
+        uint256 oldManagementFee,
+        uint256 newManagementFee
+    );
 
     function test__setPerformanceFee() public {
         vm.expectEmit(false, false, false, true, address(vault));
-        emit PerformanceFeeChanged(0, 1e16);
-        vault.setPerformanceFee(1e16);
+        emit FeesChanged(0, 1e16, 0, 0);
+        vault.setFees(1e16, 0);
 
         assertEq(vault.performanceFee(), 1e16);
     }
 
     function testFail__setPerformanceFee_nonOwner() public {
         vm.prank(alice);
-        vault.setPerformanceFee(1e16);
+        vault.setFees(1e16, 0);
     }
 
     function testFail__setPerformanceFee_invalid_fee() public {
-        vault.setPerformanceFee(3e17);
+        vault.setFees(3e17, 0);
+    }
+
+    function test__setManagementFee() public {
+        vm.expectEmit(false, false, false, true, address(vault));
+        emit FeesChanged(0, 0, 0, 1e16);
+        vault.setFees(0, 1e16);
+
+        assertEq(vault.managementFee(), 1e16);
+    }
+
+    function testFail__setManagementFee_nonOwner() public {
+        vm.prank(alice);
+        vault.setFees(0, 1e16);
+    }
+
+    function testFail__setManagementFee_invalid_fee() public {
+        vault.setFees(0, 2e17);
+    }
+
+    function test__take_performanceFee() public {
+        _depositIntoVault(bob, 10e18);
+        vault.setFees(1e17, 0);
+
+        // Inflate vault value
+        asset.mint(address(vault), 10e18);
+
+        assertEq(vault.accruedPerformanceFee(), 5e18);
+
+        vault.takeFees();
+
+        // TODO update the expected value
+        assertEq(
+            vault.balanceOf(0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E),
+            1
+        );
+        assertEq(vault.highWaterMark(), 2);
+        assertEq(vault.accruedPerformanceFee(), 0);
+    }
+
+    function test__take_performanceFee_after_change() public {
+        _depositIntoVault(bob, 10e18);
+        vault.setFees(1e17, 0);
+
+        // Inflate vault value
+        asset.mint(address(vault), 10e18);
+
+        assertEq(vault.accruedPerformanceFee(), 5e18);
+
+        vault.setFees(2e17, 0);
+
+        // TODO update the expected value
+        assertEq(
+            vault.balanceOf(0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E),
+            1
+        );
+        assertEq(vault.highWaterMark(), 2);
+        assertEq(vault.accruedPerformanceFee(), 0);
+    }
+
+    function test__take_managementFee() public {
+        _depositIntoVault(bob, 10e18);
+        vault.setFees(0, 1e16);
+
+        vm.skip(365.25 days);
+
+        assertEq(vault.accruedManagementFee(), 1e17);
+
+        vm.skip((365.25 days) / 2);
+
+        assertEq(vault.accruedManagementFee(), 1.5e17);
+
+        _depositIntoVault(bob, 10e18);
+
+        vm.skip(365.25 days);
+
+        assertEq(vault.accruedManagementFee(), 3.5e17);
+
+        vault.takeFees();
+
+        // TODO update the expected value
+        assertEq(
+            vault.balanceOf(0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E),
+            1
+        );
+        assertEq(vault.feesUpdatedAt(), 2);
+        assertEq(vault.accruedManagementFee(), 0);
+    }
+
+    function test__take_managementFee_after_change() public {
+        _depositIntoVault(bob, 10e18);
+        vault.setFees(0, 1e16);
+
+        vm.skip(365.25 days);
+
+        assertEq(vault.accruedManagementFee(), 1e17);
+
+        vault.setFees(0, 1e17);
+
+        // TODO update the expected value
+        assertEq(
+            vault.balanceOf(0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E),
+            1
+        );
+        assertEq(vault.feesUpdatedAt(), 2);
+        assertEq(vault.accruedManagementFee(), 0);
     }
 
     /*//////////////////////////////////////////////////////////////

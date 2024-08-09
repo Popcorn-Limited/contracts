@@ -8,7 +8,7 @@ import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol"
 import {ReentrancyGuardUpgradeable} from "openzeppelin-contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {PausableUpgradeable} from "openzeppelin-contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {Math} from "openzeppelin-contracts/utils/math/Math.sol";
-import {OwnedUpgradeable} from "../utils/OwnedUpgradeable.sol";
+import {OwnedUpgradeable} from "src/utils/OwnedUpgradeable.sol";
 
 /**
  * @title   BaseStrategy
@@ -28,6 +28,10 @@ abstract contract BaseStrategy is
 {
     using SafeERC20 for IERC20;
     using Math for uint256;
+
+    // constructor() {
+    //     _disableInitializers();
+    // }
 
     /**
      * @notice Initialize a new Strategy.

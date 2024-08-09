@@ -3,7 +3,7 @@
 
 pragma solidity ^0.8.25;
 
-import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math} from "../../BaseStrategy.sol";
+import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math} from "src/strategies/BaseStrategy.sol";
 import {ICToken, IComptroller} from "./ICompoundV2.sol";
 import {LibCompound} from "./LibCompound.sol";
 

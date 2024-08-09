@@ -5,7 +5,7 @@ pragma solidity ^0.8.25;
 
 import {IERC4626, IERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
-import {ICurveGauge} from "../interfaces/external/curve/ICurveGauge.sol";
+import {ICurveGauge} from "src/interfaces/external/curve/ICurveGauge.sol";
 
 struct WithdrawalRequest {
     address vault;

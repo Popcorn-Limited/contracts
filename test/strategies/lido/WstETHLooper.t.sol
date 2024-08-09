@@ -11,7 +11,7 @@ import {
     IwstETH,
     ILendingPool,
     Math
-} from "../../../src/strategies/lido/WstETHLooper.sol";
+} from "src/strategies/lido/WstETHLooper.sol";
 import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson, Math} from "../BaseStrategyTest.sol";
 
 contract WstETHLooperTest is BaseStrategyTest {

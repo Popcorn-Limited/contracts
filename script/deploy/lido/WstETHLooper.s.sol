@@ -3,7 +3,7 @@
 
 pragma solidity ^0.8.25;
 
-import {Script} from "forge-std/Script.sol";
+import {Script, console} from "forge-std/Script.sol";
 import {stdJson} from "forge-std/StdJson.sol";
 
 import {WstETHLooper, LooperInitValues, IERC20} from "../../../src/strategies/lido/WstETHLooper.sol";
@@ -15,28 +15,31 @@ contract DeployStrategy is Script {
     IERC20 awstETH;
     IERC20 vdWETH;
 
-    function run() public {
+    function run() public returns (WstETHLooper strategy) {
         string memory json = vm.readFile(
             string.concat(
                 vm.projectRoot(),
-                "./srcript/deploy/lido/WstETHLooperDeployConfig.json"
+                "/script/deploy/lido/WstETHLooperDeployConfig.json"
             )
         );
+
+        vm.startBroadcast();
+        console.log("msg.sender:", msg.sender);
+
+        // Deploy Strategy
+        strategy = new WstETHLooper();
 
         LooperInitValues memory looperValues = abi.decode(
             json.parseRaw(".strategyInit"),
             (LooperInitValues)
         );
 
-        // Deploy Strategy
-        WstETHLooper strategy = new WstETHLooper();
-
         address asset = json.readAddress(".baseInit.asset");
 
         strategy.initialize(
             asset,
             json.readAddress(".baseInit.owner"),
-            json.readBool(".baseInit.autoHarvest"),
+            json.readBool(".baseInit.autoDeposit"),
             abi.encode(
                 looperValues.aaveDataProvider,
                 looperValues.curvePool,
@@ -49,5 +52,7 @@ contract DeployStrategy is Script {
 
         IERC20(asset).approve(address(strategy), 1);
         strategy.setUserUseReserveAsCollateral(1);
+
+        vm.stopBroadcast();
     }
 }

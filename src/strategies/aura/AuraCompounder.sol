@@ -3,9 +3,9 @@
 
 pragma solidity ^0.8.25;
 
-import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math} from "../BaseStrategy.sol";
+import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math} from "src/strategies/BaseStrategy.sol";
 import {IAuraBooster, IAuraRewards} from "./IAura.sol";
-import {BaseBalancerLpCompounder, HarvestValues, TradePath} from "../../peripheral/BaseBalancerLpCompounder.sol";
+import {BaseBalancerLpCompounder, HarvestValues, TradePath} from "src/peripheral/BaseBalancerLpCompounder.sol";
 
 /**
  * @title  Aura Adapter
@@ -81,7 +81,7 @@ contract AuraCompounder is BaseStrategy, BaseBalancerLpCompounder {
 
     /// @notice The token rewarded
     function rewardTokens() external view override returns (address[] memory) {
-        return _rewardTokens;
+        return _balancerSellTokens;
     }
 
     /*//////////////////////////////////////////////////////////////

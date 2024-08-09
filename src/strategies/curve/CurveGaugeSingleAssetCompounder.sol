@@ -3,9 +3,9 @@
 
 pragma solidity ^0.8.25;
 
-import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math} from "../BaseStrategy.sol";
+import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math} from "src/strategies/BaseStrategy.sol";
 import {ICurveLp, IGauge, ICurveRouter, CurveSwap, IMinter} from "./ICurve.sol";
-import {BaseCurveCompounder, CurveTradeLibrary} from "../../peripheral/BaseCurveCompounder.sol";
+import {BaseCurveCompounder, CurveTradeLibrary} from "src/peripheral/BaseCurveCompounder.sol";
 
 /**
  * @title   Curve Child Gauge Adapter
@@ -88,7 +88,7 @@ contract CurveGaugeSingleAssetCompounder is BaseStrategy, BaseCurveCompounder {
 
     /// @notice The token rewarded from the convex reward contract
     function rewardTokens() external view override returns (address[] memory) {
-        return _rewardTokens;
+        return _curveSellTokens;
     }
 
     function previewDeposit(uint256 assets) public view override returns (uint256) {
