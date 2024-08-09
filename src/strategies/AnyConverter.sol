@@ -121,6 +121,7 @@ abstract contract AnyConverter is BaseStrategy {
 
     error SlippageTooHigh();
     error NotEnoughFloat();
+    error BalanceTooLow();
 
     function pushFunds(
         uint256 yieldAssets,
@@ -133,7 +134,7 @@ abstract contract AnyConverter is BaseStrategy {
 
         uint256 ta = totalAssets();
         // TODO: should take into account the reserved assets
-        uint256 bal = IERC20(_asset).balanceOf(address(this));
+        uint256 bal = IERC20(_asset).balanceOf(address(this)) - totalReservedAssets;
 
         IERC20(_yieldAsset).safeTransferFrom(
             msg.sender,
@@ -147,18 +148,23 @@ abstract contract AnyConverter is BaseStrategy {
             _asset
         );
 
-        // TODO: we should probably revert if we don't have enough funds
-        // to cover the withdrawable amount
+        // we revert if:
+        // 1. we don't have enough funds to cover the withdrawable amount
+        // 2. we don't have enough float after the withdrawal (if floatRatio > 0)
         if (_floatRatio > 0) {
             uint256 float = ta.mulDiv(
-                10_000 - _floatRatio,
+                _floatRatio,
                 10_000,
                 Math.Rounding.Floor
             );
-            uint256 balAfterFloat = bal - float;
-            if (balAfterFloat < withdrawable) withdrawable = balAfterFloat;
+            if (float > bal) {
+                revert NotEnoughFloat();
+            } else {
+                uint256 balAfterFloat = bal - float;
+                if (balAfterFloat < withdrawable) revert BalanceTooLow();
+            }
         } else {
-            if (bal < withdrawable) withdrawable = bal;
+            if (bal < withdrawable) revert BalanceTooLow();
         }
 
         _reserveToken(yieldAssets, withdrawable, _yieldAsset, false);
