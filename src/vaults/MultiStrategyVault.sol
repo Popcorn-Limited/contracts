@@ -200,10 +200,21 @@ contract MultiStrategyVault is
                         DEPOSIT/WITHDRAWAL LOGIC
     //////////////////////////////////////////////////////////////*/
 
+    uint withdrawalLeewayBps = 100;
+
     event StrategyWithdrawalFailed(address strategy, uint256 amount);
+    event WithdrawalLeeWayUpdated(uint256 oldLeeway, uint256 newLeeway);
 
     error ZeroAmount();
     error Misconfigured();
+
+    function setWithdrawalLeeway(uint _withdrawalLeewayBps) external onlyOwner {
+        require(_withdrawalLeewayBps <= 10_000, "Invalid withdrawal leeway");
+        uint oldLeeway = withdrawalLeewayBps;
+        withdrawalLeewayBps = _withdrawalLeewayBps;
+        emit WithdrawalLeeWayUpdated(oldLeeway, _withdrawalLeewayBps);
+    }
+
 
     function deposit(uint256 assets) external returns (uint256) {
         return deposit(assets, msg.sender);
@@ -267,7 +278,7 @@ contract MultiStrategyVault is
     function _checkPullAllocation(
         uint256 assets,
         Allocation[] calldata allocations
-    ) internal {
+    ) internal view {
         uint256 len = allocations.length;
         if (len > strategies.length) revert Misconfigured();
 
@@ -275,7 +286,8 @@ contract MultiStrategyVault is
         for (uint256 i; i < len; i++) {
             pullAmount += allocations[i].amount;
         }
-        if (pullAmount > assets) revert Misconfigured();
+        if ((assets + assets * withdrawalLeewayBps / 10_000) > pullAmount)
+            revert Misconfigured();
     }
 
     /**
