@@ -13,10 +13,7 @@ contract DeployStrategy is Script {
 
     function run() public returns (CompoundV3Depositor strategy) {
         string memory json = vm.readFile(
-            string.concat(
-                vm.projectRoot(),
-                "/script/deploy/compound/v3/CompoundV3DepositorDeployConfig.json"
-            )
+            string.concat(vm.projectRoot(), "/script/deploy/compound/v3/CompoundV3DepositorDeployConfig.json")
         );
 
         vm.startBroadcast();

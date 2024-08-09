@@ -11,28 +11,15 @@ interface IVe {
 }
 
 interface IVaultRouter {
-    function depositAndStake(
-        address vault,
-        address gauge,
-        uint256 assetAmount,
-        address receiver
-    ) external;
+    function depositAndStake(address vault, address gauge, uint256 assetAmount, address receiver) external;
 
-    function unstakeAndWithdraw(
-        address vault,
-        address gauge,
-        uint256 burnAmount,
-        address receiver
-    ) external;
+    function unstakeAndWithdraw(address vault, address gauge, uint256 burnAmount, address receiver) external;
 }
 
 interface IGauge {
     function claim_rewards(address user) external;
 
-    function claimable_reward(
-        address user,
-        address rewardToken
-    ) external view returns (uint256);
+    function claimable_reward(address user, address rewardToken) external view returns (uint256);
 }
 
 contract Fixer {
@@ -45,10 +32,7 @@ contract Fixer {
     }
 
     function claim() external {
-        uint256 claimableOvcx = IGauge(gauge).claimable_reward(
-            msg.sender,
-            rewardToken
-        );
+        uint256 claimableOvcx = IGauge(gauge).claimable_reward(msg.sender, rewardToken);
         IERC20(rewardToken).transfer(gauge, claimableOvcx);
         IGauge(gauge).claim_rewards(msg.sender);
     }
@@ -104,12 +88,7 @@ contract Tester is Test {
         vm.startPrank(user, user);
         uint256 gaugeBal = IERC20(gauge).balanceOf(user);
         IERC20(gauge).approve(router, gaugeBal);
-        IVaultRouter(router).unstakeAndWithdraw(
-            vaultAddr,
-            gauge,
-            gaugeBal,
-            user
-        );
+        IVaultRouter(router).unstakeAndWithdraw(vaultAddr, gauge, gaugeBal, user);
         vm.stopPrank();
     }
 
@@ -120,10 +99,7 @@ contract Tester is Test {
         );
 
         vm.prank(0x22f5413C075Ccd56D575A54763831C4c27A37Bdb);
-        IERC20(0x59a696bF34Eae5AD8Fd472020e3Bed410694a230).transfer(
-            address(fixer),
-            100e18
-        );
+        IERC20(0x59a696bF34Eae5AD8Fd472020e3Bed410694a230).transfer(address(fixer), 100e18);
 
         vm.prank(0x22f5413C075Ccd56D575A54763831C4c27A37Bdb);
         fixer.claim();

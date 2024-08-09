@@ -19,35 +19,21 @@ contract PeapodsUniV2CompounderTest is BaseStrategyTest {
     address[2] depositAssets;
 
     function setUp() public {
-        _setUpBaseTest(
-            0,
-            "./test/strategies/peapods/PeapodsUniV2CompounderTestConfig.json"
-        );
+        _setUpBaseTest(0, "./test/strategies/peapods/PeapodsUniV2CompounderTestConfig.json");
     }
 
-    function _setUpStrategy(
-        string memory json_,
-        string memory index_,
-        TestConfig memory testConfig_
-    ) internal override returns (IBaseStrategy) {
+    function _setUpStrategy(string memory json_, string memory index_, TestConfig memory testConfig_)
+        internal
+        override
+        returns (IBaseStrategy)
+    {
         // Read strategy init values
-        stakingContract = json_.readAddress(
-            string.concat(
-                ".configs[",
-                index_,
-                "].specific.init.stakingContract"
-            )
-        );
+        stakingContract = json_.readAddress(string.concat(".configs[", index_, "].specific.init.stakingContract"));
 
         // Deploy Strategy
         PeapodsUniV2Compounder strategy = new PeapodsUniV2Compounder();
 
-        strategy.initialize(
-            testConfig_.asset,
-            address(this),
-            true,
-            abi.encode(stakingContract)
-        );
+        strategy.initialize(testConfig_.asset, address(this), true, abi.encode(stakingContract));
 
         // Set Harvest values
         _setHarvestValues(json_, index_, address(strategy));
@@ -55,112 +41,50 @@ contract PeapodsUniV2CompounderTest is BaseStrategyTest {
         return IBaseStrategy(address(strategy));
     }
 
-    function _setHarvestValues(
-        string memory json_,
-        string memory index_,
-        address strategy
-    ) internal {
-        address router = json_.readAddress(
-            string.concat(
-                ".configs[",
-                index_,
-                "].specific.harvest.uniswapRouter"
-            )
-        );
+    function _setHarvestValues(string memory json_, string memory index_, address strategy) internal {
+        address router = json_.readAddress(string.concat(".configs[", index_, "].specific.harvest.uniswapRouter"));
 
         // assets to buy with rewards and to add to liquidity
-        depositAssets[0] = json_.readAddress(
-            string.concat(
-                ".configs[",
-                index_,
-                "].specific.harvest.depositAssets[0]"
-            )
-        );
-        depositAssets[1] = json_.readAddress(
-            string.concat(
-                ".configs[",
-                index_,
-                "].specific.harvest.depositAssets[1]"
-            )
-        );
+        depositAssets[0] = json_.readAddress(string.concat(".configs[", index_, "].specific.harvest.depositAssets[0]"));
+        depositAssets[1] = json_.readAddress(string.concat(".configs[", index_, "].specific.harvest.depositAssets[1]"));
 
         // set Uniswap trade paths
         SwapStep[] memory swaps = new SwapStep[](2);
         swaps = _getTradePaths(json_, index_);
-   
+
         // rewards
-        uint256 rewLen = json_.readUint(
-            string.concat(
-                ".configs[",
-                index_,
-                "].specific.harvest.rewards.length"
-            )
-        );
+        uint256 rewLen = json_.readUint(string.concat(".configs[", index_, "].specific.harvest.rewards.length"));
         address[] memory rewardTokens = new address[](rewLen);
         for (uint256 i = 0; i < rewLen; i++) {
             rewardTokens[i] = json_.readAddress(
-                string.concat(
-                    ".configs[",
-                    index_,
-                    "].specific.harvest.rewards.tokens[",
-                    vm.toString(i),
-                    "]"
-                )
+                string.concat(".configs[", index_, "].specific.harvest.rewards.tokens[", vm.toString(i), "]")
             );
         }
 
-        PeapodsUniV2Compounder(strategy).setHarvestValues(
-            rewardTokens,
-            router,
-            depositAssets,
-            swaps
-        );
+        PeapodsUniV2Compounder(strategy).setHarvestValues(rewardTokens, router, depositAssets, swaps);
     }
 
-    function _getTradePaths(
-        string memory json_,
-        string memory index_
-    ) internal pure returns (SwapStep[] memory swaps) {
+    function _getTradePaths(string memory json_, string memory index_)
+        internal
+        pure
+        returns (SwapStep[] memory swaps)
+    {
         // set Uniswap trade paths
         swaps = new SwapStep[](2);
 
-        uint256 lenSwap0 = json_.readUint(
-            string.concat(
-                ".configs[",
-                index_,
-                "].specific.harvest.tradePaths[0].length"
-            )
-        );
+        uint256 lenSwap0 = json_.readUint(string.concat(".configs[", index_, "].specific.harvest.tradePaths[0].length"));
         address[] memory swap0 = new address[](lenSwap0); // PEAS - WETH - DAI - pDAI
         for (uint256 i = 0; i < lenSwap0; i++) {
             swap0[i] = json_.readAddress(
-                string.concat(
-                    ".configs[",
-                    index_,
-                    "].specific.harvest.tradePaths[0].path[",
-                    vm.toString(i),
-                    "]"
-                )
+                string.concat(".configs[", index_, "].specific.harvest.tradePaths[0].path[", vm.toString(i), "]")
             );
         }
 
-        uint256 lenSwap1 = json_.readUint(
-            string.concat(
-                ".configs[",
-                index_,
-                "].specific.harvest.tradePaths[1].length"
-            )
-        );
+        uint256 lenSwap1 = json_.readUint(string.concat(".configs[", index_, "].specific.harvest.tradePaths[1].length"));
         address[] memory swap1 = new address[](lenSwap1); // PEAS - WETH - DAI
         for (uint256 i = 0; i < lenSwap1; i++) {
             swap1[i] = json_.readAddress(
-                string.concat(
-                    ".configs[",
-                    index_,
-                    "].specific.harvest.tradePaths[1].path[",
-                    vm.toString(i),
-                    "]"
-                )
+                string.concat(".configs[", index_, "].specific.harvest.tradePaths[1].path[", vm.toString(i), "]")
             );
         }
 
@@ -173,24 +97,15 @@ contract PeapodsUniV2CompounderTest is BaseStrategyTest {
     //////////////////////////////////////////////////////////////*/
 
     function test__initialization() public override {
-        string memory json = vm.readFile(
-            "./test/strategies/peapods/PeapodsUniV2CompounderTestConfig.json"
-        );
+        string memory json = vm.readFile("./test/strategies/peapods/PeapodsUniV2CompounderTestConfig.json");
 
         // Read strategy init values
-        address staking = json.readAddress(
-            string.concat(".configs[0].specific.init.stakingContract")
-        );
+        address staking = json.readAddress(string.concat(".configs[0].specific.init.stakingContract"));
 
         // Deploy Strategy
         PeapodsUniV2Compounder strategy = new PeapodsUniV2Compounder();
 
-        strategy.initialize(
-            testConfig.asset,
-            address(this),
-            true,
-            abi.encode(staking)
-        );
+        strategy.initialize(testConfig.asset, address(this), true, abi.encode(staking));
 
         assertEq(strategy.owner(), address(this), "owner");
 
@@ -208,11 +123,7 @@ contract PeapodsUniV2CompounderTest is BaseStrategyTest {
         uint256 totAssets = strategy.totalAssets();
         assertEq(totAssets, amount);
 
-        strategy.redeem(
-            IERC20(address(strategy)).balanceOf(address(bob)),
-            bob,
-            bob
-        );
+        strategy.redeem(IERC20(address(strategy)).balanceOf(address(bob)), bob, bob);
         vm.stopPrank();
 
         assertEq(strategy.totalAssets(), 0);
@@ -229,11 +140,7 @@ contract PeapodsUniV2CompounderTest is BaseStrategyTest {
         vm.stopPrank();
 
         // distribute rewards token to strategy as if they were claimed
-        deal(
-            address(0x02f92800F57BCD74066F5709F1Daa1A4302Df875),
-            address(strategy),
-            10 ether
-        );
+        deal(address(0x02f92800F57BCD74066F5709F1Daa1A4302Df875), address(strategy), 10 ether);
 
         uint256 totAssetsBefore = strategy.totalAssets();
 
@@ -244,34 +151,24 @@ contract PeapodsUniV2CompounderTest is BaseStrategyTest {
     }
 
     function test__withdrawDust() public {
-        PeapodsUniV2Compounder strategyContract = PeapodsUniV2Compounder(
-            address(strategy)
-        );
+        PeapodsUniV2Compounder strategyContract = PeapodsUniV2Compounder(address(strategy));
 
         // distribute deposit tokens in the strategy
         deal(depositAssets[0], address(strategy), 0.1 ether);
-        assertEq(
-            IERC20(depositAssets[0]).balanceOf(address(strategy)),
-            0.1 ether
-        );
+        assertEq(IERC20(depositAssets[0]).balanceOf(address(strategy)), 0.1 ether);
 
         strategyContract.withdrawDust(depositAssets[0]);
         assertEq(IERC20(depositAssets[0]).balanceOf(address(strategy)), 0);
 
         deal(depositAssets[1], address(strategy), 0.1 ether);
-        assertEq(
-            IERC20(depositAssets[1]).balanceOf(address(strategy)),
-            0.1 ether
-        );
+        assertEq(IERC20(depositAssets[1]).balanceOf(address(strategy)), 0.1 ether);
 
         strategyContract.withdrawDust(depositAssets[1]);
         assertEq(IERC20(depositAssets[1]).balanceOf(address(strategy)), 0);
     }
 
     function testFail_withdrawDust_invalidToken() public {
-        PeapodsUniV2Compounder strategyContract = PeapodsUniV2Compounder(
-            address(strategy)
-        );
+        PeapodsUniV2Compounder strategyContract = PeapodsUniV2Compounder(address(strategy));
         deal(depositAssets[0], address(strategy), 0.1 ether);
 
         // only deposit tokens
@@ -283,9 +180,7 @@ contract PeapodsUniV2CompounderTest is BaseStrategyTest {
     }
 
     function testFail_withdrawDust_onlyOwner() public {
-        PeapodsUniV2Compounder strategyContract = PeapodsUniV2Compounder(
-            address(strategy)
-        );
+        PeapodsUniV2Compounder strategyContract = PeapodsUniV2Compounder(address(strategy));
         deal(depositAssets[0], address(strategy), 0.1 ether);
 
         // only owner
@@ -300,37 +195,18 @@ contract PeapodsUniV2CompounderTest is BaseStrategyTest {
         swaps = _getTradePaths(json, "0");
 
         // rewards
-        uint256 rewLen = json.readUint(
-            string.concat(
-                ".configs[0].specific.harvest.rewards.length"
-            )
-        );
+        uint256 rewLen = json.readUint(string.concat(".configs[0].specific.harvest.rewards.length"));
         address[] memory rewardTokens = new address[](rewLen);
         for (uint256 i = 0; i < rewLen; i++) {
-            rewardTokens[i] = json.readAddress(
-                string.concat(
-                    ".configs[0].specific.harvest.rewards.tokens[",
-                    vm.toString(i),
-                    "]"
-                )
-            );
-        }  
+            rewardTokens[i] =
+                json.readAddress(string.concat(".configs[0].specific.harvest.rewards.tokens[", vm.toString(i), "]"));
+        }
 
-
-        address oldRouter = json.readAddress(
-            string.concat(
-                ".configs[0].specific.harvest.uniswapRouter"
-            )
-        );
+        address oldRouter = json.readAddress(string.concat(".configs[0].specific.harvest.uniswapRouter"));
         address mockRouter = address(0x1234);
-        
-        PeapodsUniV2Compounder(address(strategy)).setHarvestValues(
-            rewardTokens,
-            mockRouter,
-            depositAssets,
-            swaps
-        );
-        
+
+        PeapodsUniV2Compounder(address(strategy)).setHarvestValues(rewardTokens, mockRouter, depositAssets, swaps);
+
         // old router allowance is reset
         assertEq(IERC20(depositAssets[0]).allowance(address(strategy), oldRouter), 0);
         assertEq(IERC20(depositAssets[1]).allowance(address(strategy), oldRouter), 0);
@@ -343,11 +219,7 @@ contract PeapodsUniV2CompounderTest is BaseStrategyTest {
     function verify_strategyInit() public {
         assertEq(
             IERC20Metadata(address(strategy)).name(),
-            string.concat(
-                "VaultCraft Peapods ",
-                IERC20Metadata(testConfig.asset).name(),
-                " Adapter"
-            ),
+            string.concat("VaultCraft Peapods ", IERC20Metadata(testConfig.asset).name(), " Adapter"),
             "name"
         );
         assertEq(
@@ -356,13 +228,6 @@ contract PeapodsUniV2CompounderTest is BaseStrategyTest {
             "symbol"
         );
 
-        assertEq(
-            IERC20(testConfig.asset).allowance(
-                address(strategy),
-                stakingContract
-            ),
-            type(uint256).max,
-            "allowance"
-        );
+        assertEq(IERC20(testConfig.asset).allowance(address(strategy), stakingContract), type(uint256).max, "allowance");
     }
 }

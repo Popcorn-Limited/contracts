@@ -3,7 +3,13 @@
 
 pragma solidity ^0.8.25;
 
-import {ERC4626Upgradeable, IERC20Metadata, ERC20Upgradeable as ERC20, IERC4626, IERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
+import {
+    ERC4626Upgradeable,
+    IERC20Metadata,
+    ERC20Upgradeable as ERC20,
+    IERC4626,
+    IERC20
+} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuardUpgradeable} from "openzeppelin-contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {PausableUpgradeable} from "openzeppelin-contracts-upgradeable/utils/PausableUpgradeable.sol";
@@ -39,11 +45,7 @@ abstract contract BaseStrategy is
      * @param owner_ Owner of the contract. Controls management functions.
      * @param autoDeposit_ Controls if `protocolDeposit` gets called on deposit
      */
-    function __BaseStrategy_init(
-        address asset_,
-        address owner_,
-        bool autoDeposit_
-    ) internal onlyInitializing {
+    function __BaseStrategy_init(address asset_, address owner_, bool autoDeposit_) internal onlyInitializing {
         __Pausable_init();
         __ReentrancyGuard_init();
         __Owned_init(owner_);
@@ -80,12 +82,11 @@ abstract contract BaseStrategy is
     /**
      * @dev Deposit/mint common workflow.
      */
-    function _deposit(
-        address caller,
-        address receiver,
-        uint256 assets,
-        uint256 shares
-    ) internal override nonReentrant {
+    function _deposit(address caller, address receiver, uint256 assets, uint256 shares)
+        internal
+        override
+        nonReentrant
+    {
         if (shares == 0 || assets == 0) revert ZeroAmount();
 
         // If _asset is ERC-777, `transferFrom` can trigger a reentrancy BEFORE the transfer happens through the
@@ -95,12 +96,7 @@ abstract contract BaseStrategy is
         // Conclusion: we need to do the transfer before we mint so that any reentrancy would happen before the
         // assets are transferred and before the shares are minted, which is a valid state.
         // slither-disable-next-line reentrancy-no-eth
-        SafeERC20.safeTransferFrom(
-            IERC20(asset()),
-            caller,
-            address(this),
-            assets
-        );
+        SafeERC20.safeTransferFrom(IERC20(asset()), caller, address(this), assets);
 
         if (autoDeposit) _protocolDeposit(assets, shares, bytes(""));
 
@@ -112,13 +108,11 @@ abstract contract BaseStrategy is
     /**
      * @dev Withdraw/redeem common workflow.
      */
-    function _withdraw(
-        address caller,
-        address receiver,
-        address owner,
-        uint256 assets,
-        uint256 shares
-    ) internal override nonReentrant {
+    function _withdraw(address caller, address receiver, address owner, uint256 assets, uint256 shares)
+        internal
+        override
+        nonReentrant
+    {
         if (shares == 0 || assets == 0) revert ZeroAmount();
         if (caller != owner) {
             _spendAllowance(owner, caller, shares);
@@ -169,10 +163,7 @@ abstract contract BaseStrategy is
      * @dev This is an optional function for underlying protocols that require deposit/withdrawal amounts in their shares.
      * @dev Returns shares if totalSupply is 0.
      */
-    function convertToUnderlyingShares(
-        uint256 assets,
-        uint256 shares
-    ) public view virtual returns (uint256) {}
+    function convertToUnderlyingShares(uint256 assets, uint256 shares) public view virtual returns (uint256) {}
 
     function rewardTokens() external view virtual returns (address[] memory) {}
 
@@ -185,9 +176,7 @@ abstract contract BaseStrategy is
      * @dev Return 0 if paused since no further deposits are allowed.
      * @dev Override this function if the underlying protocol has a unique deposit logic and/or deposit fees.
      */
-    function maxDeposit(
-        address
-    ) public view virtual override returns (uint256) {
+    function maxDeposit(address) public view virtual override returns (uint256) {
         return paused() ? 0 : type(uint256).max;
     }
 
@@ -205,20 +194,12 @@ abstract contract BaseStrategy is
     //////////////////////////////////////////////////////////////*/
 
     /// @notice deposit into the underlying protocol.
-    function _protocolDeposit(
-        uint256 assets,
-        uint256 shares,
-        bytes memory data
-    ) internal virtual {
+    function _protocolDeposit(uint256 assets, uint256 shares, bytes memory data) internal virtual {
         // OPTIONAL - convertIntoUnderlyingShares(assets,shares)
     }
 
     /// @notice Withdraw from the underlying protocol.
-    function _protocolWithdraw(
-        uint256 assets,
-        uint256 shares,
-        bytes memory data
-    ) internal virtual {
+    function _protocolWithdraw(uint256 assets, uint256 shares, bytes memory data) internal virtual {
         // OPTIONAL - convertIntoUnderlyingShares(assets,shares)
     }
 
@@ -243,17 +224,11 @@ abstract contract BaseStrategy is
 
     function harvest(bytes memory data) external virtual onlyKeeperOrOwner {}
 
-    function pushFunds(
-        uint256 assets,
-        bytes memory data
-    ) external virtual onlyKeeperOrOwner {
+    function pushFunds(uint256 assets, bytes memory data) external virtual onlyKeeperOrOwner {
         _protocolDeposit(assets, convertToShares(assets), data);
     }
 
-    function pullFunds(
-        uint256 assets,
-        bytes memory data
-    ) external virtual onlyKeeperOrOwner {
+    function pullFunds(uint256 assets, bytes memory data) external virtual onlyKeeperOrOwner {
         _protocolWithdraw(assets, convertToShares(assets), data);
     }
 
@@ -300,15 +275,10 @@ abstract contract BaseStrategy is
     error PermitDeadlineExpired(uint256 deadline);
     error InvalidSigner(address signer);
 
-    function permit(
-        address owner,
-        address spender,
-        uint256 value,
-        uint256 deadline,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
-    ) public virtual {
+    function permit(address owner, address spender, uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s)
+        public
+        virtual
+    {
         if (deadline < block.timestamp) revert PermitDeadlineExpired(deadline);
 
         // Unchecked because the only math done is incrementing
@@ -347,24 +317,18 @@ abstract contract BaseStrategy is
     }
 
     function DOMAIN_SEPARATOR() public view virtual returns (bytes32) {
-        return
-            block.chainid == INITIAL_CHAIN_ID
-                ? INITIAL_DOMAIN_SEPARATOR
-                : computeDomainSeparator();
+        return block.chainid == INITIAL_CHAIN_ID ? INITIAL_DOMAIN_SEPARATOR : computeDomainSeparator();
     }
 
     function computeDomainSeparator() internal view virtual returns (bytes32) {
-        return
-            keccak256(
-                abi.encode(
-                    keccak256(
-                        "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
-                    ),
-                    keccak256(bytes(name())),
-                    keccak256("1"),
-                    block.chainid,
-                    address(this)
-                )
-            );
+        return keccak256(
+            abi.encode(
+                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+                keccak256(bytes(name())),
+                keccak256("1"),
+                block.chainid,
+                address(this)
+            )
+        );
     }
 }

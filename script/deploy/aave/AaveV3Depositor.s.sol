@@ -11,12 +11,8 @@ contract DeployStrategy is Script {
     using stdJson for string;
 
     function run() public returns (AaveV3Depositor strategy) {
-        string memory json = vm.readFile(
-            string.concat(
-                vm.projectRoot(),
-                "/script/deploy/aave/AaveV3DepositorDeployConfig.json"
-            )
-        );
+        string memory json =
+            vm.readFile(string.concat(vm.projectRoot(), "/script/deploy/aave/AaveV3DepositorDeployConfig.json"));
 
         vm.startBroadcast();
         console.log("msg.sender:", msg.sender);

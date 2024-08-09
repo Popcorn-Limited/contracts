@@ -16,10 +16,7 @@ contract DeployStrategy is Script {
 
     function run() public returns (PeapodsBalancerUniV2Compounder strategy) {
         string memory json = vm.readFile(
-            string.concat(
-                vm.projectRoot(),
-                "/script/deploy/peapods/PeapodsBalancerUniV2CompounderDeployConfig.json"
-            )
+            string.concat(vm.projectRoot(), "/script/deploy/peapods/PeapodsBalancerUniV2CompounderDeployConfig.json")
         );
 
         vm.startBroadcast();
@@ -41,9 +38,7 @@ contract DeployStrategy is Script {
     }
 
     function _setHarvestValues(string memory json_, address strategy) internal {
-        address uniswapRouter = json_.readAddress(
-            ".harvest.uniswap.uniswapRouter"
-        );
+        address uniswapRouter = json_.readAddress(".harvest.uniswap.uniswapRouter");
 
         // assets to buy with rewards and to add to liquidity
         address[] memory rewToken = new address[](1);
@@ -52,115 +47,64 @@ contract DeployStrategy is Script {
         // set Uniswap trade paths
         SwapStep[] memory swaps = new SwapStep[](1);
 
-        uint256 lenSwap0 = json_.readUint(
-            ".harvest.uniswap.tradePaths[0].length"
-        );
+        uint256 lenSwap0 = json_.readUint(".harvest.uniswap.tradePaths[0].length");
 
         address[] memory swap0 = new address[](lenSwap0); // PEAS - WETH
         for (uint256 i = 0; i < lenSwap0; i++) {
-            swap0[i] = json_.readAddress(
-                string.concat(
-                    ".harvest.uniswap.tradePaths[0].path[",
-                    vm.toString(i),
-                    "]"
-                )
-            );
+            swap0[i] = json_.readAddress(string.concat(".harvest.uniswap.tradePaths[0].path[", vm.toString(i), "]"));
         }
 
         swaps[0] = SwapStep(swap0);
 
         // BALANCER HARVEST VALUES
-        address balancerVault_ = json_.readAddress(
-            ".harvest.balancer.balancerVault"
-        );
+        address balancerVault_ = json_.readAddress(".harvest.balancer.balancerVault");
 
-        HarvestValues memory harvestValues_ = abi.decode(
-            json_.parseRaw(".harvest.balancer.harvestValues"),
-            (HarvestValues)
-        );
+        HarvestValues memory harvestValues_ =
+            abi.decode(json_.parseRaw(".harvest.balancer.harvestValues"), (HarvestValues));
 
         TradePath[] memory tradePaths_ = _getBalancerTradePaths(json_);
 
         PeapodsBalancerUniV2Compounder(strategy).setHarvestValues(
-            balancerVault_,
-            tradePaths_,
-            harvestValues_,
-            uniswapRouter,
-            rewToken,
-            swaps
+            balancerVault_, tradePaths_, harvestValues_, uniswapRouter, rewToken, swaps
         );
     }
 
-    function _setBalancerHarvestValues(
-        string memory json_,
-        address strategy
-    ) internal {
+    function _setBalancerHarvestValues(string memory json_, address strategy) internal {
         // Read harvest values
-        address balancerVault_ = json_.readAddress(
-            ".harvest.balancer.balancerVault"
-        );
+        address balancerVault_ = json_.readAddress(".harvest.balancer.balancerVault");
 
-        HarvestValues memory harvestValues_ = abi.decode(
-            json_.parseRaw(".harvest.balancer.harvestValues"),
-            (HarvestValues)
-        );
+        HarvestValues memory harvestValues_ =
+            abi.decode(json_.parseRaw(".harvest.balancer.harvestValues"), (HarvestValues));
 
         TradePath[] memory tradePaths_ = _getBalancerTradePaths(json_);
 
         // Set harvest values
-        BalancerCompounder(strategy).setHarvestValues(
-            balancerVault_,
-            tradePaths_,
-            harvestValues_
-        );
+        BalancerCompounder(strategy).setHarvestValues(balancerVault_, tradePaths_, harvestValues_);
     }
 
-    function _getBalancerTradePaths(
-        string memory json_
-    ) internal pure returns (TradePath[] memory) {
-        uint256 swapLen = json_.readUint(
-            string.concat(".harvest.balancer.tradePaths.length")
-        );
+    function _getBalancerTradePaths(string memory json_) internal pure returns (TradePath[] memory) {
+        uint256 swapLen = json_.readUint(string.concat(".harvest.balancer.tradePaths.length"));
 
         TradePath[] memory tradePaths_ = new TradePath[](swapLen);
         for (uint256 i; i < swapLen; i++) {
             // Read route and convert dynamic into fixed size array
             address[] memory assetAddresses = json_.readAddressArray(
-                string.concat(
-                    ".harvest.balancer.tradePaths.structs[",
-                    vm.toString(i),
-                    "].assets"
-                )
+                string.concat(".harvest.balancer.tradePaths.structs[", vm.toString(i), "].assets")
             );
             IAsset[] memory assets = new IAsset[](assetAddresses.length);
             for (uint256 n; n < assetAddresses.length; n++) {
                 assets[n] = IAsset(assetAddresses[n]);
             }
 
-            int256[] memory limits = json_.readIntArray(
-                string.concat(
-                    ".harvest.balancer.tradePaths.structs[",
-                    vm.toString(i),
-                    "].limits"
-                )
-            );
+            int256[] memory limits =
+                json_.readIntArray(string.concat(".harvest.balancer.tradePaths.structs[", vm.toString(i), "].limits"));
 
             BatchSwapStep[] memory swapSteps = abi.decode(
-                json_.parseRaw(
-                    string.concat(
-                        ".harvest.balancer.tradePaths.structs[",
-                        vm.toString(i),
-                        "].swaps"
-                    )
-                ),
+                json_.parseRaw(string.concat(".harvest.balancer.tradePaths.structs[", vm.toString(i), "].swaps")),
                 (BatchSwapStep[])
             );
 
-            tradePaths_[i] = TradePath({
-                assets: assets,
-                limits: limits,
-                swaps: abi.encode(swapSteps)
-            });
+            tradePaths_[i] = TradePath({assets: assets, limits: limits, swaps: abi.encode(swapSteps)});
         }
 
         return tradePaths_;

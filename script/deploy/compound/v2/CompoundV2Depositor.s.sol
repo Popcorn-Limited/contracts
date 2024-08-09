@@ -13,10 +13,7 @@ contract DeployStrategy is Script {
 
     function run() public returns (CompoundV2Depositor strategy) {
         string memory json = vm.readFile(
-            string.concat(
-                vm.projectRoot(),
-                "/script/deploy/compound/v2/CompoundV2DepositorDeployConfig.json"
-            )
+            string.concat(vm.projectRoot(), "/script/deploy/compound/v2/CompoundV2DepositorDeployConfig.json")
         );
 
         vm.startBroadcast();
@@ -28,10 +25,7 @@ contract DeployStrategy is Script {
             json.readAddress(".baseInit.asset"),
             json.readAddress(".baseInit.owner"),
             json.readBool(".baseInit.autoDeposit"),
-            abi.encode(
-                json.readAddress(".strategyInit.cToken"),
-                json.readAddress(".strategyInit.comptroller")
-            )
+            abi.encode(json.readAddress(".strategyInit.cToken"), json.readAddress(".strategyInit.comptroller"))
         );
 
         vm.stopBroadcast();
