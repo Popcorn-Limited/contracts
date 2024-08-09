@@ -3,6 +3,7 @@
 
 pragma solidity ^0.8.25;
 
+import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 import {AnyConverter, IERC20Metadata, ERC20, IERC20, Math} from "./AnyConverter.sol";
 
 /**
@@ -17,6 +18,7 @@ import {AnyConverter, IERC20Metadata, ERC20, IERC20, Math} from "./AnyConverter.
  */
 abstract contract AnyCompounderNaive is AnyConverter {
     using Math for uint256;
+    using SafeERC20 for IERC20;
 
     address[] public _rewardTokens;
 
@@ -39,27 +41,22 @@ abstract contract AnyCompounderNaive is AnyConverter {
      * @notice Claim rewards and compound them into the vault
      */
     function harvest(bytes memory data) external override onlyKeeperOrOwner {
-        (address claimContract, bytes claimCall, uint256 assets) = abi.decode(
-            data,
-            (address, bytes, uint256)
-        );
+        (address claimContract, bytes memory claimCall, uint256 assets) = abi.decode(data, (address, bytes, uint256));
 
-        (bool success, bytes memory data) = claimContract.call(claimCall);
+        (bool success,) = claimContract.call(claimCall);
+        require(success, "Claim failed");
 
-        uint256 ta = this.totalAssets();
+        uint256 ta = totalAssets();
 
-        IERC20(yieldAsset).transferFrom(msg.sender, address(this), assets);
+        IERC20(yieldAsset).safeTransferFrom(msg.sender, address(this), assets);
 
-        uint256 postTa = this.totalAssets();
+        uint256 postTa = totalAssets();
 
         if (ta >= postTa) revert HarvestFailed();
 
         uint256 len = _rewardTokens.length;
         for (uint256 i; i < len; i++) {
-            IERC20(_rewardTokens[i]).transfer(
-                msg.sender,
-                IERC20(_rewardTokens[i]).balanceOf(address(this))
-            );
+            IERC20(_rewardTokens[i]).safeTransfer(msg.sender, IERC20(_rewardTokens[i]).balanceOf(address(this)));
         }
 
         emit Harvested();
@@ -71,15 +68,10 @@ abstract contract AnyCompounderNaive is AnyConverter {
 
     error WrongToken();
 
-    function setRewardTokens(
-        address[] memory newRewardTokens
-    ) external onlyOwner {
+    function setRewardTokens(address[] memory newRewardTokens) external onlyOwner {
         uint256 len = newRewardTokens.length;
         for (uint256 i; i < len; i++) {
-            if (
-                newRewardTokens[i] == asset() ||
-                newRewardTokens[i] == yieldAsset
-            ) revert WrongToken();
+            if (newRewardTokens[i] == asset() || newRewardTokens[i] == yieldAsset) revert WrongToken();
         }
 
         _rewardTokens = newRewardTokens;

@@ -23,12 +23,10 @@ contract AnyDepositor is AnyConverter {
      * @param autoDeposit_ Controls if `protocolDeposit` gets called on deposit
      * @param strategyInitData_ Encoded data for this specific strategy
      */
-    function initialize(
-        address asset_,
-        address owner_,
-        bool autoDeposit_,
-        bytes memory strategyInitData_
-    ) external initializer {
+    function initialize(address asset_, address owner_, bool autoDeposit_, bytes memory strategyInitData_)
+        external
+        initializer
+    {
         __AnyConverter_init(asset_, owner_, autoDeposit_, strategyInitData_);
     }
 }

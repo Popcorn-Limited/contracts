@@ -158,7 +158,7 @@ abstract contract BaseStrategy is
     /**
      * @notice Total amount of underlying `asset` token managed by adapter through the underlying protocol.
      */
-    function _totalAssets() internal view virtual returns (uint256) {}
+    function _totalAssets() internal view virtual returns (uint256);
 
     /**
      * @notice Convert either `assets` or `shares` into underlying shares.

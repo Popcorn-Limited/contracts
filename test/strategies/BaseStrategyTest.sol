@@ -92,6 +92,9 @@ abstract contract BaseStrategyTest is PropertyTest {
         } else {
             deal(testConfig.asset, receiver, amount);
         }
+
+        vm.prank(receiver);
+        IERC20(testConfig.asset).approve(address(strategy), amount);
     }
 
     function _mintAssetAndApproveForStrategy(
