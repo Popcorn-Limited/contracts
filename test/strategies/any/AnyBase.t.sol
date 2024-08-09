@@ -264,7 +264,7 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         // claim needs to be unlocked
         vm.warp(block.timestamp + 2 days);
 
-        AnyConverter(address(strategy)).claimReserved(block.number);
+        AnyConverter(address(strategy)).claimReserved(block.number, false);
 
         assertGt(
             strategy.totalAssets(),
@@ -296,7 +296,7 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         // claim needs to be unlocked
         vm.warp(block.timestamp + 2 days);
 
-        AnyConverter(address(strategy)).claimReserved(block.number);
+        AnyConverter(address(strategy)).claimReserved(block.number, false);
 
         // while the user had 1e18 of asset reserved, they are only able to withdraw
         // 9e17 of it. Thus, 1e17 is left in the contract and added to the total assets
@@ -341,11 +341,11 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         vm.warp(block.timestamp + 2 days);
 
         // at the time this claim was reserved the ratio was 1:1
-        AnyConverter(address(strategy)).claimReserved(block.number - 2);
+        AnyConverter(address(strategy)).claimReserved(block.number - 2, false);
         // 1.25:1 in favor of the yield asset
-        AnyConverter(address(strategy)).claimReserved(block.number - 1);
+        AnyConverter(address(strategy)).claimReserved(block.number - 1, false);
         // 1.6:1 in favor of the yield asset
-        AnyConverter(address(strategy)).claimReserved(block.number);
+        AnyConverter(address(strategy)).claimReserved(block.number, false);
 
         // so we need to receive
         // 1. 1e18 * 1e18 / 1e18 = 1e18 asset
@@ -388,11 +388,11 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         vm.warp(block.timestamp + 2 days);
 
         // at the time this claim was reserved the ratio was 1:1
-        AnyConverter(address(strategy)).claimReserved(block.number - 2);
+        AnyConverter(address(strategy)).claimReserved(block.number - 2, false);
         // 0.75:1 in favor of the asset
-        AnyConverter(address(strategy)).claimReserved(block.number - 1);
+        AnyConverter(address(strategy)).claimReserved(block.number - 1, false);
         // 0.4:1 in favor of the asset
-        AnyConverter(address(strategy)).claimReserved(block.number);
+        AnyConverter(address(strategy)).claimReserved(block.number, false);
 
         // should use new favorable quote 0.4:1 in favor of asset so we need to receive
         // 1. 1e18 * 0.4e18 / 1e18 = 0.4e18 asset
@@ -423,7 +423,7 @@ abstract contract AnyBaseTest is BaseStrategyTest {
 
         vm.warp(block.timestamp + 2 days);
 
-        AnyConverter(address(strategy)).claimReserved(block.number);
+        AnyConverter(address(strategy)).claimReserved(block.number, true);
 
         // should use the old favorable quote 1:1 instead of 1.2:1 in favor of the asset
 
@@ -455,7 +455,7 @@ abstract contract AnyBaseTest is BaseStrategyTest {
 
         vm.warp(block.timestamp + 2 days);
 
-        AnyConverter(address(strategy)).claimReserved(block.number);
+        AnyConverter(address(strategy)).claimReserved(block.number, true);
 
         // should use the old favorable quote 1:1 instead of 1.2:1 in favor of the asset
 
@@ -493,11 +493,11 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         vm.warp(block.timestamp + 2 days);
 
         // ratio 1:1
-        AnyConverter(address(strategy)).claimReserved(block.number - 2);
+        AnyConverter(address(strategy)).claimReserved(block.number - 2, true);
         // ratio 1.25:1 in favor of the asset
-        AnyConverter(address(strategy)).claimReserved(block.number - 1);
+        AnyConverter(address(strategy)).claimReserved(block.number - 1, true);
         // ratio 1.6:1 in favor of the asset
-        AnyConverter(address(strategy)).claimReserved(block.number);
+        AnyConverter(address(strategy)).claimReserved(block.number, true);
 
         // so we need to receive
         // 1. 1e18 * 1e18 / 1e18 = 1e18 yield asset
@@ -540,9 +540,9 @@ abstract contract AnyBaseTest is BaseStrategyTest {
 
         vm.warp(block.timestamp + 2 days);
 
-        AnyConverter(address(strategy)).claimReserved(block.number - 2);
-        AnyConverter(address(strategy)).claimReserved(block.number - 1);
-        AnyConverter(address(strategy)).claimReserved(block.number);
+        AnyConverter(address(strategy)).claimReserved(block.number - 2, true);
+        AnyConverter(address(strategy)).claimReserved(block.number - 1, true);
+        AnyConverter(address(strategy)).claimReserved(block.number, true);
 
         // should use new favorable quote 0.4:1 in favor of yield asset so we need to receive
         // 1. 1e18 * 0.4e18 / 1e18 = 0.4e18 yield asset

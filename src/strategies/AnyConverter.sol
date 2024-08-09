@@ -337,20 +337,13 @@ abstract contract AnyConverter is BaseStrategy {
     mapping(address => mapping(address => mapping(uint256 => Reserved)))
         public reserved;
 
-    function claimReserved(uint256 blockNumber) external {
-        address _asset = asset();
-        address _yieldAsset = yieldAsset;
-
-        _claimReserved(_asset, _yieldAsset, blockNumber, true);
-        _claimReserved(_yieldAsset, _asset, blockNumber, false);
-    }
-
-    function _claimReserved(
-        address base,
-        address quote,
+    function claimReserved(
         uint256 blockNumber,
         bool isYieldAsset
-    ) internal {
+    ) external {
+        address base = isYieldAsset ? asset() : yieldAsset;
+        address quote = isYieldAsset ? yieldAsset : asset();
+
         Reserved memory _reserved = reserved[msg.sender][base][blockNumber];
         if (
             _reserved.unlockTime != 0 && _reserved.unlockTime < block.timestamp
