@@ -149,14 +149,14 @@ abstract contract BaseStrategy is
      * @notice Total amount of underlying `asset` token managed by adapter.
      * @dev Return assets held by adapter if paused.
      */
-    function totalAssets() public view override returns (uint256) {
+    function totalAssets() public view virtual override returns (uint256) {
         return IERC20(asset()).balanceOf(address(this)) + _totalAssets();
     }
 
     /**
      * @notice Total amount of underlying `asset` token managed by adapter through the underlying protocol.
      */
-    function _totalAssets() internal view virtual returns (uint256) {}
+    function _totalAssets() internal view virtual returns (uint256);
 
     /**
      * @notice Convert either `assets` or `shares` into underlying shares.
@@ -253,12 +253,12 @@ abstract contract BaseStrategy is
                       PAUSING LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Pause Deposits and withdraw all funds from the underlying protocol. Caller must be owner.
+    /// @notice Pause Deposits. Caller must be owner.
     function pause() external virtual onlyOwner {
         _pause();
     }
 
-    /// @notice Unpause Deposits and deposit all funds into the underlying protocol. Caller must be owner.
+    /// @notice Unpause Deposits. Caller must be owner.
     function unpause() external virtual onlyOwner {
         _unpause();
     }
