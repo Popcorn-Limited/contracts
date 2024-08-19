@@ -63,6 +63,13 @@ interface IBalancerVault {
     function joinPool(bytes32 poolId, address sender, address recipient, JoinPoolRequest memory request)
         external
         payable;
+
+    function swap(
+        SingleSwap memory singleSwap,
+        FundManagement memory funds,
+        uint256 limit,
+        uint256 deadline
+    ) external returns (uint256 amountCalculated);
 }
 
 interface IBalancerRouter {

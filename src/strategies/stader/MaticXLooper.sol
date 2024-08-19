@@ -18,16 +18,17 @@ import {
 import {
     IBalancerVault,
     SwapKind,
-    IAsset,
-    BatchSwapStep,
+    SingleSwap,
     FundManagement
 } from "src/interfaces/external/balancer/IBalancer.sol";
 
 struct LooperInitValues {
     address aaveDataProvider;
     address balancerVault;
+    address maticXPool;
     uint256 maxLTV;
     address poolAddressesProvider;
+    bytes32 poolId;
     uint256 slippage;
     uint256 targetLTV;
 }
@@ -50,7 +51,7 @@ contract MaticXLooper is BaseStrategy, IFlashLoanReceiver {
     IPoolAddressesProvider public poolAddressesProvider;
 
     IWMatic public constant wMatic = IWMatic(0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270); // wmatic borrow asset 
-    IMaticXPool public constant maticXPool = IMaticXPool(0xfd225C9e6601C9d38d8F98d8731BF59eFcF8C0E3); // todo constructor
+    IMaticXPool public maticXPool; // stader pool for wrapping - converting
     
     IERC20 public debtToken; // aave wmatic debt token
     IERC20 public interestToken; // aave MaticX
@@ -59,6 +60,7 @@ contract MaticXLooper is BaseStrategy, IFlashLoanReceiver {
     uint256 private constant wMaticIndex = 0; // TODO 
 
     IBalancerVault public balancerVault;
+    bytes32 public balancerPoolId;
 
     uint256 public slippage; // 1e18 = 100% slippage, 1e14 = 1 BPS slippage
 
@@ -69,7 +71,6 @@ contract MaticXLooper is BaseStrategy, IFlashLoanReceiver {
     error InvalidLTV(uint256 targetLTV, uint256 maxLTV, uint256 protocolLTV);
     error InvalidSlippage(uint256 slippage, uint256 slippageCap);
     error BadLTV(uint256 currentLTV, uint256 maxLTV);
-
     /*//////////////////////////////////////////////////////////////
                                 INITIALIZATION
     //////////////////////////////////////////////////////////////*/
@@ -89,13 +90,15 @@ contract MaticXLooper is BaseStrategy, IFlashLoanReceiver {
 
         LooperInitValues memory initValues = abi.decode(strategyInitData_, (LooperInitValues));
 
+        maticXPool = IMaticXPool(initValues.maticXPool);
+
         // retrieve and set maticX aToken, lending pool
         (address _aToken,,) = IProtocolDataProvider(initValues.aaveDataProvider).getReserveTokensAddresses(asset_);
         interestToken = IERC20(_aToken);
         lendingPool = ILendingPool(IAToken(_aToken).POOL());
 
         // set efficiency mode - Matic correlated
-        lendingPool.setUserEMode(uint8(1));
+        lendingPool.setUserEMode(uint8(2));
 
         // get protocol LTV
         DataTypes.EModeData memory emodeData = lendingPool.getEModeCategoryData(uint8(1));
@@ -124,6 +127,8 @@ contract MaticXLooper is BaseStrategy, IFlashLoanReceiver {
         // approve aave pool to pull wMatic as part of a flash loan
         IERC20(address(wMatic)).approve(address(lendingPool), type(uint256).max);
 
+        balancerPoolId = initValues.poolId;
+
         // approve balancer vault to trade MaticX
         balancerVault = IBalancerVault(initValues.balancerVault);
         IERC20(asset_).approve(address(balancerVault), type(uint256).max);
@@ -149,7 +154,6 @@ contract MaticXLooper is BaseStrategy, IFlashLoanReceiver {
     /*//////////////////////////////////////////////////////////////
                             ACCOUNTING LOGIC
     //////////////////////////////////////////////////////////////*/
-
     function _totalAssets() internal view override returns (uint256) {
         (uint256 debt,,) = maticXPool.convertMaticToMaticX(debtToken.balanceOf(address(this))); // matic debt converted in maticX amount
         uint256 collateral = interestToken.balanceOf(address(this)); // maticX collateral
@@ -303,6 +307,10 @@ contract MaticXLooper is BaseStrategy, IFlashLoanReceiver {
         // get slippage buffer for swapping with flashLoanDebt as minAmountOut
         uint256 maticXBuffer = flashLoanMaticXAmount.mulDiv(slippage, 1e18, Math.Rounding.Floor);
 
+        // if the withdraw amount with buffers  to total assets withdraw all
+        if (flashLoanMaticXAmount + maticXBuffer + toWithdraw >= _totalAssets())
+            isFullWithdraw = true;
+
         // withdraw maticX from aave
         if (isFullWithdraw) {
             // withdraw all
@@ -312,7 +320,7 @@ contract MaticXLooper is BaseStrategy, IFlashLoanReceiver {
         }
 
         // swap maticX to exact wMatic on Balancer - will be pulled by AAVE pool as flash loan repayment
-        _swapToWMatic(flashLoanMaticXAmount, flashLoanDebt, asset, toWithdraw);
+        _swapToWMatic(flashLoanMaticXAmount + maticXBuffer, flashLoanDebt, asset);
     }
 
     // returns current loan to value, debt and collateral (token) amounts
@@ -378,35 +386,22 @@ contract MaticXLooper is BaseStrategy, IFlashLoanReceiver {
     }
 
     // swaps MaticX to exact wMatic  
-    function _swapToWMatic(uint256 amountIn, uint256 exactAmountOut, address asset, uint256 maticXtoWithdraw)
+    function _swapToWMatic(uint256 maxAmountIn, uint256 exactAmountOut, address asset)
         internal
     {
-        bytes32 poolId = hex"cd78a20c597e367a4e478a2411ceb790604d7c8f000000000000000000000c22"; // TODO
-
-        BatchSwapStep[] memory swaps = new BatchSwapStep[](1);
-        swaps[0] = BatchSwapStep(
-            poolId,
-            maticXIndex,
-            wMaticIndex,
+        SingleSwap memory swap = SingleSwap(
+            balancerPoolId,
+            SwapKind.GIVEN_OUT,
+            asset,
+            address(wMatic),
             exactAmountOut,
-            hex"" // user data can be left empty
+            hex""
         );
 
-        IAsset[] memory assets = new IAsset[](2);
-        assets[0] = IAsset(address(wMatic));
-        assets[1] = IAsset(asset);
-
-        int256[] memory limits = new int256[](2);
-        limits[0] = int256(exactAmountOut); 
-        limits[1] = int256(amountIn);
-
-        // swap to exact wMatic for flash loan repayment
-        balancerVault.batchSwap(
-            SwapKind.GIVEN_OUT,
-            swaps,
-            assets,
+        balancerVault.swap(
+            swap,
             FundManagement(address(this), false, payable(address(this)), false),
-            limits,
+            maxAmountIn,
             block.timestamp
         );
     }
@@ -415,15 +410,20 @@ contract MaticXLooper is BaseStrategy, IFlashLoanReceiver {
                           MANAGEMENT LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function setHarvestValues(address newBalancerVault) external onlyOwner {
-        address asset_ = asset();
+    function setHarvestValues(address newBalancerVault, bytes32 newBalancerPoolId) external onlyOwner {
+        if(newBalancerVault != address(balancerVault)) {
+            address asset_ = asset();
 
-        // reset old pool
-        IERC20(asset_).approve(address(newBalancerVault), 0);
+            // reset old pool
+            IERC20(asset_).approve(address(balancerVault), 0);
 
-        // set and approve new one
-        balancerVault = IBalancerVault(newBalancerVault);
-        IERC20(asset_).approve(address(newBalancerVault), type(uint256).max);
+            // set and approve new one
+            balancerVault = IBalancerVault(newBalancerVault);
+            IERC20(asset_).approve(newBalancerVault, type(uint256).max);
+        }
+
+        if(newBalancerPoolId != balancerPoolId) 
+            balancerPoolId = newBalancerPoolId;
     }
 
     function harvest(bytes memory) external override onlyKeeperOrOwner {
