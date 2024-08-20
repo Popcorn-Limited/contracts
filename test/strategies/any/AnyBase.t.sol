@@ -445,7 +445,7 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         AnyConverter(address(strategy)).rescueToken(address(rescueToken));
     }
 
-    function testFail__rescueToken_token_is_in_tokens() public {
+    function test__error_rescueToken_token_is_in_tokens() public {
         vm.expectRevert(AnyConverter.Misconfigured.selector);
         AnyConverter(address(strategy)).rescueToken(testConfig.asset);
     }
