@@ -2,22 +2,11 @@
 // Docgen-SOLC: 0.8.0
 pragma solidity ^0.8.25;
 
-import {AnyCompounderNaive, AnyConverter, ClaimInteraction, IERC20} from "src/strategies/AnyCompounderNaive.sol";
+import {AnyCompounder, AnyCompounderNaive, AnyConverter, ClaimInteraction, IERC20} from "src/strategies/AnyCompounder.sol";
 import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson} from "../BaseStrategyTest.sol";
 import {MockOracle} from "test/utils/mocks/MockOracle.sol";
 import {AnyBaseTest} from "./AnyBase.t.sol";
 import "forge-std/console.sol";
-
-contract AnyCompounderNaiveImpl is AnyCompounderNaive {
-    function initialize(
-        address asset_,
-        address owner_,
-        bool autoDeposit_,
-        bytes memory strategyInitData_
-    ) external initializer {
-        __AnyConverter_init(asset_, owner_, autoDeposit_, strategyInitData_);
-    }
-}
 
 contract ClaimContract {
     address[] public rewardTokens;
@@ -55,7 +44,7 @@ contract AnyCompounderNaiveTest is AnyBaseTest {
         string memory index_,
         TestConfig memory testConfig_
     ) internal override returns (IBaseStrategy) {
-        AnyCompounderNaiveImpl _strategy = new AnyCompounderNaiveImpl();
+        AnyCompounder _strategy = new AnyCompounder();
         oracle = new MockOracle();
 
         yieldAsset = json_.readAddress(
@@ -79,11 +68,11 @@ contract AnyCompounderNaiveTest is AnyBaseTest {
     }
 
     function _addClaimId(bytes32 claimId) internal {
-        AnyCompounderNaiveImpl(address(strategy)).proposeClaimId(claimId);
+        AnyCompounder(address(strategy)).proposeClaimId(claimId);
 
         vm.warp(block.timestamp + 3 days + 1);
 
-        AnyCompounderNaiveImpl(address(strategy)).addClaimId(claimId);
+        AnyCompounder(address(strategy)).addClaimId(claimId);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -96,10 +85,10 @@ contract AnyCompounderNaiveTest is AnyBaseTest {
 
         vm.expectEmit(true, true, false, true);
         emit ClaimIdProposed(id);
-        AnyCompounderNaiveImpl(address(strategy)).proposeClaimId(id);
+        AnyCompounder(address(strategy)).proposeClaimId(id);
 
         assertEq(
-            AnyCompounderNaiveImpl(address(strategy)).proposedClaimIds(id),
+            AnyCompounder(address(strategy)).proposedClaimIds(id),
             unlockTime
         );
     }
@@ -110,32 +99,29 @@ contract AnyCompounderNaiveTest is AnyBaseTest {
         vm.startPrank(alice);
         vm.expectRevert("Only the contract owner may perform this action");
 
-        AnyCompounderNaiveImpl(address(strategy)).proposeClaimId(id);
+        AnyCompounder(address(strategy)).proposeClaimId(id);
     }
 
     function test__proposeClaimId_fails_if_proposal_exists() public {
         bytes32 id = keccak256("blub");
-        AnyCompounderNaiveImpl(address(strategy)).proposeClaimId(id);
+        AnyCompounder(address(strategy)).proposeClaimId(id);
 
         vm.expectRevert(AnyConverter.Misconfigured.selector);
-        AnyCompounderNaiveImpl(address(strategy)).proposeClaimId(id);
+        AnyCompounder(address(strategy)).proposeClaimId(id);
     }
 
     function test__addClaimId() public {
         bytes32 id = keccak256("blub");
 
-        AnyCompounderNaiveImpl(address(strategy)).proposeClaimId(id);
+        AnyCompounder(address(strategy)).proposeClaimId(id);
         vm.warp(block.timestamp + 3 days + 1);
 
         vm.expectEmit(true, true, false, true);
         emit ClaimIdAdded(id);
-        AnyCompounderNaiveImpl(address(strategy)).addClaimId(id);
+        AnyCompounder(address(strategy)).addClaimId(id);
 
-        assertEq(
-            AnyCompounderNaiveImpl(address(strategy)).proposedClaimIds(id),
-            0
-        );
-        assertTrue(AnyCompounderNaiveImpl(address(strategy)).claimIds(id));
+        assertEq(AnyCompounder(address(strategy)).proposedClaimIds(id), 0);
+        assertTrue(AnyCompounder(address(strategy)).claimIds(id));
     }
 
     function test__addClaimId_fails_if_none_owner() public {
@@ -144,22 +130,22 @@ contract AnyCompounderNaiveTest is AnyBaseTest {
         vm.startPrank(alice);
         vm.expectRevert("Only the contract owner may perform this action");
 
-        AnyCompounderNaiveImpl(address(strategy)).addClaimId(id);
+        AnyCompounder(address(strategy)).addClaimId(id);
     }
 
     function test__addClaimId_respect_timeout() public {
         bytes32 id = keccak256("blub");
-        AnyCompounderNaiveImpl(address(strategy)).proposeClaimId(id);
+        AnyCompounder(address(strategy)).proposeClaimId(id);
 
         vm.expectRevert(AnyConverter.Misconfigured.selector);
-        AnyCompounderNaiveImpl(address(strategy)).addClaimId(id);
+        AnyCompounder(address(strategy)).addClaimId(id);
     }
 
     function test__addClaimId_fails_if_doesnt_exist() public {
         bytes32 id = keccak256("blub");
 
         vm.expectRevert(AnyConverter.Misconfigured.selector);
-        AnyCompounderNaiveImpl(address(strategy)).addClaimId(id);
+        AnyCompounder(address(strategy)).addClaimId(id);
     }
 
     function test__removeClaimId() public {
@@ -168,9 +154,9 @@ contract AnyCompounderNaiveTest is AnyBaseTest {
 
         vm.expectEmit(true, true, false, true);
         emit ClaimIdRemoved(id);
-        AnyCompounderNaiveImpl(address(strategy)).removeClaimId(id);
+        AnyCompounder(address(strategy)).removeClaimId(id);
 
-        assertFalse(AnyCompounderNaiveImpl(address(strategy)).claimIds(id));
+        assertFalse(AnyCompounder(address(strategy)).claimIds(id));
     }
 
     function test__removeClaimId_fails_if_none_owner() public {
@@ -179,7 +165,7 @@ contract AnyCompounderNaiveTest is AnyBaseTest {
         vm.startPrank(alice);
         vm.expectRevert("Only the contract owner may perform this action");
 
-        AnyCompounderNaiveImpl(address(strategy)).removeClaimId(id);
+        AnyCompounder(address(strategy)).removeClaimId(id);
     }
 
     /*//////////////////////////////////////////////////////////////

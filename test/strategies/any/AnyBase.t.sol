@@ -39,9 +39,6 @@ abstract contract AnyBaseTest is BaseStrategyTest {
 
         uint256 pushAmount = (testConfig.defaultAmount / 5) * 2;
 
-        console.log("pushAmount", pushAmount);
-        console.log("defaultAmount", testConfig.defaultAmount);
-
         _mintYieldAsset(pushAmount, address(this));
 
         // Push 40% the funds into the underlying protocol
@@ -50,14 +47,6 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         // Withdraw 80% of deposit
         vm.prank(bob);
         strategy.withdraw((testConfig.defaultAmount / 5) * 4, bob, bob);
-
-        console.log("withdraw", (testConfig.defaultAmount / 5) * 4);
-
-        console.log("asset bal", IERC20(testConfig.asset).balanceOf(address(strategy)));
-        console.log("yieldAsset bal", IERC20(yieldAsset).balanceOf(address(strategy)));
-        console.log("reserved assets", AnyConverter(address(strategy)).totalReservedAssets());
-        console.log("reserved yieldAssets", AnyConverter(address(strategy)).totalReservedYieldAssets());
-        console.log("total assets", strategy.totalAssets());
 
         assertApproxEqAbs(strategy.totalAssets(), testConfig.defaultAmount / 5, _delta_, "ta");
         assertApproxEqAbs(strategy.totalSupply(), testConfig.defaultAmount / 5, _delta_, "ts");
@@ -445,7 +434,7 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         AnyConverter(address(strategy)).rescueToken(address(rescueToken));
     }
 
-    function testFail__rescueToken_token_is_in_tokens() public {
+    function test__rescueToken_token_is_in_tokens_error() public {
         vm.expectRevert(AnyConverter.Misconfigured.selector);
         AnyConverter(address(strategy)).rescueToken(testConfig.asset);
     }

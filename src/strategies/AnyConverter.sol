@@ -251,7 +251,7 @@ abstract contract AnyConverter is BaseStrategy {
     uint256 public floatRatio;
 
     ProposedChange public proposedUnlockTime;
-    uint256 public unlockTime = 1 days;
+    uint256 public unlockTime = 1;
 
     function proposeSlippage(uint256 slippage_) external onlyOwner {
         if (slippage_ > 10_000) revert Misconfigured();

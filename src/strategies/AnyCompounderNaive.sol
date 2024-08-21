@@ -42,8 +42,6 @@ abstract contract AnyCompounderNaive is AnyConverter {
 
     error HarvestFailed();
 
-    event log_bytes32(bytes32);
-
     /**
      * @notice Claim rewards and compound them into the vault
      */
