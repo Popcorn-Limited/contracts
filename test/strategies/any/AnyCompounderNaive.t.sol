@@ -2,17 +2,19 @@
 // Docgen-SOLC: 0.8.0
 pragma solidity ^0.8.25;
 
-import {AnyCompounderNaive, IERC20} from "src/strategies/AnyCompounderNaive.sol";
+import {AnyCompounderNaive, AnyConverter, ClaimInteraction, IERC20} from "src/strategies/AnyCompounderNaive.sol";
 import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson} from "../BaseStrategyTest.sol";
 import {MockOracle} from "test/utils/mocks/MockOracle.sol";
 import {AnyBaseTest} from "./AnyBase.t.sol";
 import "forge-std/console.sol";
 
 contract AnyCompounderNaiveImpl is AnyCompounderNaive {
-    function initialize(address asset_, address owner_, bool autoDeposit_, bytes memory strategyInitData_)
-        external
-        initializer
-    {
+    function initialize(
+        address asset_,
+        address owner_,
+        bool autoDeposit_,
+        bytes memory strategyInitData_
+    ) external initializer {
         __AnyConverter_init(asset_, owner_, autoDeposit_, strategyInitData_);
     }
 }
@@ -24,9 +26,12 @@ contract ClaimContract {
         rewardTokens = _rewardTokens;
     }
 
-    fallback() external {
+    function claim() external {
         for (uint256 i; i < rewardTokens.length; i++) {
-            IERC20(rewardTokens[i]).transfer(msg.sender, IERC20(rewardTokens[i]).balanceOf(address(this)));
+            IERC20(rewardTokens[i]).transfer(
+                msg.sender,
+                IERC20(rewardTokens[i]).balanceOf(address(this))
+            );
         }
     }
 }
@@ -34,28 +39,152 @@ contract ClaimContract {
 contract AnyCompounderNaiveTest is AnyBaseTest {
     using stdJson for string;
 
+    event ClaimIdProposed(bytes32 id);
+    event ClaimIdAdded(bytes32 id);
+    event ClaimIdRemoved(bytes32 id);
+
     function setUp() public {
-        _setUpBaseTest(0, "./test/strategies/any/AnyCompounderNaiveTestConfig.json");
+        _setUpBaseTest(
+            0,
+            "./test/strategies/any/AnyCompounderNaiveTestConfig.json"
+        );
     }
 
-    function _setUpStrategy(string memory json_, string memory index_, TestConfig memory testConfig_)
-        internal
-        override
-        returns (IBaseStrategy)
-    {
+    function _setUpStrategy(
+        string memory json_,
+        string memory index_,
+        TestConfig memory testConfig_
+    ) internal override returns (IBaseStrategy) {
         AnyCompounderNaiveImpl _strategy = new AnyCompounderNaiveImpl();
         oracle = new MockOracle();
 
-        yieldAsset = json_.readAddress(string.concat(".configs[", index_, "].specific.yieldAsset"));
-
-        _strategy.initialize(
-            testConfig_.asset, address(this), true, abi.encode(yieldAsset, address(oracle), uint256(10), uint256(0))
+        yieldAsset = json_.readAddress(
+            string.concat(".configs[", index_, "].specific.yieldAsset")
         );
 
-        _strategy.setRewardTokens(json.readAddressArray(string.concat(".configs[", index_, "].specific.rewardTokens")));
+        _strategy.initialize(
+            testConfig_.asset,
+            address(this),
+            true,
+            abi.encode(yieldAsset, address(oracle), uint256(10), uint256(0))
+        );
+
+        _strategy.setRewardTokens(
+            json.readAddressArray(
+                string.concat(".configs[", index_, "].specific.rewardTokens")
+            )
+        );
 
         return IBaseStrategy(address(_strategy));
     }
+
+    function _addClaimId(bytes32 claimId) internal {
+        AnyCompounderNaiveImpl(address(strategy)).proposeClaimId(claimId);
+
+        vm.warp(block.timestamp + 3 days + 1);
+
+        AnyCompounderNaiveImpl(address(strategy)).addClaimId(claimId);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            CLAIM ID TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test__proposeClaimId() public {
+        bytes32 id = keccak256("blub");
+        uint256 unlockTime = block.timestamp + 3 days;
+
+        vm.expectEmit(true, true, false, true);
+        emit ClaimIdProposed(id);
+        AnyCompounderNaiveImpl(address(strategy)).proposeClaimId(id);
+
+        assertEq(
+            AnyCompounderNaiveImpl(address(strategy)).proposedClaimIds(id),
+            unlockTime
+        );
+    }
+
+    function test__proposeClaimId_fails_if_none_owner() public {
+        bytes32 id = keccak256("blub");
+
+        vm.startPrank(alice);
+        vm.expectRevert("Only the contract owner may perform this action");
+
+        AnyCompounderNaiveImpl(address(strategy)).proposeClaimId(id);
+    }
+
+    function test__proposeClaimId_fails_if_proposal_exists() public {
+        bytes32 id = keccak256("blub");
+        AnyCompounderNaiveImpl(address(strategy)).proposeClaimId(id);
+
+        vm.expectRevert(AnyConverter.Misconfigured.selector);
+        AnyCompounderNaiveImpl(address(strategy)).proposeClaimId(id);
+    }
+
+    function test__addClaimId() public {
+        bytes32 id = keccak256("blub");
+
+        AnyCompounderNaiveImpl(address(strategy)).proposeClaimId(id);
+        vm.warp(block.timestamp + 3 days + 1);
+
+        vm.expectEmit(true, true, false, true);
+        emit ClaimIdAdded(id);
+        AnyCompounderNaiveImpl(address(strategy)).addClaimId(id);
+
+        assertEq(
+            AnyCompounderNaiveImpl(address(strategy)).proposedClaimIds(id),
+            0
+        );
+        assertTrue(AnyCompounderNaiveImpl(address(strategy)).claimIds(id));
+    }
+
+    function test__addClaimId_fails_if_none_owner() public {
+        bytes32 id = keccak256("blub");
+
+        vm.startPrank(alice);
+        vm.expectRevert("Only the contract owner may perform this action");
+
+        AnyCompounderNaiveImpl(address(strategy)).addClaimId(id);
+    }
+
+    function test__addClaimId_respect_timeout() public {
+        bytes32 id = keccak256("blub");
+        AnyCompounderNaiveImpl(address(strategy)).proposeClaimId(id);
+
+        vm.expectRevert(AnyConverter.Misconfigured.selector);
+        AnyCompounderNaiveImpl(address(strategy)).addClaimId(id);
+    }
+
+    function test__addClaimId_fails_if_doesnt_exist() public {
+        bytes32 id = keccak256("blub");
+
+        vm.expectRevert(AnyConverter.Misconfigured.selector);
+        AnyCompounderNaiveImpl(address(strategy)).addClaimId(id);
+    }
+
+    function test__removeClaimId() public {
+        bytes32 id = keccak256("blub");
+        _addClaimId(id);
+
+        vm.expectEmit(true, true, false, true);
+        emit ClaimIdRemoved(id);
+        AnyCompounderNaiveImpl(address(strategy)).removeClaimId(id);
+
+        assertFalse(AnyCompounderNaiveImpl(address(strategy)).claimIds(id));
+    }
+
+    function test__removeClaimId_fails_if_none_owner() public {
+        bytes32 id = keccak256("blub");
+
+        vm.startPrank(alice);
+        vm.expectRevert("Only the contract owner may perform this action");
+
+        AnyCompounderNaiveImpl(address(strategy)).removeClaimId(id);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            HARVEST TESTS
+    //////////////////////////////////////////////////////////////*/
 
     function test_harvest_should_increase_total_assets() public {
         // base code to have != total assets
@@ -78,13 +207,38 @@ contract AnyCompounderNaiveTest is AnyBaseTest {
         _mintYieldAsset(testConfig.defaultAmount, address(this));
 
         ClaimContract claimContract = new ClaimContract(rewardTokens);
-        strategy.harvest(abi.encode(claimContract, bytes(""), testConfig.defaultAmount));
+        _addClaimId(
+            keccak256(
+                abi.encodePacked(claimContract, ClaimContract.claim.selector)
+            )
+        );
+        strategy.harvest(
+            abi.encode(
+                testConfig.defaultAmount,
+                ClaimInteraction({
+                    addr: address(claimContract),
+                    callData: abi.encodeWithSelector(
+                        ClaimContract.claim.selector
+                    )
+                })
+            )
+        );
 
-        assertGt(strategy.totalAssets(), totalAssets, "total assets should increase");
-        assertEq(strategy.totalSupply(), totalSupply, "total supply should not change");
+        assertGt(
+            strategy.totalAssets(),
+            totalAssets,
+            "total assets should increase"
+        );
+        assertEq(
+            strategy.totalSupply(),
+            totalSupply,
+            "total supply should not change"
+        );
     }
 
-    function test_harvest_should_fail_if_total_assets_does_not_increase() public {
+    function test_harvest_should_fail_if_total_assets_does_not_increase()
+        public
+    {
         // base code to have != total assets
         strategy.toggleAutoDeposit();
         _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
@@ -102,8 +256,41 @@ contract AnyCompounderNaiveTest is AnyBaseTest {
         _mintYieldAsset(testConfig.defaultAmount, address(this));
 
         ClaimContract claimContract = new ClaimContract(rewardTokens);
+        _addClaimId(
+            keccak256(
+                abi.encodePacked(claimContract, ClaimContract.claim.selector)
+            )
+        );
 
         vm.expectRevert(AnyCompounderNaive.HarvestFailed.selector);
-        strategy.harvest(abi.encode(claimContract, bytes(""), 0));
+        strategy.harvest(
+            abi.encode(
+                0,
+                ClaimInteraction({
+                    addr: address(claimContract),
+                    callData: abi.encodeWithSelector(
+                        ClaimContract.claim.selector
+                    )
+                })
+            )
+        );
+    }
+
+    function test__harvest_fails_if_not_claimId() public {
+        address[] memory rewardTokens = strategy.rewardTokens();
+        ClaimContract claimContract = new ClaimContract(rewardTokens);
+
+        vm.expectRevert(AnyConverter.Misconfigured.selector);
+        strategy.harvest(
+            abi.encode(
+                0,
+                ClaimInteraction({
+                    addr: address(claimContract),
+                    callData: abi.encodeWithSelector(
+                        ClaimContract.claim.selector
+                    )
+                })
+            )
+        );
     }
 }
