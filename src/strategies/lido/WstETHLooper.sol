@@ -9,14 +9,7 @@ import {ILido} from "./ILido.sol";
 import {Math} from "openzeppelin-contracts/utils/math/Math.sol";
 import {IWETH} from "src/interfaces/external/IWETH.sol";
 import {ICurveMetapool} from "src/interfaces/external/curve/ICurveMetapool.sol";
-import {
-    ILendingPool,
-    IAToken,
-    IFlashLoanReceiver,
-    IProtocolDataProvider,
-    IPoolAddressesProvider,
-    DataTypes
-} from "src/interfaces/external/aave/IAaveV3.sol";
+import {ILendingPool, IAToken, IFlashLoanReceiver, IProtocolDataProvider, IPoolAddressesProvider, DataTypes} from "src/interfaces/external/aave/IAaveV3.sol";
 
 struct LooperInitValues {
     address aaveDataProvider;
@@ -44,8 +37,10 @@ contract WstETHLooper is BaseStrategy, IFlashLoanReceiver {
     ILendingPool public lendingPool;
     IPoolAddressesProvider public poolAddressesProvider;
 
-    IWETH public constant weth = IWETH(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
-    address public constant stETH = address(0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84);
+    IWETH public constant weth =
+        IWETH(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
+    address public constant stETH =
+        address(0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84);
 
     IERC20 public debtToken; // aave eth debt token
     IERC20 public interestToken; // aave awstETH
@@ -76,16 +71,23 @@ contract WstETHLooper is BaseStrategy, IFlashLoanReceiver {
      * @param autoDeposit_ Controls if `protocolDeposit` gets called on deposit
      * @param strategyInitData_ Encoded data for this specific strategy
      */
-    function initialize(address asset_, address owner_, bool autoDeposit_, bytes memory strategyInitData_)
-        public
-        initializer
-    {
+    function initialize(
+        address asset_,
+        address owner_,
+        bool autoDeposit_,
+        bytes memory strategyInitData_
+    ) public initializer {
         __BaseStrategy_init(asset_, owner_, autoDeposit_);
 
-        LooperInitValues memory initValues = abi.decode(strategyInitData_, (LooperInitValues));
+        LooperInitValues memory initValues = abi.decode(
+            strategyInitData_,
+            (LooperInitValues)
+        );
 
         // retrieve and set wstETH aToken, lending pool
-        (address _aToken,,) = IProtocolDataProvider(initValues.aaveDataProvider).getReserveTokensAddresses(asset_);
+        (address _aToken, , ) = IProtocolDataProvider(
+            initValues.aaveDataProvider
+        ).getReserveTokensAddresses(asset_);
 
         interestToken = IERC20(_aToken);
         lendingPool = ILendingPool(IAToken(_aToken).POOL());
@@ -94,7 +96,9 @@ contract WstETHLooper is BaseStrategy, IFlashLoanReceiver {
         lendingPool.setUserEMode(uint8(1));
 
         // get protocol LTV
-        DataTypes.EModeData memory emodeData = lendingPool.getEModeCategoryData(uint8(1));
+        DataTypes.EModeData memory emodeData = lendingPool.getEModeCategoryData(
+            uint8(1)
+        );
         protocolMaxLTV = uint256(emodeData.maxLTV) * 1e14; // make it 18 decimals to compare;
 
         // check ltv init values are correct
@@ -103,15 +107,22 @@ contract WstETHLooper is BaseStrategy, IFlashLoanReceiver {
         targetLTV = initValues.targetLTV;
         maxLTV = initValues.maxLTV;
 
-        poolAddressesProvider = IPoolAddressesProvider(initValues.poolAddressesProvider);
+        poolAddressesProvider = IPoolAddressesProvider(
+            initValues.poolAddressesProvider
+        );
 
         // retrieve and set WETH variable debt token
-        (,, address _variableDebtToken) =
-            IProtocolDataProvider(initValues.aaveDataProvider).getReserveTokensAddresses(address(weth));
+        (, , address _variableDebtToken) = IProtocolDataProvider(
+            initValues.aaveDataProvider
+        ).getReserveTokensAddresses(address(weth));
 
         debtToken = IERC20(_variableDebtToken); // variable debt WETH token
 
-        _name = string.concat("VaultCraft Leveraged ", IERC20Metadata(asset_).name(), " Adapter");
+        _name = string.concat(
+            "VaultCraft Leveraged ",
+            IERC20Metadata(asset_).name(),
+            " Adapter"
+        );
         _symbol = string.concat("vc-", IERC20Metadata(asset_).symbol());
 
         // approve aave router to pull wstETH
@@ -134,11 +145,21 @@ contract WstETHLooper is BaseStrategy, IFlashLoanReceiver {
 
     receive() external payable {}
 
-    function name() public view override(IERC20Metadata, ERC20) returns (string memory) {
+    function name()
+        public
+        view
+        override(IERC20Metadata, ERC20)
+        returns (string memory)
+    {
         return _name;
     }
 
-    function symbol() public view override(IERC20Metadata, ERC20) returns (string memory) {
+    function symbol()
+        public
+        view
+        override(IERC20Metadata, ERC20)
+        returns (string memory)
+    {
         return _symbol;
     }
 
@@ -147,7 +168,9 @@ contract WstETHLooper is BaseStrategy, IFlashLoanReceiver {
     //////////////////////////////////////////////////////////////*/
 
     function _totalAssets() internal view override returns (uint256) {
-        uint256 debt = ILido(stETH).getSharesByPooledEth(debtToken.balanceOf(address(this))); // wstETH DEBT
+        uint256 debt = ILido(stETH).getSharesByPooledEth(
+            debtToken.balanceOf(address(this))
+        ); // wstETH DEBT
         uint256 collateral = interestToken.balanceOf(address(this)); // wstETH collateral
 
         if (debt >= collateral) return 0;
@@ -157,7 +180,11 @@ contract WstETHLooper is BaseStrategy, IFlashLoanReceiver {
             total -= debt;
 
             // if there's debt, apply slippage to repay it
-            uint256 slippageDebt = debt.mulDiv(slippage, 1e18, Math.Rounding.Ceil);
+            uint256 slippageDebt = debt.mulDiv(
+                slippage,
+                1e18,
+                Math.Rounding.Ceil
+            );
 
             if (slippageDebt >= total) return 0;
 
@@ -168,7 +195,7 @@ contract WstETHLooper is BaseStrategy, IFlashLoanReceiver {
     }
 
     function getLTV() public view returns (uint256 ltv) {
-        (ltv,,) = _getCurrentLTV();
+        (ltv, , ) = _getCurrentLTV();
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -177,7 +204,11 @@ contract WstETHLooper is BaseStrategy, IFlashLoanReceiver {
 
     error NotFlashLoan();
 
-    function ADDRESSES_PROVIDER() external view returns (IPoolAddressesProvider) {
+    function ADDRESSES_PROVIDER()
+        external
+        view
+        returns (IPoolAddressesProvider)
+    {
         return poolAddressesProvider;
     }
 
@@ -197,8 +228,12 @@ contract WstETHLooper is BaseStrategy, IFlashLoanReceiver {
             revert NotFlashLoan();
         }
 
-        (bool isWithdraw, bool isFullWithdraw, uint256 assetsToWithdraw, uint256 depositAmount) =
-            abi.decode(params, (bool, bool, uint256, uint256));
+        (
+            bool isWithdraw,
+            bool isFullWithdraw,
+            uint256 assetsToWithdraw,
+            uint256 depositAmount
+        ) = abi.decode(params, (bool, bool, uint256, uint256));
 
         if (isWithdraw) {
             // flash loan is to repay ETH debt as part of a withdrawal
@@ -222,32 +257,53 @@ contract WstETHLooper is BaseStrategy, IFlashLoanReceiver {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Deposit wstETH into lending protocol
-    function _protocolDeposit(uint256 assets, uint256, bytes memory) internal override {
+    function _protocolDeposit(
+        uint256 assets,
+        uint256,
+        bytes memory
+    ) internal override {
         // deposit wstETH into aave - receive aToken here
         lendingPool.supply(asset(), assets, address(this), 0);
     }
 
     /// @notice repay part of the vault debt and withdraw wstETH
-    function _protocolWithdraw(uint256 assets, uint256, bytes memory) internal override {
+    function _protocolWithdraw(
+        uint256 assets,
+        uint256,
+        bytes memory
+    ) internal override {
         (, uint256 currentDebt, uint256 currentCollateral) = _getCurrentLTV();
         uint256 ethAssetsValue = ILido(stETH).getPooledEthByShares(assets);
         bool isFullWithdraw;
         uint256 ratioDebtToRepay;
 
         {
-            uint256 debtSlippage = currentDebt.mulDiv(slippage, 1e18, Math.Rounding.Ceil);
+            uint256 debtSlippage = currentDebt.mulDiv(
+                slippage,
+                1e18,
+                Math.Rounding.Ceil
+            );
 
             // find the % of debt to repay as the % of collateral being withdrawn
-            ratioDebtToRepay =
-                ethAssetsValue.mulDiv(1e18, (currentCollateral - currentDebt - debtSlippage), Math.Rounding.Floor);
+            ratioDebtToRepay = ethAssetsValue.mulDiv(
+                1e18,
+                (currentCollateral - currentDebt - debtSlippage),
+                Math.Rounding.Floor
+            );
 
-            isFullWithdraw = assets == _totalAssets() || ratioDebtToRepay >= 1e18;
+            isFullWithdraw =
+                assets == _totalAssets() ||
+                ratioDebtToRepay >= 1e18;
         }
 
         // get the LTV we would have without repaying debt
         uint256 futureLTV = isFullWithdraw
             ? type(uint256).max
-            : currentDebt.mulDiv(1e18, (currentCollateral - ethAssetsValue), Math.Rounding.Floor);
+            : currentDebt.mulDiv(
+                1e18,
+                (currentCollateral - ethAssetsValue),
+                Math.Rounding.Floor
+            );
 
         if (futureLTV <= maxLTV || currentDebt == 0) {
             // 1 - withdraw any asset amount with no debt
@@ -255,8 +311,13 @@ contract WstETHLooper is BaseStrategy, IFlashLoanReceiver {
             lendingPool.withdraw(asset(), assets, address(this));
         } else {
             // 1 - withdraw assets but repay debt
-            uint256 debtToRepay =
-                isFullWithdraw ? currentDebt : currentDebt.mulDiv(ratioDebtToRepay, 1e18, Math.Rounding.Floor);
+            uint256 debtToRepay = isFullWithdraw
+                ? currentDebt
+                : currentDebt.mulDiv(
+                    ratioDebtToRepay,
+                    1e18,
+                    Math.Rounding.Floor
+                );
 
             // flash loan debtToRepay - mode 0 - flash loan is repaid at the end
             _flashLoanETH(debtToRepay, 0, assets, 0, isFullWithdraw);
@@ -268,7 +329,10 @@ contract WstETHLooper is BaseStrategy, IFlashLoanReceiver {
 
     // deposit back into the protocol
     // either from flash loan or simply ETH dust held by the adapter
-    function _redepositAsset(uint256 borrowAmount, uint256 depositAmount) internal {
+    function _redepositAsset(
+        uint256 borrowAmount,
+        uint256 depositAmount
+    ) internal {
         address wstETH = asset();
 
         if (borrowAmount > 0) {
@@ -277,7 +341,7 @@ contract WstETHLooper is BaseStrategy, IFlashLoanReceiver {
         }
 
         // stake borrowed eth and receive wstETH
-        (bool sent,) = wstETH.call{value: depositAmount}("");
+        (bool sent, ) = wstETH.call{value: depositAmount}("");
         require(sent, "Fail to send eth to wstETH");
 
         // get wstETH balance after staking
@@ -291,42 +355,67 @@ contract WstETHLooper is BaseStrategy, IFlashLoanReceiver {
 
     // reduce leverage by withdrawing wstETH, swapping to ETH repaying ETH debt
     // repayAmount is a ETH (wETH) amount
-    function _reduceLeverage(bool isFullWithdraw, uint256 toWithdraw, uint256 flashLoanDebt) internal {
+    function _reduceLeverage(
+        bool isFullWithdraw,
+        uint256 toWithdraw,
+        uint256 flashLoanDebt
+    ) internal {
         address asset = asset();
 
         // get flash loan amount converted in wstETH
-        uint256 flashLoanWstETHAmount = ILido(stETH).getSharesByPooledEth(flashLoanDebt);
+        uint256 flashLoanWstETHAmount = ILido(stETH).getSharesByPooledEth(
+            flashLoanDebt
+        );
 
         // get slippage buffer for swapping with flashLoanDebt as minAmountOut
-        uint256 wstETHBuffer = flashLoanWstETHAmount.mulDiv(slippage, 1e18, Math.Rounding.Floor);
+        uint256 wstETHBuffer = flashLoanWstETHAmount.mulDiv(
+            slippage,
+            1e18,
+            Math.Rounding.Floor
+        );
 
         // withdraw wstETH from aave
         if (isFullWithdraw) {
             // withdraw all
             lendingPool.withdraw(asset, type(uint256).max, address(this));
         } else {
-            lendingPool.withdraw(asset, flashLoanWstETHAmount + wstETHBuffer + toWithdraw, address(this));
+            lendingPool.withdraw(
+                asset,
+                flashLoanWstETHAmount + wstETHBuffer + toWithdraw,
+                address(this)
+            );
         }
 
         // unwrap wstETH into stETH
-        uint256 stETHAmount = IwstETH(asset).unwrap(flashLoanWstETHAmount + wstETHBuffer);
+        uint256 stETHAmount = IwstETH(asset).unwrap(
+            flashLoanWstETHAmount + wstETHBuffer
+        );
 
         // swap stETH for ETH and deposit into WETH - will be pulled by AAVE pool as flash loan repayment
         _swapToWETH(stETHAmount, flashLoanDebt, asset, toWithdraw);
     }
 
     // returns current loan to value, debt and collateral (token) amounts
-    function _getCurrentLTV() internal view returns (uint256 loanToValue, uint256 debt, uint256 collateral) {
+    function _getCurrentLTV()
+        internal
+        view
+        returns (uint256 loanToValue, uint256 debt, uint256 collateral)
+    {
         debt = debtToken.balanceOf(address(this)); // ETH DEBT
-        collateral = ILido(stETH).getPooledEthByShares(interestToken.balanceOf(address(this))); // converted into ETH amount;
+        collateral = ILido(stETH).getPooledEthByShares(
+            interestToken.balanceOf(address(this))
+        ); // converted into ETH amount;
 
-        (debt == 0 || collateral == 0)
-            ? loanToValue = 0
-            : loanToValue = debt.mulDiv(1e18, collateral, Math.Rounding.Ceil);
+        (debt == 0 || collateral == 0) ? loanToValue = 0 : loanToValue = debt
+            .mulDiv(1e18, collateral, Math.Rounding.Ceil);
     }
 
     // reverts if targetLTV < maxLTV < protocolLTV is not satisfied
-    function _verifyLTV(uint256 _targetLTV, uint256 _maxLTV, uint256 _protocolLTV) internal pure {
+    function _verifyLTV(
+        uint256 _targetLTV,
+        uint256 _maxLTV,
+        uint256 _protocolLTV
+    ) internal pure {
         if (_targetLTV >= _maxLTV) {
             revert InvalidLTV(_targetLTV, _maxLTV, _protocolLTV);
         }
@@ -337,7 +426,7 @@ contract WstETHLooper is BaseStrategy, IFlashLoanReceiver {
 
     // verify that currentLTV is not above maxLTV
     function _assertHealthyLTV() internal view {
-        (uint256 currentLTV,,) = _getCurrentLTV();
+        (uint256 currentLTV, , ) = _getCurrentLTV();
 
         if (currentLTV > maxLTV) {
             revert BadLTV(currentLTV, maxLTV);
@@ -371,29 +460,45 @@ contract WstETHLooper is BaseStrategy, IFlashLoanReceiver {
             amounts,
             interestRateModes,
             address(this),
-            abi.encode(interestRateMode == 0 ? true : false, isFullWithdraw, assetsToWithdraw, depositAmount_),
+            abi.encode(
+                interestRateMode == 0 ? true : false,
+                isFullWithdraw,
+                assetsToWithdraw,
+                depositAmount_
+            ),
             0
         );
     }
 
     // swaps stETH to WETH
-    function _swapToWETH(uint256 amount, uint256 minAmount, address asset, uint256 wstETHToWithdraw)
-        internal
-        returns (uint256 amountETHReceived)
-    {
+    function _swapToWETH(
+        uint256 amount,
+        uint256 minAmount,
+        address asset,
+        uint256 wstETHToWithdraw
+    ) internal returns (uint256 amountETHReceived) {
         // swap to ETH
-        amountETHReceived = stableSwapStETH.exchange(STETHID, WETHID, amount, minAmount);
+        amountETHReceived = stableSwapStETH.exchange(
+            STETHID,
+            WETHID,
+            amount,
+            minAmount
+        );
 
         // wrap precise amount of eth for flash loan repayment
         weth.deposit{value: minAmount}();
 
         // restake the eth needed to reach the wstETH amount the user is withdrawing
-        uint256 missingWstETH = wstETHToWithdraw - IERC20(asset).balanceOf(address(this)) + 1;
+        uint256 missingWstETH = wstETHToWithdraw -
+            IERC20(asset).balanceOf(address(this)) +
+            1;
         if (missingWstETH > 0) {
-            uint256 ethAmount = ILido(stETH).getPooledEthByShares(missingWstETH);
+            uint256 ethAmount = ILido(stETH).getPooledEthByShares(
+                missingWstETH
+            );
 
             // stake eth to receive wstETH
-            (bool sent,) = asset.call{value: ethAmount}("");
+            (bool sent, ) = asset.call{value: ethAmount}("");
             require(sent, "Fail to send eth to wstETH");
         }
     }
@@ -420,19 +525,35 @@ contract WstETHLooper is BaseStrategy, IFlashLoanReceiver {
     // amount of WETH to borrow OR amount of WETH to repay (converted into wstETH amount internally)
     function adjustLeverage() public {
         // get vault current leverage : debt/collateral
-        (uint256 currentLTV, uint256 currentDebt, uint256 currentCollateral) = _getCurrentLTV();
+        (
+            uint256 currentLTV,
+            uint256 currentDebt,
+            uint256 currentCollateral
+        ) = _getCurrentLTV();
 
         // de-leverage if vault LTV is higher than target
         if (currentLTV > targetLTV) {
-            uint256 amountETH = (currentDebt - (targetLTV.mulDiv((currentCollateral), 1e18, Math.Rounding.Floor)))
-                .mulDiv(1e18, (1e18 - targetLTV), Math.Rounding.Ceil);
+            uint256 amountETH = (currentDebt -
+                (
+                    targetLTV.mulDiv(
+                        (currentCollateral),
+                        1e18,
+                        Math.Rounding.Floor
+                    )
+                )).mulDiv(1e18, (1e18 - targetLTV), Math.Rounding.Ceil);
 
             // flash loan eth to repay part of the debt
             _flashLoanETH(amountETH, 0, 0, 0, false);
         } else {
-            uint256 amountETH = (targetLTV.mulDiv(currentCollateral, 1e18, Math.Rounding.Ceil) - currentDebt).mulDiv(
-                1e18, (1e18 - targetLTV), Math.Rounding.Ceil
-            );
+            uint256 amountETH = (targetLTV.mulDiv(
+                currentCollateral,
+                1e18,
+                Math.Rounding.Ceil
+            ) - currentDebt).mulDiv(
+                    1e18,
+                    (1e18 - targetLTV),
+                    Math.Rounding.Ceil
+                );
 
             uint256 dustBalance = address(this).balance;
             if (dustBalance < amountETH) {
@@ -454,11 +575,16 @@ contract WstETHLooper is BaseStrategy, IFlashLoanReceiver {
 
     function withdrawDust(address recipient) public onlyOwner {
         // send eth dust to recipient
-        (bool sent,) = address(recipient).call{value: address(this).balance}("");
+        (bool sent, ) = address(recipient).call{value: address(this).balance}(
+            ""
+        );
         require(sent, "Failed to send ETH");
     }
 
-    function setLeverageValues(uint256 targetLTV_, uint256 maxLTV_) external onlyOwner {
+    function setLeverageValues(
+        uint256 targetLTV_,
+        uint256 maxLTV_
+    ) external onlyOwner {
         // reverts if targetLTV < maxLTV < protocolLTV is not satisfied
         _verifyLTV(targetLTV_, maxLTV_, protocolMaxLTV);
 
@@ -486,5 +612,24 @@ contract WstETHLooper is BaseStrategy, IFlashLoanReceiver {
         lendingPool.setUserUseReserveAsCollateral(asset_, true);
 
         initCollateral = true;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                          NOT IMPLEMENTED
+    //////////////////////////////////////////////////////////////*/
+
+    function convertToUnderlyingShares(
+        uint256 assets,
+        uint256 shares
+    ) public view override returns (uint256) {
+        revert();
+    }
+
+    function claim() internal override returns (bool success) {
+        revert();
+    }
+
+    function rewardTokens() external view override returns (address[] memory) {
+        revert();
     }
 }

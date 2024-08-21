@@ -16,7 +16,11 @@ import {BaseCurveCompounder, CurveSwap} from "src/peripheral/BaseCurveCompounder
  * An ERC4626 compliant Wrapper for Pendle Protocol.
  * Implements harvest func that swaps via balancer and curve
  */
-contract PendleBalancerCurveCompounder is PendleDepositor, BaseBalancerCompounder, BaseCurveCompounder {
+contract PendleBalancerCurveCompounder is
+    PendleDepositor,
+    BaseBalancerCompounder,
+    BaseCurveCompounder
+{
     /*//////////////////////////////////////////////////////////////
                             INITIALIZATION
     //////////////////////////////////////////////////////////////*/
@@ -28,12 +32,12 @@ contract PendleBalancerCurveCompounder is PendleDepositor, BaseBalancerCompounde
      * @param autoDeposit_ Controls if `protocolDeposit` gets called on deposit
      * @param strategyInitData_ Encoded data for this specific strategy
      */
-    function initialize(address asset_, address owner_, bool autoDeposit_, bytes memory strategyInitData_)
-        external
-        virtual
-        override
-        initializer
-    {
+    function initialize(
+        address asset_,
+        address owner_,
+        bool autoDeposit_,
+        bytes memory strategyInitData_
+    ) external virtual override initializer {
         __PendleBase_init(asset_, owner_, autoDeposit_, strategyInitData_);
     }
 
