@@ -34,7 +34,7 @@ struct LooperInitValues {
 }
 
 /// @title Leveraged maticX yield adapter
-/// @author Andrea Di Nenno
+/// @author ADN
 /// @notice ERC4626 wrapper for leveraging maticX yield
 /// @dev The strategy takes MaticX and deposits it into a lending protocol (aave).
 /// Then it borrows Matic, swap for MaticX and redeposits it

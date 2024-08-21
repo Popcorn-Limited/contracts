@@ -20,10 +20,10 @@ import {
 struct LooperInitValues {
     address aaveDataProvider;
     address curvePool;
-    address ethXPool;
     uint256 maxLTV;
     address poolAddressesProvider;
     uint256 slippage;
+    address stakingPool;
     uint256 targetLTV;
 }
 
@@ -36,7 +36,7 @@ struct FlashLoanCache {
 }
 
 /// @title Leveraged ETHx yield adapter
-/// @author Andrea Di Nenno
+/// @author ADN
 /// @notice ERC4626 wrapper for leveraging ETHx yield
 /// @dev The strategy takes ETHx and deposits it into a lending protocol (aave).
 /// Then it borrows WETH, swap for ETHx and redeposits it
@@ -51,6 +51,7 @@ contract ETHXLooper is BaseStrategy, IFlashLoanReceiver {
     // address of the aave/spark router
     ILendingPool public lendingPool;
     IPoolAddressesProvider public poolAddressesProvider;
+    IProtocolDataProvider public protocolDataProvider;
 
     IWETH public constant weth = IWETH(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
     IETHxStaking public stakingPool; // stader pool for wrapping - converting
@@ -91,10 +92,12 @@ contract ETHXLooper is BaseStrategy, IFlashLoanReceiver {
 
         LooperInitValues memory initValues = abi.decode(strategyInitData_, (LooperInitValues));
 
-        stakingPool = IETHxStaking(initValues.ethXPool);
+        stakingPool = IETHxStaking(initValues.stakingPool);
+        protocolDataProvider = IProtocolDataProvider(initValues.aaveDataProvider);
+        poolAddressesProvider = IPoolAddressesProvider(initValues.poolAddressesProvider);
 
         // retrieve and set ethX aToken, lending pool
-        (address _aToken,,) = IProtocolDataProvider(initValues.aaveDataProvider).getReserveTokensAddresses(asset_);
+        (address _aToken,,) = protocolDataProvider.getReserveTokensAddresses(asset_);
         interestToken = IERC20(_aToken);
         lendingPool = ILendingPool(IAToken(_aToken).POOL());
 
@@ -111,11 +114,8 @@ contract ETHXLooper is BaseStrategy, IFlashLoanReceiver {
         targetLTV = initValues.targetLTV;
         maxLTV = initValues.maxLTV;
 
-        poolAddressesProvider = IPoolAddressesProvider(initValues.poolAddressesProvider);
-
         // retrieve and set weth variable debt token
-        (,, address _variableDebtToken) =
-            IProtocolDataProvider(initValues.aaveDataProvider).getReserveTokensAddresses(address(weth));
+        (,, address _variableDebtToken) = protocolDataProvider.getReserveTokensAddresses(address(weth));
 
         debtToken = IERC20(_variableDebtToken); // variable debt weth token
 
@@ -153,10 +153,22 @@ contract ETHXLooper is BaseStrategy, IFlashLoanReceiver {
     /*//////////////////////////////////////////////////////////////
                             ACCOUNTING LOGIC
     //////////////////////////////////////////////////////////////*/
+    function maxDeposit(
+        address
+    ) public view override returns (uint256) {
+        if(paused())
+            return 0;
+        
+        // TODO borrow cap - asset decimals
+        (uint256 borrowCap, uint256 supplyCap) = protocolDataProvider.getReserveCaps(asset());
+
+        return (supplyCap * 1e18) - interestToken.totalSupply();
+    }
+
     function _totalAssets() internal view override returns (uint256) {
         uint256 ethToEthXRate = stakingPool.getExchangeRate();
         uint256 debt = debtToken.balanceOf(address(this)).mulDiv(1e18, ethToEthXRate, Math.Rounding.Ceil); // weth debt converted in ethX amount
-        
+
         uint256 collateral = interestToken.balanceOf(address(this)); // ethX collateral
 
         if (debt >= collateral) return 0;
@@ -240,8 +252,8 @@ contract ETHXLooper is BaseStrategy, IFlashLoanReceiver {
         uint256 ethToEthXRate = stakingPool.getExchangeRate();
 
         (, uint256 currentDebt, uint256 currentCollateral) = _getCurrentLTV(ethToEthXRate);
-        uint256 ethAssetsValue = assets.mulDiv(1e18, ethToEthXRate, Math.Rounding.Ceil);
-        
+        uint256 ethAssetsValue = assets.mulDiv(ethToEthXRate, 1e18, Math.Rounding.Ceil);
+
         bool isFullWithdraw;
         uint256 ratioDebtToRepay;
 
@@ -365,7 +377,7 @@ contract ETHXLooper is BaseStrategy, IFlashLoanReceiver {
         bool isFullWithdraw,
         uint256 exchangeRate
     ) internal {
-        uint256 depositAmount_ = depositAmount; // avoids stack too deep
+        // uint256 depositAmount_ = depositAmount; // avoids stack too deep
 
         address[] memory assets = new address[](1);
         assets[0] = address(weth);
@@ -377,18 +389,28 @@ contract ETHXLooper is BaseStrategy, IFlashLoanReceiver {
         uint256[] memory interestRateModes = new uint256[](1);
         interestRateModes[0] = interestRateMode;
 
+        bool isWithdraw = interestRateMode == 0 ? true : false;
+
+        FlashLoanCache memory cache = FlashLoanCache(
+            isWithdraw, 
+            isFullWithdraw, 
+            assetsToWithdraw, 
+            depositAmount, 
+            exchangeRate
+        );
+
         lendingPool.flashLoan(
             address(this),
             assets,
             amounts,
             interestRateModes,
             address(this),
-            abi.encode(interestRateMode == 0 ? true : false, isFullWithdraw, assetsToWithdraw, depositAmount_, exchangeRate),
+            abi.encode(cache),
             0
         );
     }
 
-    // swaps ETHx to exact WETH  
+    // swaps ETHx to exact WETH - redeposits extra ETH
     function _swapToWETH(uint256 amount, uint256 minAmount, address asset, uint256 toWithdraw, uint256 exchangeRate)
         internal
     {
