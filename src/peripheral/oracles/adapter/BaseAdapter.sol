@@ -4,6 +4,7 @@ pragma solidity ^0.8.25;
 import {IERC20Metadata} from "openzeppelin-contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
 import {Errors} from "src/lib/euler/Errors.sol";
+import {ScaleUtils, Scale} from "src/lib/euler/ScaleUtils.sol";
 
 /// @title BaseAdapter
 /// @custom:security-contact security@euler.xyz
