@@ -337,12 +337,18 @@ abstract contract AnyConverter is BaseStrategy {
                             RESERVE LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    event ReserveClaimed(address user, address token, uint256 withdrawn);
+    event ReserveClaimed(
+        address user,
+        address token,
+        uint256 blockNumber,
+        uint256 withdrawn
+    );
     // we don't emit the block number because that's already part of the event log
     // e.g. see https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_getlogs
     event ReserveAdded(
         address indexed user,
         address indexed asset,
+        uint256 blockNumber,
         uint256 unlockTime,
         uint256 amount,
         uint256 withdrawable
@@ -390,10 +396,17 @@ abstract contract AnyConverter is BaseStrategy {
                 }
 
                 IERC20(quote).safeTransfer(msg.sender, withdrawable);
-                emit ReserveClaimed(msg.sender, base, _reserved.withdrawable);
+                emit ReserveClaimed(
+                    msg.sender,
+                    base,
+                    blockNumber,
+                    _reserved.withdrawable
+                );
             } else {
                 revert("Nothing to claim");
             }
+        } else {
+            revert("Nothing to claim");
         }
     }
 
@@ -420,7 +433,14 @@ abstract contract AnyConverter is BaseStrategy {
             totalReservedAssets += withdrawable;
         }
 
-        emit ReserveAdded(msg.sender, token, _unlockTime, amount, withdrawable);
+        emit ReserveAdded(
+            msg.sender,
+            token,
+            block.number,
+            _unlockTime,
+            amount,
+            withdrawable
+        );
     }
 
     /*//////////////////////////////////////////////////////////////
