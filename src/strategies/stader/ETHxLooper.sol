@@ -421,9 +421,9 @@ contract ETHXLooper is BaseStrategy, IFlashLoanReceiver {
         weth.deposit{value: minAmount}();
 
         // restake the eth needed to reach the ETHx amount the user is withdrawing
-        uint256 missingETHx = toWithdraw - IERC20(asset).balanceOf(address(this)) + 1;
+        uint256 missingETHx = toWithdraw - IERC20(asset).balanceOf(address(this));
         if (missingETHx > 0) {
-            uint256 missingETHAmount = missingETHx.mulDiv(exchangeRate, 1e18, Math.Rounding.Floor);
+            uint256 missingETHAmount = missingETHx.mulDiv(exchangeRate, 1e18, Math.Rounding.Ceil);
 
             // stake eth to receive ETHx
             stakingPool.deposit{value:missingETHAmount}(address(this));

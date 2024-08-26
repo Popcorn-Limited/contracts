@@ -403,9 +403,9 @@ contract ETHXLooperTest is BaseStrategyTest {
         strategyContract.adjustLeverage();
 
         // withdraw full amount - repay full debt
-        uint256 amountWithd = strategy.totalAssets() - 1;
-        vm.prank(bob);
-        strategy.withdraw(amountWithd, bob, bob);
+        vm.startPrank(bob);
+        strategy.redeem(IERC20(address(strategy)).balanceOf(bob), bob, bob);
+        vm.stopPrank();
 
         // check total assets
         assertEq(strategy.totalAssets(), 0);
