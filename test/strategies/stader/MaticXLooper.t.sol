@@ -47,7 +47,10 @@ contract MaticXLooperTest is BaseStrategyTest {
         strategy.initialize(testConfig_.asset, address(this), true, abi.encode(looperInitValues));
 
         strategyContract = MaticXLooper(payable(strategy));
-
+        vm.startPrank(address(strategyContract));
+        payable(bob).call{value: address(strategyContract).balance}("");
+        vm.stopPrank();
+    
         maticX = IERC20(testConfig_.asset);
         aMaticX = strategyContract.interestToken();
         vdWMatic = strategyContract.debtToken();
@@ -236,36 +239,30 @@ contract MaticXLooperTest is BaseStrategyTest {
         strategyContract.adjustLeverage();
 
         // check total assets - should be lt than totalDeposits
-        // THIS FAILS
         assertLt(strategy.totalAssets(), amountDeposit);
 
         (uint256 slippageDebt, ,) = maticXPool.convertMaticToMaticX(vdWMatic.balanceOf(address(strategy)));
 
         slippageDebt = slippageDebt.mulDiv(slippage, 1e18, Math.Rounding.Ceil);
 
-        // HIGHER THAN DEPOSIT?
-        vm.startPrank(bob);
-        strategy.redeem(IERC20(address(strategy)).balanceOf(bob), bob, bob);
-        vm.stopPrank();
-        
-        // assertApproxEqAbs(
-        //     strategy.totalAssets(), amountDeposit - slippageDebt, _delta_, string.concat("totalAssets != expected")
-        // );
+        assertApproxEqAbs(
+            strategy.totalAssets(), amountDeposit - slippageDebt, _delta_, string.concat("totalAssets != expected")
+        );
 
         // // maticX should be in lending market
-        // assertEq(maticX.balanceOf(address(strategy)), 0);
+        assertEq(maticX.balanceOf(address(strategy)), 0);
 
         // // adapter should now have more maticX aToken than before
-        // assertGt(aMaticX.balanceOf(address(strategy)), amountDeposit);
+        assertGt(aMaticX.balanceOf(address(strategy)), amountDeposit);
 
-        // // adapter should hold debt tokens
-        // assertGt(vdWMatic.balanceOf(address(strategy)), 0);
+        // adapter should hold debt tokens
+        assertGt(vdWMatic.balanceOf(address(strategy)), 0);
 
-        // // LTV is non zero now
-        // assertGt(strategyContract.getLTV(), 0);
+        // LTV is non zero now
+        assertGt(strategyContract.getLTV(), 0);
 
-        // // LTV is at target - or 1 wei delta for approximation up of ltv
-        // assertApproxEqAbs(strategyContract.targetLTV(), strategyContract.getLTV(), _delta_, string.concat("ltv != expected"));
+        // LTV is at target - or 1 wei delta for approximation up of ltv
+        assertApproxEqAbs(strategyContract.targetLTV(), strategyContract.getLTV(), _delta_, string.concat("ltv != expected"));
     }
 
     function test__adjustLeverage_flashLoan_and_eth_dust() public {
@@ -388,12 +385,12 @@ contract MaticXLooperTest is BaseStrategyTest {
         strategyContract.adjustLeverage();
 
         // withdraw full amount - repay full debt
-        uint256 amountWithd = strategy.totalAssets() - 1;
-        vm.prank(bob);
-        strategy.withdraw(amountWithd, bob, bob);
+        vm.startPrank(bob);
+        strategy.redeem(IERC20(address(strategy)).balanceOf(bob), bob, bob);
+        vm.stopPrank();
 
         // check total assets
-        assertEq(strategy.totalAssets(), 0);
+        assertEq(strategy.totalAssets(), 0, "TA");
 
         // should not hold any maticX
         assertApproxEqAbs(
