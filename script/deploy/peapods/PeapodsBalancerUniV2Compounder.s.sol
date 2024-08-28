@@ -11,7 +11,7 @@ import {BalancerCompounder, IERC20, HarvestValues, TradePath} from "src/strategi
 import {IAsset, BatchSwapStep} from "src/peripheral/BalancerTradeLibrary.sol";
 import {IStakedToken} from "src/strategies/peapods/PeapodsStrategy.sol";
 
-contract DeployStrategy is Script {
+contract Deploy is Script {
     using stdJson for string;
 
     function run() public returns (PeapodsBalancerUniV2Compounder strategy) {

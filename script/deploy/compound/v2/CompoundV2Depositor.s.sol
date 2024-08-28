@@ -8,7 +8,7 @@ import {stdJson} from "forge-std/StdJson.sol";
 
 import {CompoundV2Depositor, IERC20} from "src/strategies/compound/v2/CompoundV2Depositor.sol";
 
-contract DeployStrategy is Script {
+contract Deploy is Script {
     using stdJson for string;
 
     function run() public returns (CompoundV2Depositor strategy) {

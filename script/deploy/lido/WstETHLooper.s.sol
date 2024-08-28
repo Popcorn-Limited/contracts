@@ -8,7 +8,7 @@ import {stdJson} from "forge-std/StdJson.sol";
 
 import {WstETHLooper, LooperInitValues, IERC20} from "../../../src/strategies/lido/WstETHLooper.sol";
 
-contract DeployStrategy is Script {
+contract Deploy is Script {
     using stdJson for string;
 
     IERC20 wstETH;

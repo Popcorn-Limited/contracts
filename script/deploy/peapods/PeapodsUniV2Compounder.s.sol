@@ -9,7 +9,7 @@ import {stdJson} from "forge-std/StdJson.sol";
 import {PeapodsUniV2Compounder, SwapStep} from "src/strategies/peapods/PeapodsUniV2Compounder.sol";
 import {IStakedToken} from "src/strategies/peapods/PeapodsStrategy.sol";
 
-contract DeployStrategy is Script {
+contract Deploy is Script {
     using stdJson for string;
 
     function run() public returns (PeapodsUniV2Compounder strategy) {
