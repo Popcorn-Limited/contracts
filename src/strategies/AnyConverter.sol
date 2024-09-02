@@ -271,7 +271,7 @@ abstract contract AnyConverter is BaseStrategy {
 
         if (
             _proposedSlippage.changeTime == 0 ||
-            block.timestamp > _proposedSlippage.changeTime
+            _proposedSlippage.changeTime > block.timestamp
         ) revert Misconfigured();
 
         emit SlippageChanged(slippage, _proposedSlippage.value);
@@ -297,7 +297,7 @@ abstract contract AnyConverter is BaseStrategy {
 
         if (
             _proposedFloatRatio.changeTime == 0 ||
-            block.timestamp > _proposedFloatRatio.changeTime
+            _proposedFloatRatio.changeTime > block.timestamp
         ) {
             revert Misconfigured();
         }
@@ -323,7 +323,7 @@ abstract contract AnyConverter is BaseStrategy {
 
         if (
             _proposedUnlockTime.changeTime == 0 ||
-            block.timestamp > _proposedUnlockTime.changeTime
+            _proposedUnlockTime.changeTime > block.timestamp
         ) {
             revert Misconfigured();
         }
