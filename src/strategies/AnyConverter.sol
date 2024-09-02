@@ -21,7 +21,7 @@ abstract contract AnyConverter is BaseStrategy {
     using Math for uint256;
     using SafeERC20 for IERC20;
 
-    address public yieldAsset;
+    address public yieldToken;
     address[] public tokens;
 
     IPriceOracle public oracle;
@@ -46,14 +46,14 @@ abstract contract AnyConverter is BaseStrategy {
         __BaseStrategy_init(asset_, owner_, autoDeposit_);
 
         address oracle_;
-        (yieldAsset, oracle_, slippage, floatRatio) = abi.decode(
+        (yieldToken, oracle_, slippage, floatRatio) = abi.decode(
             strategyInitData_,
             (address, address, uint256, uint256)
         );
         oracle = IPriceOracle(oracle_);
 
         tokens.push(asset_);
-        tokens.push(yieldAsset);
+        tokens.push(yieldToken);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -64,28 +64,30 @@ abstract contract AnyConverter is BaseStrategy {
      * @notice Total amount of underlying `asset` token managed by adapter.
      * @dev Return assets held by adapter if paused.
      */
-    function totalAssets() public view virtual override returns (uint256) {
-        uint256 bal = IERC20(asset()).balanceOf(address(this));
-        uint256 _totalReservedAssets = totalReservedAssets;
-        // yieldAssetBal is the total amount of yieldAssets that are held by the contract
-        // priced in the underlying asset token
-        uint256 yieldAssetBal = _totalAssets();
-
-        if (bal + yieldAssetBal <= _totalReservedAssets) return 0;
-        return (bal + yieldAssetBal - totalReservedAssets);
+    function totalAssets() public view override returns (uint256) {
+        return _totalAssets();
     }
 
-    /// @notice Calculates the total amount of underlying tokens the Vault holds.
-    /// @return The total amount of underlying tokens the Vault holds.
     function _totalAssets() internal view override returns (uint256) {
-        uint256 yieldBal = IERC20(yieldAsset).balanceOf(address(this));
-        uint256 _totalReservedYieldAssets = totalReservedYieldAssets;
+        uint256 bal = IERC20(asset()).balanceOf(address(this));
+        uint256 _totalReservedAssets = totalReservedAssets;
+        // yieldTokenBal is the total amount of yieldTokens that are held by the contract
+        // priced in the underlying asset token
+        uint256 yieldTokenBal = _totalYieldTokenInAssets();
 
-        if (yieldBal <= _totalReservedYieldAssets) return 0;
+        if (bal + yieldTokenBal <= _totalReservedAssets) return 0;
+        return (bal + yieldTokenBal - totalReservedAssets);
+    }
+
+    function _totalYieldTokenInAssets() internal view returns (uint256) {
+        uint256 yieldBal = IERC20(yieldToken).balanceOf(address(this));
+        uint256 _totalReservedyieldTokens = totalReservedyieldTokens;
+
+        if (yieldBal <= _totalReservedyieldTokens) return 0;
         return
             oracle.getQuote(
-                yieldBal - _totalReservedYieldAssets,
-                yieldAsset,
+                yieldBal - _totalReservedyieldTokens,
+                yieldToken,
                 asset()
             );
     }
@@ -133,8 +135,8 @@ abstract contract AnyConverter is BaseStrategy {
                         PUSH/PULL LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    event PushedFunds(uint256 yieldAssetsIn, uint256 assetsOut);
-    event PulledFunds(uint256 assetsIn, uint256 yieldAssetsOut);
+    event PushedFunds(uint256 yieldTokensIn, uint256 assetsOut);
+    event PulledFunds(uint256 assetsIn, uint256 yieldTokensOut);
 
     error SlippageTooHigh();
     error NotEnoughFloat();
@@ -149,27 +151,27 @@ abstract contract AnyConverter is BaseStrategy {
     }
 
     function pushFunds(
-        uint256 yieldAssets,
+        uint256 yieldTokens,
         bytes memory
     ) external override onlyKeeperOrOwner whenNotPaused {
         // caching
         address _asset = asset();
-        address _yieldAsset = yieldAsset;
+        address _yieldToken = yieldToken;
         uint256 _floatRatio = floatRatio;
 
         uint256 ta = totalAssets();
         uint256 bal = IERC20(_asset).balanceOf(address(this)) -
             totalReservedAssets;
 
-        IERC20(_yieldAsset).safeTransferFrom(
+        IERC20(_yieldToken).safeTransferFrom(
             msg.sender,
             address(this),
-            yieldAssets
+            yieldTokens
         );
 
         uint256 withdrawable = oracle.getQuote(
-            yieldAssets,
-            _yieldAsset,
+            yieldTokens,
+            _yieldToken,
             _asset
         );
 
@@ -188,7 +190,7 @@ abstract contract AnyConverter is BaseStrategy {
             if (bal < withdrawable) revert BalanceTooLow();
         }
 
-        _reserveToken(yieldAssets, withdrawable, _yieldAsset, false);
+        _reserveToken(yieldTokens, withdrawable, _yieldToken, false);
         uint256 postTa = totalAssets();
 
         if (
@@ -197,7 +199,7 @@ abstract contract AnyConverter is BaseStrategy {
             revert SlippageTooHigh();
         }
 
-        emit PushedFunds(yieldAssets, withdrawable);
+        emit PushedFunds(yieldTokens, withdrawable);
     }
 
     function pullFunds(
@@ -206,13 +208,13 @@ abstract contract AnyConverter is BaseStrategy {
     ) external override onlyKeeperOrOwner whenNotPaused {
         // caching
         address _asset = asset();
-        address _yieldAsset = yieldAsset;
+        address _yieldToken = yieldToken;
 
         uint256 ta = totalAssets();
 
         IERC20(_asset).safeTransferFrom(msg.sender, address(this), assets);
 
-        uint256 withdrawable = oracle.getQuote(assets, _asset, _yieldAsset);
+        uint256 withdrawable = oracle.getQuote(assets, _asset, _yieldToken);
         _reserveToken(assets, withdrawable, _asset, true);
 
         uint256 postTa = totalAssets();
@@ -251,7 +253,7 @@ abstract contract AnyConverter is BaseStrategy {
     uint256 public floatRatio;
 
     ProposedChange public proposedUnlockTime;
-    uint256 public unlockTime = 1 days;
+    uint256 public unlockTime = 1;
 
     function proposeSlippage(uint256 slippage_) external onlyOwner {
         if (slippage_ > 10_000) revert Misconfigured();
@@ -337,12 +339,18 @@ abstract contract AnyConverter is BaseStrategy {
                             RESERVE LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    event ReserveClaimed(address user, address token, uint256 withdrawn);
+    event ReserveClaimed(
+        address user,
+        address token,
+        uint256 blockNumber,
+        uint256 withdrawn
+    );
     // we don't emit the block number because that's already part of the event log
     // e.g. see https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_getlogs
     event ReserveAdded(
         address indexed user,
         address indexed asset,
+        uint256 blockNumber,
         uint256 unlockTime,
         uint256 amount,
         uint256 withdrawable
@@ -355,7 +363,7 @@ abstract contract AnyConverter is BaseStrategy {
     }
 
     uint256 public totalReservedAssets;
-    uint256 public totalReservedYieldAssets;
+    uint256 public totalReservedyieldTokens;
 
     // we only allow 1 reserve per block so we can use that as the
     // primary key to differentiate between multiple reserves.
@@ -364,9 +372,9 @@ abstract contract AnyConverter is BaseStrategy {
     mapping(address => mapping(address => mapping(uint256 => Reserved)))
         public reserved;
 
-    function claimReserved(uint256 blockNumber, bool isYieldAsset) external {
-        address base = isYieldAsset ? asset() : yieldAsset;
-        address quote = isYieldAsset ? yieldAsset : asset();
+    function claimReserved(uint256 blockNumber, bool isyieldToken) external {
+        address base = isyieldToken ? asset() : yieldToken;
+        address quote = isyieldToken ? yieldToken : asset();
 
         Reserved memory _reserved = reserved[msg.sender][base][blockNumber];
         if (
@@ -383,17 +391,24 @@ abstract contract AnyConverter is BaseStrategy {
             if (withdrawable > 0) {
                 delete reserved[msg.sender][base][blockNumber];
 
-                if (isYieldAsset) {
-                    totalReservedYieldAssets -= _reserved.withdrawable;
+                if (isyieldToken) {
+                    totalReservedyieldTokens -= _reserved.withdrawable;
                 } else {
                     totalReservedAssets -= _reserved.withdrawable;
                 }
 
                 IERC20(quote).safeTransfer(msg.sender, withdrawable);
-                emit ReserveClaimed(msg.sender, base, _reserved.withdrawable);
+                emit ReserveClaimed(
+                    msg.sender,
+                    base,
+                    blockNumber,
+                    _reserved.withdrawable
+                );
             } else {
                 revert("Nothing to claim");
             }
+        } else {
+            revert("Nothing to claim");
         }
     }
 
@@ -401,7 +416,7 @@ abstract contract AnyConverter is BaseStrategy {
         uint256 amount,
         uint256 withdrawable,
         address token,
-        bool isYieldAsset
+        bool isyieldToken
     ) internal {
         if (reserved[msg.sender][token][block.number].deposited > 0) {
             revert("Already reserved");
@@ -414,13 +429,20 @@ abstract contract AnyConverter is BaseStrategy {
             unlockTime: _unlockTime
         });
 
-        if (isYieldAsset) {
-            totalReservedYieldAssets += withdrawable;
+        if (isyieldToken) {
+            totalReservedyieldTokens += withdrawable;
         } else {
             totalReservedAssets += withdrawable;
         }
 
-        emit ReserveAdded(msg.sender, token, _unlockTime, amount, withdrawable);
+        emit ReserveAdded(
+            msg.sender,
+            token,
+            block.number,
+            _unlockTime,
+            amount,
+            withdrawable
+        );
     }
 
     /*//////////////////////////////////////////////////////////////

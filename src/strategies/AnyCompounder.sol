@@ -3,7 +3,7 @@
 
 pragma solidity ^0.8.25;
 
-import {AnyConverter, IERC20Metadata, ERC20, IERC20, Math} from "./AnyConverter.sol";
+import {AnyCompounderNaive, AnyConverter, ClaimInteraction, IERC20Metadata, ERC20, IERC20, Math} from "./AnyCompounderNaive.sol";
 
 /**
  * @title   BaseStrategy
@@ -15,7 +15,7 @@ import {AnyConverter, IERC20Metadata, ERC20, IERC20, Math} from "./AnyConverter.
  * All specific interactions for the underlying protocol need to be overriden in the actual implementation.
  * The adapter can be initialized with a strategy that can perform additional operations. (Leverage, Compounding, etc.)
  */
-contract AnyDepositor is AnyConverter {
+contract AnyCompounder is AnyCompounderNaive {
     /**
      * @notice Initialize a new Strategy.
      * @param asset_ The underlying asset used for deposit/withdraw and accounting
