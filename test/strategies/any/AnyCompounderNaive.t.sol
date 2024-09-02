@@ -47,15 +47,15 @@ contract AnyCompounderNaiveTest is AnyBaseTest {
         AnyCompounder _strategy = new AnyCompounder();
         oracle = new MockOracle();
 
-        yieldAsset = json_.readAddress(
-            string.concat(".configs[", index_, "].specific.yieldAsset")
+        yieldToken = json_.readAddress(
+            string.concat(".configs[", index_, "].specific.yieldToken")
         );
 
         _strategy.initialize(
             testConfig_.asset,
             address(this),
             true,
-            abi.encode(yieldAsset, address(oracle), uint256(10), uint256(0))
+            abi.encode(yieldToken, address(oracle), uint256(10), uint256(0))
         );
 
         _strategy.setRewardTokens(
@@ -190,7 +190,7 @@ contract AnyCompounderNaiveTest is AnyBaseTest {
         }
 
         // give this contract yield assets and allow the strategy to pull them
-        _mintYieldAsset(testConfig.defaultAmount, address(this));
+        _mintyieldToken(testConfig.defaultAmount, address(this));
 
         ClaimContract claimContract = new ClaimContract(rewardTokens);
         _addClaimId(
@@ -239,7 +239,7 @@ contract AnyCompounderNaiveTest is AnyBaseTest {
         }
 
         // give this contract yield assets and allow the strategy to pull them
-        _mintYieldAsset(testConfig.defaultAmount, address(this));
+        _mintyieldToken(testConfig.defaultAmount, address(this));
 
         ClaimContract claimContract = new ClaimContract(rewardTokens);
         _addClaimId(

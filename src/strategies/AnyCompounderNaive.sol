@@ -46,6 +46,8 @@ abstract contract AnyCompounderNaive is AnyConverter {
      * @notice Claim rewards and compound them into the vault
      */
     function harvest(bytes memory data) external override onlyKeeperOrOwner {
+        uint256 ta = totalAssets();
+
         (uint256 assets, ClaimInteraction memory claimInteraction) = abi.decode(
             data,
             (uint256, ClaimInteraction)
@@ -59,10 +61,8 @@ abstract contract AnyCompounderNaive is AnyConverter {
         );
         require(success, "Claim failed");
 
-        uint256 ta = totalAssets();
-        IERC20(yieldAsset).safeTransferFrom(msg.sender, address(this), assets);
-        uint256 postTa = totalAssets();
-        if (ta >= postTa) revert HarvestFailed();
+        IERC20(yieldToken).safeTransferFrom(msg.sender, address(this), assets);
+
         uint256 len = _rewardTokens.length;
         for (uint256 i; i < len; i++) {
             IERC20(_rewardTokens[i]).safeTransfer(
@@ -70,6 +70,10 @@ abstract contract AnyCompounderNaive is AnyConverter {
                 IERC20(_rewardTokens[i]).balanceOf(address(this))
             );
         }
+
+        uint256 postTa = totalAssets();
+        if (ta >= postTa) revert HarvestFailed();
+
         emit Harvested();
     }
 
@@ -120,7 +124,7 @@ abstract contract AnyCompounderNaive is AnyConverter {
         for (uint256 i; i < len; i++) {
             if (
                 newRewardTokens[i] == asset() ||
-                newRewardTokens[i] == yieldAsset
+                newRewardTokens[i] == yieldToken
             ) revert WrongToken();
         }
 
@@ -128,7 +132,7 @@ abstract contract AnyCompounderNaive is AnyConverter {
 
         tokens = newRewardTokens;
         tokens.push(asset());
-        tokens.push(yieldAsset);
+        tokens.push(yieldToken);
     }
 
     function proposeClaimId(bytes32 proposedClaimId) external onlyOwner {

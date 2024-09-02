@@ -15,18 +15,23 @@ contract AnyDepositorTest is AnyBaseTest {
         _setUpBaseTest(0, "./test/strategies/any/AnyDepositorTestConfig.json");
     }
 
-    function _setUpStrategy(string memory json_, string memory index_, TestConfig memory testConfig_)
-        internal
-        override
-        returns (IBaseStrategy)
-    {
+    function _setUpStrategy(
+        string memory json_,
+        string memory index_,
+        TestConfig memory testConfig_
+    ) internal override returns (IBaseStrategy) {
         AnyDepositor _strategy = new AnyDepositor();
         oracle = new MockOracle();
 
-        yieldAsset = json_.readAddress(string.concat(".configs[", index_, "].specific.yieldAsset"));
+        yieldToken = json_.readAddress(
+            string.concat(".configs[", index_, "].specific.yieldToken")
+        );
 
         _strategy.initialize(
-            testConfig_.asset, address(this), true, abi.encode(yieldAsset, address(oracle), uint256(10), uint256(0))
+            testConfig_.asset,
+            address(this),
+            true,
+            abi.encode(yieldToken, address(oracle), uint256(10), uint256(0))
         );
 
         return IBaseStrategy(address(_strategy));

@@ -15,7 +15,7 @@
                 "testId": "Any AaveV3 Compounder Naive"
             },
             "specific": {
-                "yieldAsset": "0x028171bCA77440897B824Ca71D1c56caC55b68A3",
+                "yieldToken": "0x028171bCA77440897B824Ca71D1c56caC55b68A3",
                 "whale": "0x07ede94cf6316f4809f2b725f5d79ad303fb4dc8",
                 "rescueToken": "0x6982508145454Ce325dDbE47a25d4ec3d2311933",
                 "rewardTokens": [
