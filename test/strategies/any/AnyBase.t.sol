@@ -51,37 +51,37 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         // Push 40% the funds into the underlying protocol
         strategy.pushFunds(pushAmount, bytes(""));
 
-        // Withdraw 80% of deposit
+        // Withdraw 20% of deposit
         vm.prank(bob);
-        strategy.withdraw((testConfig.defaultAmount / 5) * 4, bob, bob);
+        strategy.withdraw(testConfig.defaultAmount / 5, bob, bob);
 
         assertApproxEqAbs(
             strategy.totalAssets(),
-            testConfig.defaultAmount / 5,
+            (testConfig.defaultAmount / 5) * 4,
             _delta_,
             "ta"
         );
         assertApproxEqAbs(
             strategy.totalSupply(),
-            testConfig.defaultAmount / 5,
+            (testConfig.defaultAmount / 5) * 4,
             _delta_,
             "ts"
         );
         assertApproxEqAbs(
             strategy.balanceOf(bob),
-            testConfig.defaultAmount / 5,
+            (testConfig.defaultAmount / 5) * 4,
             _delta_,
             "share bal"
         );
         assertApproxEqAbs(
             IERC20(_asset_).balanceOf(bob),
-            (testConfig.defaultAmount / 5) * 4,
+            testConfig.defaultAmount / 5,
             _delta_,
             "asset bal"
         );
         assertApproxEqAbs(
             IERC20(_asset_).balanceOf(address(strategy)),
-            testConfig.defaultAmount / 5,
+            (testConfig.defaultAmount / 5) * 4,
             _delta_,
             "strategy asset bal"
         );
@@ -101,37 +101,37 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         // Push 40% the funds into the underlying protocol
         strategy.pushFunds(pushAmount, bytes(""));
 
-        // Redeem 80% of deposit
+        // Redeem 20% of deposit
         vm.prank(bob);
-        strategy.redeem((testConfig.defaultAmount / 5) * 4, bob, bob);
+        strategy.redeem(testConfig.defaultAmount / 5, bob, bob);
 
         assertApproxEqAbs(
             strategy.totalAssets(),
-            testConfig.defaultAmount / 5,
+            (testConfig.defaultAmount / 5) * 4,
             _delta_,
             "ta"
         );
         assertApproxEqAbs(
             strategy.totalSupply(),
-            testConfig.defaultAmount / 5,
+            (testConfig.defaultAmount / 5) * 4,
             _delta_,
             "ts"
         );
         assertApproxEqAbs(
             strategy.balanceOf(bob),
-            testConfig.defaultAmount / 5,
+            (testConfig.defaultAmount / 5) * 4,
             _delta_,
             "share bal"
         );
         assertApproxEqAbs(
             IERC20(_asset_).balanceOf(bob),
-            (testConfig.defaultAmount / 5) * 4,
+            testConfig.defaultAmount / 5,
             _delta_,
             "asset bal"
         );
         assertApproxEqAbs(
             IERC20(_asset_).balanceOf(address(strategy)),
-            testConfig.defaultAmount / 5,
+            (testConfig.defaultAmount / 5) * 4,
             _delta_,
             "strategy asset bal"
         );
@@ -217,6 +217,20 @@ abstract contract AnyBaseTest is BaseStrategyTest {
             _delta_,
             "strategy asset bal"
         );
+    }
+
+    function test__reserved_funds_cant_be_withdrawn() public {
+        _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
+
+        vm.prank(bob);
+        strategy.deposit(testConfig.defaultAmount, bob);
+
+        _mintyieldToken(testConfig.defaultAmount, address(this));
+        strategy.pushFunds(testConfig.defaultAmount, bytes(""));
+
+        vm.startPrank(bob);
+        vm.expectRevert(IBaseStrategy.InsufficientFunds.selector);
+        strategy.withdraw(testConfig.defaultAmount, bob, bob);
     }
 
     /*//////////////////////////////////////////////////////////////

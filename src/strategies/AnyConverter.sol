@@ -109,6 +109,10 @@ abstract contract AnyConverter is BaseStrategy {
         revert();
     }
 
+    function getFloat() internal view override returns (uint256) {
+        return IERC20(asset()).balanceOf(address(this)) - totalReservedAssets;
+    }
+
     /*//////////////////////////////////////////////////////////////
                           INTERNAL HOOKS LOGIC
     //////////////////////////////////////////////////////////////*/

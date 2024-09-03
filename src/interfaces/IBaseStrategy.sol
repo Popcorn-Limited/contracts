@@ -9,6 +9,8 @@ import {IPermit} from "./IPermit.sol";
 import {IPausable} from "./IPausable.sol";
 
 interface IBaseStrategy is IERC4626, IOwned, IPermit, IPausable {
+    error InsufficientFunds();
+
     function harvest(bytes memory data) external;
 
     function initialize(address asset_, address owner_, bool autoDeposit_, bytes memory adapterData_) external;

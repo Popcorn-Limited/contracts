@@ -60,6 +60,7 @@ abstract contract BaseStrategy is
     //////////////////////////////////////////////////////////////*/
 
     error ZeroAmount();
+    error InsufficientFunds();
 
     function deposit(uint256 assets) public returns (uint256) {
         return deposit(assets, msg.sender);
@@ -124,15 +125,19 @@ abstract contract BaseStrategy is
             _spendAllowance(owner, caller, shares);
         }
 
+        uint256 available = getFloat();
+
         // We call this before the `burn` to allow for normal calculations with shares before they get burned
         // Since we transfer assets after the burn the function should remain safe
         if (!paused()) {
-            uint256 float = IERC20(asset()).balanceOf(address(this));
-            if (assets > float) {
-                uint256 missing = assets - float;
+            if (assets > available) {
+                uint256 missing = assets - available;
                 _protocolWithdraw(missing, convertToShares(missing), bytes(""));
+                available = getFloat();
             }
         }
+
+        if (available < assets) revert InsufficientFunds();
 
         // If _asset is ERC-777, `transfer` can trigger a reentrancy AFTER the transfer happens through the
         // `tokensReceived` hook. On the other hand, the `tokensToSend` hook, that is triggered before the transfer,
@@ -175,6 +180,10 @@ abstract contract BaseStrategy is
     ) public view virtual returns (uint256);
 
     function rewardTokens() external view virtual returns (address[] memory);
+
+    function getFloat() internal view virtual returns (uint256) {
+        return IERC20(asset()).balanceOf(address(this));
+    }
 
     /*//////////////////////////////////////////////////////////////
                      DEPOSIT/WITHDRAWAL LIMIT LOGIC
