@@ -13,6 +13,9 @@ contract Deploy is Script {
     uint256 internal depositLimit;
     address internal owner;
 
+    uint256 performanceFee;
+    uint256 managementFee;
+
     function run() public returns (MultiStrategyVault vault) {
         vm.startBroadcast();
         console.log("msg.sender:", msg.sender);
@@ -33,6 +36,9 @@ contract Deploy is Script {
 
         owner = msg.sender;
 
+        performanceFee = 1000; // 10%
+        managementFee = 0; // 0%
+
         // Actual deployment
         vault = new MultiStrategyVault();
 
@@ -44,6 +50,8 @@ contract Deploy is Script {
             depositLimit,
             owner
         );
+
+        vault.setFees(performanceFee, managementFee);
 
         vm.stopBroadcast();
     }

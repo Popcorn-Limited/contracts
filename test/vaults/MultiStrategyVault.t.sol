@@ -1156,6 +1156,24 @@ contract MultiStrategyVaultTest is Test {
         assertEq(vault.proposedStrategyTime(), 0);
     }
 
+    function test__changeStrategies_without_deposits() public {
+        IERC4626[] memory newStrategies = new IERC4626[](1);
+        IERC4626 newStrategy = _createStrategy(IERC20(address(asset)));
+        newStrategies[0] = newStrategy;
+
+        uint256[] memory newWithdrawalQueue = new uint256[](1);
+
+        // Preparation to change the adapter
+        vault.proposeStrategies(newStrategies, newWithdrawalQueue, uint256(0));
+
+        vm.warp(block.timestamp + 3 days);
+
+        vm.expectEmit(false, false, false, true, address(vault));
+        emit ChangedStrategies();
+
+        vault.changeStrategies();
+    }
+
     function testFail__changeStrategies_respect_rageQuit() public {
         IERC4626[] memory newStrategies = new IERC4626[](1);
         IERC4626 newStrategy = _createStrategy(IERC20(address(asset)));

@@ -119,7 +119,7 @@ contract MultiStrategyVault is
         depositIndex = depositIndex_;
 
         // Set other state variables
-        quitPeriod = 1;
+        quitPeriod = 3 days;
         depositLimit = depositLimit_;
         highWaterMark = convertToAssets(1e18);
 
@@ -607,12 +607,14 @@ contract MultiStrategyVault is
         uint256 len = strategies.length;
         if (len > 0) {
             for (uint256 i; i < len; i++) {
-                // TODO skip redeem if balance is 0
-                strategies[i].redeem(
-                    strategies[i].balanceOf(address(this)),
-                    address(this),
-                    address(this)
-                );
+                uint256 stratBal = strategies[i].balanceOf(address(this));
+                if (stratBal > 0) {
+                    strategies[i].redeem(
+                        stratBal,
+                        address(this),
+                        address(this)
+                    );
+                }
                 IERC20(asset_).approve(address(strategies[i]), 0);
             }
         }
