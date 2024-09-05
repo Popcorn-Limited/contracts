@@ -10,6 +10,14 @@ import {PausableUpgradeable} from "openzeppelin-contracts-upgradeable/utils/Paus
 import {Math} from "openzeppelin-contracts/utils/math/Math.sol";
 import {OwnedUpgradeable} from "../utils/OwnedUpgradeable.sol";
 
+interface IOracle {
+    function getQuote(
+        uint256 inAmount,
+        address base,
+        address quote
+    ) external view returns (uint256 outAmount);
+}
+
 /**
  * @title   MultiStrategyVault
  * @author  RedVeil
@@ -34,6 +42,8 @@ contract MultisigVault is
 
     bytes32 public contractName;
 
+    IOracle public oracle;
+    address public multisig;
     uint256 public quitPeriod;
 
     event VaultInitialized(bytes32 contractName, address indexed asset);
@@ -48,9 +58,8 @@ contract MultisigVault is
     /**
      * @notice Initialize a new Vault.
      * @param asset_ Underlying Asset which users will deposit.
-     * @param strategies_ strategies to be used to earn interest for this vault.
-     * @param depositIndex_ index of the strategy that the vault should use on deposit
-     * @param withdrawalQueue_ indices determining the order in which we should withdraw funds from strategies
+     * @param multisig_ Multisig
+     * @param oracle_ Oracle
      * @param depositLimit_ Maximum amount of assets which can be deposited.
      * @param owner_ Owner of the contract. Controls management functions.
      * @dev This function is called by the factory contract when deploying a new vault.
@@ -59,8 +68,8 @@ contract MultisigVault is
      */
     function initialize(
         IERC20 asset_,
-        address multisig,
-        address oracle,
+        address multisig_,
+        address oracle_,
         uint256 depositLimit_,
         address owner_
     ) external initializer {
@@ -70,6 +79,9 @@ contract MultisigVault is
         __Owned_init(owner_);
 
         if (address(asset_) == address(0)) revert InvalidAsset();
+
+        multisig = multisig_;
+        oracle = IOracle(oracle_);
 
         // Set other state variables
         quitPeriod = 3 days;
@@ -200,7 +212,7 @@ contract MultisigVault is
 
     /// @return Total amount of underlying `asset` token managed by vault. Delegates to adapter.
     function totalAssets() public view override returns (uint256) {
-        return oracle.totalAssets();
+        return oracle.getQuote(totalSupply(), address(this), asset());
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -302,7 +314,6 @@ contract MultisigVault is
         uint256 performanceFee_,
         uint256 managementFee_
     ) public onlyOwner {
-        // TODO check these values
         // Dont take more than 20% performanceFee
         if (performanceFee_ > 2e17) revert InvalidFee(performanceFee_);
         // Dont take more than 10% managementFee
