@@ -7,7 +7,7 @@ import {Script, console} from "forge-std/Script.sol";
 import {stdJson} from "forge-std/StdJson.sol";
 import {AnyDepositor, IERC20} from "src/strategies/AnyDepositor.sol";
 
-contract DeployStrategy is Script {
+contract Deploy is Script {
     using stdJson for string;
 
     function run() public returns (AnyDepositor strategy) {
