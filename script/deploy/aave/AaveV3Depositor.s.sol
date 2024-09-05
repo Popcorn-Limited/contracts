@@ -7,7 +7,7 @@ import {Script, console} from "forge-std/Script.sol";
 import {stdJson} from "forge-std/StdJson.sol";
 import {AaveV3Depositor, IERC20} from "src/strategies/aave/aaveV3/AaveV3Depositor.sol";
 
-contract DeployStrategy is Script {
+contract Deploy is Script {
     using stdJson for string;
 
     function run() public returns (AaveV3Depositor strategy) {

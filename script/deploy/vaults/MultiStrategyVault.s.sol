@@ -3,15 +3,18 @@
 pragma solidity ^0.8.25;
 
 import {Script, console} from "forge-std/Script.sol";
-import {MultiStrategyVault, IERC4626, IERC20} from "../../src/vaults/MultiStrategyVault.sol";
+import {MultiStrategyVault, IERC4626, IERC20} from "src/vaults/MultiStrategyVault.sol";
 
-contract DeployMultiStrategyVault is Script {
+contract Deploy is Script {
     IERC20 internal asset;
     IERC4626[] internal strategies;
     uint256 internal defaultDepositIndex;
     uint256[] internal withdrawalQueue;
     uint256 internal depositLimit;
     address internal owner;
+
+    uint256 performanceFee;
+    uint256 managementFee;
 
     function run() public returns (MultiStrategyVault vault) {
         vm.startBroadcast();
@@ -20,8 +23,10 @@ contract DeployMultiStrategyVault is Script {
         // @dev edit this values below
         asset = IERC20(0x9D39A5DE30e57443BfF2A8307A4256c8797A3497);
 
-        strategies =
-            [IERC4626(0xF82316c0cd110dB4c4a6c15F85dFaD7266551854), IERC4626(0x377DFCC7B9ce9aDD96347f34b2303C9bD8067e01)];
+        strategies = [
+            IERC4626(0xF82316c0cd110dB4c4a6c15F85dFaD7266551854),
+            IERC4626(0x377DFCC7B9ce9aDD96347f34b2303C9bD8067e01)
+        ];
 
         defaultDepositIndex = uint256(0);
 
@@ -31,10 +36,22 @@ contract DeployMultiStrategyVault is Script {
 
         owner = msg.sender;
 
+        performanceFee = 1000; // 10%
+        managementFee = 0; // 0%
+
         // Actual deployment
         vault = new MultiStrategyVault();
 
-        vault.initialize(asset, strategies, defaultDepositIndex, withdrawalQueue, depositLimit, owner);
+        vault.initialize(
+            asset,
+            strategies,
+            defaultDepositIndex,
+            withdrawalQueue,
+            depositLimit,
+            owner
+        );
+
+        vault.setFees(performanceFee, managementFee);
 
         vm.stopBroadcast();
     }

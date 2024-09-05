@@ -15,7 +15,7 @@ import {
 } from "src/strategies/pendle/PendleBalancerCurveCompounder.sol";
 import {TradePath, IAsset, BatchSwapStep} from "src/peripheral/BaseBalancerCompounder.sol";
 
-contract DeployStrategy is Script {
+contract Deploy is Script {
     using stdJson for string;
 
     function run() public returns (PendleBalancerCurveCompounder strategy) {

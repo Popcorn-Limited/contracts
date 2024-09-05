@@ -8,7 +8,7 @@ import {stdJson} from "forge-std/StdJson.sol";
 import {AuraCompounder, HarvestValues, TradePath} from "src/strategies/aura/AuraCompounder.sol";
 import {IAsset, BatchSwapStep} from "src/interfaces/external/balancer/IBalancer.sol";
 
-contract DeployStrategy is Script {
+contract Deploy is Script {
     using stdJson for string;
 
     function run() public returns (AuraCompounder strategy) {

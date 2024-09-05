@@ -14,7 +14,7 @@ struct ConvexInit {
     uint256 pid;
 }
 
-contract DeployStrategy is Script {
+contract Deploy is Script {
     using stdJson for string;
 
     function run() public returns (ConvexCompounder strategy) {

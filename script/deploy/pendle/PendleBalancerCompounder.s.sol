@@ -10,7 +10,7 @@ import {IPendleRouter, IPendleSYToken, ISYTokenV3} from "src/strategies/pendle/I
 import {PendleBalancerCompounder, IERC20, PendleDepositor} from "src/strategies/pendle/PendleBalancerCompounder.sol";
 import {TradePath, IAsset, BatchSwapStep} from "src/peripheral/BaseBalancerCompounder.sol";
 
-contract DeployStrategy is Script {
+contract Deploy is Script {
     using stdJson for string;
 
     function run() public returns (PendleBalancerCompounder strategy) {

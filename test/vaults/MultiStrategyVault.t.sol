@@ -1156,6 +1156,24 @@ contract MultiStrategyVaultTest is Test {
         assertEq(vault.proposedStrategyTime(), 0);
     }
 
+    function test__changeStrategies_without_deposits() public {
+        IERC4626[] memory newStrategies = new IERC4626[](1);
+        IERC4626 newStrategy = _createStrategy(IERC20(address(asset)));
+        newStrategies[0] = newStrategy;
+
+        uint256[] memory newWithdrawalQueue = new uint256[](1);
+
+        // Preparation to change the adapter
+        vault.proposeStrategies(newStrategies, newWithdrawalQueue, uint256(0));
+
+        vm.warp(block.timestamp + 3 days);
+
+        vm.expectEmit(false, false, false, true, address(vault));
+        emit ChangedStrategies();
+
+        vault.changeStrategies();
+    }
+
     function testFail__changeStrategies_respect_rageQuit() public {
         IERC4626[] memory newStrategies = new IERC4626[](1);
         IERC4626 newStrategy = _createStrategy(IERC20(address(asset)));
@@ -1456,16 +1474,15 @@ contract MultiStrategyVaultTest is Test {
         // Inflate vault value
         asset.mint(address(vault), 10e18);
 
-        assertEq(vault.accruedPerformanceFee(), 5e18);
+        assertEq(vault.accruedPerformanceFee(), 1e18 - 1);
 
         vault.takeFees();
 
-        // TODO update the expected value
         assertEq(
             vault.balanceOf(0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E),
-            1
+            5e17 - 1
         );
-        assertEq(vault.highWaterMark(), 2);
+        assertEq(vault.highWaterMark(), 2e18 - 1);
         assertEq(vault.accruedPerformanceFee(), 0);
     }
 
@@ -1476,16 +1493,15 @@ contract MultiStrategyVaultTest is Test {
         // Inflate vault value
         asset.mint(address(vault), 10e18);
 
-        assertEq(vault.accruedPerformanceFee(), 5e18);
+        assertEq(vault.accruedPerformanceFee(), 1e18 - 1);
 
         vault.setFees(2e17, 0);
 
-        // TODO update the expected value
         assertEq(
             vault.balanceOf(0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E),
-            1
+            5e17 - 1
         );
-        assertEq(vault.highWaterMark(), 2);
+        assertEq(vault.highWaterMark(), 2e18 - 1);
         assertEq(vault.accruedPerformanceFee(), 0);
     }
 
@@ -1501,20 +1517,20 @@ contract MultiStrategyVaultTest is Test {
 
         assertEq(vault.accruedManagementFee(), 1.5e17);
 
+        // takes fees on deposit
         _depositIntoVault(bob, 10e18);
 
         vm.warp(block.timestamp + 365.25 days);
 
-        assertEq(vault.accruedManagementFee(), 3.5e17);
+        assertEq(vault.accruedManagementFee(), 2e17);
 
         vault.takeFees();
 
-        // TODO update the expected value
         assertEq(
             vault.balanceOf(0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E),
-            1
+            502999999999999999
         );
-        assertEq(vault.feesUpdatedAt(), 2);
+        assertEq(vault.feesUpdatedAt(), 78894001);
         assertEq(vault.accruedManagementFee(), 0);
     }
 
@@ -1528,12 +1544,11 @@ contract MultiStrategyVaultTest is Test {
 
         vault.setFees(0, 1e17);
 
-        // TODO update the expected value
         assertEq(
             vault.balanceOf(0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E),
-            1
+            1e17
         );
-        assertEq(vault.feesUpdatedAt(), 2);
+        assertEq(vault.feesUpdatedAt(), 31557601);
         assertEq(vault.accruedManagementFee(), 0);
     }
 

@@ -19,7 +19,7 @@ struct CurveGaugeInit {
     address pool;
 }
 
-contract DeployStrategy is Script {
+contract Deploy is Script {
     using stdJson for string;
 
     function run() public returns (CurveGaugeSingleAssetCompounder strategy) {
