@@ -22,7 +22,7 @@
           "maxLTV": 900000000000000000,
           "poolAddressesProvider": "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb",
           "poolId": "0xcd78a20c597e367a4e478a2411ceb790604d7c8f000000000000000000000c22",
-          "slippage": 8000000000000000,
+          "slippage": 5000000000000000,
           "targetLTV": 800000000000000000
         }
       }

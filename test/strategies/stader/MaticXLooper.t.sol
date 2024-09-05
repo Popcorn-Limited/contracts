@@ -439,21 +439,45 @@ contract MaticXLooperTest is BaseStrategyTest {
         vm.stopPrank();
 
         // check total assets
-        assertEq(strategy.totalAssets(), 0, "TA");
+        uint256 expDust = amountDeposit.mulDiv(slippage, 1e18, Math.Rounding.Floor);
+        assertApproxEqAbs(strategy.totalAssets(), expDust, _delta_, "TA");
 
-        // should not hold any maticX
-        assertApproxEqAbs(
-            maticX.balanceOf(address(strategy)),
-            0,
-            _delta_,
-            string.concat("more maticX dust than expected")
-        );
+        assertEq(IERC20(address(strategy)).totalSupply(), 0);
 
         // should not hold any maticX aToken
         assertEq(aMaticX.balanceOf(address(strategy)), 0);
 
         // adapter should not hold debt any debt
         assertEq(vdWMatic.balanceOf(address(strategy)), 0);
+    }
+
+    function test_withdraw_dust() public {
+        // manager can withdraw maticX balance when vault total supply is 0
+        deal(address(maticX), address(strategy), 10e18);
+        
+        vm.prank(address(this));
+        strategyContract.withdrawDust(address(this));
+        
+        assertEq(strategy.totalAssets(), 0, "TA");
+    }
+
+    function test_withdraw_dust_invalid() public {
+        // manager can not withdraw maticX balance when vault total supply is > 0
+        deal(address(maticX), address(bob), 10e18);
+
+        vm.startPrank(bob);
+        maticX.approve(address(strategy), 10e18);
+        strategy.deposit(10e18, bob);
+        vm.stopPrank();
+
+        uint256 totAssetsBefore = strategy.totalAssets();
+        uint256 maticXOwnerBefore = IERC20(address(maticX)).balanceOf(address(this));
+        
+        vm.prank(address(this));
+        strategyContract.withdrawDust(address(this));
+        
+        assertEq(strategy.totalAssets(), totAssetsBefore, "TA DUST");
+        assertEq(IERC20(address(maticX)).balanceOf(address(this)), maticXOwnerBefore, "OWNER DUST");
     }
 
     function test__setLeverageValues_lever_up() public {

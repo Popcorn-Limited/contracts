@@ -22,7 +22,7 @@ struct LooperInitValues {
 }
 
 /// @title Leveraged maticX yield adapter
-/// @author ADN
+/// @author Vaultcraft
 /// @notice ERC4626 wrapper for leveraging maticX yield
 /// @dev The strategy takes MaticX and deposits it into a lending protocol (aave).
 /// Then it borrows Matic, swap for MaticX and redeposits it
@@ -45,9 +45,6 @@ contract MaticXLooper is BaseStrategy, IFlashLoanReceiver {
 
     IERC20 public debtToken; // aave wmatic debt token
     IERC20 public interestToken; // aave MaticX
-
-    uint256 private constant maticXIndex = 1; // TODO
-    uint256 private constant wMaticIndex = 0; // TODO
 
     IBalancerVault public balancerVault;
     bytes32 public balancerPoolId;
@@ -396,7 +393,7 @@ contract MaticXLooper is BaseStrategy, IFlashLoanReceiver {
             Math.Rounding.Floor
         );
 
-        // if the withdraw amount with buffers  to total assets withdraw all
+        // if the withdraw amount with buffers to total assets withdraw all
         if (flashLoanMaticXAmount + maticXBuffer + toWithdraw >= _totalAssets())
             isFullWithdraw = true;
 
@@ -637,10 +634,17 @@ contract MaticXLooper is BaseStrategy, IFlashLoanReceiver {
 
     function withdrawDust(address recipient) public onlyOwner {
         // send matic dust to recipient
-        (bool sent, ) = address(recipient).call{value: address(this).balance}(
-            ""
-        );
-        require(sent, "Failed to send Matic");
+        uint256 maticBalance = address(this).balance;
+        if (maticBalance > 0) {
+            (bool sent,) = address(recipient).call{value: address(this).balance}("");
+            require(sent, "Failed to send Matic");
+        }
+
+        // send maticX 
+        uint256 maticXBalance = IERC20(asset()).balanceOf(address(this));
+        if(totalSupply() == 0 && maticXBalance > 0) {
+            IERC20(asset()).transfer(recipient, maticXBalance);
+        }
     }
 
     function setLeverageValues(
