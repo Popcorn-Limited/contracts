@@ -4,13 +4,7 @@
 pragma solidity ^0.8.25;
 
 import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math} from "src/strategies/BaseStrategy.sol";
-import {
-    ILendingPool,
-    IAaveIncentives,
-    IAToken,
-    IProtocolDataProvider,
-    DataTypes
-} from "src/interfaces/external/aave/IAaveV3.sol";
+import {ILendingPool, IAaveIncentives, IAToken, IProtocolDataProvider, DataTypes} from "src/interfaces/external/aave/IAaveV3.sol";
 
 /**
  * @title   AaveV3 Adapter
@@ -49,13 +43,16 @@ contract AaveV3Depositor is BaseStrategy {
      * @param autoDeposit_ Controls if `protocolDeposit` gets called on deposit
      * @param strategyInitData_ Encoded data for this specific strategy
      */
-    function initialize(address asset_, address owner_, bool autoDeposit_, bytes memory strategyInitData_)
-        external
-        initializer
-    {
+    function initialize(
+        address asset_,
+        address owner_,
+        bool autoDeposit_,
+        bytes memory strategyInitData_
+    ) external initializer {
         address _aaveDataProvider = abi.decode(strategyInitData_, (address));
 
-        (address _aToken,,) = IProtocolDataProvider(_aaveDataProvider).getReserveTokensAddresses(asset_);
+        (address _aToken, , ) = IProtocolDataProvider(_aaveDataProvider)
+            .getReserveTokensAddresses(asset_);
 
         aToken = IAToken(_aToken);
         if (aToken.UNDERLYING_ASSET_ADDRESS() != asset_) {
@@ -69,15 +66,29 @@ contract AaveV3Depositor is BaseStrategy {
 
         IERC20(asset_).approve(address(lendingPool), type(uint256).max);
 
-        _name = string.concat("VaultCraft AaveV3 ", IERC20Metadata(asset()).name(), " Adapter");
+        _name = string.concat(
+            "VaultCraft AaveV3 ",
+            IERC20Metadata(asset()).name(),
+            " Adapter"
+        );
         _symbol = string.concat("vcAv3-", IERC20Metadata(asset()).symbol());
     }
 
-    function name() public view override(IERC20Metadata, ERC20) returns (string memory) {
+    function name()
+        public
+        view
+        override(IERC20Metadata, ERC20)
+        returns (string memory)
+    {
         return _name;
     }
 
-    function symbol() public view override(IERC20Metadata, ERC20) returns (string memory) {
+    function symbol()
+        public
+        view
+        override(IERC20Metadata, ERC20)
+        returns (string memory)
+    {
         return _symbol;
     }
 
@@ -94,17 +105,32 @@ contract AaveV3Depositor is BaseStrategy {
         return aaveIncentives.getRewardsByAsset(asset());
     }
 
+    function convertToUnderlyingShares(
+        uint256 assets,
+        uint256 shares
+    ) public view override returns (uint256) {
+        revert();
+    }
+
     /*//////////////////////////////////////////////////////////////
                           INTERNAL HOOKS LOGIC
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Deposit into aave lending pool
-    function _protocolDeposit(uint256 assets, uint256, bytes memory) internal override {
+    function _protocolDeposit(
+        uint256 assets,
+        uint256,
+        bytes memory
+    ) internal override {
         lendingPool.supply(asset(), assets, address(this), 0);
     }
 
     /// @notice Withdraw from lending pool
-    function _protocolWithdraw(uint256 assets, uint256, bytes memory) internal override {
+    function _protocolWithdraw(
+        uint256 assets,
+        uint256,
+        bytes memory
+    ) internal override {
         lendingPool.withdraw(asset(), assets, address(this));
     }
 
@@ -119,8 +145,18 @@ contract AaveV3Depositor is BaseStrategy {
         address[] memory _assets = new address[](1);
         _assets[0] = address(aToken);
 
-        try aaveIncentives.claimAllRewardsOnBehalf(_assets, address(this), address(this)) {
+        try
+            aaveIncentives.claimAllRewardsOnBehalf(
+                _assets,
+                address(this),
+                address(this)
+            )
+        {
             success = true;
         } catch {}
+    }
+
+    function harvest(bytes memory) external override {
+        revert();
     }
 }

@@ -1,0 +1,14 @@
+{
+  "baseInit": {
+    "asset": "",
+    "owner": "",
+    "autoDeposit": false
+  },
+  "strategyInit": {
+    "yieldAsset": "0x028171bCA77440897B824Ca71D1c56caC55b68A3",
+    "oracle": "0x07ede94cf6316f4809f2b725f5d79ad303fb4dc8",
+    "slippage": 10,
+    "floatRatio": 10
+  },
+  "harvest": {}
+}
