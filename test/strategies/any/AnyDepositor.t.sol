@@ -31,7 +31,7 @@ contract AnyDepositorTest is AnyBaseTest {
             testConfig_.asset,
             address(this),
             true,
-            abi.encode(yieldToken, address(oracle), uint256(10), uint256(0))
+            abi.encode(yieldToken, address(oracle), uint256(0), uint256(0))
         );
 
         return IBaseStrategy(address(_strategy));

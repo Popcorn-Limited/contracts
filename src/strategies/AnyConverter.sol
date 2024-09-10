@@ -81,12 +81,12 @@ abstract contract AnyConverter is BaseStrategy {
 
     function _totalYieldTokenInAssets() internal view returns (uint256) {
         uint256 yieldBal = IERC20(yieldToken).balanceOf(address(this));
-        uint256 _totalReservedyieldTokens = totalReservedyieldTokens;
+        uint256 _totalReservedYieldTokens = totalReservedYieldTokens;
 
-        if (yieldBal <= _totalReservedyieldTokens) return 0;
+        if (yieldBal <= _totalReservedYieldTokens) return 0;
         return
             oracle.getQuote(
-                yieldBal - _totalReservedyieldTokens,
+                yieldBal - _totalReservedYieldTokens,
                 yieldToken,
                 asset()
             );
@@ -173,6 +173,12 @@ abstract contract AnyConverter is BaseStrategy {
             yieldTokens
         );
 
+        // raise it by slippage
+        yieldTokens = yieldTokens.mulDiv(
+            10_000,
+            10_000 - slippage,
+            Math.Rounding.Floor
+        );
         uint256 withdrawable = oracle.getQuote(
             yieldTokens,
             _yieldToken,
@@ -195,13 +201,6 @@ abstract contract AnyConverter is BaseStrategy {
         }
 
         _reserveToken(yieldTokens, withdrawable, _yieldToken, false);
-        uint256 postTa = totalAssets();
-
-        if (
-            postTa < ta.mulDiv(10_000 - slippage, 10_000, Math.Rounding.Floor)
-        ) {
-            revert SlippageTooHigh();
-        }
 
         emit PushedFunds(yieldTokens, withdrawable);
     }
@@ -214,20 +213,16 @@ abstract contract AnyConverter is BaseStrategy {
         address _asset = asset();
         address _yieldToken = yieldToken;
 
-        uint256 ta = totalAssets();
-
         IERC20(_asset).safeTransferFrom(msg.sender, address(this), assets);
 
+        // raise it by slippage
+        assets = assets.mulDiv(
+            10_000,
+            10_000 - slippage,
+            Math.Rounding.Floor
+        );
         uint256 withdrawable = oracle.getQuote(assets, _asset, _yieldToken);
         _reserveToken(assets, withdrawable, _asset, true);
-
-        uint256 postTa = totalAssets();
-
-        if (
-            postTa < ta.mulDiv(10_000 - slippage, 10_000, Math.Rounding.Floor)
-        ) {
-            revert SlippageTooHigh();
-        }
 
         emit PulledFunds(assets, withdrawable);
     }
@@ -367,7 +362,7 @@ abstract contract AnyConverter is BaseStrategy {
     }
 
     uint256 public totalReservedAssets;
-    uint256 public totalReservedyieldTokens;
+    uint256 public totalReservedYieldTokens;
 
     // we only allow 1 reserve per block so we can use that as the
     // primary key to differentiate between multiple reserves.
@@ -396,7 +391,7 @@ abstract contract AnyConverter is BaseStrategy {
                 delete reserved[msg.sender][base][blockNumber];
 
                 if (isyieldToken) {
-                    totalReservedyieldTokens -= _reserved.withdrawable;
+                    totalReservedYieldTokens -= _reserved.withdrawable;
                 } else {
                     totalReservedAssets -= _reserved.withdrawable;
                 }
@@ -434,7 +429,7 @@ abstract contract AnyConverter is BaseStrategy {
         });
 
         if (isyieldToken) {
-            totalReservedyieldTokens += withdrawable;
+            totalReservedYieldTokens += withdrawable;
         } else {
             totalReservedAssets += withdrawable;
         }

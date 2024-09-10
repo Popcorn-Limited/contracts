@@ -55,7 +55,7 @@ contract AnyCompounderNaiveTest is AnyBaseTest {
             testConfig_.asset,
             address(this),
             true,
-            abi.encode(yieldToken, address(oracle), uint256(10), uint256(0))
+            abi.encode(yieldToken, address(oracle), uint256(0), uint256(0))
         );
 
         _strategy.setRewardTokens(
@@ -190,7 +190,7 @@ contract AnyCompounderNaiveTest is AnyBaseTest {
         }
 
         // give this contract yield assets and allow the strategy to pull them
-        _mintyieldToken(testConfig.defaultAmount, address(this));
+        _mintYieldToken(testConfig.defaultAmount, address(this));
 
         ClaimContract claimContract = new ClaimContract(rewardTokens);
         _addClaimId(
@@ -239,7 +239,7 @@ contract AnyCompounderNaiveTest is AnyBaseTest {
         }
 
         // give this contract yield assets and allow the strategy to pull them
-        _mintyieldToken(testConfig.defaultAmount, address(this));
+        _mintYieldToken(testConfig.defaultAmount, address(this));
 
         ClaimContract claimContract = new ClaimContract(rewardTokens);
         _addClaimId(

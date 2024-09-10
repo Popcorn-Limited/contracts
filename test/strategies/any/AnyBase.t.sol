@@ -3,11 +3,12 @@
 pragma solidity ^0.8.25;
 
 import {AnyConverter} from "src/strategies/AnyConverter.sol";
-import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson, IERC20} from "../BaseStrategyTest.sol";
+import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson, IERC20, Math} from "../BaseStrategyTest.sol";
 import {MockOracle} from "test/utils/mocks/MockOracle.sol";
 import "forge-std/console.sol";
 
 abstract contract AnyBaseTest is BaseStrategyTest {
+    using Math for uint256;
     using stdJson for string;
 
     address yieldToken;
@@ -21,7 +22,7 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         );
     }
 
-    function _mintyieldToken(
+    function _mintYieldToken(
         uint256 amount,
         address receiver
     ) internal virtual {
@@ -46,7 +47,7 @@ abstract contract AnyBaseTest is BaseStrategyTest {
 
         uint256 pushAmount = (testConfig.defaultAmount / 5) * 2;
 
-        _mintyieldToken(pushAmount, address(this));
+        _mintYieldToken(pushAmount, address(this));
 
         // Push 40% the funds into the underlying protocol
         strategy.pushFunds(pushAmount, bytes(""));
@@ -96,7 +97,7 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         strategy.deposit(testConfig.defaultAmount, bob);
 
         uint256 pushAmount = (testConfig.defaultAmount / 5) * 2;
-        _mintyieldToken(pushAmount, address(this));
+        _mintYieldToken(pushAmount, address(this));
 
         // Push 40% the funds into the underlying protocol
         strategy.pushFunds(pushAmount, bytes(""));
@@ -151,7 +152,7 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         uint256 oldTa = strategy.totalAssets();
         uint256 oldTs = strategy.totalSupply();
 
-        _mintyieldToken(testConfig.defaultAmount, address(this));
+        _mintYieldToken(testConfig.defaultAmount, address(this));
 
         strategy.pushFunds(testConfig.defaultAmount, bytes(""));
 
@@ -178,13 +179,60 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         );
     }
 
+    function test__pushFunds_with_slippage() public {
+        strategy.toggleAutoDeposit();
+        AnyConverter(address(strategy)).proposeSlippage(1000);
+        vm.warp(block.timestamp + 3 days + 1);
+        AnyConverter(address(strategy)).changeSlippage();
+
+        _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
+
+        vm.prank(bob);
+        strategy.deposit(testConfig.defaultAmount, bob);
+
+        uint256 oldTa = strategy.totalAssets();
+        uint256 oldTs = strategy.totalSupply();
+
+        uint256 yieldTokenAmount = testConfig.defaultAmount / 2;
+        uint256 expectedReserve = yieldTokenAmount.mulDiv(
+            10_000,
+            9000,
+            Math.Rounding.Floor
+        );
+        _mintYieldToken(yieldTokenAmount, address(this));
+
+        strategy.pushFunds(yieldTokenAmount, bytes(""));
+
+        uint256 reserved = AnyConverter(address(strategy))
+            .totalReservedAssets();
+
+        assertEq(reserved, expectedReserve);
+        assertEq(
+            IERC20(yieldToken).balanceOf(address(strategy)),
+            yieldTokenAmount
+        );
+        assertEq(
+            IERC20(testConfig.asset).balanceOf(address(strategy)) - reserved,
+            testConfig.defaultAmount - expectedReserve
+        );
+        assertEq(reserved, expectedReserve);
+
+        assertApproxEqAbs(
+            strategy.totalAssets(),
+            oldTa - (expectedReserve - yieldTokenAmount),
+            _delta_,
+            "ta"
+        );
+        assertApproxEqAbs(strategy.totalSupply(), oldTs, _delta_, "ts");
+    }
+
     function test__pullFunds() public override {
         _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
 
         vm.prank(bob);
         strategy.deposit(testConfig.defaultAmount, bob);
 
-        _mintyieldToken(testConfig.defaultAmount, address(this));
+        _mintYieldToken(testConfig.defaultAmount, address(this));
         strategy.pushFunds(testConfig.defaultAmount, bytes(""));
 
         uint256 oldTa = strategy.totalAssets();
@@ -195,12 +243,12 @@ abstract contract AnyBaseTest is BaseStrategyTest {
 
         uint256 reservedAssets = AnyConverter(address(strategy))
             .totalReservedAssets();
-        uint256 reservedyieldToken = AnyConverter(address(strategy))
-            .totalReservedyieldTokens();
+        uint256 reservedYieldToken = AnyConverter(address(strategy))
+            .totalReservedYieldTokens();
 
         assertEq(
             IERC20(yieldToken).balanceOf(address(strategy)) -
-                reservedyieldToken,
+                reservedYieldToken,
             0
         );
         assertEq(
@@ -211,12 +259,59 @@ abstract contract AnyBaseTest is BaseStrategyTest {
 
         assertApproxEqAbs(strategy.totalAssets(), oldTa, _delta_, "ta");
         assertApproxEqAbs(strategy.totalSupply(), oldTs, _delta_, "ts");
-        assertApproxEqAbs(
-            IERC20(_asset_).balanceOf(address(strategy)) - reservedAssets,
-            testConfig.defaultAmount,
-            _delta_,
-            "strategy asset bal"
+    }
+
+    function test__pullFunds_with_slippage() public {
+        _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
+
+        vm.prank(bob);
+        strategy.deposit(testConfig.defaultAmount, bob);
+
+        _mintYieldToken(testConfig.defaultAmount, address(this));
+        strategy.pushFunds(testConfig.defaultAmount, bytes(""));
+
+        // Add slippage
+        AnyConverter(address(strategy)).proposeSlippage(1000);
+        vm.warp(block.timestamp + 3 days + 1);
+        AnyConverter(address(strategy)).changeSlippage();
+
+        uint256 oldTa = strategy.totalAssets();
+        uint256 oldTs = strategy.totalSupply();
+
+        uint256 assetAmount = testConfig.defaultAmount / 2;
+        uint256 expectedReserve = assetAmount.mulDiv(
+            10_000,
+            9000,
+            Math.Rounding.Floor
         );
+        _mintAsset(assetAmount, address(this));
+        strategy.pullFunds(assetAmount, bytes(""));
+
+        uint256 reservedAssets = AnyConverter(address(strategy))
+            .totalReservedAssets();
+        uint256 reservedYieldToken = AnyConverter(address(strategy))
+            .totalReservedYieldTokens();
+
+        assertEq(reservedYieldToken, expectedReserve);
+        // warp adds some assets as interest from the aToken
+        assertEq(
+            IERC20(yieldToken).balanceOf(address(strategy)) -
+                reservedYieldToken,
+            445012582609314989
+        );
+        assertEq(
+            IERC20(testConfig.asset).balanceOf(address(strategy)) -
+                reservedAssets,
+            assetAmount
+        );
+
+        assertApproxEqAbs(
+            strategy.totalAssets(),
+            oldTa - (expectedReserve - assetAmount),
+            _delta_,
+            "ta"
+        );
+        assertApproxEqAbs(strategy.totalSupply(), oldTs, _delta_, "ts");
     }
 
     function test__reserved_funds_cant_be_withdrawn() public {
@@ -225,7 +320,7 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         vm.prank(bob);
         strategy.deposit(testConfig.defaultAmount, bob);
 
-        _mintyieldToken(testConfig.defaultAmount, address(this));
+        _mintYieldToken(testConfig.defaultAmount, address(this));
         strategy.pushFunds(testConfig.defaultAmount, bytes(""));
 
         vm.startPrank(bob);
@@ -245,7 +340,7 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         vm.prank(bob);
         strategy.deposit(testConfig.defaultAmount, bob);
 
-        _mintyieldToken(testConfig.defaultAmount, address(this));
+        _mintYieldToken(testConfig.defaultAmount, address(this));
         strategy.pushFunds(testConfig.defaultAmount, bytes(""));
 
         oracle.setPrice(yieldToken, _asset_, (1e18 * 12_500) / 10_000);
@@ -277,7 +372,7 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         vm.prank(bob);
         strategy.deposit(testConfig.defaultAmount, bob);
 
-        _mintyieldToken(testConfig.defaultAmount, address(this));
+        _mintYieldToken(testConfig.defaultAmount, address(this));
         strategy.pushFunds(testConfig.defaultAmount, bytes(""));
 
         oracle.setPrice(yieldToken, _asset_, (1e18 * 9_000) / 10_000);
@@ -318,7 +413,7 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         // Each time they push the price will have changed. We'll check whether the
         // correct prices are used for the claiming of the keeper's reserves
 
-        _mintyieldToken(amount * 3, address(this));
+        _mintYieldToken(amount * 3, address(this));
         strategy.pushFunds(amount, bytes(""));
 
         vm.roll(block.number + 1);
@@ -365,7 +460,7 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         // Each time they push the price will have changed. We'll check whether the
         // correct prices are used for the claiming of the keeper's reserves
 
-        _mintyieldToken(amount * 3, address(this));
+        _mintYieldToken(amount * 3, address(this));
         strategy.pushFunds(amount, bytes(""));
 
         vm.roll(block.number + 1);
@@ -400,7 +495,7 @@ abstract contract AnyBaseTest is BaseStrategyTest {
 
     function test__pull_funds_should_use_old_favorable_quote() public {
         _mintAsset(testConfig.defaultAmount, address(this));
-        _mintyieldToken(testConfig.defaultAmount * 2, address(this));
+        _mintYieldToken(testConfig.defaultAmount * 2, address(this));
         // send yield assets to strategy. We'll pull them in this test
         IERC20(yieldToken).transfer(
             address(strategy),
@@ -432,7 +527,7 @@ abstract contract AnyBaseTest is BaseStrategyTest {
 
     function test__pull_funds_should_use_new_favorable_quote() public {
         _mintAsset(testConfig.defaultAmount, address(this));
-        _mintyieldToken(testConfig.defaultAmount * 2, address(this));
+        _mintYieldToken(testConfig.defaultAmount * 2, address(this));
         // send yield assets to strategy. We'll pull them in this test
         IERC20(yieldToken).transfer(
             address(strategy),
@@ -467,7 +562,7 @@ abstract contract AnyBaseTest is BaseStrategyTest {
     {
         uint256 amount = 1e18;
         _mintAsset(amount * 3, address(this));
-        _mintyieldToken(amount * 4, address(this));
+        _mintYieldToken(amount * 4, address(this));
         // send yield assets to strategy. We'll pull them in this test
         IERC20(yieldToken).transfer(address(strategy), amount * 4);
 
@@ -515,7 +610,7 @@ abstract contract AnyBaseTest is BaseStrategyTest {
     {
         uint256 amount = 1e18;
         _mintAsset(amount * 3, address(this));
-        _mintyieldToken(amount * 4, address(this));
+        _mintYieldToken(amount * 4, address(this));
         // send yield assets to strategy. We'll pull them in this test
         IERC20(yieldToken).transfer(address(strategy), amount * 4);
 
