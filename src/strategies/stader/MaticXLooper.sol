@@ -7,7 +7,6 @@ import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math} from "src/
 import {IMaticXPool} from "./IMaticX.sol";
 import {Math} from "openzeppelin-contracts/utils/math/Math.sol";
 import {IWETH as IWMatic} from "src/interfaces/external/IWETH.sol";
-import {IStrategyWithData} from "src/interfaces/IStrategyWithData.sol";
 import {
     ILendingPool,
     IAToken,
@@ -40,7 +39,7 @@ struct LooperInitValues {
 /// @notice ERC4626 wrapper for leveraging maticX yield
 /// @dev The strategy takes MaticX and deposits it into a lending protocol (aave).
 /// Then it borrows Matic, swap for MaticX and redeposits it
-contract MaticXLooper is BaseStrategy, IStrategyWithData, IFlashLoanReceiver {
+contract MaticXLooper is BaseStrategy, IFlashLoanReceiver {
     // using FixedPointMathLib for uint256;
     using SafeERC20 for IERC20;
     using Math for uint256;
@@ -292,32 +291,24 @@ contract MaticXLooper is BaseStrategy, IStrategyWithData, IFlashLoanReceiver {
     /*//////////////////////////////////////////////////////////////
                           IStrategyWithData LOGIC
     //////////////////////////////////////////////////////////////*/
-    function withdrawWithData(
+
+    /// @notice user can pass a preferred slippage %, which will be used against the default one 
+    /// @notice surplus of assets released is then transferred  
+    function _protocolWithdrawWithData(
         uint256 assets, 
-        address receiver, 
-        address owner, 
-        bytes calldata extraData
-    ) external override(IStrategyWithData) returns (uint256 shares) {
-        if (shares == 0 || assets == 0) revert ZeroAmount();
-        address caller = _msgSender();
-
-        if (caller != owner) {
-            _spendAllowance(owner, caller, shares);
-        }
-
-        shares = _convertToShares(assets, Math.Rounding.Ceil);
-
-        uint256 assetBalBefore = IERC20(asset()).balanceOf(address(this));
+        uint256 shares, 
+        bytes memory extraData
+    ) internal override returns (uint256 extraAmountToTransfer) {
+        uint256 assetBalanceBefore = IERC20(asset()).balanceOf(address(this));
 
         _protocolWithdraw(assets, shares, extraData);
 
-        uint256 assetBalAfter = IERC20(asset()).balanceOf(address(this));
-
-        // transfer surplus here TODO get balance before and after
-
-        _burn(owner, shares);
+        uint256 assetBalanceAfter = IERC20(asset()).balanceOf(address(this));
+        
+        // calculate eventual surplus
+        if(assetBalanceAfter - assetBalanceBefore > assets)
+            extraAmountToTransfer = assetBalanceAfter - assetBalanceBefore - assets;
     }
-
 
     /*//////////////////////////////////////////////////////////////
                           INTERNAL HOOKS LOGIC
@@ -351,12 +342,13 @@ contract MaticXLooper is BaseStrategy, IStrategyWithData, IFlashLoanReceiver {
         bool isFullWithdraw;
         uint256 ratioDebtToRepay;
 
+        // user can provide a desired slippage
         uint256 chosenSlippage;
         if(extraData.length > 0) 
             chosenSlippage = abi.decode(extraData, (uint256));
         
         // user cannot provide a higher slippage than default
-        if (chosenSlippage > slippage) 
+        if (chosenSlippage > slippage || chosenSlippage == 0) 
             chosenSlippage = slippage;
         
         {
