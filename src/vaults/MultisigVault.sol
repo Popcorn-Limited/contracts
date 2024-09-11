@@ -9,6 +9,17 @@ import {ReentrancyGuardUpgradeable} from "openzeppelin-contracts-upgradeable/uti
 import {PausableUpgradeable} from "openzeppelin-contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {Math} from "openzeppelin-contracts/utils/math/Math.sol";
 import {OwnedUpgradeable} from "../utils/OwnedUpgradeable.sol";
+import {IERC7540Operator} from "ERC-7540/interfaces/IERC7540.sol";
+import {IERC165} from "ERC-7540/interfaces/IERC7575.sol";
+
+struct PendingRedeem {
+    uint256 shares;
+}
+
+struct ClaimableRedeem {
+    uint256 assets;
+    uint256 shares;
+}
 
 interface IOracle {
     function getQuote(
@@ -45,6 +56,16 @@ contract MultisigVault is
     IOracle public oracle;
     address public multisig;
     uint256 public quitPeriod;
+
+    /// @dev Assume requests are non-fungible and all have ID = 0
+    uint256 internal constant REQUEST_ID = 0;
+
+    mapping(address => mapping(address => bool)) public isOperator;
+    mapping(address controller => mapping(bytes32 nonce => bool used))
+        public authorizations;
+
+    mapping(address => PendingRedeem) internal _pendingRedeem;
+    mapping(address => ClaimableRedeem) internal _claimableRedeem;
 
     event VaultInitialized(bytes32 contractName, address indexed asset);
 
@@ -176,34 +197,74 @@ contract MultisigVault is
         emit Deposit(caller, receiver, assets, shares);
     }
 
-    /**
-     * @dev Withdraw/redeem common workflow.
-     */
-    function _withdraw(
-        address caller,
-        address receiver,
-        address owner,
+    function withdraw(
         uint256 assets,
-        uint256 shares
-    ) internal override nonReentrant {
-        if (shares == 0 || assets == 0) revert ZeroAmount();
-        if (caller != owner) {
-            _spendAllowance(owner, caller, shares);
-        }
+        address receiver,
+        address controller
+    ) public virtual override returns (uint256 shares) {
+        require(
+            controller == msg.sender || isOperator[controller][msg.sender],
+            "ERC7540Vault/invalid-caller"
+        );
+        require(assets != 0, "Must claim nonzero amount");
 
-        _takeFees();
+        // Claiming partially introduces precision loss. The user therefore receives a rounded down amount,
+        // while the claimable balance is reduced by a rounded up amount.
+        ClaimableRedeem storage claimable = _claimableRedeem[controller];
+        shares = assets.mulDiv(
+            claimable.shares,
+            claimable.assets,
+            Math.Rounding.Floor
+        );
+        uint256 sharesUp = assets.mulDiv(
+            claimable.shares,
+            claimable.assets,
+            Math.Rounding.Ceil
+        );
 
-        // If _asset is ERC-777, `transfer` can trigger a reentrancy AFTER the transfer happens through the
-        // `tokensReceived` hook. On the other hand, the `tokensToSend` hook, that is triggered before the transfer,
-        // calls the vault, which is assumed not malicious.
-        //
-        // Conclusion: we need to do the transfer after the burn so that any reentrancy would happen after the
-        // shares are burned and after the assets are transferred, which is a valid state.
-        _burn(owner, shares);
+        claimable.assets -= assets;
+        claimable.shares = claimable.shares > sharesUp
+            ? claimable.shares - sharesUp
+            : 0;
 
-        SafeERC20.safeTransferFrom(IERC20(asset()), multisig, caller, assets);
+        SafeERC20.safeTransfer(IERC20(asset()), receiver, assets);
 
-        emit Withdraw(caller, receiver, owner, assets, shares);
+        emit Withdraw(msg.sender, receiver, controller, assets, shares);
+    }
+
+    function redeem(
+        uint256 shares,
+        address receiver,
+        address controller
+    ) public virtual override returns (uint256 assets) {
+        require(
+            controller == msg.sender || isOperator[controller][msg.sender],
+            "ERC7540Vault/invalid-caller"
+        );
+        require(shares != 0, "Must claim nonzero amount");
+
+        // Claiming partially introduces precision loss. The user therefore receives a rounded down amount,
+        // while the claimable balance is reduced by a rounded up amount.
+        ClaimableRedeem storage claimable = _claimableRedeem[controller];
+        assets = shares.mulDiv(
+            claimable.assets,
+            claimable.shares,
+            Math.Rounding.Floor
+        );
+        uint256 assetsUp = shares.mulDiv(
+            claimable.assets,
+            claimable.shares,
+            Math.Rounding.Ceil
+        );
+
+        claimable.assets = claimable.assets > assetsUp
+            ? claimable.assets - assetsUp
+            : 0;
+        claimable.shares -= shares;
+
+        SafeERC20.safeTransfer(IERC20(asset()), receiver, assets);
+
+        emit Withdraw(msg.sender, receiver, controller, assets, shares);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -213,6 +274,33 @@ contract MultisigVault is
     /// @return Total amount of underlying `asset` token managed by vault. Delegates to adapter.
     function totalAssets() public view override returns (uint256) {
         return oracle.getQuote(totalSupply(), address(this), asset());
+    }
+
+    // Preview functions always revert for async flows
+    function previewWithdraw(
+        uint256
+    ) public pure virtual override returns (uint256) {
+        revert("ERC7540Vault/async-flow");
+    }
+
+    function previewRedeem(
+        uint256
+    ) public pure virtual override returns (uint256) {
+        revert("ERC7540Vault/async-flow");
+    }
+
+    function pendingRedeemRequest(
+        uint256,
+        address controller
+    ) public view returns (uint256 pendingShares) {
+        pendingShares = _pendingRedeem[controller].shares;
+    }
+
+    function claimableRedeemRequest(
+        uint256,
+        address controller
+    ) public view returns (uint256 claimableShares) {
+        claimableShares = _claimableRedeem[controller].shares;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -237,6 +325,92 @@ contract MultisigVault is
         if (depositLimit_ == type(uint256).max) return depositLimit_;
 
         return convertToShares(depositLimit_ - assets);
+    }
+
+    function maxWithdraw(
+        address controller
+    ) public view virtual override returns (uint256) {
+        return _claimableRedeem[controller].assets;
+    }
+
+    function maxRedeem(
+        address controller
+    ) public view virtual override returns (uint256) {
+        return _claimableRedeem[controller].shares;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        ERC7540 LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    event RedeemRequest(
+        address indexed controller,
+        address indexed owner,
+        uint256 indexed requestId,
+        address sender,
+        uint256 assets
+    );
+    event OperatorSet(
+        address indexed controller,
+        address indexed operator,
+        bool approved
+    );
+
+    /// @notice this deposit request is added to any pending deposit request
+    function requestRedeem(
+        uint256 shares,
+        address controller,
+        address owner
+    ) external returns (uint256 requestId) {
+        require(
+            owner == msg.sender || isOperator[owner][msg.sender],
+            "ERC7540Vault/invalid-owner"
+        );
+        require(
+            ERC20(address(this)).balanceOf(owner) >= shares,
+            "ERC7540Vault/insufficient-balance"
+        );
+        require(shares != 0, "ZERO_SHARES");
+
+        SafeERC20.safeTransferFrom(this, owner, address(this), shares);
+
+        uint256 currentPendingShares = _pendingRedeem[controller].shares;
+        _pendingRedeem[controller] = PendingRedeem(
+            shares + currentPendingShares
+        );
+
+        emit RedeemRequest(controller, owner, REQUEST_ID, msg.sender, shares);
+        return REQUEST_ID;
+    }
+
+    function fulfillRedeem(
+        address controller,
+        uint256 shares
+    ) public onlyOwner returns (uint256 assets) {
+        PendingRedeem storage request = _pendingRedeem[controller];
+        require(request.shares != 0 && shares <= request.shares, "ZERO_SHARES");
+
+        assets = convertToAssets(shares);
+
+        _claimableRedeem[controller] = ClaimableRedeem(
+            _claimableRedeem[controller].assets + assets,
+            _claimableRedeem[controller].shares + shares
+        );
+
+        request.shares -= shares;
+    }
+
+    function setOperator(
+        address operator,
+        bool approved
+    ) public virtual returns (bool success) {
+        require(
+            msg.sender != operator,
+            "ERC7540Vault/cannot-set-self-as-operator"
+        );
+        isOperator[msg.sender][operator] = approved;
+        emit OperatorSet(msg.sender, operator, approved);
+        success = true;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -457,5 +631,18 @@ contract MultisigVault is
                     address(this)
                 )
             );
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        ERC165 LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    function supportsInterface(
+        bytes4 interfaceId
+    ) public pure virtual returns (bool) {
+        return
+            interfaceId == type(IERC4626).interfaceId ||
+            interfaceId == type(IERC7540Operator).interfaceId ||
+            interfaceId == type(IERC165).interfaceId;
     }
 }

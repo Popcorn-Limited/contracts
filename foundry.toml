@@ -16,7 +16,8 @@ remappings = [
   'safe-smart-account/=lib/safe-smart-account/',
   'solady/=lib/solady/src/',
   '@uniswap/v3-core/=lib/v3-core/contracts/',
-  '@uniswap/v3-periphery/=lib/v3-periphery/contracts/'
+  '@uniswap/v3-periphery/=lib/v3-periphery/contracts/',
+  'ERC-7540/=lib/ERC-7540-Reference/src/'
 ]
 
 no_match_contract = "Skip"
