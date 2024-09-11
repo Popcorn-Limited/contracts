@@ -35,12 +35,16 @@ contract CompoundV3Compounder is BaseStrategy {
      * @param autoDeposit_ Controls if `protocolDeposit` gets called on deposit
      * @param strategyInitData_ Encoded data for this specific strategy
      */
-    function initialize(address asset_, address owner_, bool autoDeposit_, bytes memory strategyInitData_)
-        external
-        initializer
-    {
-        (address cToken_, address rewarder_, address rewardToken_) =
-            abi.decode(strategyInitData_, (address, address, address));
+    function initialize(
+        address asset_,
+        address owner_,
+        bool autoDeposit_,
+        bytes memory strategyInitData_
+    ) external initializer {
+        (address cToken_, address rewarder_, address rewardToken_) = abi.decode(
+            strategyInitData_,
+            (address, address, address)
+        );
 
         cToken = ICToken(cToken_);
         rewarder = ICometRewarder(rewarder_);
@@ -50,15 +54,29 @@ contract CompoundV3Compounder is BaseStrategy {
 
         IERC20(asset_).approve(cToken_, type(uint256).max);
 
-        _name = string.concat("VaultCraft CompoundV3 ", IERC20Metadata(asset_).name(), " Compounder");
+        _name = string.concat(
+            "VaultCraft CompoundV3 ",
+            IERC20Metadata(asset_).name(),
+            " Compounder"
+        );
         _symbol = string.concat("vcCv3-", IERC20Metadata(asset_).symbol());
     }
 
-    function name() public view override(IERC20Metadata, ERC20) returns (string memory) {
+    function name()
+        public
+        view
+        override(IERC20Metadata, ERC20)
+        returns (string memory)
+    {
         return _name;
     }
 
-    function symbol() public view override(IERC20Metadata, ERC20) returns (string memory) {
+    function symbol()
+        public
+        view
+        override(IERC20Metadata, ERC20)
+        returns (string memory)
+    {
         return _symbol;
     }
 
@@ -77,15 +95,30 @@ contract CompoundV3Compounder is BaseStrategy {
         return _rewardTokens;
     }
 
+    function convertToUnderlyingShares(
+        uint256 assets,
+        uint256 shares
+    ) public view override returns (uint256) {
+        revert();
+    }
+
     /*//////////////////////////////////////////////////////////////
                           INTERNAL HOOKS LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function _protocolDeposit(uint256 assets, uint256, bytes memory) internal override {
+    function _protocolDeposit(
+        uint256 assets,
+        uint256,
+        bytes memory
+    ) internal override {
         cToken.supply(asset(), assets);
     }
 
-    function _protocolWithdraw(uint256 assets, uint256, bytes memory) internal override {
+    function _protocolWithdraw(
+        uint256 assets,
+        uint256,
+        bytes memory
+    ) internal override {
         cToken.withdraw(asset(), assets);
     }
 

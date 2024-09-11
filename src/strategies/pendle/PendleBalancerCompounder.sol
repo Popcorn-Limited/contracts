@@ -26,12 +26,12 @@ contract PendleBalancerCompounder is PendleDepositor, BaseBalancerCompounder {
      * @param autoDeposit_ Controls if `protocolDeposit` gets called on deposit
      * @param strategyInitData_ Encoded data for this specific strategy
      */
-    function initialize(address asset_, address owner_, bool autoDeposit_, bytes memory strategyInitData_)
-        external
-        virtual
-        override
-        initializer
-    {
+    function initialize(
+        address asset_,
+        address owner_,
+        bool autoDeposit_,
+        bytes memory strategyInitData_
+    ) external virtual override initializer {
         __PendleBase_init(asset_, owner_, autoDeposit_, strategyInitData_);
     }
 
@@ -61,7 +61,10 @@ contract PendleBalancerCompounder is PendleDepositor, BaseBalancerCompounder {
         emit Harvested();
     }
 
-    function setHarvestValues(address newBalancerVault, TradePath[] memory newTradePaths) external onlyOwner {
+    function setHarvestValues(
+        address newBalancerVault,
+        TradePath[] memory newTradePaths
+    ) external onlyOwner {
         setBalancerTradeValues(newBalancerVault, newTradePaths);
     }
 }

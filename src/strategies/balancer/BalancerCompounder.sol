@@ -39,11 +39,16 @@ contract BalancerCompounder is BaseStrategy, BaseBalancerLpCompounder {
      * @param autoDeposit_ Controls if `protocolDeposit` gets called on deposit
      * @param strategyInitData_ Encoded data for this specific strategy
      */
-    function initialize(address asset_, address owner_, bool autoDeposit_, bytes memory strategyInitData_)
-        external
-        initializer
-    {
-        (address minter_, address gauge_) = abi.decode(strategyInitData_, (address, address));
+    function initialize(
+        address asset_,
+        address owner_,
+        bool autoDeposit_,
+        bytes memory strategyInitData_
+    ) external initializer {
+        (address minter_, address gauge_) = abi.decode(
+            strategyInitData_,
+            (address, address)
+        );
 
         if (IGauge(gauge_).is_killed()) revert Disabled();
 
@@ -54,15 +59,29 @@ contract BalancerCompounder is BaseStrategy, BaseBalancerLpCompounder {
 
         IERC20(asset_).approve(gauge_, type(uint256).max);
 
-        _name = string.concat("VaultCraft BalancerCompounder ", IERC20Metadata(asset()).name(), " Adapter");
+        _name = string.concat(
+            "VaultCraft BalancerCompounder ",
+            IERC20Metadata(asset()).name(),
+            " Adapter"
+        );
         _symbol = string.concat("vc-bc-", IERC20Metadata(asset()).symbol());
     }
 
-    function name() public view override(IERC20Metadata, ERC20) returns (string memory) {
+    function name()
+        public
+        view
+        override(IERC20Metadata, ERC20)
+        returns (string memory)
+    {
         return _name;
     }
 
-    function symbol() public view override(IERC20Metadata, ERC20) returns (string memory) {
+    function symbol()
+        public
+        view
+        override(IERC20Metadata, ERC20)
+        returns (string memory)
+    {
         return _symbol;
     }
 
@@ -79,15 +98,30 @@ contract BalancerCompounder is BaseStrategy, BaseBalancerLpCompounder {
         return _balancerSellTokens;
     }
 
+    function convertToUnderlyingShares(
+        uint256 assets,
+        uint256 shares
+    ) public view override returns (uint256) {
+        revert();
+    }
+
     /*//////////////////////////////////////////////////////////////
                           INTERNAL HOOKS LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function _protocolDeposit(uint256 assets, uint256, bytes memory) internal virtual override {
+    function _protocolDeposit(
+        uint256 assets,
+        uint256,
+        bytes memory
+    ) internal virtual override {
         gauge.deposit(assets);
     }
 
-    function _protocolWithdraw(uint256 assets, uint256, bytes memory) internal virtual override {
+    function _protocolWithdraw(
+        uint256 assets,
+        uint256,
+        bytes memory
+    ) internal virtual override {
         gauge.withdraw(assets, false);
     }
 
@@ -119,6 +153,10 @@ contract BalancerCompounder is BaseStrategy, BaseBalancerLpCompounder {
         TradePath[] memory newTradePaths,
         HarvestValues memory harvestValues_
     ) external onlyOwner {
-        setBalancerLpCompounderValues(newBalancerVault, newTradePaths, harvestValues_);
+        setBalancerLpCompounderValues(
+            newBalancerVault,
+            newTradePaths,
+            harvestValues_
+        );
     }
 }

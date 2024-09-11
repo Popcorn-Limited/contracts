@@ -1,0 +1,30 @@
+{
+    "length": 1,
+    "configs": [
+      {
+        "base": {
+          "asset": "0xa35b1b31ce002fbf2058d22f30f95d405200a15b",
+          "blockNumber": 0,
+          "defaultAmount": 10000000000000000,
+          "delta": 10000000000000000,
+          "maxDeposit": 10000000000000000000,
+          "maxWithdraw": 10000000000000000000,
+          "minDeposit": 1000000000000000,
+          "minWithdraw": 1000000000000000,
+          "network": "mainnet",
+          "testId": "EthXLooper"
+        },
+        "specific": {
+          "init": {
+            "aaveDataProvider": "0x7B4EB56E7CD4b454BA8ff71E4518426369a138a3",
+            "curvePool": "0x59ab5a5b5d617e478a2479b0cad80da7e2831492",
+            "maxLTV": 900000000000000000,
+            "poolAddressesProvider": "0x2f39d218133AFaB8F2B819B1066c7E434Ad94E9e",
+            "slippage": 10000000000000000,
+            "stakingPool": "0xcf5ea1b38380f6af39068375516daf40ed70d299",
+            "targetLTV": 800000000000000000
+          }
+        }
+      }
+    ]
+  }

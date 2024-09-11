@@ -94,7 +94,7 @@ contract CompoundV3CompounderTest is BaseStrategyTest {
         assertEq(strategy.totalAssets(), oldTa);
     }
 
-    function testFail__non_owner() public {
+    function testFail__harvest_non_owner() public {
         _mintAssetAndApproveForStrategy(100e18, bob);
 
         vm.prank(bob);

@@ -1,0 +1,17 @@
+{
+    "baseInit": {
+      "asset": "",
+      "owner": "",
+      "autoDeposit": false
+    },
+    "strategyInit": {
+      "aaveDataProvider": "0x7B4EB56E7CD4b454BA8ff71E4518426369a138a3",
+      "curvePool": "0x59ab5a5b5d617e478a2479b0cad80da7e2831492",
+      "maxLTV": 850000000000000000,
+      "poolAddressesProvider": "0x2f39d218133AFaB8F2B819B1066c7E434Ad94E9e",
+      "slippage": 10000000000000000,
+      "stakingPool": "0xcf5ea1b38380f6af39068375516daf40ed70d299",
+      "targetLTV": 800000000000000000
+    }
+  }
+  

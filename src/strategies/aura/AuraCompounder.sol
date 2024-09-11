@@ -39,13 +39,20 @@ contract AuraCompounder is BaseStrategy, BaseBalancerLpCompounder {
      * @param autoDeposit_ Controls if `protocolDeposit` gets called on deposit
      * @param strategyInitData_ Encoded data for this specific strategy
      */
-    function initialize(address asset_, address owner_, bool autoDeposit_, bytes memory strategyInitData_)
-        external
-        initializer
-    {
-        (address auraBooster_, uint256 auraPoolId_) = abi.decode(strategyInitData_, (address, uint256));
+    function initialize(
+        address asset_,
+        address owner_,
+        bool autoDeposit_,
+        bytes memory strategyInitData_
+    ) external initializer {
+        (address auraBooster_, uint256 auraPoolId_) = abi.decode(
+            strategyInitData_,
+            (address, uint256)
+        );
 
-        (address balancerLpToken_,,, address auraRewards_,,) = IAuraBooster(auraBooster_).poolInfo(auraPoolId_);
+        (address balancerLpToken_, , , address auraRewards_, , ) = IAuraBooster(
+            auraBooster_
+        ).poolInfo(auraPoolId_);
 
         auraRewards = IAuraRewards(auraRewards_);
         auraBooster = IAuraBooster(auraBooster_);
@@ -57,15 +64,29 @@ contract AuraCompounder is BaseStrategy, BaseBalancerLpCompounder {
 
         IERC20(asset_).approve(auraBooster_, type(uint256).max);
 
-        _name = string.concat("VaultCraft Aura ", IERC20Metadata(asset_).name(), " Adapter");
+        _name = string.concat(
+            "VaultCraft Aura ",
+            IERC20Metadata(asset_).name(),
+            " Adapter"
+        );
         _symbol = string.concat("vcAu-", IERC20Metadata(asset_).symbol());
     }
 
-    function name() public view override(IERC20Metadata, ERC20) returns (string memory) {
+    function name()
+        public
+        view
+        override(IERC20Metadata, ERC20)
+        returns (string memory)
+    {
         return _name;
     }
 
-    function symbol() public view override(IERC20Metadata, ERC20) returns (string memory) {
+    function symbol()
+        public
+        view
+        override(IERC20Metadata, ERC20)
+        returns (string memory)
+    {
         return _symbol;
     }
 
@@ -84,15 +105,30 @@ contract AuraCompounder is BaseStrategy, BaseBalancerLpCompounder {
         return _balancerSellTokens;
     }
 
+    function convertToUnderlyingShares(
+        uint256 assets,
+        uint256 shares
+    ) public view override returns (uint256) {
+        revert();
+    }
+
     /*//////////////////////////////////////////////////////////////
                           INTERNAL HOOKS LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function _protocolDeposit(uint256 assets, uint256, bytes memory) internal override {
+    function _protocolDeposit(
+        uint256 assets,
+        uint256,
+        bytes memory
+    ) internal override {
         auraBooster.deposit(auraPoolId, assets, true);
     }
 
-    function _protocolWithdraw(uint256 assets, uint256, bytes memory) internal override {
+    function _protocolWithdraw(
+        uint256 assets,
+        uint256,
+        bytes memory
+    ) internal override {
         auraRewards.withdrawAndUnwrap(assets, false);
     }
 
@@ -125,6 +161,10 @@ contract AuraCompounder is BaseStrategy, BaseBalancerLpCompounder {
         TradePath[] memory newTradePaths,
         HarvestValues memory harvestValues_
     ) external onlyOwner {
-        setBalancerLpCompounderValues(newBalancerVault, newTradePaths, harvestValues_);
+        setBalancerLpCompounderValues(
+            newBalancerVault,
+            newTradePaths,
+            harvestValues_
+        );
     }
 }
