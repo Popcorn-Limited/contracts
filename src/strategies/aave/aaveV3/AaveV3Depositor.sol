@@ -145,18 +145,33 @@ contract AaveV3Depositor is BaseStrategy {
         address[] memory _assets = new address[](1);
         _assets[0] = address(aToken);
 
-        try
-            aaveIncentives.claimAllRewardsOnBehalf(
-                _assets,
-                address(this),
-                address(this)
-            )
-        {
+        try aaveIncentives.claimAllRewardsToSelf(_assets) {
             success = true;
         } catch {}
     }
 
-    function harvest(bytes memory) external override {
-        revert();
+    function harvest(bytes memory data) external override onlyKeeperOrOwner {
+        claim();
+
+        address[] memory _rewardTokens = aaveIncentives.getRewardsByAsset(
+            asset()
+        );
+
+        for (uint256 i; i < _rewardTokens.length; i++) {
+            uint256 balance = IERC20(_rewardTokens[i]).balanceOf(address(this));
+            if (balance > 0) {
+                IERC20(_rewardTokens[i]).transfer(msg.sender, balance);
+            }
+        }
+
+        uint256 assetAmount = abi.decode(data, (uint256));
+
+        if (assetAmount == 0) revert ZeroAmount();
+
+        IERC20(asset()).transferFrom(msg.sender, address(this), assetAmount);
+
+        _protocolDeposit(assetAmount, 0, bytes(""));
+
+        emit Harvested();
     }
 }

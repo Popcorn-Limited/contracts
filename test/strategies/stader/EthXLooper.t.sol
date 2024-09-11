@@ -3,16 +3,7 @@
 
 pragma solidity ^0.8.25;
 
-import {
-    ETHXLooper,
-    LooperInitValues,
-    IERC20,
-    IERC20Metadata,
-    IETHxStaking,
-    ILendingPool,
-    IProtocolDataProvider,
-    Math
-} from "src/strategies/stader/ETHxLooper.sol";
+import {ETHXLooper, LooperInitValues, IERC20, IERC20Metadata, IETHxStaking, ILendingPool, IProtocolDataProvider, Math} from "src/strategies/stader/ETHxLooper.sol";
 import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson, Math} from "../BaseStrategyTest.sol";
 
 contract ETHXLooperTest is BaseStrategyTest {
@@ -24,29 +15,39 @@ contract ETHXLooperTest is BaseStrategyTest {
     IERC20 vdWETH;
     ILendingPool lendingPool;
     ETHXLooper strategyContract;
-    IETHxStaking stakingPool = IETHxStaking(0xcf5EA1b38380f6aF39068375516Daf40Ed70D299);
+    IETHxStaking stakingPool =
+        IETHxStaking(0xcf5EA1b38380f6aF39068375516Daf40Ed70D299);
     IProtocolDataProvider public protocolDataProvider;
 
     uint256 defaultAmount;
     uint256 slippage;
 
     function setUp() public {
-        _setUpBaseTest(0, "./test/strategies/stader/ETHXLooperTestConfig.json");
+        _setUpBaseTest(0, "./test/strategies/stader/EthXLooperTestConfig.json");
     }
 
-    function _setUpStrategy(string memory json_, string memory index_, TestConfig memory testConfig_)
-        internal
-        override
-        returns (IBaseStrategy)
-    {
+    function _setUpStrategy(
+        string memory json_,
+        string memory index_,
+        TestConfig memory testConfig_
+    ) internal override returns (IBaseStrategy) {
         // Read strategy init values
-        LooperInitValues memory looperInitValues =
-            abi.decode(json_.parseRaw(string.concat(".configs[", index_, "].specific.init")), (LooperInitValues));
+        LooperInitValues memory looperInitValues = abi.decode(
+            json_.parseRaw(
+                string.concat(".configs[", index_, "].specific.init")
+            ),
+            (LooperInitValues)
+        );
 
         // Deploy Strategy
         ETHXLooper strategy = new ETHXLooper();
 
-        strategy.initialize(testConfig_.asset, address(this), true, abi.encode(looperInitValues));
+        strategy.initialize(
+            testConfig_.asset,
+            address(this),
+            true,
+            abi.encode(looperInitValues)
+        );
 
         strategyContract = ETHXLooper(payable(strategy));
 
@@ -56,7 +57,9 @@ contract ETHXLooperTest is BaseStrategyTest {
         lendingPool = strategyContract.lendingPool();
         defaultAmount = testConfig_.defaultAmount;
         slippage = strategyContract.slippage();
-        protocolDataProvider = IProtocolDataProvider(strategyContract.protocolDataProvider());
+        protocolDataProvider = IProtocolDataProvider(
+            strategyContract.protocolDataProvider()
+        );
 
         deal(testConfig_.asset, address(this), 1);
         IERC20(testConfig_.asset).approve(address(strategy), 1);
@@ -90,12 +93,20 @@ contract ETHXLooperTest is BaseStrategyTest {
     }
 
     function test__initialization() public override {
-        LooperInitValues memory looperInitValues = abi.decode(json.parseRaw(string.concat(".configs[0].specific.init")), (LooperInitValues));
+        LooperInitValues memory looperInitValues = abi.decode(
+            json.parseRaw(string.concat(".configs[0].specific.init")),
+            (LooperInitValues)
+        );
 
         // Deploy Strategy
         ETHXLooper strategy = new ETHXLooper();
 
-        strategy.initialize(testConfig.asset, address(this), true, abi.encode(looperInitValues));
+        strategy.initialize(
+            testConfig.asset,
+            address(this),
+            true,
+            abi.encode(looperInitValues)
+        );
 
         verify_adapterInit();
     }
@@ -105,7 +116,11 @@ contract ETHXLooperTest is BaseStrategyTest {
         for (uint256 i; i < len; i++) {
             if (i > 0) _setUpBaseTest(i, path);
 
-            uint256 amount = bound(fuzzAmount, testConfig.minDeposit, testConfig.maxDeposit);
+            uint256 amount = bound(
+                fuzzAmount,
+                testConfig.minDeposit,
+                testConfig.maxDeposit
+            );
 
             _mintAssetAndApproveForStrategy(amount, bob);
 
@@ -119,10 +134,11 @@ contract ETHXLooperTest is BaseStrategyTest {
     }
 
     function test__maxDeposit() public override {
-        (uint256 borrowCap, uint256 supplyCap) = protocolDataProvider.getReserveCaps(strategy.asset());
+        (uint256 borrowCap, uint256 supplyCap) = protocolDataProvider
+            .getReserveCaps(strategy.asset());
 
         uint256 expectedCap = supplyCap * 1e18 - aEthX.totalSupply();
-        
+
         assertEq(strategy.maxDeposit(bob), expectedCap);
 
         _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
@@ -135,20 +151,30 @@ contract ETHXLooperTest is BaseStrategyTest {
         assertEq(strategy.maxDeposit(bob), 0);
     }
 
-
     function test__withdraw(uint8 fuzzAmount) public override {
         uint256 len = json.readUint(".length");
         for (uint256 i; i < len; i++) {
             if (i > 0) _setUpBaseTest(i, path);
 
-            uint256 amount = bound(fuzzAmount, testConfig.minDeposit, testConfig.maxDeposit);
+            uint256 amount = bound(
+                fuzzAmount,
+                testConfig.minDeposit,
+                testConfig.maxDeposit
+            );
 
-            uint256 reqAssets = strategy.previewMint(strategy.previewWithdraw(amount));
+            uint256 reqAssets = strategy.previewMint(
+                strategy.previewWithdraw(amount)
+            );
             _mintAssetAndApproveForStrategy(reqAssets, bob);
             vm.prank(bob);
             strategy.deposit(reqAssets, bob);
 
-            prop_withdraw(bob, bob, strategy.maxWithdraw(bob), testConfig.testId);
+            prop_withdraw(
+                bob,
+                bob,
+                strategy.maxWithdraw(bob),
+                testConfig.testId
+            );
 
             _mintAssetAndApproveForStrategy(reqAssets, bob);
             vm.prank(bob);
@@ -159,7 +185,12 @@ contract ETHXLooperTest is BaseStrategyTest {
             vm.prank(bob);
             strategy.approve(alice, type(uint256).max);
 
-            prop_withdraw(alice, bob, strategy.maxWithdraw(bob), testConfig.testId);
+            prop_withdraw(
+                alice,
+                bob,
+                strategy.maxWithdraw(bob),
+                testConfig.testId
+            );
         }
     }
 
@@ -169,8 +200,14 @@ contract ETHXLooperTest is BaseStrategyTest {
         address asset = strategy.asset();
 
         strategyContract.setHarvestValues(newPool);
-        uint256 oldAllowance = IERC20(asset).allowance(address(strategy), oldPool);
-        uint256 newAllowance = IERC20(asset).allowance(address(strategy), newPool);
+        uint256 oldAllowance = IERC20(asset).allowance(
+            address(strategy),
+            oldPool
+        );
+        uint256 newAllowance = IERC20(asset).allowance(
+            address(strategy),
+            newPool
+        );
 
         assertEq(address(strategyContract.stableSwapPool()), newPool);
         assertEq(oldAllowance, 0);
@@ -258,12 +295,19 @@ contract ETHXLooperTest is BaseStrategyTest {
         // check total assets - should be lt than totalDeposits
         assertLt(strategy.totalAssets(), amountDeposit);
 
-        uint256 slippageDebt = vdWETH.balanceOf(address(strategy)).mulDiv(1e18, ethToEthXRate, Math.Rounding.Ceil);
+        uint256 slippageDebt = vdWETH.balanceOf(address(strategy)).mulDiv(
+            1e18,
+            ethToEthXRate,
+            Math.Rounding.Ceil
+        );
 
         slippageDebt = slippageDebt.mulDiv(slippage, 1e18, Math.Rounding.Ceil);
-        
+
         assertApproxEqAbs(
-            strategy.totalAssets(), amountDeposit - slippageDebt, _delta_, string.concat("totalAssets != expected")
+            strategy.totalAssets(),
+            amountDeposit - slippageDebt,
+            _delta_,
+            string.concat("totalAssets != expected")
         );
 
         // ethX should be in lending market
@@ -279,7 +323,12 @@ contract ETHXLooperTest is BaseStrategyTest {
         assertGt(strategyContract.getLTV(), 0);
 
         // LTV is at target - or 1 wei delta for approximation up of ltv
-        assertApproxEqAbs(strategyContract.targetLTV(), strategyContract.getLTV(), _delta_, string.concat("ltv != expected"));
+        assertApproxEqAbs(
+            strategyContract.targetLTV(),
+            strategyContract.getLTV(),
+            _delta_,
+            string.concat("ltv != expected")
+        );
     }
 
     function test__adjustLeverage_flashLoan_and_eth_dust() public {
@@ -397,7 +446,6 @@ contract ETHXLooperTest is BaseStrategyTest {
         ethX.approve(address(strategy), amountMint);
         strategy.deposit(amountDeposit, bob);
         vm.stopPrank();
-        
 
         // HARVEST - trigger leverage loop - get debt
         strategyContract.adjustLeverage();
@@ -412,7 +460,10 @@ contract ETHXLooperTest is BaseStrategyTest {
 
         // should not hold any ethX
         assertApproxEqAbs(
-            ethX.balanceOf(address(strategy)), 0, _delta_, string.concat("more ethX dust than expected")
+            ethX.balanceOf(address(strategy)),
+            0,
+            _delta_,
+            string.concat("more ethX dust than expected")
         );
 
         // should not hold any ethX aToken
@@ -471,13 +522,23 @@ contract ETHXLooperTest is BaseStrategyTest {
     function test__setLeverageValues_invalidInputs() public {
         // protocolLTV < targetLTV < maxLTV
         vm.expectRevert(
-            abi.encodeWithSelector(ETHXLooper.InvalidLTV.selector, 3e18, 4e18, strategyContract.protocolMaxLTV())
+            abi.encodeWithSelector(
+                ETHXLooper.InvalidLTV.selector,
+                3e18,
+                4e18,
+                strategyContract.protocolMaxLTV()
+            )
         );
         strategyContract.setLeverageValues(3e18, 4e18);
 
         // maxLTV < targetLTV < protocolLTV
         vm.expectRevert(
-            abi.encodeWithSelector(ETHXLooper.InvalidLTV.selector, 4e17, 3e17, strategyContract.protocolMaxLTV())
+            abi.encodeWithSelector(
+                ETHXLooper.InvalidLTV.selector,
+                4e17,
+                3e17,
+                strategyContract.protocolMaxLTV()
+            )
         );
         strategyContract.setLeverageValues(4e17, 3e17);
     }
@@ -494,7 +555,13 @@ contract ETHXLooperTest is BaseStrategyTest {
     function test__setSlippage_invalidValue() public {
         uint256 newSlippage = 1e18; // 100%
 
-        vm.expectRevert(abi.encodeWithSelector(ETHXLooper.InvalidSlippage.selector, newSlippage, 2e17));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ETHXLooper.InvalidSlippage.selector,
+                newSlippage,
+                2e17
+            )
+        );
         strategyContract.setSlippage(newSlippage);
     }
 
@@ -506,12 +573,24 @@ contract ETHXLooperTest is BaseStrategyTest {
         // reverts with invalid msg.sender and valid initiator
         vm.expectRevert(ETHXLooper.NotFlashLoan.selector);
         vm.prank(bob);
-        strategyContract.executeOperation(assets, amounts, premiums, address(strategy), "");
+        strategyContract.executeOperation(
+            assets,
+            amounts,
+            premiums,
+            address(strategy),
+            ""
+        );
 
         // reverts with invalid initiator and valid msg.sender
         vm.expectRevert(ETHXLooper.NotFlashLoan.selector);
         vm.prank(address(lendingPool));
-        strategyContract.executeOperation(assets, amounts, premiums, address(bob), "");
+        strategyContract.executeOperation(
+            assets,
+            amounts,
+            premiums,
+            address(bob),
+            ""
+        );
     }
 
     function test__harvest() public override {
@@ -520,13 +599,14 @@ contract ETHXLooperTest is BaseStrategyTest {
         vm.prank(bob);
         strategy.deposit(100e18, bob);
 
-        // LTV should be 0
-        assertEq(strategyContract.getLTV(), 0);
+        vm.warp(block.timestamp + 30 days);
 
-        strategy.harvest(hex"");
+        uint256 oldTa = strategy.totalAssets();
 
-        // LTV should be at target now
-        assertApproxEqAbs(strategyContract.targetLTV(), strategyContract.getLTV(), _delta_, string.concat("ltv != expected"));
+        _mintAssetAndApproveForStrategy(10e18, address(this));
+        strategy.harvest(abi.encode(10e18));
+
+        assertGt(strategy.totalAssets(), oldTa);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -537,7 +617,11 @@ contract ETHXLooperTest is BaseStrategyTest {
         assertEq(strategy.asset(), address(ethX), "asset");
         assertEq(
             IERC20Metadata(address(strategy)).name(),
-            string.concat("VaultCraft Leveraged ", IERC20Metadata(address(ethX)).name(), " Adapter"),
+            string.concat(
+                "VaultCraft Leveraged ",
+                IERC20Metadata(address(ethX)).name(),
+                " Adapter"
+            ),
             "name"
         );
         assertEq(
@@ -546,6 +630,11 @@ contract ETHXLooperTest is BaseStrategyTest {
             "symbol"
         );
 
-        assertApproxEqAbs(ethX.allowance(address(strategy), address(lendingPool)), type(uint256).max, 1, "allowance");
+        assertApproxEqAbs(
+            ethX.allowance(address(strategy), address(lendingPool)),
+            type(uint256).max,
+            1,
+            "allowance"
+        );
     }
 }

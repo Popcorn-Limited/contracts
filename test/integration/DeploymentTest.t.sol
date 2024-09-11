@@ -88,18 +88,18 @@ contract DeploymentTest is Test {
                                 HELPER
     //////////////////////////////////////////////////////////////*/
 
-    function _mintAsset(address asset, address receiver, uint256 amount) internal virtual {
+    function _mintAsset(address token, address receiver, uint256 amount) internal virtual {
         // USDC on mainnet cant be dealt (find(StdStorage): Slot(s) not found) therefore we transfer from a whale
-        if (block.chainid == 1 && address(asset) == 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48) {
+        if (block.chainid == 1 && address(token) == 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48) {
             vm.prank(0x4B16c5dE96EB2117bBE5fd171E4d203624B014aa);
             IERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48).transfer(receiver, amount);
         }
         // USDC on optimism cant be dealt (find(StdStorage): Slot(s) not found) therefore we transfer from a whale
-        else if (block.chainid == 10 && address(asset) == 0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85) {
+        else if (block.chainid == 10 && address(token) == 0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85) {
             vm.prank(0xf89d7b9c864f589bbF53a82105107622B35EaA40);
             IERC20(0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85).transfer(receiver, amount);
         } else {
-            deal(address(asset), receiver, amount);
+            deal(address(token), receiver, amount);
         }
     }
 
