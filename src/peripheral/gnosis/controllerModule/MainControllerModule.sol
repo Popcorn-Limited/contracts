@@ -58,9 +58,7 @@ contract ControllerModule is Owned {
     function takeoverSafe(
         address[] memory newOwners,
         uint256 newThreshold
-    ) external {
-        require(isModule[msg.sender], "Not Module");
-
+    ) external onlyOwner {
         address _gnosisSafe = gnosisSafe;
         ISafe safe = ISafe(_gnosisSafe);
         address[] memory owners = safe.getOwners();
@@ -127,19 +125,5 @@ contract ControllerModule is Owned {
                 revert("SM: change threshold failed");
             }
         }
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                            MANAGEMENT LOGIC
-    //////////////////////////////////////////////////////////////*/
-
-    mapping(address => bool) public isModule;
-
-    function addModule(address module) external onlyOwner {
-        isModule[module] = true;
-    }
-
-    function removeModule(address module) external onlyOwner {
-        isModule[module] = false;
     }
 }

@@ -131,7 +131,7 @@ abstract contract AbstractBaseVault is
     uint256 internal constant REQUEST_ID = 0;
 
     mapping(address => mapping(address => RedeemRequest))
-        internal _redeemRequests;
+        public redeemRequests;
     mapping(address => uint256) internal _pendingRedeem;
     mapping(address => ClaimableRedeem) internal _claimableRedeem;
 

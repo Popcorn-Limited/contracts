@@ -13,7 +13,7 @@ import {
     PendleDepositor
 } from "src/strategies/pendle/PendleBalancerCurveCompounder.sol";
 import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson, Math} from "../BaseStrategyTest.sol";
-import {TradePath, IAsset, BatchSwapStep} from "src/peripheral/BaseBalancerCompounder.sol";
+import {TradePath, IAsset, BatchSwapStep} from "src/peripheral/compounder/balancer/BaseBalancerCompounder.sol";
 import {IERC20Metadata} from "openzeppelin-contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 contract PendleBalancerCurveCompounderTest is BaseStrategyTest {

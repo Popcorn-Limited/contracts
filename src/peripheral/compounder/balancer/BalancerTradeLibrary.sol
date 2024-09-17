@@ -10,7 +10,7 @@ import {
     BatchSwapStep,
     FundManagement,
     JoinPoolRequest
-} from "../interfaces/external/balancer/IBalancer.sol";
+} from "src/interfaces/external/balancer/IBalancer.sol";
 
 library BalancerTradeLibrary {
     function trade(

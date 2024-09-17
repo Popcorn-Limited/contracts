@@ -8,7 +8,7 @@ import {Test} from "forge-std/Test.sol";
 import {IPendleRouter, IPendleSYToken} from "src/strategies/pendle/IPendle.sol";
 import {PendleBalancerCompounder, PendleDepositor} from "src/strategies/pendle/PendleBalancerCompounder.sol";
 import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson, Math} from "../BaseStrategyTest.sol";
-import {TradePath, IAsset, BatchSwapStep} from "src/peripheral/BaseBalancerCompounder.sol";
+import {TradePath, IAsset, BatchSwapStep} from "src/peripheral/compounder/balancer/BaseBalancerCompounder.sol";
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "openzeppelin-contracts/token/ERC20/extensions/IERC20Metadata.sol";
 

@@ -5,7 +5,7 @@ pragma solidity ^0.8.25;
 
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
-import {ICurveRouter, CurveSwap, ICurveLp} from "../strategies/curve/ICurve.sol";
+import {ICurveRouter, CurveSwap, ICurveLp} from "src/strategies/curve/ICurve.sol";
 import {CurveTradeLibrary} from "./CurveTradeLibrary.sol";
 
 abstract contract BaseCurveCompounder {
