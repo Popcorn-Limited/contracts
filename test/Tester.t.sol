@@ -5,7 +5,7 @@ pragma solidity ^0.8.15;
 
 import {Test, console} from "forge-std/Test.sol";
 import {IERC4626, IERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
-import {ControllerModule, ISafe} from "src/peripheral/gnosis/ControllerModule.sol";
+import {ControllerModule, ISafe} from "src/peripheral/gnosis/controllerModule/ControllerModule.sol";
 
 interface ILooper {
     function adjustLeverage() external;

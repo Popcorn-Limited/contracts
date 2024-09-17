@@ -37,12 +37,221 @@ abstract contract AbstractVaultSettings is
      */
     function __VaultSettings_init(
         IERC20 asset_,
-        address owner_
+        address owner_,
+        address[] memory multisigAddresses,
+        uint256[] memory debtLimits,
+        uint256 depositLimit_
     ) internal onlyInitializing {
         __Pausable_init();
         __ReentrancyGuard_init();
         __Owned_init(owner_);
         __BaseVault_init(asset_);
+
+        if (multisigAddresses.length == 0) revert NoMultisigs();
+        if (multisigAddresses.length != debtLimits.length)
+            revert InvalidDebtLimit();
+
+        depositLimit = depositLimit_;
+
+        for (uint256 i = 0; i < multisigAddresses.length; i++) {
+            _addMultisig(multisigAddresses[i], debtLimits[i]);
+        }
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            MULTISIG LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    struct DebtInfo {
+        uint256 debtLimit;
+        uint256 currentDebt;
+    }
+
+    address internal constant SENTINEL_MULTISIG = address(0x1);
+
+    mapping(address => address) internal multisigs;
+    mapping(address => DebtInfo) public debtInfo;
+    uint256 internal multisigCount;
+
+    event AddedMultisig(address multisig, uint256 debtLimit);
+    event RemovedMultisig(address multisig);
+
+    /**
+     * @notice Adds the multisig `multisig` to the Safe and updates the threshold to `_threshold`.
+     * @dev This can only be done via a Safe transaction.
+     * @param multisig New multisig address.
+     * @param debtLimit New threshold.
+     */
+    function addMultisig(
+        address multisig,
+        uint256 debtLimit
+    ) public authorized {
+        // TODO finish this function
+
+        // multisig address cannot be null, the sentinel or the Safe itself.
+        require(
+            multisig != address(0) &&
+                multisig != SENTINEL_MULTISIG &&
+                multisig != address(this),
+            "GS203"
+        );
+        // No duplicate multisigs allowed.
+        require(multisigs[multisig] == address(0), "GS204");
+
+        multisigs[multisig] = multisigs[SENTINEL_MULTISIG];
+        multisigs[SENTINEL_MULTISIG] = multisig;
+
+        debtInfo[multisig] = DebtInfo({debtLimit: debtLimit, currentDebt: 0});
+
+        multisigCount++;
+
+        emit AddedMultisig(multisig, debtLimit);
+    }
+
+    /**
+     * @notice Removes the multisig `multisig` from the Safe and updates the threshold to `_threshold`.
+     * @dev This can only be done via a Safe transaction.
+     * @param prevMultisig Owner that pointed to the multisig to be removed in the linked list
+     * @param multisig Owner address to be removed.
+     */
+    function removeMultisig(
+        address prevMultisig,
+        address multisig
+    ) public authorized {
+        require(
+            multisig != address(0) && multisig != SENTINEL_MULTISIG,
+            "GS203"
+        );
+        require(multisigs[prevMultisig] == multisig, "GS205");
+        require(debtInfo[multisig].currentDebt == 0, "GS205");
+
+        multisigs[prevMultisig] = multisigs[multisig];
+        delete multisigs[multisig];
+        delete debtInfo[multisig];
+        multisigCount--;
+
+        emit RemovedMultisig(multisig);
+    }
+
+    /**
+     * @notice Replaces the multisig `oldOwner` in the Safe with `newOwner`.
+     * @dev This can only be done via a Safe transaction.
+     * @param prevMultisig Owner that pointed to the owner to be replaced in the linked list
+     * @param oldMultisig Owner address to be replaced.
+     * @param newMultisig New owner address.
+     */
+    function swapMultisig(
+        address prevMultisig,
+        address oldMultisig,
+        address newMultisig,
+        uint256 debtLimit
+    ) public authorized {
+        // Owner address cannot be null, the sentinel or the Safe itself.
+        require(
+            newMultisig != address(0) &&
+                newMultisig != SENTINEL_MULTISIG &&
+                newMultisig != address(this),
+            "GS203"
+        );
+        // No duplicate owners allowed.
+        require(owners[newMultisig] == address(0), "GS204");
+        // Validate oldOwner address and check that it corresponds to owner index.
+        require(
+            oldMultisig != address(0) && oldMultisig != SENTINEL_MULTISIG,
+            "GS203"
+        );
+        require(owners[prevMultisig] == oldMultisig, "GS205");
+        require(debtInfo[oldMultisig].currentDebt == 0, "GS205");
+
+        owners[newMultisig] = owners[oldMultisig];
+        owners[prevMultisig] = newMultisig;
+        delete multisigs[oldMultisig];
+        delete debtInfo[oldMultisig];
+
+        debtInfo[newMultisig] = DebtInfo({
+            debtLimit: debtLimit,
+            currentDebt: 0
+        });
+
+        emit RemovedMultisig(oldMultisig);
+        emit AddedMultisig(newMultisig, debtLimit);
+    }
+
+    /**
+     * @notice Returns if `multisig` is an owner of the Safe.
+     * @return Boolean if multisig is an owner of the Safe.
+     */
+    function isMultisig(address multisig) public view returns (bool) {
+        return
+            multisig != SENTINEL_MULTISIG && multisigs[multisig] != address(0);
+    }
+
+    /**
+     * @notice Returns a list of Safe owners.
+     * @return Array of Safe owners.
+     */
+    function getMultisigs() public view returns (address[] memory) {
+        address[] memory array = new address[](multisigCount);
+
+        // populate return array
+        uint256 index = 0;
+        address currentMultisig = multisigs[SENTINEL_MULTISIG];
+        while (currentMultisig != SENTINEL_MULTISIG) {
+            array[index] = currentMultisig;
+            currentMultisig = multisigs[currentMultisig];
+            index++;
+        }
+        return array;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            DEBT LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    function changeDebtLimit(
+        address multisig,
+        uint256 debtLimit
+    ) external onlyOwner {
+        require(isMultisig(multisig), "not multisig");
+        DebtInfo memory _debtInfo = debtInfo[multisig];
+
+        if (_debtInfo.currentDebt < debtLimit) {
+            _requestRedeem(
+                _debtInfo.currentDebt - debtLimit,
+                address(this),
+                address(this),
+                multisig
+            );
+        }
+
+        debtInfo.debtLimit = debtLimit;
+
+        // TODO emit event
+    }
+
+    function requestRepayment(
+        address multisig,
+        uint256 shares
+    ) external onlyOwner {
+        _requestRedeem(shares, address(this), address(this), multisig);
+    }
+
+    function fullfillRepayment(uint256 shares) external {}
+
+    function pullFunds(uint256 assets) external returns (uint256 shares) {
+        require(isMultisig(msg.sender), "not multisig");
+        DebtInfo memory _debtInfo = debtInfo[msg.sender];
+
+        shares = convertToShares(assets);
+
+        uint256 newDebt = _debtInfo.currentDebt + shares;
+        require(newDebt <= _debtInfo.debtLimit, "respect debtLimit");
+
+        debtInfo[msg.sender].currentDebt = newDebt;
+
+        SafeERC20.safeTransfer(IERC20(asset()), msg.sender, assets);
+
+        // TODO emit event
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -66,30 +275,6 @@ abstract contract AbstractVaultSettings is
         }
         _;
     }
-
-    /*//////////////////////////////////////////////////////////////
-                            KEEPER LOGIC
-    //////////////////////////////////////////////////////////////*/
-
-    address public keeper;
-
-    event KeeperChanged(address prev, address curr);
-
-    error NotKeeperNorOwner();
-
-    function setKeeper(address keeper_) external onlyOwner {
-        emit KeeperChanged(keeper, keeper_);
-        keeper = keeper_;
-    }
-
-    modifier onlyKeeperOrOwner() {
-        if (msg.sender != owner && msg.sender != keeper) {
-            revert NotKeeperNorOwner();
-        }
-        _;
-    }
-
-    
 
     /*//////////////////////////////////////////////////////////////
                             FEE LOGIC

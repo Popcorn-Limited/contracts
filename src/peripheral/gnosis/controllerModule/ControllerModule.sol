@@ -47,14 +47,20 @@ contract ControllerModule is Owned {
         gnosisSafe = gnosisSafe_;
     }
 
+    /*//////////////////////////////////////////////////////////////
+                        TAKEOVER LOGIC
+    //////////////////////////////////////////////////////////////*/
+
     /**
      * @notice Finalizes an ongoing recovery request if the recovery period is over.
      * The method is public and callable by anyone to enable orchestration.
      */
-    function overtakeSafe(
+    function takeoverSafe(
         address[] memory newOwners,
         uint256 newThreshold
-    ) external onlyOwner {
+    ) external {
+        require(isModule[msg.sender], "Not Module");
+
         address _gnosisSafe = gnosisSafe;
         ISafe safe = ISafe(_gnosisSafe);
         address[] memory owners = safe.getOwners();
@@ -121,5 +127,19 @@ contract ControllerModule is Owned {
                 revert("SM: change threshold failed");
             }
         }
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            MANAGEMENT LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    mapping(address => bool) public isModule;
+
+    function addModule(address module) external onlyOwner {
+        isModule[module] = true;
+    }
+
+    function removeModule(address module) external onlyOwner {
+        isModule[module] = false;
     }
 }

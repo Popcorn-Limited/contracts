@@ -3,7 +3,7 @@
 pragma solidity ^0.8.15;
 
 import {Script, console} from "forge-std/Script.sol";
-import {LoggerGuard} from "../../src/peripheral/gnosis/LoggerGuard.sol";
+import {LoggerGuard} from "src/peripheral/gnosis/transactionGuard/LoggerGuard.sol";
 
 contract Deploy is Script {
     function run() public {
