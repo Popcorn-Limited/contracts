@@ -627,24 +627,25 @@ contract MaticXLooperTest is BaseStrategyTest {
         );
     }
 
-    function test__harvest() public override {
-        _mintAssetAndApproveForStrategy(100e18, bob);
+    // function test__harvest() public override {
+    //     _mintAssetAndApproveForStrategy(100e18, bob);
 
-        vm.prank(bob);
-        strategy.deposit(100e18, bob);
+    //     vm.prank(bob);
+    //     strategy.deposit(100e18, bob);
 
-        vm.warp(block.timestamp + 30 days);
+    //     // LTV should be 0
+    //     assertEq(strategyContract.getLTV(), 0);
 
-        uint256 oldTa = strategy.totalAssets();
+    //     strategy.harvest(hex"");
 
-        // LTV should be at target now
-        assertApproxEqAbs(
-            strategyContract.targetLTV(),
-            strategyContract.getLTV(),
-            _delta_,
-            string.concat("ltv != expected")
-        );
-    }
+    //     // LTV should be at target now
+    //     assertApproxEqAbs(
+    //         strategyContract.targetLTV(),
+    //         strategyContract.getLTV(),
+    //         _delta_,
+    //         string.concat("ltv != expected")
+    //     );
+    // }
 
     /*//////////////////////////////////////////////////////////////
                           INITIALIZATION

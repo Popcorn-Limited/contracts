@@ -5,7 +5,7 @@ pragma solidity ^0.8.25;
 
 import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math} from "src/strategies/BaseStrategy.sol";
 import {Math} from "openzeppelin-contracts/utils/math/Math.sol";
-import {ILendingPool, IAToken, IFlashLoanReceiver, IProtocolDataProvider, IPoolAddressesProvider, DataTypes} from "src/interfaces/external/aave/IAaveV3.sol";
+import {ILendingPool, IAaveIncentives, IAToken, IFlashLoanReceiver, IProtocolDataProvider, IPoolAddressesProvider, DataTypes} from "src/interfaces/external/aave/IAaveV3.sol";
 
 struct LooperBaseValues {
     address aaveDataProvider;
@@ -33,6 +33,7 @@ abstract contract BaseAaveLeverageStrategy is BaseStrategy, IFlashLoanReceiver {
 
     ILendingPool public lendingPool; // aave router
     IPoolAddressesProvider public poolAddressesProvider; // aave pool provider
+    IAaveIncentives public aaveIncentives; // aave incentives 
 
     IERC20 public borrowAsset; // asset to borrow
     IERC20 public debtToken; // aave debt token
@@ -68,6 +69,9 @@ abstract contract BaseAaveLeverageStrategy is BaseStrategy, IFlashLoanReceiver {
         ).getReserveTokensAddresses(asset_);
         interestToken = IERC20(_aToken);
         lendingPool = ILendingPool(IAToken(_aToken).POOL());
+        aaveIncentives = IAaveIncentives(
+            IAToken(_aToken).getIncentivesController()
+        );
 
         // set efficiency mode
         _setEfficiencyMode();
@@ -228,8 +232,44 @@ abstract contract BaseAaveLeverageStrategy is BaseStrategy, IFlashLoanReceiver {
         _assertHealthyLTV();
     }
 
-    function harvest(bytes memory) external override onlyKeeperOrOwner {
-        adjustLeverage();
+    /// @notice The token rewarded if the aave liquidity mining is active
+    function rewardTokens() external view override returns (address[] memory) {
+        return aaveIncentives.getRewardsByAsset(asset());
+    }
+
+    /// @notice Claim additional rewards given that it's active.
+    function claim() internal override returns (bool success) {
+        if (address(aaveIncentives) == address(0)) return false;
+
+        address[] memory _assets = new address[](1);
+        _assets[0] = address(interestToken);
+
+        try aaveIncentives.claimAllRewardsToSelf(_assets) {
+            success = true;
+        } catch {}
+    }
+
+    function harvest(bytes memory data) external override onlyKeeperOrOwner {
+        claim();
+
+        address[] memory _rewardTokens = aaveIncentives.getRewardsByAsset(
+            asset()
+        );
+
+        for (uint256 i; i < _rewardTokens.length; i++) {
+            uint256 balance = IERC20(_rewardTokens[i]).balanceOf(address(this));
+            if (balance > 0) {
+                IERC20(_rewardTokens[i]).transfer(msg.sender, balance);
+            }
+        }
+
+        uint256 assetAmount = abi.decode(data, (uint256));
+
+        if (assetAmount == 0) revert ZeroAmount();
+
+        IERC20(asset()).transferFrom(msg.sender, address(this), assetAmount);
+
+        _protocolDeposit(assetAmount, 0, bytes(""));
 
         emit Harvested();
     }
