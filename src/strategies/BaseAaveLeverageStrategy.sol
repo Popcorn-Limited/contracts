@@ -33,7 +33,8 @@ abstract contract BaseAaveLeverageStrategy is BaseStrategy, IFlashLoanReceiver {
 
     ILendingPool public lendingPool; // aave router
     IPoolAddressesProvider public poolAddressesProvider; // aave pool provider
-    IAaveIncentives public aaveIncentives; // aave incentives 
+    IAaveIncentives public aaveIncentives; // aave incentives
+    IProtocolDataProvider public protocolDataProvider; // aave data provider
 
     IERC20 public borrowAsset; // asset to borrow
     IERC20 public debtToken; // aave debt token
@@ -64,9 +65,13 @@ abstract contract BaseAaveLeverageStrategy is BaseStrategy, IFlashLoanReceiver {
         __BaseStrategy_init(asset_, owner_, autoDeposit_);
 
         // retrieve and set deposit aToken, lending pool
-        (address _aToken, , ) = IProtocolDataProvider(
+        protocolDataProvider = IProtocolDataProvider(
             initValues.aaveDataProvider
-        ).getReserveTokensAddresses(asset_);
+        );
+
+        (address _aToken, , ) = protocolDataProvider.getReserveTokensAddresses(
+            asset_
+        );
         interestToken = IERC20(_aToken);
         lendingPool = ILendingPool(IAToken(_aToken).POOL());
         aaveIncentives = IAaveIncentives(
@@ -90,9 +95,8 @@ abstract contract BaseAaveLeverageStrategy is BaseStrategy, IFlashLoanReceiver {
 
         // retrieve and set aave variable debt token
         borrowAsset = IERC20(initValues.borrowAsset);
-        (, , address _variableDebtToken) = IProtocolDataProvider(
-            initValues.aaveDataProvider
-        ).getReserveTokensAddresses(address(borrowAsset));
+        (, , address _variableDebtToken) = protocolDataProvider
+            .getReserveTokensAddresses(address(borrowAsset));
 
         debtToken = IERC20(_variableDebtToken); // variable debt token
 
@@ -529,7 +533,8 @@ abstract contract BaseAaveLeverageStrategy is BaseStrategy, IFlashLoanReceiver {
         _convertCollateralToDebt(
             flashLoanCollateralValue + swapBuffer,
             flashLoanDebt,
-            asset
+            asset,
+            toWithdraw
         );
     }
 
@@ -601,7 +606,8 @@ abstract contract BaseAaveLeverageStrategy is BaseStrategy, IFlashLoanReceiver {
     function _convertCollateralToDebt(
         uint256 maxCollateralIn,
         uint256 exactDebtAmont,
-        address asset
+        address asset,
+        uint256 toWithdraw
     ) internal virtual;
 
     // must provide logic to use borrowed debt assets to get collateral

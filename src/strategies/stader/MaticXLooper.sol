@@ -62,7 +62,8 @@ contract MaticXLooper is BaseAaveLeverageStrategy {
     function _convertCollateralToDebt(
         uint256 maxCollateralIn,
         uint256 exactDebtAmont,
-        address asset
+        address asset,
+        uint256
     ) internal override {
         SingleSwap memory swap = SingleSwap(
             balancerPoolId,
