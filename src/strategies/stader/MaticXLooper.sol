@@ -259,17 +259,8 @@ contract MaticXLooper is BaseStrategy, IFlashLoanReceiver {
             revert NotFlashLoan();
         }
 
-<<<<<<< HEAD
-        (
-            bool isWithdraw,
-            bool isFullWithdraw,
-            uint256 assetsToWithdraw,
-            uint256 depositAmount
-        ) = abi.decode(params, (bool, bool, uint256, uint256));
-=======
         (bool isWithdraw, bool isFullWithdraw, uint256 assetsToWithdraw, uint256 depositAmount, uint256 chosenSlippage) =
             abi.decode(params, (bool, bool, uint256, uint256, uint256));
->>>>>>> 59eca30 (WIP withdraw with data)
 
         if (isWithdraw) {
             // flash loan is to repay Matic debt as part of a withdrawal
@@ -325,15 +316,7 @@ contract MaticXLooper is BaseStrategy, IFlashLoanReceiver {
     }
 
     /// @notice repay part of the vault debt and withdraw maticX
-<<<<<<< HEAD
-    function _protocolWithdraw(
-        uint256 assets,
-        uint256,
-        bytes memory
-    ) internal override {
-=======
     function _protocolWithdraw(uint256 assets, uint256, bytes memory extraData) internal override {
->>>>>>> 59eca30 (WIP withdraw with data)
         (, uint256 currentDebt, uint256 currentCollateral) = _getCurrentLTV();
         (uint256 maticAssetsValue, , ) = maticXPool.convertMaticXToMatic(
             assets
@@ -352,15 +335,7 @@ contract MaticXLooper is BaseStrategy, IFlashLoanReceiver {
             chosenSlippage = slippage;
         
         {
-<<<<<<< HEAD
-            uint256 debtSlippage = currentDebt.mulDiv(
-                slippage,
-                1e18,
-                Math.Rounding.Ceil
-            );
-=======
             uint256 debtSlippage = currentDebt.mulDiv(chosenSlippage, 1e18, Math.Rounding.Ceil);
->>>>>>> 59eca30 (WIP withdraw with data)
 
             // find the % of debt to repay as the % of collateral being withdrawn
             ratioDebtToRepay = maticAssetsValue.mulDiv(
@@ -432,16 +407,10 @@ contract MaticXLooper is BaseStrategy, IFlashLoanReceiver {
 
     // reduce leverage by withdrawing maticX, swapping to Matic repaying Matic debt
     function _reduceLeverage(
-<<<<<<< HEAD
-        bool isFullWithdraw,
-        uint256 toWithdraw,
-        uint256 flashLoanDebt
-=======
         bool isFullWithdraw, 
         uint256 toWithdraw, 
         uint256 flashLoanDebt,
         uint256 chosenSlippage
->>>>>>> 59eca30 (WIP withdraw with data)
     ) internal {
         address asset = asset();
 
@@ -451,15 +420,7 @@ contract MaticXLooper is BaseStrategy, IFlashLoanReceiver {
         );
 
         // get slippage buffer for swapping with flashLoanDebt as minAmountOut
-<<<<<<< HEAD
-        uint256 maticXBuffer = flashLoanMaticXAmount.mulDiv(
-            slippage,
-            1e18,
-            Math.Rounding.Floor
-        );
-=======
         uint256 maticXBuffer = flashLoanMaticXAmount.mulDiv(chosenSlippage, 1e18, Math.Rounding.Floor);
->>>>>>> 59eca30 (WIP withdraw with data)
 
         // if the withdraw amount with buffers to total assets withdraw all
         if (flashLoanMaticXAmount + maticXBuffer + toWithdraw >= _totalAssets())
@@ -551,16 +512,7 @@ contract MaticXLooper is BaseStrategy, IFlashLoanReceiver {
             amounts,
             interestRateModes,
             address(this),
-<<<<<<< HEAD
-            abi.encode(
-                interestRateMode == 0 ? true : false,
-                isFullWithdraw,
-                assetsToWithdraw,
-                depositAmount_
-            ),
-=======
             abi.encode(interestRateMode == 0 ? true : false, isFullWithdraw, assetsToWithdraw, depositAmount_, chosenSlippage),
->>>>>>> 59eca30 (WIP withdraw with data)
             0
         );
     }

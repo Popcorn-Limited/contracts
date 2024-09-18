@@ -9,7 +9,6 @@ import {ReentrancyGuardUpgradeable} from "openzeppelin-contracts-upgradeable/uti
 import {PausableUpgradeable} from "openzeppelin-contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {Math} from "openzeppelin-contracts/utils/math/Math.sol";
 import {OwnedUpgradeable} from "../utils/OwnedUpgradeable.sol";
-import {IStrategyWithData} from "../interfaces/IStrategyWithData.sol";
 
 struct Allocation {
     uint256 index;
@@ -360,48 +359,8 @@ contract MultiStrategyVault is
         // Get the Vault's floating balance.
         uint256 float = asset_.balanceOf(address(this));
 
-        bytes[] memory extraData = new bytes[](0); // empty extraData
-
         if (withdrawalQueue_.length > 0 && assets > float) {
-            _withdrawStrategyFunds(assets, float, withdrawalQueue_, extraData);
-        }
-
-        asset_.safeTransfer(receiver, assets);
-
-        emit Withdraw(caller, receiver, owner, assets, shares);
-    }
-
-    function withdrawWithData(
-        address receiver,
-        address owner,
-        uint256 assets,
-        bytes[] memory extraData
-    ) external nonReentrant {
-        uint256 maxAssets = maxWithdraw(owner);
-        if (assets > maxAssets) {
-            revert ERC4626ExceededMaxWithdraw(owner, assets, maxAssets);
-        }
-
-        address caller = _msgSender();
-        uint256 shares = previewWithdraw(assets);
-
-        if (shares == 0 || assets == 0) revert ZeroAmount();
-        if (caller != owner) {
-            _spendAllowance(owner, caller, shares);
-        }
-
-        _takeFees();
-
-        _burn(owner, shares);
-
-        IERC20 asset_ = IERC20(asset());
-        uint256[] memory withdrawalQueue_ = withdrawalQueue;
-
-        // Get the Vault's floating balance.
-        uint256 float = asset_.balanceOf(address(this));
-
-        if (withdrawalQueue_.length > 0 && assets > float) {
-            _withdrawStrategyFunds(assets, float, withdrawalQueue_, extraData);
+            _withdrawStrategyFunds(assets, float, withdrawalQueue_);
         }
 
         asset_.safeTransfer(receiver, assets);
@@ -412,8 +371,7 @@ contract MultiStrategyVault is
     function _withdrawStrategyFunds(
         uint256 amount,
         uint256 float,
-        uint256[] memory queue,
-        bytes[] memory extraData
+        uint256[] memory queue
     ) internal {
         // Iterate the withdrawal queue and get indexes
         // Will revert due to underflow if we empty the stack before pulling the desired amount.
@@ -428,56 +386,26 @@ contract MultiStrategyVault is
             );
 
             if (withdrawableAssets >= missing) {
-                if(extraData[i].length > 0) {
-                    // withdraw with data
-                    try IStrategyWithData(address(strategy)).withdrawWithData(missing, address(this), address(this), extraData[i]) {
-                        break;
-                    } catch {
-                        emit StrategyWithdrawalFailed(address(strategy), missing);
-                    }
-                } else {
-                    // regular withdraw
-                    try strategy.withdraw(missing, address(this), address(this)) {
-                        break;
-                    } catch {
-                        emit StrategyWithdrawalFailed(address(strategy), missing);
-                    }
+                try strategy.withdraw(missing, address(this), address(this)) {
+                    break;
+                } catch {
+                    emit StrategyWithdrawalFailed(address(strategy), missing);
                 }
             } else if (withdrawableAssets > 0) {
-                if(extraData[i].length > 0) {
-                    try
-                        // withdraw with data
-                        IStrategyWithData(address(strategy)).withdrawWithData(
-                            withdrawableAssets,
-                            address(this),
-                            address(this),
-                            extraData[i]
-                        )
-                    {
-                        float += withdrawableAssets;
-                    } catch {
-                        emit StrategyWithdrawalFailed(
-                            address(strategy),
-                            withdrawableAssets
-                        );
-                    }   
-                } else {
-                    // regular withdraw
-                    try
-                        strategy.withdraw(
-                            withdrawableAssets,
-                            address(this),
-                            address(this)
-                        )
-                    {
-                        float += withdrawableAssets;
-                    } catch {
-                        emit StrategyWithdrawalFailed(
-                            address(strategy),
-                            withdrawableAssets
-                        );
-                    }   
-                }
+                try
+                    strategy.withdraw(
+                        withdrawableAssets,
+                        address(this),
+                        address(this)
+                    )
+                {
+                    float += withdrawableAssets;
+                } catch {
+                    emit StrategyWithdrawalFailed(
+                        address(strategy),
+                        withdrawableAssets
+                    );
+                }   
             }
         }
     }
@@ -544,7 +472,6 @@ contract MultiStrategyVault is
     error InvalidIndex();
     error InvalidWithdrawalQueue();
     error NotPassedQuitPeriod(uint256 quitPeriod_);
-    error InvalidExtraData();
 
     function getStrategies() external view returns (IERC4626[] memory) {
         return strategies;
@@ -731,30 +658,17 @@ contract MultiStrategyVault is
     /**
      * @notice Pull funds out of strategies to be reallocated into different strategies. Caller must be Owner.
      * @param allocations An array of structs each including the strategyIndex to withdraw from and the amount of assets
-     * @param extraData An array of encoded bytes to pass down to strategy for extra-logic, if present
      */
-    function pullFunds(Allocation[] calldata allocations, bytes[] calldata extraData) external onlyOwner {
+    function pullFunds(Allocation[] calldata allocations) external onlyOwner {
         uint256 len = allocations.length;
-
-        if(extraData.length != len)
-            revert InvalidExtraData();
         
         for (uint256 i; i < len; i++) {
             if (allocations[i].amount > 0) {
-                if(extraData[i].length > 0) {
-                    IStrategyWithData(address(strategies[allocations[i].index])).withdrawWithData(
-                        allocations[i].amount,
-                        address(this),
-                        address(this),
-                        extraData[i]
-                    );
-                } else {
-                    strategies[allocations[i].index].withdraw(
-                        allocations[i].amount,
-                        address(this),
-                        address(this)
-                    );
-                }
+                strategies[allocations[i].index].withdraw(
+                    allocations[i].amount,
+                    address(this),
+                    address(this)
+                );
             }
         }
     }

@@ -9,7 +9,6 @@ import {ReentrancyGuardUpgradeable} from "openzeppelin-contracts-upgradeable/uti
 import {PausableUpgradeable} from "openzeppelin-contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {Math} from "openzeppelin-contracts/utils/math/Math.sol";
 import {OwnedUpgradeable} from "src/utils/OwnedUpgradeable.sol";
-import {IStrategyWithData} from "src/interfaces/IStrategyWithData.sol";
 
 /**
  * @title   BaseStrategy
@@ -23,7 +22,6 @@ import {IStrategyWithData} from "src/interfaces/IStrategyWithData.sol";
  */
 abstract contract BaseStrategy is
     ERC4626Upgradeable,
-    IStrategyWithData,
     PausableUpgradeable,
     OwnedUpgradeable,
     ReentrancyGuardUpgradeable
@@ -154,50 +152,6 @@ abstract contract BaseStrategy is
         emit Withdraw(caller, receiver, owner, assets, shares);
     }
 
-    /**
-     * @dev Withdraw workflow with custom data
-     */
-    function withdrawWithData(
-        uint256 assets, 
-        address receiver, 
-        address owner, 
-        bytes calldata extraData
-    ) external override(IStrategyWithData) returns (uint256 shares) {
-        uint256 maxAssets = maxWithdraw(owner);
-        if (assets > maxAssets) {
-            revert ERC4626ExceededMaxWithdraw(owner, assets, maxAssets);
-        }
-
-        uint256 shares = previewWithdraw(assets);
-        address caller = _msgSender();
-
-        if (shares == 0 || assets == 0) revert ZeroAmount();
-        if (caller != owner) {
-            _spendAllowance(owner, caller, shares);
-        }
-
-        uint256 assetSurplus;
-        // We call this before the `burn` to allow for normal calculations with shares before they get burned
-        // Since we transfer assets after the burn the function should remain safe
-        if (!paused()) {
-            uint256 float = IERC20(asset()).balanceOf(address(this));
-            if (assets > float) {
-                uint256 missing = assets - float;
-                assetSurplus = _protocolWithdrawWithData(missing, convertToShares(missing), extraData);
-            }
-        }
-
-        _burn(owner, shares);
-
-        IERC20(asset()).safeTransfer(receiver, assets);
-
-        // transfer eventual surplus to owner directly
-        if(assetSurplus > 0)
-            IERC20(asset()).safeTransfer(owner, assetSurplus);
-
-        emit Withdraw(caller, receiver, owner, assets, shares);
-    }
-
     /*//////////////////////////////////////////////////////////////
                             ACCOUNTING LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -272,13 +226,6 @@ abstract contract BaseStrategy is
         uint256 shares,
         bytes memory data
     ) internal virtual;
-
-    /// @notice Override in implementation strategy to have custom protocol logic during withdraw based on data
-    function _protocolWithdrawWithData(
-        uint256 assets,
-        uint256 shares,
-        bytes memory data
-    ) internal virtual returns (uint256 assetSurplus) {}
 
     /*//////////////////////////////////////////////////////////////
                             STRATEGY LOGIC
