@@ -3,8 +3,11 @@
 
 pragma solidity ^0.8.25;
 
-import {MaticXLooper, LooperInitValues, IERC20, IERC20Metadata, IMaticXPool, ILendingPool, Math} from "src/strategies/stader/MaticXLooper.sol";
+import {MaticXLooper, BaseAaveLeverageStrategy, LooperValues, LooperBaseValues, IERC20, IMaticXPool} from "src/strategies/stader/MaticXLooper.sol";
+import {IERC20Metadata, ILendingPool, Math} from "src/strategies/BaseAaveLeverageStrategy.sol";
+
 import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson, Math} from "../BaseStrategyTest.sol";
+import "forge-std/console.sol";
 
 contract MaticXLooperTest is BaseStrategyTest {
     using stdJson for string;
@@ -34,11 +37,18 @@ contract MaticXLooperTest is BaseStrategyTest {
         TestConfig memory testConfig_
     ) internal override returns (IBaseStrategy) {
         // Read strategy init values
-        LooperInitValues memory looperInitValues = abi.decode(
+        LooperBaseValues memory baseValues = abi.decode(
+            json_.parseRaw(
+                string.concat(".configs[", index_, "].specific.base")
+            ),
+            (LooperBaseValues)
+        );
+
+        LooperValues memory looperInitValues = abi.decode(
             json_.parseRaw(
                 string.concat(".configs[", index_, "].specific.init")
             ),
-            (LooperInitValues)
+            (LooperValues)
         );
 
         // Deploy Strategy
@@ -48,7 +58,7 @@ contract MaticXLooperTest is BaseStrategyTest {
             testConfig_.asset,
             address(this),
             true,
-            abi.encode(looperInitValues)
+            abi.encode(baseValues, looperInitValues)
         );
 
         strategyContract = MaticXLooper(payable(strategy));
@@ -95,9 +105,16 @@ contract MaticXLooperTest is BaseStrategyTest {
     }
 
     function test__initialization() public override {
-        LooperInitValues memory looperInitValues = abi.decode(
+        LooperBaseValues memory baseValues = abi.decode(
+            json.parseRaw(
+                string.concat(".configs[0].specific.base")
+            ),
+            (LooperBaseValues)
+        );
+
+        LooperValues memory looperInitValues = abi.decode(
             json.parseRaw(string.concat(".configs[0].specific.init")),
-            (LooperInitValues)
+            (LooperValues)
         );
 
         // Deploy Strategy
@@ -107,7 +124,7 @@ contract MaticXLooperTest is BaseStrategyTest {
             testConfig.asset,
             address(this),
             true,
-            abi.encode(looperInitValues)
+            abi.encode(baseValues, looperInitValues)
         );
 
         verify_adapterInit();
@@ -184,7 +201,7 @@ contract MaticXLooperTest is BaseStrategyTest {
         address newPool = address(0x85dE3ADd465a219EE25E04d22c39aB027cF5C12E);
         address asset = strategy.asset();
 
-        strategyContract.setHarvestValues(newPool, poolId);
+        strategyContract.setHarvestValues(abi.encode(newPool, poolId));
         uint256 oldAllowance = IERC20(asset).allowance(
             address(strategy),
             oldPool
@@ -439,7 +456,11 @@ contract MaticXLooperTest is BaseStrategyTest {
         vm.stopPrank();
 
         // check total assets
-        uint256 expDust = amountDeposit.mulDiv(slippage, 1e18, Math.Rounding.Floor);
+        uint256 expDust = amountDeposit.mulDiv(
+            slippage,
+            1e18,
+            Math.Rounding.Floor
+        );
         assertApproxEqAbs(strategy.totalAssets(), expDust, _delta_, "TA");
 
         assertEq(IERC20(address(strategy)).totalSupply(), 0);
@@ -454,10 +475,10 @@ contract MaticXLooperTest is BaseStrategyTest {
     function test_withdraw_dust() public {
         // manager can withdraw maticX balance when vault total supply is 0
         deal(address(maticX), address(strategy), 10e18);
-        
+
         vm.prank(address(this));
         strategyContract.withdrawDust(address(this));
-        
+
         assertEq(strategy.totalAssets(), 0, "TA");
     }
 
@@ -471,13 +492,19 @@ contract MaticXLooperTest is BaseStrategyTest {
         vm.stopPrank();
 
         uint256 totAssetsBefore = strategy.totalAssets();
-        uint256 maticXOwnerBefore = IERC20(address(maticX)).balanceOf(address(this));
-        
+        uint256 maticXOwnerBefore = IERC20(address(maticX)).balanceOf(
+            address(this)
+        );
+
         vm.prank(address(this));
         strategyContract.withdrawDust(address(this));
-        
+
         assertEq(strategy.totalAssets(), totAssetsBefore, "TA DUST");
-        assertEq(IERC20(address(maticX)).balanceOf(address(this)), maticXOwnerBefore, "OWNER DUST");
+        assertEq(
+            IERC20(address(maticX)).balanceOf(address(this)),
+            maticXOwnerBefore,
+            "OWNER DUST"
+        );
     }
 
     function test__setLeverageValues_lever_up() public {
@@ -530,7 +557,7 @@ contract MaticXLooperTest is BaseStrategyTest {
         // protocolLTV < targetLTV < maxLTV
         vm.expectRevert(
             abi.encodeWithSelector(
-                MaticXLooper.InvalidLTV.selector,
+                BaseAaveLeverageStrategy.InvalidLTV.selector,
                 3e18,
                 4e18,
                 strategyContract.protocolMaxLTV()
@@ -541,7 +568,7 @@ contract MaticXLooperTest is BaseStrategyTest {
         // maxLTV < targetLTV < protocolLTV
         vm.expectRevert(
             abi.encodeWithSelector(
-                MaticXLooper.InvalidLTV.selector,
+                BaseAaveLeverageStrategy.InvalidLTV.selector,
                 4e17,
                 3e17,
                 strategyContract.protocolMaxLTV()
@@ -564,7 +591,7 @@ contract MaticXLooperTest is BaseStrategyTest {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                MaticXLooper.InvalidSlippage.selector,
+                BaseAaveLeverageStrategy.InvalidSlippage.selector,
                 newSlippage,
                 2e17
             )
@@ -578,7 +605,7 @@ contract MaticXLooperTest is BaseStrategyTest {
         uint256[] memory premiums = new uint256[](1);
 
         // reverts with invalid msg.sender and valid initiator
-        vm.expectRevert(MaticXLooper.NotFlashLoan.selector);
+        vm.expectRevert(BaseAaveLeverageStrategy.NotFlashLoan.selector);
         vm.prank(bob);
         strategyContract.executeOperation(
             assets,
@@ -589,7 +616,7 @@ contract MaticXLooperTest is BaseStrategyTest {
         );
 
         // reverts with invalid initiator and valid msg.sender
-        vm.expectRevert(MaticXLooper.NotFlashLoan.selector);
+        vm.expectRevert(BaseAaveLeverageStrategy.NotFlashLoan.selector);
         vm.prank(address(lendingPool));
         strategyContract.executeOperation(
             assets,
@@ -610,10 +637,13 @@ contract MaticXLooperTest is BaseStrategyTest {
 
         uint256 oldTa = strategy.totalAssets();
 
-        _mintAssetAndApproveForStrategy(10e18, address(this));
-        strategy.harvest(abi.encode(10e18));
-
-        assertGt(strategy.totalAssets(), oldTa);
+        // LTV should be at target now
+        assertApproxEqAbs(
+            strategyContract.targetLTV(),
+            strategyContract.getLTV(),
+            _delta_,
+            string.concat("ltv != expected")
+        );
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -627,7 +657,7 @@ contract MaticXLooperTest is BaseStrategyTest {
             string.concat(
                 "VaultCraft Leveraged ",
                 IERC20Metadata(address(maticX)).name(),
-                " Adapter"
+                " Strategy"
             ),
             "name"
         );
