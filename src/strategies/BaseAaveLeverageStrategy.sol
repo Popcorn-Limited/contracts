@@ -546,7 +546,7 @@ abstract contract BaseAaveLeverageStrategy is BaseStrategy, IFlashLoanReceiver {
         address asset
     ) internal {
         // use borrow asset to get more collateral
-        _convertDebtToCollateral(borrowAmount, totCollateralAmount); // TODO improve
+        _convertDebtToCollateral(borrowAmount, totCollateralAmount);
 
         // deposit collateral balance into lending protocol
         // may include eventual dust held by contract somehow
