@@ -182,6 +182,13 @@ abstract contract BaseAaveLeverageStrategy is BaseStrategy, IFlashLoanReceiver {
         (ltv, , ) = _getCurrentLTV();
     }
 
+    function convertToUnderlyingShares(
+        uint256 assets,
+        uint256 shares
+    ) public view override returns (uint256) {
+        revert();
+    }
+
     /*//////////////////////////////////////////////////////////////
                           MANAGEMENT LOGIC
     //////////////////////////////////////////////////////////////*/

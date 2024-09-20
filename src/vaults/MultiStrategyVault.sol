@@ -405,7 +405,7 @@ contract MultiStrategyVault is
                         address(strategy),
                         withdrawableAssets
                     );
-                }   
+                }
             }
         }
     }
@@ -660,8 +660,11 @@ contract MultiStrategyVault is
      * @param allocations An array of structs each including the strategyIndex to withdraw from and the amount of assets
      */
     function pullFunds(Allocation[] calldata allocations) external onlyOwner {
+        _pullFunds(allocations);
+    }
+
+    function _pullFunds(Allocation[] calldata allocations) internal {
         uint256 len = allocations.length;
-        
         for (uint256 i; i < len; i++) {
             if (allocations[i].amount > 0) {
                 strategies[allocations[i].index].withdraw(

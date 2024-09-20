@@ -141,23 +141,4 @@ contract WstETHLooper is BaseAaveLeverageStrategy {
             IERC20(asset()).transfer(recipient, wstETHBalance);
         }
     }
-
-    /*//////////////////////////////////////////////////////////////
-                          NOT IMPLEMENTED
-    //////////////////////////////////////////////////////////////*/
-
-    function convertToUnderlyingShares(
-        uint256 assets,
-        uint256 shares
-    ) public view override returns (uint256) {
-        revert();
-    }
-
-    function claim() internal override returns (bool success) {
-        revert();
-    }
-
-    function rewardTokens() external view override returns (address[] memory) {
-        revert();
-    }
 }
