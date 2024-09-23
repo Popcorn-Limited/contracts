@@ -3,7 +3,7 @@
 pragma solidity ^0.8.15;
 
 import {Script, console} from "forge-std/Script.sol";
-import {ControllerModule} from "src/peripheral/gnosis/controllerModule/ControllerModule.sol";
+import {ControllerModule} from "src/peripheral/gnosis/controllerModule/MainControllerModule.sol";
 
 contract Deploy is Script {
     function run() public {
