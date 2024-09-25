@@ -15,13 +15,13 @@ import {ICurveGauge} from "src/interfaces/external/curve/ICurveGauge.sol";
 contract VaultRouter {
     using SafeERC20 for IERC20;
 
-    error SlippageTooHigh();
-
     constructor() {}
 
     /*//////////////////////////////////////////////////////////////
                     SYNCHRONOUS INTERACTION LOGIC
     //////////////////////////////////////////////////////////////*/
+
+    error SlippageTooHigh();
 
     function depositAndStake(
         address vault,
@@ -83,6 +83,8 @@ contract VaultRouter {
         uint256 shares
     );
 
+    error ArrayMismatch();
+
     mapping(address => mapping(address => uint256)) public requestShares;
 
     function unstakeAndRequestWithdrawal(
@@ -133,7 +135,7 @@ contract VaultRouter {
         uint256[] memory shares
     ) external {
         uint256 len = receivers.length;
-        if (len != shares.length) revert();
+        if (len != shares.length) revert ArrayMismatch();
 
         IERC20 asset = IERC20(IERC4626(vault).asset());
 

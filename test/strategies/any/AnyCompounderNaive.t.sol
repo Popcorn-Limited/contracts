@@ -4,7 +4,7 @@ pragma solidity ^0.8.25;
 
 import {AnyCompounder, AnyCompounderNaive, AnyConverter, ClaimInteraction, IERC20} from "src/strategies/AnyCompounder.sol";
 import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson} from "../BaseStrategyTest.sol";
-import {MockOracle} from "test/utils/mocks/MockOracle.sol";
+import {MockOracle} from "test/mocks/MockOracle.sol";
 import {AnyBaseTest} from "./AnyBase.t.sol";
 import "forge-std/console.sol";
 

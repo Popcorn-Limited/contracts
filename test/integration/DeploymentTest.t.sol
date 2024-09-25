@@ -9,7 +9,7 @@ import {stdJson} from "forge-std/StdJson.sol";
 import {IERC4626, IERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import {Clones} from "openzeppelin-contracts/proxy/Clones.sol";
 
-import {MockERC4626} from "../utils/mocks/MockERC4626.sol";
+import {MockERC4626} from "../mocks/MockERC4626.sol";
 
 import {MultiStrategyVault} from "src/vaults/MultiStrategyVault.sol";
 import {AaveV3Depositor, IERC20} from "src/strategies/aave/aaveV3/AaveV3Depositor.sol";

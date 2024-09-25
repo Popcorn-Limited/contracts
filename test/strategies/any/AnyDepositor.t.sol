@@ -5,7 +5,7 @@ pragma solidity ^0.8.25;
 import {AnyDepositor, IERC20} from "src/strategies/AnyDepositor.sol";
 import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson} from "../BaseStrategyTest.sol";
 import {AnyBaseTest} from "./AnyBase.t.sol";
-import {MockOracle} from "test/utils/mocks/MockOracle.sol";
+import {MockOracle} from "test/mocks/MockOracle.sol";
 import "forge-std/console.sol";
 
 contract AnyDepositorTest is AnyBaseTest {
