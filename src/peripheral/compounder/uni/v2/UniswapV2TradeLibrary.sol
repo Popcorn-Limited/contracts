@@ -3,7 +3,7 @@
 
 pragma solidity ^0.8.25;
 
-import {IUniswapRouterV2} from "../interfaces/external/uni/IUniswapRouterV2.sol";
+import {IUniswapRouterV2} from "src/interfaces/external/uni/IUniswapRouterV2.sol";
 
 library UniswapV2TradeLibrary {
     function trade(

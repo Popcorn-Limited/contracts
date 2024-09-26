@@ -4,7 +4,7 @@
 pragma solidity ^0.8.15;
 
 import {PeapodsDepositor, IERC20, SafeERC20} from "./PeapodsStrategy.sol";
-import {BaseUniV2LpCompounder, SwapStep} from "src/peripheral/BaseUniV2LpCompounder.sol";
+import {BaseUniV2LpCompounder, SwapStep} from "src/peripheral/compounder/uni/v2/BaseUniV2LpCompounder.sol";
 
 /**
  * @title   ERC4626 Peapods Protocol Vault Adapter
