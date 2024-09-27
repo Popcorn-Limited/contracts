@@ -12,6 +12,17 @@ struct CallStruct {
     bytes data;
 }
 
+struct PendingAllowance {
+    address target;
+    bytes4 data;
+    bool allowed;
+}
+
+struct ProposedChange {
+    uint256 value;
+    uint256 changeTime;
+}
+
 /**
  * @title   BaseStrategy
  * @author  RedVeil
@@ -278,11 +289,6 @@ abstract contract AnyConverterV2 is BaseStrategy {
 
     error Misconfigured();
 
-    struct ProposedChange {
-        uint256 value;
-        uint256 changeTime;
-    }
-
     ProposedChange public proposedSlippage;
     uint256 public slippage;
 
@@ -316,19 +322,33 @@ abstract contract AnyConverterV2 is BaseStrategy {
                             RESERVE LOGIC
     //////////////////////////////////////////////////////////////*/
 
+    PendingAllowance[] public pendingAllowances;
+    uint256 public pendingAllowancesTime;
     mapping(address => mapping(bytes4 => bool)) public isAllowed;
 
+    function proposeAllowed(
+        PendingAllowance[] memory allowances
+    ) external onlyOwner {
+        if (pendingAllowancesTime != 0) revert Misconfigured();
 
-    function setAllowed(address target, bytes4 data, bool allowed) external onlyOwner {
-        isAllowed[target][data] = allowed;
+        pendingAllowances = allowances;
+        pendingAllowancesTime = block.timestamp + 3 days;
     }
 
-    function setAllowedMany(address[] memory targets, bytes4[] memory data, bool[] memory allowed) external onlyOwner {
-        if (targets.length != data.length || data.length != allowed.length) revert Misconfigured();
+    function changeAllowances() external onlyOwner {
+        if (
+            pendingAllowancesTime == 0 ||
+            pendingAllowancesTime > block.timestamp
+        ) revert Misconfigured();
 
-        for (uint256 i; i < targets.length; i++) {
-            isAllowed[targets[i]][data[i]] = allowed[i];
+        for (uint256 i; i < pendingAllowances.length; i++) {
+            isAllowed[pendingAllowances[i].target][
+                pendingAllowances[i].data
+            ] = pendingAllowances[i].allowed;
         }
+
+        delete pendingAllowances;
+        delete pendingAllowancesTime;
     }
 
     /*//////////////////////////////////////////////////////////////
