@@ -2,7 +2,7 @@
 // Docgen-SOLC: 0.8.0
 pragma solidity ^0.8.25;
 
-import {AnyCompounder, AnyCompounderNaive, AnyConverter, ClaimInteraction, IERC20} from "src/strategies/AnyCompounder.sol";
+import {AnyCompounder, AnyCompounderNaiveV2, AnyConverterV2, ClaimInteraction, IERC20} from "src/strategies/any/v2/AnyCompounderNaiveV2.sol";
 import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson} from "../../BaseStrategyTest.sol";
 import {MockOracle} from "test/mocks/MockOracle.sol";
 import {AnyBaseTest} from "./AnyBase.t.sol";
