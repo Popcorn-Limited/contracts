@@ -7,6 +7,11 @@ import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol"
 import {BaseStrategy, IERC20Metadata, ERC20, IERC20, Math} from "./BaseStrategy.sol";
 import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
 
+struct CallStruct {
+    address target;
+    bytes data;
+}
+
 /**
  * @title   BaseStrategy
  * @author  RedVeil
@@ -17,7 +22,7 @@ import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
  * All specific interactions for the underlying protocol need to be overriden in the actual implementation.
  * The adapter can be initialized with a strategy that can perform additional operations. (Leverage, Compounding, etc.)
  */
-abstract contract AnyConverter is BaseStrategy {
+abstract contract AnyConverterV2 is BaseStrategy {
     using Math for uint256;
     using SafeERC20 for IERC20;
 
@@ -154,73 +159,114 @@ abstract contract AnyConverter is BaseStrategy {
         revert();
     }
 
+    /// @notice Convert assets to yieldTokens
     function pushFunds(
-        uint256 yieldTokens,
-        bytes memory
+        uint256,
+        bytes memory data
     ) external override onlyKeeperOrOwner whenNotPaused {
+        (
+            uint256 preTotalAssets,
+            uint256 preAssetBalance,
+            uint256 preYieldTokenBalance,
+            uint256 postTotalAssets,
+            uint256 postAssetBalance,
+            uint256 postYieldTokenBalance
+        ) = _convert(data);
+
+        // Total assets should stay the same or increase (with slippage)
+        if (
+            postTotalAssets <
+            preTotalAssets.mulDiv(
+                10_000 - slippage,
+                10_000,
+                Math.Rounding.Floor
+            )
+        ) revert("Total assets decreased");
+
+        // Asset balance should stay the same or decrease
+        if (postAssetBalance >= preAssetBalance)
+            revert("Asset balance increased");
+
+        // YieldToken balance should stay increase
+        if (postYieldTokenBalance < preYieldTokenBalance)
+            revert("Yield token balance decreased");
+
+        emit PushedFunds(yieldTokens, withdrawable);
+    }
+
+    /// @notice Convert yieldTokens to assets
+    function pullFunds(
+        uint256,
+        bytes memory data
+    ) external override onlyKeeperOrOwner whenNotPaused {
+        (
+            uint256 preTotalAssets,
+            uint256 preAssetBalance,
+            uint256 preYieldTokenBalance,
+            uint256 postTotalAssets,
+            uint256 postAssetBalance,
+            uint256 postYieldTokenBalance
+        ) = _convert(data);
+
+        // Total assets should stay the same or increase (with slippage)
+        if (
+            postTotalAssets <
+            preTotalAssets.mulDiv(
+                10_000 - slippage,
+                10_000,
+                Math.Rounding.Floor
+            )
+        ) revert("Total assets decreased");
+
+        // YieldToken balance should stay the same or decrease
+        if (postYieldTokenBalance >= preYieldTokenBalance)
+            revert("YieldToken balance increased");
+
+        // Asset balance should increase
+        if (postAssetBalance < preAssetBalance)
+            revert("Asset balance decreased");
+    }
+
+    function _convert(bytes memory data) internal {
         // caching
         address _asset = asset();
         address _yieldToken = yieldToken;
         uint256 _floatRatio = floatRatio;
 
-        uint256 ta = totalAssets();
-        uint256 bal = IERC20(_asset).balanceOf(address(this)) -
-            totalReservedAssets;
-
-        IERC20(_yieldToken).safeTransferFrom(
-            msg.sender,
-            address(this),
-            yieldTokens
+        uint256 preTotalAssets = totalAssets();
+        uint256 preAssetBalance = IERC20(_asset).balanceOf(address(this));
+        uint256 preYieldTokenBalance = IERC20(_yieldToken).balanceOf(
+            address(this)
         );
 
-        // raise it by slippage
-        yieldTokens = yieldTokens.mulDiv(
-            10_000,
-            10_000 - slippage,
-            Math.Rounding.Floor
-        );
-        uint256 withdrawable = oracle.getQuote(
-            yieldTokens,
-            _yieldToken,
-            _asset
+        (bytes memory stuff, CallStruct[] memory calls) = abi.decode(
+            data,
+            (bytes, CallStruct[])
         );
 
-        // we revert if:
-        // 1. we don't have enough funds to cover the withdrawable amount
-        // 2. we don't have enough float after the withdrawal (if floatRatio > 0)
-        if (_floatRatio > 0) {
-            uint256 float = ta.mulDiv(_floatRatio, 10_000, Math.Rounding.Floor);
-            if (float > bal) {
-                revert NotEnoughFloat();
-            } else {
-                uint256 balAfterFloat = bal - float;
-                if (balAfterFloat < withdrawable) revert BalanceTooLow();
-            }
-        } else {
-            if (bal < withdrawable) revert BalanceTooLow();
+        for (uint256 i; i < calls.length; i++) {
+            if (!isAllowed[calls[i].target][bytes4(calls[i].data)])
+                revert("Not allowed");
+
+            (bool success, bytes memory ret) = calls[i].target.call(
+                calls[i].data
+            );
+            if (!success) revert("Call failed");
         }
 
-        _reserveToken(yieldTokens, withdrawable, _yieldToken, false);
-
-        emit PushedFunds(yieldTokens, withdrawable);
-    }
-
-    function pullFunds(
-        uint256 assets,
-        bytes memory
-    ) external override onlyKeeperOrOwner whenNotPaused {
-        // caching
-        address _asset = asset();
-        address _yieldToken = yieldToken;
-
-        IERC20(_asset).safeTransferFrom(msg.sender, address(this), assets);
-
-        // raise it by slippage
-        assets = assets.mulDiv(10_000, 10_000 - slippage, Math.Rounding.Floor);
-        uint256 withdrawable = oracle.getQuote(assets, _asset, _yieldToken);
-        _reserveToken(assets, withdrawable, _asset, true);
-
-        emit PulledFunds(assets, withdrawable);
+        uint256 postTotalAssets = totalAssets();
+        uint256 postAssetBalance = IERC20(_asset).balanceOf(address(this));
+        uint256 postYieldTokenBalance = IERC20(_yieldToken).balanceOf(
+            address(this)
+        );
+        return (
+            preTotalAssets,
+            preAssetBalance,
+            preYieldTokenBalance,
+            postTotalAssets,
+            postAssetBalance,
+            postYieldTokenBalance
+        );
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -229,10 +275,6 @@ abstract contract AnyConverter is BaseStrategy {
 
     event SlippageProposed(uint256 slippage);
     event SlippageChanged(uint256 oldSlippage, uint256 newSlippage);
-    event FloatRatioProposed(uint256 ratio);
-    event FloatRatioChanged(uint256 oldRatio, uint256 newRatio);
-    event UnlockTimeProposed(uint256 unlockTime);
-    event UnlockTimeChanged(uint256 oldUnlockTime, uint256 newUnlockTime);
 
     error Misconfigured();
 
@@ -243,12 +285,6 @@ abstract contract AnyConverter is BaseStrategy {
 
     ProposedChange public proposedSlippage;
     uint256 public slippage;
-
-    ProposedChange public proposedFloatRatio;
-    uint256 public floatRatio;
-
-    ProposedChange public proposedUnlockTime;
-    uint256 public unlockTime = 1;
 
     function proposeSlippage(uint256 slippage_) external onlyOwner {
         if (slippage_ > 10_000) revert Misconfigured();
@@ -276,168 +312,23 @@ abstract contract AnyConverter is BaseStrategy {
         delete proposedSlippage;
     }
 
-    function proposeFloatRatio(uint256 ratio_) external onlyOwner {
-        if (ratio_ > 10_000) revert Misconfigured();
-
-        proposedFloatRatio = ProposedChange({
-            value: ratio_,
-            changeTime: block.timestamp + 3 days
-        });
-
-        emit FloatRatioProposed(ratio_);
-    }
-
-    function changeFloatRatio() external onlyOwner {
-        ProposedChange memory _proposedFloatRatio = proposedFloatRatio;
-
-        if (
-            _proposedFloatRatio.changeTime == 0 ||
-            _proposedFloatRatio.changeTime > block.timestamp
-        ) {
-            revert Misconfigured();
-        }
-
-        emit FloatRatioChanged(slippage, _proposedFloatRatio.value);
-
-        floatRatio = _proposedFloatRatio.value;
-
-        delete proposedFloatRatio;
-    }
-
-    function proposeUnlockTime(uint256 unlockTime_) external onlyOwner {
-        proposedUnlockTime = ProposedChange({
-            value: unlockTime_,
-            changeTime: block.timestamp + 3 days
-        });
-
-        emit UnlockTimeProposed(unlockTime_);
-    }
-
-    function changeUnlockTime() external onlyOwner {
-        ProposedChange memory _proposedUnlockTime = proposedUnlockTime;
-
-        if (
-            _proposedUnlockTime.changeTime == 0 ||
-            _proposedUnlockTime.changeTime > block.timestamp
-        ) {
-            revert Misconfigured();
-        }
-
-        emit UnlockTimeChanged(unlockTime, _proposedUnlockTime.value);
-
-        unlockTime = _proposedUnlockTime.value;
-
-        delete proposedUnlockTime;
-    }
-
     /*//////////////////////////////////////////////////////////////
                             RESERVE LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    event ReserveClaimed(
-        address user,
-        address token,
-        uint256 blockNumber,
-        uint256 withdrawn
-    );
-    // we don't emit the block number because that's already part of the event log
-    // e.g. see https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_getlogs
-    event ReserveAdded(
-        address indexed user,
-        address indexed asset,
-        uint256 blockNumber,
-        uint256 unlockTime,
-        uint256 amount,
-        uint256 withdrawable
-    );
+    mapping(address => mapping(bytes4 => bool)) public isAllowed;
 
-    struct Reserved {
-        uint256 unlockTime;
-        uint256 deposited;
-        uint256 withdrawable;
+
+    function setAllowed(address target, bytes4 data, bool allowed) external onlyOwner {
+        isAllowed[target][data] = allowed;
     }
 
-    uint256 public totalReservedAssets;
-    uint256 public totalReservedYieldTokens;
+    function setAllowedMany(address[] memory targets, bytes4[] memory data, bool[] memory allowed) external onlyOwner {
+        if (targets.length != data.length || data.length != allowed.length) revert Misconfigured();
 
-    // we only allow 1 reserve per block so we can use that as the
-    // primary key to differentiate between multiple reserves.
-    //
-    // user address => asset address => block number => Reserved
-    mapping(address => mapping(address => mapping(uint256 => Reserved)))
-        public reserved;
-
-    function claimReserved(uint256 blockNumber, bool isyieldToken) external {
-        address base = isyieldToken ? asset() : yieldToken;
-        address quote = isyieldToken ? yieldToken : asset();
-
-        Reserved memory _reserved = reserved[msg.sender][base][blockNumber];
-        if (
-            _reserved.unlockTime != 0 && _reserved.unlockTime < block.timestamp
-        ) {
-            // if the assets value went down after the keeper reserved the funds,
-            // we want to use the new favorable quote.
-            // If the assets value went up, we want to use the old favorable quote.
-            uint256 withdrawable = Math.min(
-                oracle.getQuote(_reserved.deposited, base, quote),
-                _reserved.withdrawable
-            );
-
-            if (withdrawable > 0) {
-                delete reserved[msg.sender][base][blockNumber];
-
-                if (isyieldToken) {
-                    totalReservedYieldTokens -= _reserved.withdrawable;
-                } else {
-                    totalReservedAssets -= _reserved.withdrawable;
-                }
-
-                IERC20(quote).safeTransfer(msg.sender, withdrawable);
-                emit ReserveClaimed(
-                    msg.sender,
-                    base,
-                    blockNumber,
-                    _reserved.withdrawable
-                );
-            } else {
-                revert("Nothing to claim");
-            }
-        } else {
-            revert("Nothing to claim");
+        for (uint256 i; i < targets.length; i++) {
+            isAllowed[targets[i]][data[i]] = allowed[i];
         }
-    }
-
-    function _reserveToken(
-        uint256 amount,
-        uint256 withdrawable,
-        address token,
-        bool isyieldToken
-    ) internal {
-        if (reserved[msg.sender][token][block.number].deposited > 0) {
-            revert("Already reserved");
-        }
-
-        uint256 _unlockTime = block.timestamp + unlockTime;
-        reserved[msg.sender][token][block.number] = Reserved({
-            deposited: amount,
-            withdrawable: withdrawable,
-            unlockTime: _unlockTime
-        });
-
-        if (isyieldToken) {
-            totalReservedYieldTokens += withdrawable;
-        } else {
-            totalReservedAssets += withdrawable;
-        }
-
-        emit ReserveAdded(
-            msg.sender,
-            token,
-            block.number,
-            _unlockTime,
-            amount,
-            withdrawable
-        );
     }
 
     /*//////////////////////////////////////////////////////////////
