@@ -6,7 +6,7 @@ pragma solidity ^0.8.25;
 import {Script, console} from "forge-std/Script.sol";
 import {stdJson} from "forge-std/StdJson.sol";
 
-import {MaticXLooper, LooperInitValues, IERC20} from "../../../src/strategies/stader/MaticXLooper.sol";
+import {MaticXLooper, LooperValues, LooperBaseValues, IERC20} from "../../../src/strategies/stader/MaticXLooper.sol";
 
 contract DeployStrategy is Script {
     using stdJson for string;
@@ -25,9 +25,14 @@ contract DeployStrategy is Script {
         // Deploy Strategy
         strategy = new MaticXLooper();
 
-        LooperInitValues memory looperValues = abi.decode(
-            json.parseRaw(".strategyInit"),
-            (LooperInitValues)
+        LooperBaseValues memory baseValues = abi.decode(
+            json.parseRaw(".baseLeverage"),
+            (LooperBaseValues)
+        );
+
+        LooperValues memory looperInitValues = abi.decode(
+            json.parseRaw(".strategy"),
+            (LooperValues)
         );
 
         address asset = json.readAddress(".baseInit.asset");
@@ -37,14 +42,8 @@ contract DeployStrategy is Script {
             json.readAddress(".baseInit.owner"),
             json.readBool(".baseInit.autoDeposit"),
             abi.encode(
-                looperValues.aaveDataProvider,
-                looperValues.balancerVault,
-                looperValues.maticXPool,
-                looperValues.maxLTV,
-                looperValues.poolAddressesProvider,
-                looperValues.poolId,
-                looperValues.slippage,
-                looperValues.targetLTV
+                baseValues,
+                looperInitValues
             )
         );
 

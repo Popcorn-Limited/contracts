@@ -15,15 +15,18 @@
         "testId": "MaticXLooper"
       },
       "specific": {
-        "init": {
+        "base": {
           "aaveDataProvider": "0x7deEB8aCE4220643D8edeC871a23807E4d006eE5",
+          "borrowAsset": "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270",
+          "maxLTV": 900000000000000000,
+          "maxSlippage": 5000000000000000,
+          "poolAddressesProvider": "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb",
+          "targetLTV": 800000000000000000
+        },
+        "init": {
           "balancerVault": "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
           "maticXPool": "0xfd225C9e6601C9d38d8F98d8731BF59eFcF8C0E3",
-          "maxLTV": 900000000000000000,
-          "poolAddressesProvider": "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb",
-          "poolId": "0xcd78a20c597e367a4e478a2411ceb790604d7c8f000000000000000000000c22",
-          "slippage": 8000000000000000,
-          "targetLTV": 800000000000000000
+          "poolId": "0xcd78a20c597e367a4e478a2411ceb790604d7c8f000000000000000000000c22"
         }
       }
     }

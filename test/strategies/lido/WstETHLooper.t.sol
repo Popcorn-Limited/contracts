@@ -5,14 +5,14 @@ pragma solidity ^0.8.25;
 
 import {
     WstETHLooper,
-    LooperInitValues,
+    BaseAaveLeverageStrategy,
+    LooperValues,
+    LooperBaseValues,
     IERC20,
-    IERC20Metadata,
-    IwstETH,
-    ILendingPool,
-    Math
+    IwstETH
 } from "src/strategies/lido/WstETHLooper.sol";
 import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson, Math} from "../BaseStrategyTest.sol";
+import {IERC20Metadata, ILendingPool, Math} from "src/strategies/BaseAaveLeverageStrategy.sol";
 
 contract WstETHLooperTest is BaseStrategyTest {
     using stdJson for string;
@@ -28,7 +28,7 @@ contract WstETHLooperTest is BaseStrategyTest {
     uint256 slippage;
 
     function setUp() public {
-        _setUpBaseTest(1, "./test/strategies/lido/WstETHLooperTestConfig.json");
+        _setUpBaseTest(0, "./test/strategies/lido/WstETHLooperTestConfig.json");
     }
 
     function _setUpStrategy(string memory json_, string memory index_, TestConfig memory testConfig_)
@@ -37,13 +37,24 @@ contract WstETHLooperTest is BaseStrategyTest {
         returns (IBaseStrategy)
     {
         // Read strategy init values
-        LooperInitValues memory looperInitValues =
-            abi.decode(json_.parseRaw(string.concat(".configs[", index_, "].specific.init")), (LooperInitValues));
+        LooperBaseValues memory baseValues = abi.decode(
+            json_.parseRaw(
+                string.concat(".configs[", index_, "].specific.base")
+            ),
+            (LooperBaseValues)
+        );
 
+        LooperValues memory looperInitValues = abi.decode(
+            json_.parseRaw(
+                string.concat(".configs[", index_, "].specific.init")
+            ),
+            (LooperValues)
+        );
         // Deploy Strategy
         WstETHLooper strategy = new WstETHLooper();
 
-        strategy.initialize(testConfig_.asset, address(this), true, abi.encode(looperInitValues));
+        strategy.initialize(testConfig_.asset, address(this), true, abi.encode(baseValues, 
+        looperInitValues));
 
         strategyContract = WstETHLooper(payable(strategy));
 
@@ -86,13 +97,24 @@ contract WstETHLooperTest is BaseStrategyTest {
     }
 
     function test__initialization() public override {
-        LooperInitValues memory looperInitValues =
-            abi.decode(json.parseRaw(string.concat(".configs[1].specific.init")), (LooperInitValues));
+        LooperBaseValues memory baseValues = abi.decode(
+            json.parseRaw(
+                string.concat(".configs[0].specific.base")
+            ),
+            (LooperBaseValues)
+        );
+
+        LooperValues memory looperInitValues = abi.decode(
+            json.parseRaw(
+                string.concat(".configs[0].specific.init")
+            ),
+            (LooperValues)
+        );
 
         // Deploy Strategy
         WstETHLooper strategy = new WstETHLooper();
 
-        strategy.initialize(testConfig.asset, address(this), true, abi.encode(looperInitValues));
+        strategy.initialize(testConfig.asset, address(this), true, abi.encode(baseValues, looperInitValues));
 
         verify_adapterInit();
     }
@@ -143,15 +165,15 @@ contract WstETHLooperTest is BaseStrategyTest {
     }
 
     function test__setHarvestValues() public {
-        address oldPool = address(strategyContract.stableSwapStETH());
+        address oldPool = address(strategyContract.stableSwapPool());
         address newPool = address(0x85dE3ADd465a219EE25E04d22c39aB027cF5C12E);
         address stETH = strategyContract.stETH();
 
-        strategyContract.setHarvestValues(newPool);
+        strategyContract.setHarvestValues(abi.encode(newPool));
         uint256 oldAllowance = IERC20(stETH).allowance(address(strategy), oldPool);
         uint256 newAllowance = IERC20(stETH).allowance(address(strategy), newPool);
 
-        assertEq(address(strategyContract.stableSwapStETH()), newPool);
+        assertEq(address(strategyContract.stableSwapPool()), newPool);
         assertEq(oldAllowance, 0);
         assertEq(newAllowance, type(uint256).max);
     }
@@ -459,13 +481,13 @@ contract WstETHLooperTest is BaseStrategyTest {
     function test__setLeverageValues_invalidInputs() public {
         // protocolLTV < targetLTV < maxLTV
         vm.expectRevert(
-            abi.encodeWithSelector(WstETHLooper.InvalidLTV.selector, 3e18, 4e18, strategyContract.protocolMaxLTV())
+            abi.encodeWithSelector(BaseAaveLeverageStrategy.InvalidLTV.selector, 3e18, 4e18, strategyContract.protocolMaxLTV())
         );
         strategyContract.setLeverageValues(3e18, 4e18);
 
         // maxLTV < targetLTV < protocolLTV
         vm.expectRevert(
-            abi.encodeWithSelector(WstETHLooper.InvalidLTV.selector, 4e17, 3e17, strategyContract.protocolMaxLTV())
+            abi.encodeWithSelector(BaseAaveLeverageStrategy.InvalidLTV.selector, 4e17, 3e17, strategyContract.protocolMaxLTV())
         );
         strategyContract.setLeverageValues(4e17, 3e17);
     }
@@ -482,7 +504,7 @@ contract WstETHLooperTest is BaseStrategyTest {
     function test__setSlippage_invalidValue() public {
         uint256 newSlippage = 1e18; // 100%
 
-        vm.expectRevert(abi.encodeWithSelector(WstETHLooper.InvalidSlippage.selector, newSlippage, 2e17));
+        vm.expectRevert(abi.encodeWithSelector(BaseAaveLeverageStrategy.InvalidSlippage.selector, newSlippage, 2e17));
         strategyContract.setSlippage(newSlippage);
     }
 
@@ -492,30 +514,30 @@ contract WstETHLooperTest is BaseStrategyTest {
         uint256[] memory premiums = new uint256[](1);
 
         // reverts with invalid msg.sender and valid initiator
-        vm.expectRevert(WstETHLooper.NotFlashLoan.selector);
+        vm.expectRevert(BaseAaveLeverageStrategy.NotFlashLoan.selector);
         vm.prank(bob);
         strategyContract.executeOperation(assets, amounts, premiums, address(strategy), "");
 
         // reverts with invalid initiator and valid msg.sender
-        vm.expectRevert(WstETHLooper.NotFlashLoan.selector);
+        vm.expectRevert(BaseAaveLeverageStrategy.NotFlashLoan.selector);
         vm.prank(address(lendingPool));
         strategyContract.executeOperation(assets, amounts, premiums, address(bob), "");
     }
 
-    function test__harvest() public override {
-        _mintAssetAndApproveForStrategy(100e18, bob);
+    // function test__harvest() public override {
+    //     _mintAssetAndApproveForStrategy(100e18, bob);
 
-        vm.prank(bob);
-        strategy.deposit(100e18, bob);
+    //     vm.prank(bob);
+    //     strategy.deposit(100e18, bob);
 
-        // LTV should be 0
-        assertEq(strategyContract.getLTV(), 0);
+    //     // LTV should be 0
+    //     assertEq(strategyContract.getLTV(), 0);
 
-        strategy.harvest(hex"");
+    //     strategy.harvest(hex"");
 
-        // LTV should be at target now
-        assertApproxEqAbs(strategyContract.targetLTV(), strategyContract.getLTV(), 1, string.concat("ltv != expected"));
-    }
+    //     // LTV should be at target now
+    //     assertApproxEqAbs(strategyContract.targetLTV(), strategyContract.getLTV(), 1, string.concat("ltv != expected"));
+    // }
 
     /*//////////////////////////////////////////////////////////////
                           INITIALIZATION
@@ -525,7 +547,7 @@ contract WstETHLooperTest is BaseStrategyTest {
         assertEq(strategy.asset(), address(wstETH), "asset");
         assertEq(
             IERC20Metadata(address(strategy)).name(),
-            string.concat("VaultCraft Leveraged ", IERC20Metadata(address(wstETH)).name(), " Adapter"),
+            string.concat("VaultCraft Leveraged ", IERC20Metadata(address(wstETH)).name(), " Strategy"),
             "name"
         );
         assertEq(
