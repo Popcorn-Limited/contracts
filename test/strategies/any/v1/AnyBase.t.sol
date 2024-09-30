@@ -2,8 +2,8 @@
 // Docgen-SOLC: 0.8.0
 pragma solidity ^0.8.25;
 
-import {AnyConverter} from "src/strategies/AnyConverter.sol";
-import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson, IERC20, Math} from "../../BaseStrategyTest.sol";
+import {AnyConverter} from "src/strategies/any/v1/AnyConverter.sol";
+import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson, IERC20, Math} from "test/strategies/BaseStrategyTest.sol";
 import {MockOracle} from "test/mocks/MockOracle.sol";
 import "forge-std/console.sol";
 

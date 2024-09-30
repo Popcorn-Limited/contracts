@@ -5,7 +5,7 @@ pragma solidity ^0.8.25;
 
 import {Script, console} from "forge-std/Script.sol";
 import {stdJson} from "forge-std/StdJson.sol";
-import {AnyDepositor, IERC20} from "src/strategies/AnyDepositor.sol";
+import {AnyDepositor, IERC20} from "src/strategies/any/v1/AnyDepositor.sol";
 
 contract Deploy is Script {
     using stdJson for string;

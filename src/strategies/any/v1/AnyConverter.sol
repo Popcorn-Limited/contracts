@@ -4,7 +4,7 @@
 pragma solidity ^0.8.25;
 
 import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
-import {BaseStrategy, IERC20Metadata, ERC20, IERC20, Math} from "./BaseStrategy.sol";
+import {BaseStrategy, IERC20Metadata, ERC20, IERC20, Math} from "src/strategies/BaseStrategy.sol";
 import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
 
 /**

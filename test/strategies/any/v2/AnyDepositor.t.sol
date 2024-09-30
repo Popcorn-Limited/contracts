@@ -2,17 +2,21 @@
 // Docgen-SOLC: 0.8.0
 pragma solidity ^0.8.25;
 
-import {AnyDepositor, IERC20} from "src/strategies/any/v1/AnyDepositor.sol";
+import {AnyDepositorV2, IERC20} from "src/strategies/any/v2/AnyDepositorV2.sol";
 import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson} from "test/strategies/BaseStrategyTest.sol";
 import {AnyBaseTest} from "./AnyBase.t.sol";
 import {MockOracle} from "test/mocks/MockOracle.sol";
 import "forge-std/console.sol";
 
-contract AnyDepositorTest is AnyBaseTest {
+contract AnyDepositorV2Test is AnyBaseTest {
     using stdJson for string;
 
     function setUp() public {
-        _setUpBaseTest(0, "./test/strategies/any/v1/AnyDepositorTestConfig.json");
+        _setUpBaseTest(
+            0,
+            "./test/strategies/any/v2/AnyDepositorTestConfig.json"
+        );
+        _setUpBase();
     }
 
     function _setUpStrategy(
@@ -20,7 +24,7 @@ contract AnyDepositorTest is AnyBaseTest {
         string memory index_,
         TestConfig memory testConfig_
     ) internal override returns (IBaseStrategy) {
-        AnyDepositor _strategy = new AnyDepositor();
+        AnyDepositorV2 _strategy = new AnyDepositorV2();
         oracle = new MockOracle();
 
         yieldToken = json_.readAddress(
@@ -31,7 +35,7 @@ contract AnyDepositorTest is AnyBaseTest {
             testConfig_.asset,
             address(this),
             true,
-            abi.encode(yieldToken, address(oracle), uint256(0), uint256(0))
+            abi.encode(yieldToken, address(oracle), uint256(0))
         );
 
         return IBaseStrategy(address(_strategy));
