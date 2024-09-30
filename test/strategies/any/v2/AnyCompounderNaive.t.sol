@@ -2,8 +2,8 @@
 // Docgen-SOLC: 0.8.0
 pragma solidity ^0.8.25;
 
-import {AnyCompounder, AnyCompounderNaiveV2, AnyConverterV2, ClaimInteraction, IERC20} from "src/strategies/any/v2/AnyCompounderNaiveV2.sol";
-import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson} from "../../BaseStrategyTest.sol";
+import {AnyCompounderV2, AnyCompounderNaiveV2, AnyConverterV2, CallStruct, PendingCallAllowance, IERC20} from "src/strategies/any/v2/AnyCompounderV2.sol";
+import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson} from "test/strategies/BaseStrategyTest.sol";
 import {MockOracle} from "test/mocks/MockOracle.sol";
 import {AnyBaseTest} from "./AnyBase.t.sol";
 import "forge-std/console.sol";
@@ -25,18 +25,21 @@ contract ClaimContract {
     }
 }
 
-contract AnyCompounderNaiveTest is AnyBaseTest {
+contract AnyCompounderNaiveV2Test is AnyBaseTest {
     using stdJson for string;
 
     event ClaimIdProposed(bytes32 id);
     event ClaimIdAdded(bytes32 id);
     event ClaimIdRemoved(bytes32 id);
 
+    ClaimContract public claimContract;
+
     function setUp() public {
         _setUpBaseTest(
             0,
-            "./test/strategies/any/AnyCompounderNaiveTestConfig.json"
+            "./test/strategies/any/v2/AnyCompounderNaiveTestConfig.json"
         );
+        _setUpBase();
     }
 
     function _setUpStrategy(
@@ -44,7 +47,7 @@ contract AnyCompounderNaiveTest is AnyBaseTest {
         string memory index_,
         TestConfig memory testConfig_
     ) internal override returns (IBaseStrategy) {
-        AnyCompounder _strategy = new AnyCompounder();
+        AnyCompounderV2 _strategy = new AnyCompounderV2();
         oracle = new MockOracle();
 
         yieldToken = json_.readAddress(
@@ -67,105 +70,32 @@ contract AnyCompounderNaiveTest is AnyBaseTest {
         return IBaseStrategy(address(_strategy));
     }
 
-    function _addClaimId(bytes32 claimId) internal {
-        AnyCompounder(address(strategy)).proposeClaimId(claimId);
+    function _prepareClaim() internal {
+        address[] memory rewardTokens = strategy.rewardTokens();
+        claimContract = new ClaimContract(rewardTokens);
 
-        vm.warp(block.timestamp + 3 days + 1);
+        for (uint256 i; i < rewardTokens.length; i++) {
+            deal(rewardTokens[i], address(claimContract), 1e18);
+        }
 
-        AnyCompounder(address(strategy)).addClaimId(claimId);
-    }
+        // Give this contract yield assets and allow the strategy to pull them
+        _mintYieldToken(testConfig.defaultAmount, address(this));
+        IERC20(yieldToken).approve(address(strategy), testConfig.defaultAmount);
 
-    /*//////////////////////////////////////////////////////////////
-                            CLAIM ID TESTS
-    //////////////////////////////////////////////////////////////*/
-
-    function test__proposeClaimId() public {
-        bytes32 id = keccak256("blub");
-        uint256 unlockTime = block.timestamp + 3 days;
-
-        vm.expectEmit(true, true, false, true);
-        emit ClaimIdProposed(id);
-        AnyCompounder(address(strategy)).proposeClaimId(id);
-
-        assertEq(
-            AnyCompounder(address(strategy)).proposedClaimIds(id),
-            unlockTime
+        // Approve claim call
+        address target = address(claimContract);
+        bytes4 selector = bytes4(
+            abi.encodeWithSelector(ClaimContract.claim.selector)
         );
-    }
-
-    function test__proposeClaimId_fails_if_none_owner() public {
-        bytes32 id = keccak256("blub");
-
-        vm.startPrank(alice);
-        vm.expectRevert("Only the contract owner may perform this action");
-
-        AnyCompounder(address(strategy)).proposeClaimId(id);
-    }
-
-    function test__proposeClaimId_fails_if_proposal_exists() public {
-        bytes32 id = keccak256("blub");
-        AnyCompounder(address(strategy)).proposeClaimId(id);
-
-        vm.expectRevert(AnyConverter.Misconfigured.selector);
-        AnyCompounder(address(strategy)).proposeClaimId(id);
-    }
-
-    function test__addClaimId() public {
-        bytes32 id = keccak256("blub");
-
-        AnyCompounder(address(strategy)).proposeClaimId(id);
+        PendingCallAllowance[] memory changes = new PendingCallAllowance[](1);
+        changes[0] = PendingCallAllowance({
+            target: target,
+            selector: selector,
+            allowed: true
+        });
+        AnyConverterV2(address(strategy)).proposeCallAllowance(changes);
         vm.warp(block.timestamp + 3 days + 1);
-
-        vm.expectEmit(true, true, false, true);
-        emit ClaimIdAdded(id);
-        AnyCompounder(address(strategy)).addClaimId(id);
-
-        assertEq(AnyCompounder(address(strategy)).proposedClaimIds(id), 0);
-        assertTrue(AnyCompounder(address(strategy)).claimIds(id));
-    }
-
-    function test__addClaimId_fails_if_none_owner() public {
-        bytes32 id = keccak256("blub");
-
-        vm.startPrank(alice);
-        vm.expectRevert("Only the contract owner may perform this action");
-
-        AnyCompounder(address(strategy)).addClaimId(id);
-    }
-
-    function test__addClaimId_respect_timeout() public {
-        bytes32 id = keccak256("blub");
-        AnyCompounder(address(strategy)).proposeClaimId(id);
-
-        vm.expectRevert(AnyConverter.Misconfigured.selector);
-        AnyCompounder(address(strategy)).addClaimId(id);
-    }
-
-    function test__addClaimId_fails_if_doesnt_exist() public {
-        bytes32 id = keccak256("blub");
-
-        vm.expectRevert(AnyConverter.Misconfigured.selector);
-        AnyCompounder(address(strategy)).addClaimId(id);
-    }
-
-    function test__removeClaimId() public {
-        bytes32 id = keccak256("blub");
-        _addClaimId(id);
-
-        vm.expectEmit(true, true, false, true);
-        emit ClaimIdRemoved(id);
-        AnyCompounder(address(strategy)).removeClaimId(id);
-
-        assertFalse(AnyCompounder(address(strategy)).claimIds(id));
-    }
-
-    function test__removeClaimId_fails_if_none_owner() public {
-        bytes32 id = keccak256("blub");
-
-        vm.startPrank(alice);
-        vm.expectRevert("Only the contract owner may perform this action");
-
-        AnyCompounder(address(strategy)).removeClaimId(id);
+        AnyConverterV2(address(strategy)).changeCallAllowances();
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -183,29 +113,13 @@ contract AnyCompounderNaiveTest is AnyBaseTest {
         uint256 totalAssets = strategy.totalAssets();
         uint256 totalSupply = strategy.totalSupply();
 
-        // we give the strategy reward tokens to simulate a harvest
-        address[] memory rewardTokens = strategy.rewardTokens();
-        for (uint256 i; i < rewardTokens.length; i++) {
-            deal(rewardTokens[i], address(strategy), 1e18);
-        }
-
-        // give this contract yield assets and allow the strategy to pull them
-        _mintYieldToken(testConfig.defaultAmount, address(this));
-
-        ClaimContract claimContract = new ClaimContract(rewardTokens);
-        _addClaimId(
-            keccak256(
-                abi.encodePacked(claimContract, ClaimContract.claim.selector)
-            )
-        );
+        _prepareClaim();
         strategy.harvest(
             abi.encode(
                 testConfig.defaultAmount,
-                ClaimInteraction({
-                    addr: address(claimContract),
-                    callData: abi.encodeWithSelector(
-                        ClaimContract.claim.selector
-                    )
+                CallStruct({
+                    target: address(claimContract),
+                    data: abi.encodeWithSelector(ClaimContract.claim.selector)
                 })
             )
         );
@@ -232,49 +146,15 @@ contract AnyCompounderNaiveTest is AnyBaseTest {
         vm.prank(bob);
         strategy.deposit(testConfig.defaultAmount, bob);
 
-        // we give the strategy reward tokens to simulate a harvest
-        address[] memory rewardTokens = strategy.rewardTokens();
-        for (uint256 i; i < rewardTokens.length; i++) {
-            deal(rewardTokens[i], address(strategy), 1e18);
-        }
+        _prepareClaim();
 
-        // give this contract yield assets and allow the strategy to pull them
-        _mintYieldToken(testConfig.defaultAmount, address(this));
-
-        ClaimContract claimContract = new ClaimContract(rewardTokens);
-        _addClaimId(
-            keccak256(
-                abi.encodePacked(claimContract, ClaimContract.claim.selector)
-            )
-        );
-
-        vm.expectRevert(AnyCompounderNaive.HarvestFailed.selector);
+        vm.expectRevert(AnyCompounderNaiveV2.HarvestFailed.selector);
         strategy.harvest(
             abi.encode(
                 0,
-                ClaimInteraction({
-                    addr: address(claimContract),
-                    callData: abi.encodeWithSelector(
-                        ClaimContract.claim.selector
-                    )
-                })
-            )
-        );
-    }
-
-    function test__harvest_fails_if_not_claimId() public {
-        address[] memory rewardTokens = strategy.rewardTokens();
-        ClaimContract claimContract = new ClaimContract(rewardTokens);
-
-        vm.expectRevert(AnyConverter.Misconfigured.selector);
-        strategy.harvest(
-            abi.encode(
-                0,
-                ClaimInteraction({
-                    addr: address(claimContract),
-                    callData: abi.encodeWithSelector(
-                        ClaimContract.claim.selector
-                    )
+                CallStruct({
+                    target: address(claimContract),
+                    data: abi.encodeWithSelector(ClaimContract.claim.selector)
                 })
             )
         );

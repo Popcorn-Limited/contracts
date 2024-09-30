@@ -4,7 +4,7 @@
 pragma solidity ^0.8.25;
 
 import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
-import {AnyConverterV2, IERC20Metadata, ERC20, IERC20, Math} from "./AnyConverterV2.sol";
+import {AnyConverterV2, IERC20Metadata, ERC20, IERC20, Math, CallStruct, PendingCallAllowance} from "./AnyConverterV2.sol";
 
 /**
  * @title   BaseStrategy
@@ -51,9 +51,7 @@ abstract contract AnyCompounderNaiveV2 is AnyConverterV2 {
         if (!isAllowed[claimInteraction.target][bytes4(claimInteraction.data)])
             revert("Not allowed");
 
-        (bool success, ) = claimInteraction.target.call(
-            claimInteraction.data
-        );
+        (bool success, ) = claimInteraction.target.call(claimInteraction.data);
         require(success, "Claim failed");
 
         IERC20(yieldToken).safeTransferFrom(msg.sender, address(this), assets);

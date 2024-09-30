@@ -2,13 +2,13 @@
 // Docgen-SOLC: 0.8.0
 pragma solidity ^0.8.25;
 
-import {AnyConverterV2, CallStruct, ProposedChange, PendingAllowance} from "src/strategies/AnyConverterV2.sol";
-import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson, IERC20, Math} from "../../BaseStrategyTest.sol";
+import {AnyConverterV2, CallStruct, ProposedChange, PendingCallAllowance} from "src/strategies/any/v2/AnyConverterV2.sol";
+import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson, IERC20, Math} from "test/strategies/BaseStrategyTest.sol";
 import {MockOracle} from "test/mocks/MockOracle.sol";
 import {MockExchange} from "test/mocks/MockExchange.sol";
 import "forge-std/console.sol";
 
-abstract contract AnyV2BaseTest is BaseStrategyTest {
+abstract contract AnyBaseTest is BaseStrategyTest {
     using Math for uint256;
     using stdJson for string;
 
@@ -18,6 +18,32 @@ abstract contract AnyV2BaseTest is BaseStrategyTest {
 
     function _setUpBase() internal {
         exchange = new MockExchange();
+
+        PendingCallAllowance[] memory changes = new PendingCallAllowance[](3);
+        changes[0] = PendingCallAllowance({
+            target: testConfig.asset,
+            selector: bytes4(keccak256("approve(address,uint256)")),
+            allowed: true
+        });
+        changes[1] = PendingCallAllowance({
+            target: yieldToken,
+            selector: bytes4(keccak256("approve(address,uint256)")),
+            allowed: true
+        });
+        changes[2] = PendingCallAllowance({
+            target: address(exchange),
+            selector: bytes4(
+                keccak256(
+                    "swapTokenExactAmountIn(address,uint256,address,uint256)"
+                )
+            ),
+            allowed: true
+        });
+
+        AnyConverterV2(address(strategy)).proposeCallAllowance(changes);
+
+        vm.warp(block.timestamp + 3 days + 1);
+        AnyConverterV2(address(strategy)).changeCallAllowances();
     }
 
     function _increasePricePerShare(uint256 amount) internal override {
@@ -37,7 +63,7 @@ abstract contract AnyV2BaseTest is BaseStrategyTest {
     }
 
     function _pushFunds(uint256 amountIn, uint256 amountOut) internal {
-        _mintYieldToken(amountOut, address(exchange));
+        _mintYieldToken(amountOut * 2, address(exchange));
 
         bytes memory encodedApprove = abi.encodeWithSelector(
             bytes4(keccak256("approve(address,uint256)")),
@@ -60,11 +86,21 @@ abstract contract AnyV2BaseTest is BaseStrategyTest {
         calls[0] = CallStruct(testConfig.asset, encodedApprove);
         calls[1] = CallStruct(address(exchange), encodedSwap);
 
-        strategy.pushFunds(0, abi.encode(bytes(""), calls));
+        strategy.pushFunds(0, abi.encode(calls));
+
+        _mintAsset(amountIn, address(this));
+        IERC20(testConfig.asset).approve(address(exchange), amountIn);
+
+        exchange.swapTokenExactAmountIn(
+            testConfig.asset,
+            amountIn,
+            yieldToken,
+            amountOut
+        );
     }
 
     function _pullFunds(uint256 amountIn, uint256 amountOut) internal {
-        _mintAsset(amountOut, address(exchange));
+        _mintAsset(amountOut * 2, address(exchange));
 
         bytes memory encodedApprove = abi.encodeWithSelector(
             bytes4(keccak256("approve(address,uint256)")),
@@ -87,7 +123,7 @@ abstract contract AnyV2BaseTest is BaseStrategyTest {
         calls[0] = CallStruct(yieldToken, encodedApprove);
         calls[1] = CallStruct(address(exchange), encodedSwap);
 
-        strategy.pushFunds(0, abi.encode(bytes(""), calls));
+        strategy.pullFunds(0, abi.encode(calls));
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -136,7 +172,7 @@ abstract contract AnyV2BaseTest is BaseStrategyTest {
         );
         assertApproxEqAbs(
             IERC20(_asset_).balanceOf(address(strategy)),
-            (testConfig.defaultAmount / 5) * 4,
+            (testConfig.defaultAmount / 5) * 2,
             _delta_,
             "strategy asset bal"
         );
@@ -184,7 +220,7 @@ abstract contract AnyV2BaseTest is BaseStrategyTest {
         );
         assertApproxEqAbs(
             IERC20(_asset_).balanceOf(address(strategy)),
-            (testConfig.defaultAmount / 5) * 4,
+            (testConfig.defaultAmount / 5) * 2,
             _delta_,
             "strategy asset bal"
         );
@@ -248,18 +284,17 @@ abstract contract AnyV2BaseTest is BaseStrategyTest {
             testConfig.defaultAmount - amountIn
         );
 
-        // TODO reduce by slippage
-        assertApproxEqAbs(strategy.totalAssets(), oldTa, _delta_, "ta");
+        assertApproxEqAbs(
+            strategy.totalAssets(),
+            testConfig.defaultAmount / 2 + expectedAmountOut,
+            _delta_,
+            "ta"
+        );
         assertApproxEqAbs(strategy.totalSupply(), oldTs, _delta_, "ts");
     }
 
     function test__pullFunds() public override {
-        _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
-
-        vm.prank(bob);
-        strategy.deposit(testConfig.defaultAmount, bob);
-
-        _pushFunds(testConfig.defaultAmount, testConfig.defaultAmount);
+        test__pushFunds();
 
         uint256 oldTa = strategy.totalAssets();
         uint256 oldTs = strategy.totalSupply();
@@ -277,20 +312,15 @@ abstract contract AnyV2BaseTest is BaseStrategyTest {
     }
 
     function test__pullFunds_with_slippage() public {
-        _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
+        test__pushFunds();
 
-        vm.prank(bob);
-        strategy.deposit(testConfig.defaultAmount, bob);
-
-        _pushFunds(testConfig.defaultAmount, testConfig.defaultAmount);
+        uint256 oldTa = strategy.totalAssets();
+        uint256 oldTs = strategy.totalSupply();
 
         // Add slippage
         AnyConverterV2(address(strategy)).proposeSlippage(1000);
         vm.warp(block.timestamp + 3 days + 1);
         AnyConverterV2(address(strategy)).changeSlippage();
-
-        uint256 oldTa = strategy.totalAssets();
-        uint256 oldTs = strategy.totalSupply();
 
         uint256 amountIn = testConfig.defaultAmount / 2;
         uint256 expectedAmountOut = amountIn.mulDiv(
@@ -303,15 +333,20 @@ abstract contract AnyV2BaseTest is BaseStrategyTest {
         // warp adds some assets as interest from the aToken
         assertEq(
             IERC20(yieldToken).balanceOf(address(strategy)),
-            445012582609314989
+            500567815567176224
         );
         assertEq(
             IERC20(testConfig.asset).balanceOf(address(strategy)),
-            assetAmount
+            expectedAmountOut
         );
 
         // TODO reduce by slippage
-        assertApproxEqAbs(strategy.totalAssets(), oldTa, _delta_, "ta");
+        assertApproxEqAbs(
+            strategy.totalAssets(),
+            500567815567176224 + expectedAmountOut,
+            _delta_,
+            "ta"
+        );
         assertApproxEqAbs(strategy.totalSupply(), oldTs, _delta_, "ts");
     }
 
@@ -321,7 +356,18 @@ abstract contract AnyV2BaseTest is BaseStrategyTest {
         vm.prank(bob);
         strategy.deposit(testConfig.defaultAmount, bob);
 
-        // TODO actual reverting call
+        CallStruct[] memory calls = new CallStruct[](2);
+        calls[0] = CallStruct(
+            yieldToken,
+            abi.encodeWithSelector(
+                bytes4(keccak256("transfer(address,uint256)")),
+                address(exchange),
+                testConfig.defaultAmount
+            )
+        );
+
+        vm.expectRevert("Not Allowed");
+        strategy.pushFunds(0, abi.encode(calls));
     }
 
     function testFail__pullFunds_invalid_call() public {
@@ -331,7 +377,19 @@ abstract contract AnyV2BaseTest is BaseStrategyTest {
         strategy.deposit(testConfig.defaultAmount, bob);
         _pushFunds(testConfig.defaultAmount, testConfig.defaultAmount);
 
-        // TODO actual reverting call
+                CallStruct[] memory calls = new CallStruct[](2);
+        calls[0] = CallStruct(
+            yieldToken,
+            abi.encodeWithSelector(
+                bytes4(keccak256("transfer(address,uint256)")),
+                address(exchange),
+                testConfig.defaultAmount
+            )
+        );
+
+        vm.expectRevert("Not Allowed");
+        strategy.pullFunds(0, abi.encode(calls));
+
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -342,23 +400,33 @@ abstract contract AnyV2BaseTest is BaseStrategyTest {
         uint256 newSlippage = 500; // 5%
         AnyConverterV2(address(strategy)).proposeSlippage(newSlippage);
 
-        (uint256 proposedSlippage, uint256 proposedTime) = AnyConverterV2(address(strategy)).proposedSlippage();
-        assertEq(proposedSlippage, newSlippage, "Proposed slippage should match");
-        assertEq(proposedTime, block.timestamp, "Proposed time should be current block timestamp");
+        (uint256 proposedSlippage, uint256 proposedTime) = AnyConverterV2(
+            address(strategy)
+        ).proposedSlippage();
+        assertEq(
+            proposedSlippage,
+            newSlippage,
+            "Proposed slippage should match"
+        );
+        assertEq(
+            proposedTime,
+            block.timestamp + 3 days,
+            "Proposed time should be current block timestamp"
+        );
     }
 
     function test__proposeSlippage_owner_only() public {
         uint256 newSlippage = 500; // 5%
-        
+
         vm.prank(bob);
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert("Only the contract owner may perform this action");
         AnyConverterV2(address(strategy)).proposeSlippage(newSlippage);
     }
 
     function test__proposeSlippage_invalid_value() public {
         uint256 invalidSlippage = 10001; // 100.01%, which is invalid
-        
-        vm.expectRevert(AnyConverterV2.InvalidConfig.selector);
+
+        vm.expectRevert(AnyConverterV2.Misconfigured.selector);
         AnyConverterV2(address(strategy)).proposeSlippage(invalidSlippage);
     }
 
@@ -367,18 +435,35 @@ abstract contract AnyV2BaseTest is BaseStrategyTest {
         uint256 secondSlippage = 1000; // 10%
 
         AnyConverterV2(address(strategy)).proposeSlippage(firstSlippage);
-        
-        (uint256 proposedSlippage, uint256 firstProposedTime) = AnyConverterV2(address(strategy)).proposedSlippage();
-        assertEq(proposedSlippage, firstSlippage, "First proposed slippage should match");
+
+        (uint256 proposedSlippage, uint256 firstProposedTime) = AnyConverterV2(
+            address(strategy)
+        ).proposedSlippage();
+        assertEq(
+            proposedSlippage,
+            firstSlippage,
+            "First proposed slippage should match"
+        );
 
         // Warp time forward
         vm.warp(block.timestamp + 1 days);
 
         AnyConverterV2(address(strategy)).proposeSlippage(secondSlippage);
-        
-        (proposedSlippage, uint256 secondProposedTime) = AnyConverterV2(address(strategy)).proposedSlippage();
-        assertEq(proposedSlippage, secondSlippage, "Second proposed slippage should match");
-        assertGt(secondProposedTime, firstProposedTime, "Second proposal time should be later");
+
+        (
+            uint256 secondProposedSlippage,
+            uint256 secondProposedTime
+        ) = AnyConverterV2(address(strategy)).proposedSlippage();
+        assertEq(
+            secondProposedSlippage,
+            secondSlippage,
+            "Second proposed slippage should match"
+        );
+        assertGt(
+            secondProposedTime,
+            firstProposedTime,
+            "Second proposal time should be later"
+        );
     }
 
     function test__changeSlippage() public {
@@ -401,7 +486,7 @@ abstract contract AnyV2BaseTest is BaseStrategyTest {
         vm.warp(block.timestamp + 3 days + 1);
 
         vm.prank(bob);
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert("Only the contract owner may perform this action");
         AnyConverterV2(address(strategy)).changeSlippage();
     }
 
@@ -409,15 +494,12 @@ abstract contract AnyV2BaseTest is BaseStrategyTest {
         uint256 newSlippage = 500; // 5%
         AnyConverterV2(address(strategy)).proposeSlippage(newSlippage);
 
-        // Warp time forward, but not past the required delay
-        vm.warp(block.timestamp + 3 days);
-
-        vm.expectRevert(AnyConverterV2.TimelockNotReady.selector);
+        vm.expectRevert(AnyConverterV2.Misconfigured.selector);
         AnyConverterV2(address(strategy)).changeSlippage();
     }
 
     function test__changeSlippage_no_proposal() public {
-        vm.expectRevert(AnyConverterV2.NoProposal.selector);
+        vm.expectRevert(AnyConverterV2.Misconfigured.selector);
         AnyConverterV2(address(strategy)).changeSlippage();
     }
 
@@ -429,7 +511,8 @@ abstract contract AnyV2BaseTest is BaseStrategyTest {
 
         AnyConverterV2(address(strategy)).changeSlippage();
 
-        (uint256 proposedSlippage, ) = AnyConverterV2(address(strategy)).proposedSlippage();
+        (uint256 proposedSlippage, ) = AnyConverterV2(address(strategy))
+            .proposedSlippage();
         assertEq(proposedSlippage, 0, "Proposed slippage should be reset");
     }
 
@@ -437,47 +520,132 @@ abstract contract AnyV2BaseTest is BaseStrategyTest {
                             SET ALLOWED FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    function test__proposeAllowed() public {
-        bytes4 newAllowedFunction = bytes4(keccak256("someFunction(uint256)"));
-        AnyConverterV2(address(strategy)).proposeAllowed(newAllowedFunction);
-
-        (bytes4 proposedAllowed, uint256 proposedTime) = AnyConverterV2(address(strategy)).proposedAllowed();
-        assertEq(proposedAllowed, newAllowedFunction, "Proposed allowed function should match");
-        assertEq(proposedTime, block.timestamp, "Proposed time should be current block timestamp");
+    function _getProposedAllowance()
+        internal
+        view
+        returns (PendingCallAllowance[] memory)
+    {
+        address target = address(0x444);
+        bytes4 selector = bytes4(keccak256("someFunction(uint256)"));
+        PendingCallAllowance[] memory changes = new PendingCallAllowance[](1);
+        changes[0] = PendingCallAllowance({
+            target: target,
+            selector: selector,
+            allowed: true
+        });
+        return changes;
     }
 
-    function test__proposeAllowed_owner_only() public {
-        bytes4 newAllowedFunction = bytes4(keccak256("someFunction(uint256)"));
-        
+    function test__proposeCallAllowance() public {
+        PendingCallAllowance[] memory changes = _getProposedAllowance();
+        AnyConverterV2(address(strategy)).proposeCallAllowance(changes);
+
+        (
+            uint256 proposedTime,
+            PendingCallAllowance[] memory proposed
+        ) = AnyConverterV2(address(strategy)).getProposedCallAllowance();
+
+        assertEq(proposed.length, 1);
+        assertEq(proposed[0].selector, changes[0].selector);
+        assertEq(proposed[0].target, changes[0].target);
+        assertEq(proposed[0].allowed, true);
+        assertEq(proposedTime, block.timestamp + 3 days);
+    }
+
+    function test__proposeCallAllowance_owner_only() public {
+        PendingCallAllowance[] memory changes = _getProposedAllowance();
+
         vm.prank(bob);
-        vm.expectRevert("Ownable: caller is not the owner");
-        AnyConverterV2(address(strategy)).proposeAllowed(newAllowedFunction);
+        vm.expectRevert("Only the contract owner may perform this action");
+        AnyConverterV2(address(strategy)).proposeCallAllowance(changes);
     }
 
-    function test__proposeAllowed_zero_selector() public {
-        bytes4 zeroSelector = bytes4(0);
-        
-        vm.expectRevert(AnyConverterV2.InvalidConfig.selector);
-        AnyConverterV2(address(strategy)).proposeAllowed(zeroSelector);
-    }
-
-    function test__proposeAllowed_multiple_proposals() public {
-        bytes4 firstAllowed = bytes4(keccak256("firstFunction(uint256)"));
-        bytes4 secondAllowed = bytes4(keccak256("secondFunction(address)"));
-
-        AnyConverterV2(address(strategy)).proposeAllowed(firstAllowed);
-        
-        (bytes4 proposedAllowed, uint256 firstProposedTime) = AnyConverterV2(address(strategy)).proposedAllowed();
-        assertEq(proposedAllowed, firstAllowed, "First proposed allowed should match");
+    function test__proposeCallAllowance_multiple_proposal() public {
+        uint256 firstCallTime = block.timestamp;
+        PendingCallAllowance[] memory changes = _getProposedAllowance();
+        AnyConverterV2(address(strategy)).proposeCallAllowance(changes);
 
         // Warp time forward
         vm.warp(block.timestamp + 1 days);
 
-        AnyConverterV2(address(strategy)).proposeAllowed(secondAllowed);
-        
-        (proposedAllowed, uint256 secondProposedTime) = AnyConverterV2(address(strategy)).proposedAllowed();
-        assertEq(proposedAllowed, secondAllowed, "Second proposed allowed should match");
-        assertGt(secondProposedTime, firstProposedTime, "Second proposal time should be later");
+        changes[0] = PendingCallAllowance({
+            target: address(0x333),
+            selector: bytes4(keccak256("someOtherFunction(uint256)")),
+            allowed: true
+        });
+
+        AnyConverterV2(address(strategy)).proposeCallAllowance(changes);
+        (
+            uint256 proposedTime,
+            PendingCallAllowance[] memory proposed
+        ) = AnyConverterV2(address(strategy)).getProposedCallAllowance();
+
+        // Should add both proposals
+        assertEq(proposed.length, 2);
+        assertEq(proposed[0].target, address(0x444));
+        assertEq(
+            proposed[0].selector,
+            bytes4(keccak256("someFunction(uint256)"))
+        );
+        assertEq(proposed[0].allowed, true);
+        assertEq(proposed[1].target, address(0x333));
+        assertEq(
+            proposed[1].selector,
+            bytes4(keccak256("someOtherFunction(uint256)"))
+        );
+        assertEq(proposed[1].allowed, true);
+        assertEq(proposedTime, firstCallTime + 4 days);
+    }
+
+    function test__changeCallAllowances() public {
+        PendingCallAllowance[] memory changes = _getProposedAllowance();
+        AnyConverterV2(address(strategy)).proposeCallAllowance(changes);
+
+        // Warp time forward past the required delay
+        vm.warp(block.timestamp + 3 days + 1);
+
+        // Change allowances
+        AnyConverterV2(address(strategy)).changeCallAllowances();
+
+        (
+            uint256 proposedTime,
+            PendingCallAllowance[] memory proposed
+        ) = AnyConverterV2(address(strategy)).getProposedCallAllowance();
+
+        assertEq(proposedTime, 0);
+        assertEq(proposed.length, 0);
+
+        assertTrue(
+            AnyConverterV2(address(strategy)).isAllowed(
+                address(0x444),
+                bytes4(keccak256("someFunction(uint256)"))
+            )
+        );
+    }
+
+    function test__changeCallAllowances_owner_only() public {
+        PendingCallAllowance[] memory changes = _getProposedAllowance();
+        AnyConverterV2(address(strategy)).proposeCallAllowance(changes);
+
+        // Warp time forward past the required delay
+        vm.warp(block.timestamp + 3 days + 1);
+
+        vm.prank(bob);
+        vm.expectRevert("Only the contract owner may perform this action");
+        AnyConverterV2(address(strategy)).changeCallAllowances();
+    }
+
+    function test__changeCallAllowances_before_delay() public {
+        PendingCallAllowance[] memory changes = _getProposedAllowance();
+        AnyConverterV2(address(strategy)).proposeCallAllowance(changes);
+
+        vm.expectRevert(AnyConverterV2.Misconfigured.selector);
+        AnyConverterV2(address(strategy)).changeCallAllowances();
+    }
+
+    function test__changeCallAllowances_no_proposal() public {
+        vm.expectRevert(AnyConverterV2.Misconfigured.selector);
+        AnyConverterV2(address(strategy)).changeCallAllowances();
     }
 
     /*//////////////////////////////////////////////////////////////

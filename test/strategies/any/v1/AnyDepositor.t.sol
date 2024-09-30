@@ -2,8 +2,8 @@
 // Docgen-SOLC: 0.8.0
 pragma solidity ^0.8.25;
 
-import {AnyDepositor, IERC20} from "src/strategies/AnyDepositor.sol";
-import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson} from "../../BaseStrategyTest.sol";
+import {AnyDepositor, IERC20} from "src/strategies/any/v1/AnyDepositor.sol";
+import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson} from "test/strategies/BaseStrategyTest.sol";
 import {AnyBaseTest} from "./AnyBase.t.sol";
 import {MockOracle} from "test/mocks/MockOracle.sol";
 import "forge-std/console.sol";
@@ -12,7 +12,7 @@ contract AnyDepositorTest is AnyBaseTest {
     using stdJson for string;
 
     function setUp() public {
-        _setUpBaseTest(0, "./test/strategies/any/AnyDepositorTestConfig.json");
+        _setUpBaseTest(0, "./test/strategies/any/v1/AnyDepositorTestConfig.json");
     }
 
     function _setUpStrategy(

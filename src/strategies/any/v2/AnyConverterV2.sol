@@ -4,7 +4,7 @@
 pragma solidity ^0.8.25;
 
 import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
-import {BaseStrategy, IERC20Metadata, ERC20, IERC20, Math} from "./BaseStrategy.sol";
+import {BaseStrategy, IERC20Metadata, ERC20, IERC20, Math} from "src/strategies/BaseStrategy.sol";
 import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
 
 struct CallStruct {
@@ -12,9 +12,9 @@ struct CallStruct {
     bytes data;
 }
 
-struct PendingAllowance {
+struct PendingCallAllowance {
     address target;
-    bytes4 data;
+    bytes4 selector;
     bool allowed;
 }
 
@@ -62,9 +62,9 @@ abstract contract AnyConverterV2 is BaseStrategy {
         __BaseStrategy_init(asset_, owner_, autoDeposit_);
 
         address oracle_;
-        (yieldToken, oracle_, slippage, floatRatio) = abi.decode(
+        (yieldToken, oracle_, slippage) = abi.decode(
             strategyInitData_,
-            (address, address, uint256, uint256)
+            (address, address, uint256)
         );
         oracle = IPriceOracle(oracle_);
 
@@ -80,29 +80,10 @@ abstract contract AnyConverterV2 is BaseStrategy {
      * @notice Total amount of underlying `asset` token managed by adapter.
      * @dev Return assets held by adapter if paused.
      */
-    function totalAssets() public view override returns (uint256) {
-        return _totalAssets();
-    }
-
     function _totalAssets() internal view override returns (uint256) {
-        uint256 bal = IERC20(asset()).balanceOf(address(this));
-        uint256 _totalReservedAssets = totalReservedAssets;
-        // yieldTokenBal is the total amount of yieldTokens that are held by the contract
-        // priced in the underlying asset token
-        uint256 yieldTokenBal = _totalYieldTokenInAssets();
-
-        if (bal + yieldTokenBal <= _totalReservedAssets) return 0;
-        return (bal + yieldTokenBal - totalReservedAssets);
-    }
-
-    function _totalYieldTokenInAssets() internal view returns (uint256) {
-        uint256 yieldBal = IERC20(yieldToken).balanceOf(address(this));
-        uint256 _totalReservedYieldTokens = totalReservedYieldTokens;
-
-        if (yieldBal <= _totalReservedYieldTokens) return 0;
         return
             oracle.getQuote(
-                yieldBal - _totalReservedYieldTokens,
+                IERC20(yieldToken).balanceOf(address(this)),
                 yieldToken,
                 asset()
             );
@@ -123,10 +104,6 @@ abstract contract AnyConverterV2 is BaseStrategy {
         returns (address[] memory)
     {
         revert();
-    }
-
-    function getFloat() internal view override returns (uint256) {
-        return IERC20(asset()).balanceOf(address(this)) - totalReservedAssets;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -202,7 +179,10 @@ abstract contract AnyConverterV2 is BaseStrategy {
         if (postYieldTokenBalance < preYieldTokenBalance)
             revert("Yield token balance decreased");
 
-        emit PushedFunds(yieldTokens, withdrawable);
+        emit PushedFunds(
+            postYieldTokenBalance - preYieldTokenBalance,
+            preAssetBalance - postAssetBalance
+        );
     }
 
     /// @notice Convert yieldTokens to assets
@@ -236,13 +216,19 @@ abstract contract AnyConverterV2 is BaseStrategy {
         // Asset balance should increase
         if (postAssetBalance < preAssetBalance)
             revert("Asset balance decreased");
+
+        emit PulledFunds(
+            postAssetBalance - preAssetBalance,
+            preYieldTokenBalance - postYieldTokenBalance
+        );
     }
 
-    function _convert(bytes memory data) internal {
+    function _convert(
+        bytes memory data
+    ) internal returns (uint256, uint256, uint256, uint256, uint256, uint256) {
         // caching
         address _asset = asset();
         address _yieldToken = yieldToken;
-        uint256 _floatRatio = floatRatio;
 
         uint256 preTotalAssets = totalAssets();
         uint256 preAssetBalance = IERC20(_asset).balanceOf(address(this));
@@ -250,18 +236,13 @@ abstract contract AnyConverterV2 is BaseStrategy {
             address(this)
         );
 
-        (bytes memory stuff, CallStruct[] memory calls) = abi.decode(
-            data,
-            (bytes, CallStruct[])
-        );
+        CallStruct[] memory calls = abi.decode(data, (CallStruct[]));
 
         for (uint256 i; i < calls.length; i++) {
             if (!isAllowed[calls[i].target][bytes4(calls[i].data)])
                 revert("Not allowed");
 
-            (bool success, bytes memory ret) = calls[i].target.call(
-                calls[i].data
-            );
+            (bool success, ) = calls[i].target.call(calls[i].data);
             if (!success) revert("Call failed");
         }
 
@@ -319,36 +300,63 @@ abstract contract AnyConverterV2 is BaseStrategy {
     }
 
     /*//////////////////////////////////////////////////////////////
-                            RESERVE LOGIC
+                        ALLOWED FUNCTION LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    PendingAllowance[] public pendingAllowances;
-    uint256 public pendingAllowancesTime;
+    event CallAllowanceProposed(
+        address target,
+        bytes4 selector,
+        bool isAllowed
+    );
+    event CallAllowanceChanged(address target, bytes4 selector, bool isAllowed);
+
+    PendingCallAllowance[] public pendingCallAllowances;
+    uint256 public pendingCallAllowanceTime;
     mapping(address => mapping(bytes4 => bool)) public isAllowed;
 
-    function proposeAllowed(
-        PendingAllowance[] memory allowances
+    function proposeCallAllowance(
+        PendingCallAllowance[] calldata callAllowances
     ) external onlyOwner {
-        if (pendingAllowancesTime != 0) revert Misconfigured();
+        for (uint256 i; i < callAllowances.length; i++) {
+            pendingCallAllowances.push(callAllowances[i]);
 
-        pendingAllowances = allowances;
-        pendingAllowancesTime = block.timestamp + 3 days;
+            emit CallAllowanceProposed(
+                callAllowances[i].target,
+                callAllowances[i].selector,
+                callAllowances[i].allowed
+            );
+        }
+        pendingCallAllowanceTime = block.timestamp + 3 days;
     }
 
-    function changeAllowances() external onlyOwner {
+    function changeCallAllowances() external onlyOwner {
         if (
-            pendingAllowancesTime == 0 ||
-            pendingAllowancesTime > block.timestamp
+            pendingCallAllowanceTime == 0 ||
+            pendingCallAllowanceTime > block.timestamp
         ) revert Misconfigured();
 
-        for (uint256 i; i < pendingAllowances.length; i++) {
-            isAllowed[pendingAllowances[i].target][
-                pendingAllowances[i].data
-            ] = pendingAllowances[i].allowed;
+        for (uint256 i; i < pendingCallAllowances.length; i++) {
+            isAllowed[pendingCallAllowances[i].target][
+                pendingCallAllowances[i].selector
+            ] = pendingCallAllowances[i].allowed;
+
+            emit CallAllowanceChanged(
+                pendingCallAllowances[i].target,
+                pendingCallAllowances[i].selector,
+                pendingCallAllowances[i].allowed
+            );
         }
 
-        delete pendingAllowances;
-        delete pendingAllowancesTime;
+        delete pendingCallAllowances;
+        delete pendingCallAllowanceTime;
+    }
+
+    function getProposedCallAllowance()
+        external
+        view
+        returns (uint256, PendingCallAllowance[] memory)
+    {
+        return (pendingCallAllowanceTime, pendingCallAllowances);
     }
 
     /*//////////////////////////////////////////////////////////////
