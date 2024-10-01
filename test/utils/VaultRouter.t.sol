@@ -158,7 +158,8 @@ contract VaultRouterTest is Test {
         router.fullfillWithdrawal(address(vault), user, amount);
 
         assertEq(router.requestShares(address(vault), user), 0);
-        assertEq(asset.balanceOf(user), 100e18);
+        assertEq(asset.balanceOf(address(router)), 100e18);
+        assertEq(router.claimableAssets(address(asset), user), 100e18);
     }
 
     function test__fullfillWithdrawals_MultipleReceivers() public {
@@ -213,9 +214,11 @@ contract VaultRouterTest is Test {
         assertEq(router.requestShares(address(vault), user2), 0);
         assertEq(router.requestShares(address(vault), user3), 0);
 
-        assertEq(asset.balanceOf(user), 100e18);
-        assertEq(asset.balanceOf(user2), 150e18);
-        assertEq(asset.balanceOf(user3), 200e18);
+        assertEq(asset.balanceOf(address(router)), 450e18);
+
+        assertEq(router.claimableAssets(address(asset), user), 100e18);
+        assertEq(router.claimableAssets(address(asset), user2), 150e18);
+        assertEq(router.claimableAssets(address(asset), user3), 200e18);
     }
 
     function test__fullfillWithdrawals_array_mismatch() public {
@@ -228,6 +231,33 @@ contract VaultRouterTest is Test {
 
         vm.expectRevert(VaultRouter.ArrayMismatch.selector);
         router.fullfillWithdrawals(address(vault), receivers, amounts);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                           CLAIM WITHDRAWAL
+    //////////////////////////////////////////////////////////////*/
+
+    function test__claimWithdrawal() public {
+        // First, request and fulfill withdrawal
+        test__fullfillWithdrawal();
+
+        vm.prank(user);
+        router.claimWithdrawal(address(asset), user);
+
+        assertEq(asset.balanceOf(user), 100e18);
+        assertEq(router.claimableAssets(address(asset), user), 0);
+        assertEq(asset.balanceOf(address(router)), 0);
+    }
+
+     function test__claimWithdrawal_for_someone_else() public {
+        // First, request and fulfill withdrawal
+        test__fullfillWithdrawal();
+
+        router.claimWithdrawal(address(asset), user);
+
+        assertEq(asset.balanceOf(user), 100e18);
+        assertEq(router.claimableAssets(address(asset), user), 0);
+        assertEq(asset.balanceOf(address(router)), 0);
     }
 
     /*//////////////////////////////////////////////////////////////
