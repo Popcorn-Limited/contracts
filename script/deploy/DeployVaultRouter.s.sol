@@ -3,14 +3,14 @@
 pragma solidity ^0.8.15;
 
 import {Script, console} from "forge-std/Script.sol";
-import {FeeRecipientProxy} from "src/utils/FeeRecipientProxy.sol";
+import {VaultRouter} from "src/utils/VaultRouter.sol";
 
 contract Deploy is Script {
     function run() public {
         vm.startBroadcast();
         console.log("msg.sender:", msg.sender);
 
-        new FeeRecipientProxy{salt: bytes32("FeeRecipientProxy")}(msg.sender);
+        new VaultRouter{salt: bytes32("VaultRouter")}();
 
         vm.stopBroadcast();
     }
