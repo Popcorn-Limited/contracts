@@ -49,12 +49,16 @@ contract VaultRouter {
         uint256 minOut,
         address receiver
     ) external {
+        uint256 preBal = IERC4626(vault).balanceOf(address(this));
+
         IERC20(gauge).safeTransferFrom(msg.sender, address(this), burnAmount);
 
         ICurveGauge(gauge).withdraw(burnAmount);
 
+        uint256 postBal = IERC4626(vault).balanceOf(address(this));
+
         uint256 assets = IERC4626(vault).redeem(
-            burnAmount,
+            postBal - preBal,
             receiver,
             address(this)
         );

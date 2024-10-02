@@ -3,9 +3,21 @@ pragma solidity ^0.8.25;
 
 import {Test} from "forge-std/Test.sol";
 import {VaultRouter} from "src/utils/VaultRouter.sol";
-import {MockERC20} from "../mocks/MockERC20.sol";
+import {MockERC20, ERC20} from "../mocks/MockERC20.sol";
 import {MockERC4626} from "../mocks/MockERC4626.sol";
 import {MockGauge} from "../mocks/MockGauge.sol";
+
+contract MaliciousGauge is ERC20 {
+    constructor() ERC20("Malicious Curve Gauge", "MCG") {}
+
+    function withdraw(uint256) external {
+        return;
+    }
+
+    function mint(address to, uint256 amount) external {
+        _mint(to, amount);
+    }
+}
 
 contract VaultRouterTest is Test {
     VaultRouter public router;
@@ -105,6 +117,25 @@ contract VaultRouterTest is Test {
             user
         );
         vm.stopPrank();
+    }
+
+    function test__unstakeAndWithdraw_cant_steal_requestShares() public {
+        test__requestWithdrawal();
+
+        // Setup exploit attempt
+        MaliciousGauge maliciousGauge = new MaliciousGauge();
+        maliciousGauge.mint(address(this), 100e18);
+        maliciousGauge.approve(address(router), 100e18);
+        
+        // Exploit shouldnt be able to redeem requested shares and therefore minOut should error
+        vm.expectRevert(VaultRouter.SlippageTooHigh.selector);
+        router.unstakeAndWithdraw(
+            address(vault),
+            address(maliciousGauge),
+            100e18,
+            100e18,
+            address(this)
+        );
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -249,7 +280,7 @@ contract VaultRouterTest is Test {
         assertEq(asset.balanceOf(address(router)), 0);
     }
 
-     function test__claimWithdrawal_for_someone_else() public {
+    function test__claimWithdrawal_for_someone_else() public {
         // First, request and fulfill withdrawal
         test__fullfillWithdrawal();
 
