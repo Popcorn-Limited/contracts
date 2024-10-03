@@ -6,6 +6,7 @@ pragma solidity ^0.8.25;
 import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math} from "src/strategies/BaseStrategy.sol";
 import {Math} from "openzeppelin-contracts/utils/math/Math.sol";
 import {ILendingPool, IAaveIncentives, IAToken, IFlashLoanReceiver, IProtocolDataProvider, IPoolAddressesProvider, DataTypes} from "src/interfaces/external/aave/IAaveV3.sol";
+import "forge-std/console.sol";
 
 struct LooperBaseValues {
     address aaveDataProvider;
@@ -561,7 +562,7 @@ abstract contract BaseAaveLeverageStrategy is BaseStrategy, IFlashLoanReceiver {
         _protocolDeposit(IERC20(asset).balanceOf(address(this)), 0, hex"");
     }
 
-    // returns current loan to value,
+    // returns current loan to value
     // debt and collateral amounts in debt value
     function _getCurrentLTV()
         internal
@@ -571,8 +572,18 @@ abstract contract BaseAaveLeverageStrategy is BaseStrategy, IFlashLoanReceiver {
         debt = debtToken.balanceOf(address(this)); // debt
         collateral = _toDebtValue(interestToken.balanceOf(address(this))); // collateral converted into debt amount;
 
-        (debt == 0 || collateral == 0) ? loanToValue = 0 : loanToValue = debt
-            .mulDiv(1e18, collateral, Math.Rounding.Ceil);
+        // get position data from the aave lending pool
+        (, , , uint256 liqThreshold, , uint256 healthFactor) = lendingPool
+            .getUserAccountData(address(this));
+
+        // LTV = LT / HF
+        (healthFactor == type(uint256).max)
+            ? loanToValue = 0
+            : loanToValue = (liqThreshold * 1e14).mulDiv(
+            1e18,
+            healthFactor,
+            Math.Rounding.Ceil
+        );
     }
 
     // reverts if targetLTV < maxLTV < protocolLTV is not satisfied
