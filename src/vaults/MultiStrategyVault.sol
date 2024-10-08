@@ -119,7 +119,7 @@ contract MultiStrategyVault is
         depositIndex = depositIndex_;
 
         // Set other state variables
-        quitPeriod = 3 days;
+        quitPeriod = 1 days;
         depositLimit = depositLimit_;
         highWaterMark = convertToAssets(1e18);
 

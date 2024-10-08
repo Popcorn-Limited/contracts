@@ -107,7 +107,7 @@ contract MultiStrategyVaultTest is Test {
         assertEq(address(newVault.strategies(1)), address(strategies[1]));
         assertEq(newVault.owner(), bob);
 
-        assertEq(newVault.quitPeriod(), 3 days);
+        assertEq(newVault.quitPeriod(), 1 days);
         assertEq(
             asset.allowance(address(newVault), address(strategies[0])),
             type(uint256).max
