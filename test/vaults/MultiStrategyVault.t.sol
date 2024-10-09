@@ -6,7 +6,7 @@ pragma solidity ^0.8.15;
 import {Test} from "forge-std/Test.sol";
 import {MockERC20} from "../mocks/MockERC20.sol";
 import {MockERC4626} from "../mocks/MockERC4626.sol";
-import {MultiStrategyVault, Allocation} from "src/vaults/MultiStrategyVault.sol";
+import {MultiStrategyVault, Allocation, InitializeParams} from "src/vaults/MultiStrategyVault.sol";
 import {IERC4626, IERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
 import {Clones} from "openzeppelin-contracts/proxy/Clones.sol";
@@ -58,12 +58,15 @@ contract MultiStrategyVaultTest is Test {
         withdrawalQueue.push(0);
 
         vault.initialize(
-            IERC20(address(asset)),
-            strategies,
-            uint256(0),
-            withdrawalQueue,
-            type(uint256).max,
-            address(this)
+            InitializeParams(
+                IERC20(address(asset)),
+                strategies,
+                uint256(0),
+                withdrawalQueue,
+                type(uint256).max,
+                address(this),
+                address(0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E)
+            )
         );
     }
 
@@ -90,12 +93,15 @@ contract MultiStrategyVaultTest is Test {
         MultiStrategyVault newVault = MultiStrategyVault(vaultAddress);
 
         newVault.initialize(
-            IERC20(address(asset)),
-            strategies,
-            uint256(0),
-            withdrawalQueue,
-            type(uint256).max,
-            bob
+            InitializeParams(
+                IERC20(address(asset)),
+                strategies,
+                uint256(0),
+                withdrawalQueue,
+                type(uint256).max,
+                bob,
+                address(0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E)
+            )
         );
 
         assertEq(newVault.name(), "VaultCraft Mock Token Vault");
@@ -123,12 +129,15 @@ contract MultiStrategyVaultTest is Test {
         MultiStrategyVault newVault = MultiStrategyVault(vaultAddress);
 
         newVault.initialize(
-            IERC20(address(0)),
-            strategies,
-            uint256(0),
-            withdrawalQueue,
-            type(uint256).max,
-            address(this)
+            InitializeParams(
+                IERC20(address(0)),
+                strategies,
+                uint256(0),
+                withdrawalQueue,
+                type(uint256).max,
+                address(this),
+                address(0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E)
+            )
         );
     }
 
@@ -142,12 +151,15 @@ contract MultiStrategyVaultTest is Test {
         MultiStrategyVault newVault = MultiStrategyVault(vaultAddress);
 
         newVault.initialize(
-            IERC20(address(asset)),
-            newStrategies,
-            uint256(0),
-            withdrawalQueue,
-            type(uint256).max,
-            address(this)
+            InitializeParams(
+                IERC20(address(asset)),
+                newStrategies,
+                uint256(0),
+                withdrawalQueue,
+                type(uint256).max,
+                address(this),
+                address(0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E)
+            )
         );
     }
 
@@ -156,12 +168,15 @@ contract MultiStrategyVaultTest is Test {
         MultiStrategyVault newVault = MultiStrategyVault(vaultAddress);
 
         newVault.initialize(
-            IERC20(address(asset)),
-            new IERC4626[](1),
-            uint256(0),
-            withdrawalQueue,
-            type(uint256).max,
-            address(this)
+            InitializeParams(
+                IERC20(address(asset)),
+                new IERC4626[](1),
+                uint256(0),
+                withdrawalQueue,
+                type(uint256).max,
+                address(this),
+                address(0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E)
+            )
         );
     }
 
@@ -169,12 +184,15 @@ contract MultiStrategyVaultTest is Test {
         address vaultAddress = Clones.clone(implementation);
         MultiStrategyVault newVault = MultiStrategyVault(vaultAddress);
         newVault.initialize(
-            IERC20(address(asset)),
-            strategies,
-            uint256(3),
-            withdrawalQueue,
-            type(uint256).max,
-            bob
+            InitializeParams(
+                IERC20(address(asset)),
+                strategies,
+                uint256(3),
+                withdrawalQueue,
+                type(uint256).max,
+                bob,
+                address(0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E)
+            )
         );
     }
 
@@ -185,12 +203,15 @@ contract MultiStrategyVaultTest is Test {
         uint256[] memory newWithdrawalQueue = new uint256[](3);
 
         newVault.initialize(
-            IERC20(address(asset)),
-            strategies,
-            uint256(0),
-            newWithdrawalQueue,
-            type(uint256).max,
-            bob
+            InitializeParams(
+                IERC20(address(asset)),
+                strategies,
+                uint256(0),
+                newWithdrawalQueue,
+                type(uint256).max,
+                bob,
+                address(0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E)
+            )
         );
     }
 
@@ -201,12 +222,15 @@ contract MultiStrategyVaultTest is Test {
         uint256[] memory newWithdrawalQueue = new uint256[](1);
 
         newVault.initialize(
-            IERC20(address(asset)),
-            strategies,
-            uint256(0),
-            newWithdrawalQueue,
-            type(uint256).max,
-            bob
+            InitializeParams(
+                IERC20(address(asset)),
+                strategies,
+                uint256(0),
+                newWithdrawalQueue,
+                type(uint256).max,
+                bob,
+                address(0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E)
+            )
         );
     }
 
@@ -219,12 +243,15 @@ contract MultiStrategyVaultTest is Test {
         newWithdrawalQueue[1] = uint256(2);
 
         newVault.initialize(
-            IERC20(address(asset)),
-            strategies,
-            uint256(0),
-            newWithdrawalQueue,
-            type(uint256).max,
-            bob
+            InitializeParams(
+                IERC20(address(asset)),
+                strategies,
+                uint256(0),
+                newWithdrawalQueue,
+                type(uint256).max,
+                bob,
+                address(0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E)
+            )
         );
     }
 
@@ -238,12 +265,15 @@ contract MultiStrategyVaultTest is Test {
         newStrategies[1] = newStrategy;
 
         newVault.initialize(
-            IERC20(address(asset)),
-            newStrategies,
-            uint256(0),
-            withdrawalQueue,
-            type(uint256).max,
-            bob
+            InitializeParams(
+                IERC20(address(asset)),
+                newStrategies,
+                uint256(0),
+                withdrawalQueue,
+                type(uint256).max,
+                bob,
+                address(0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E)
+            )
         );
     }
 
@@ -256,12 +286,15 @@ contract MultiStrategyVaultTest is Test {
         newWithdrawalQueue[1] = 0;
 
         newVault.initialize(
-            IERC20(address(asset)),
-            strategies,
-            uint256(0),
-            newWithdrawalQueue,
-            type(uint256).max,
-            bob
+            InitializeParams(
+                IERC20(address(asset)),
+                strategies,
+                uint256(0),
+                newWithdrawalQueue,
+                type(uint256).max,
+                bob,
+                address(0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E)
+            )
         );
     }
 
@@ -580,6 +613,7 @@ contract MultiStrategyVaultTest is Test {
 
         Allocation[] memory withdrawAllocations = new Allocation[](2);
         withdrawAllocations[0] = Allocation({index: 0, amount: 4e18});
+        withdrawAllocations[1] = Allocation({index: 1, amount: 4e18});
 
         vm.prank(bob);
         vault.withdraw(3e18, withdrawAllocations);
@@ -654,6 +688,7 @@ contract MultiStrategyVaultTest is Test {
 
         Allocation[] memory withdrawAllocations = new Allocation[](2);
         withdrawAllocations[0] = Allocation({index: 0, amount: 4e18});
+        withdrawAllocations[1] = Allocation({index: 1, amount: 4e18});
 
         vm.prank(bob);
         vault.redeem(3e18, withdrawAllocations);
@@ -684,12 +719,15 @@ contract MultiStrategyVaultTest is Test {
         uint256[] memory newWithdrawalQueue;
 
         newVault.initialize(
-            IERC20(address(asset)),
-            newStrategies,
-            type(uint256).max,
-            newWithdrawalQueue,
-            type(uint256).max,
-            bob
+            InitializeParams(
+                IERC20(address(asset)),
+                newStrategies,
+                type(uint256).max,
+                newWithdrawalQueue,
+                type(uint256).max,
+                bob,
+                address(0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E)
+            )
         );
         return newVault;
     }
@@ -710,12 +748,15 @@ contract MultiStrategyVaultTest is Test {
         uint256[] memory newWithdrawalQueue;
 
         newVault.initialize(
-            IERC20(address(asset)),
-            newStrategies,
-            0,
-            newWithdrawalQueue,
-            type(uint256).max,
-            address(this)
+            InitializeParams(
+                IERC20(address(asset)),
+                newStrategies,
+                0,
+                newWithdrawalQueue,
+                type(uint256).max,
+                address(this),
+                address(0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E)
+            )
         );
     }
 
@@ -727,12 +768,15 @@ contract MultiStrategyVaultTest is Test {
         uint256[] memory newWithdrawalQueue = new uint256[](1);
 
         newVault.initialize(
-            IERC20(address(asset)),
-            newStrategies,
-            0,
-            newWithdrawalQueue,
-            type(uint256).max,
-            address(this)
+            InitializeParams(
+                IERC20(address(asset)),
+                newStrategies,
+                0,
+                newWithdrawalQueue,
+                type(uint256).max,
+                address(this),
+                address(0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E)
+            )
         );
     }
 

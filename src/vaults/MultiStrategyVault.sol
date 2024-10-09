@@ -10,6 +10,25 @@ import {PausableUpgradeable} from "openzeppelin-contracts-upgradeable/utils/Paus
 import {Math} from "openzeppelin-contracts/utils/math/Math.sol";
 import {OwnedUpgradeable} from "../utils/OwnedUpgradeable.sol";
 
+/**
+ * @param asset_ Underlying Asset which users will deposit.
+ * @param strategies_ strategies to be used to earn interest for this vault.
+ * @param depositIndex_ index of the strategy that the vault should use on deposit
+ * @param withdrawalQueue_ indices determining the order in which we should withdraw funds from strategies
+ * @param depositLimit_ Maximum amount of assets which can be deposited.
+ * @param owner_ Owner of the contract. Controls management functions.
+ * @param feeRecipient_ Address that will receive fees.
+ */
+struct InitializeParams {
+    IERC20 asset;
+    IERC4626[] strategies;
+    uint256 depositIndex;
+    uint256[] withdrawalQueue;
+    uint256 depositLimit;
+    address owner;
+    address feeRecipient;
+}
+
 struct Allocation {
     uint256 index;
     uint256 amount;
@@ -52,36 +71,24 @@ contract MultiStrategyVault is
 
     /**
      * @notice Initialize a new Vault.
-     * @param asset_ Underlying Asset which users will deposit.
-     * @param strategies_ strategies to be used to earn interest for this vault.
-     * @param depositIndex_ index of the strategy that the vault should use on deposit
-     * @param withdrawalQueue_ indices determining the order in which we should withdraw funds from strategies
-     * @param depositLimit_ Maximum amount of assets which can be deposited.
-     * @param owner_ Owner of the contract. Controls management functions.
+     * @param params InitializeParams struct containing all necessary parameters.
      * @dev This function is called by the factory contract when deploying a new vault.
      * @dev Usually the adapter should already be pre configured. Otherwise a new one can only be added after a ragequit time.
      * @dev overflows if depositLimit is close to maxUint (convertToShares multiplies depositLimit with totalSupply)
      */
-    function initialize(
-        IERC20 asset_,
-        IERC4626[] memory strategies_,
-        uint256 depositIndex_,
-        uint256[] memory withdrawalQueue_,
-        uint256 depositLimit_,
-        address owner_
-    ) external initializer {
+    function initialize(InitializeParams memory params) external initializer {
         __Pausable_init();
         __ReentrancyGuard_init();
-        __ERC4626_init(IERC20Metadata(address(asset_)));
-        __Owned_init(owner_);
+        __ERC4626_init(IERC20Metadata(address(params.asset)));
+        __Owned_init(params.owner);
 
-        if (address(asset_) == address(0)) revert InvalidAsset();
+        if (address(params.asset) == address(0)) revert InvalidAsset();
 
         // Cache
-        uint256 len = strategies_.length;
+        uint256 len = params.strategies.length;
 
         // Verify WithdrawalQueue length
-        if (withdrawalQueue_.length != len) {
+        if (params.withdrawalQueue.length != len) {
             revert InvalidWithdrawalQueue();
         }
 
@@ -91,56 +98,60 @@ contract MultiStrategyVault is
                 _verifyStrategyAndWithdrawalQueue(
                     i,
                     len,
-                    address(asset_),
-                    strategies_,
-                    withdrawalQueue_
+                    address(params.asset),
+                    params.strategies,
+                    params.withdrawalQueue
                 );
 
                 // Approve asset for strategy
                 // Doing this inside this loop instead of its own loop for gas savings
-                asset_.approve(address(strategies_[i]), type(uint256).max);
+                params.asset.approve(
+                    address(params.strategies[i]),
+                    type(uint256).max
+                );
             }
 
             // Validate depositIndex
-            if (depositIndex_ >= len && depositIndex_ != type(uint256).max) {
+            if (
+                params.depositIndex >= len &&
+                params.depositIndex != type(uint256).max
+            ) {
                 revert InvalidIndex();
             }
 
             // Set withdrawalQueue and strategies
-            strategies = strategies_;
-            withdrawalQueue = withdrawalQueue_;
+            strategies = params.strategies;
+            withdrawalQueue = params.withdrawalQueue;
         } else {
             // Validate depositIndex
-            if (depositIndex_ != type(uint256).max) {
+            if (params.depositIndex != type(uint256).max) {
                 revert InvalidIndex();
             }
         }
 
-        depositIndex = depositIndex_;
+        depositIndex = params.depositIndex;
 
         // Set other state variables
         quitPeriod = 1 days;
-        depositLimit = depositLimit_;
+        depositLimit = params.depositLimit;
         highWaterMark = convertToAssets(1e18);
+        FEE_RECIPIENT = params.feeRecipient;
 
         _name = string.concat(
             "VaultCraft ",
-            IERC20Metadata(address(asset_)).name(),
+            IERC20Metadata(address(params.asset)).name(),
             " Vault"
         );
         _symbol = string.concat(
             "vc-",
-            IERC20Metadata(address(asset_)).symbol()
+            IERC20Metadata(address(params.asset)).symbol()
         );
 
         contractName = keccak256(
             abi.encodePacked("VaultCraft ", name(), block.timestamp, "Vault")
         );
 
-        INITIAL_CHAIN_ID = block.chainid;
-        INITIAL_DOMAIN_SEPARATOR = computeDomainSeparator();
-
-        emit VaultInitialized(contractName, address(asset_));
+        emit VaultInitialized(contractName, address(params.asset));
     }
 
     function name()
@@ -686,8 +697,8 @@ contract MultiStrategyVault is
     uint256 public managementFee;
     uint256 public feesUpdatedAt;
 
-    address public constant FEE_RECIPIENT =
-        address(0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E);
+    address public FEE_RECIPIENT;
+
     uint256 internal constant SECONDS_PER_YEAR = 365.25 days;
 
     event FeesChanged(

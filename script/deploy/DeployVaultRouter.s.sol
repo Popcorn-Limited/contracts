@@ -6,11 +6,11 @@ import {Script, console} from "forge-std/Script.sol";
 import {VaultRouter} from "src/utils/VaultRouter.sol";
 
 contract Deploy is Script {
-    function run() public {
+    function run() public returns (VaultRouter router) {
         vm.startBroadcast();
         console.log("msg.sender:", msg.sender);
 
-        new VaultRouter{salt: bytes32("VaultRouter")}();
+        router = new VaultRouter{salt: bytes32("VaultRouter")}();
 
         vm.stopBroadcast();
     }
