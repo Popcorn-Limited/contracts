@@ -9,10 +9,13 @@ contract DeployPeer is Script {
 
     function run() public {
         address minter = msg.sender;
+        address owner = msg.sender;
+        
         vm.startBroadcast();
-        console.log("SENDER", msg.sender);
+
         PeerToken t = new PeerToken();
-        t.initalize(minter, msg.sender, "Wormhole Bridged VCX", "wVCX");
+
+        t.initalize(minter, owner, "Wormhole Bridged VCX", "wVCX");
 
         vm.stopBroadcast();
     }
@@ -21,16 +24,16 @@ contract DeployPeer is Script {
 contract SetMinter is Script {
     function setUp() public {}
 
+    // to set a new ntt manager as peer token minter
     function run() public {
         // uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
-        // address ntt_manager = address(0x67eB307120D219d84d1a66a62016D396045F352b); // TODO
 
-        // PeerToken t = PeerToken(0xe15323Ae15269782fAdeF9937D24f675bdDdbC35);
+        address ntt_manager = address(0x67eB307120D219d84d1a66a62016D396045F352b); // edit
+        PeerToken t = PeerToken(0xe15323Ae15269782fAdeF9937D24f675bdDdbC35); // edit
         
-        // vm.startBroadcast();
+        vm.startBroadcast();
 
-        // t.setMinter(ntt_manager);
-        // vm.stopBroadcast();
-
+        t.setMinter(ntt_manager);
+        vm.stopBroadcast();
     }
 }
