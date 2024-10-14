@@ -151,7 +151,7 @@ abstract contract AnyConverterV2 is BaseStrategy {
     function pushFunds(
         uint256,
         bytes memory data
-    ) external override onlyKeeperOrOwner whenNotPaused {
+    ) external override onlyKeeperOrOwner {
         (
             uint256 preTotalAssets,
             uint256 preAssetBalance,
@@ -167,7 +167,7 @@ abstract contract AnyConverterV2 is BaseStrategy {
             preTotalAssets.mulDiv(
                 10_000 - slippage,
                 10_000,
-                Math.Rounding.Floor
+                Math.Rounding.Ceil
             )
         ) revert("Total assets decreased");
 
@@ -189,7 +189,7 @@ abstract contract AnyConverterV2 is BaseStrategy {
     function pullFunds(
         uint256,
         bytes memory data
-    ) external override onlyKeeperOrOwner whenNotPaused {
+    ) external override onlyKeeperOrOwner {
         (
             uint256 preTotalAssets,
             uint256 preAssetBalance,
@@ -205,7 +205,7 @@ abstract contract AnyConverterV2 is BaseStrategy {
             preTotalAssets.mulDiv(
                 10_000 - slippage,
                 10_000,
-                Math.Rounding.Floor
+                Math.Rounding.Ceil
             )
         ) revert("Total assets decreased");
 
