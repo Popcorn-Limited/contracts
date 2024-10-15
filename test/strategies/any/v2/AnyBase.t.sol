@@ -370,6 +370,40 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         strategy.pushFunds(0, abi.encode(calls));
     }
 
+    function test__pushFunds_outstanding_allowance_reverts() public {
+        strategy.toggleAutoDeposit();
+        _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
+
+        vm.prank(bob);
+        strategy.deposit(testConfig.defaultAmount, bob);
+
+        _mintYieldToken(testConfig.defaultAmount * 2, address(exchange));
+
+        bytes memory encodedApprove = abi.encodeWithSelector(
+            bytes4(keccak256("approve(address,uint256)")),
+            address(exchange),
+            testConfig.defaultAmount * 2
+        );
+        bytes memory encodedSwap = abi.encodeWithSelector(
+            bytes4(
+                keccak256(
+                    "swapTokenExactAmountIn(address,uint256,address,uint256)"
+                )
+            ),
+            testConfig.asset,
+            testConfig.defaultAmount,
+            yieldToken,
+            testConfig.defaultAmount
+        );
+
+        CallStruct[] memory calls = new CallStruct[](2);
+        calls[0] = CallStruct(testConfig.asset, encodedApprove);
+        calls[1] = CallStruct(address(exchange), encodedSwap);
+
+        vm.expectRevert("Total assets decreased");
+        strategy.pushFunds(0, abi.encode(calls));
+    }
+
     function testFail__pullFunds_invalid_call() public {
         _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
 
@@ -388,6 +422,37 @@ abstract contract AnyBaseTest is BaseStrategyTest {
         );
 
         vm.expectRevert("Not Allowed");
+        strategy.pullFunds(0, abi.encode(calls));
+    }
+
+    function test__pullFunds_outstanding_allowance_reverts() public {
+        test__pushFunds();
+
+        // Set outstanding allowance
+        _mintAsset(testConfig.defaultAmount * 2, address(exchange));
+
+        bytes memory encodedApprove = abi.encodeWithSelector(
+            bytes4(keccak256("approve(address,uint256)")),
+            address(exchange),
+            testConfig.defaultAmount * 2
+        );
+        bytes memory encodedSwap = abi.encodeWithSelector(
+            bytes4(
+                keccak256(
+                    "swapTokenExactAmountIn(address,uint256,address,uint256)"
+                )
+            ),
+            yieldToken,
+            testConfig.defaultAmount,
+            testConfig.asset,
+            testConfig.defaultAmount
+        );
+
+        CallStruct[] memory calls = new CallStruct[](2);
+        calls[0] = CallStruct(yieldToken, encodedApprove);
+        calls[1] = CallStruct(address(exchange), encodedSwap);
+
+        vm.expectRevert("Total assets decreased");
         strategy.pullFunds(0, abi.encode(calls));
     }
 

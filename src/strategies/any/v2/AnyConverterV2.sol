@@ -6,6 +6,7 @@ pragma solidity ^0.8.25;
 import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 import {BaseStrategy, IERC20Metadata, ERC20, IERC20, Math} from "src/strategies/BaseStrategy.sol";
 import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
+import {BytesLib} from "bitlib/BytesLib.sol";
 
 struct CallStruct {
     address target;
@@ -36,11 +37,14 @@ struct ProposedChange {
 abstract contract AnyConverterV2 is BaseStrategy {
     using Math for uint256;
     using SafeERC20 for IERC20;
-
+    using BytesLib for bytes;
     address public yieldToken;
     address[] public tokens;
 
     IPriceOracle public oracle;
+
+    bytes4 public constant APPROVE_SELECTOR =
+        bytes4(keccak256("approve(address,uint256)"));
 
     /*//////////////////////////////////////////////////////////////
                             INITIALIZATION
@@ -152,37 +156,19 @@ abstract contract AnyConverterV2 is BaseStrategy {
         uint256,
         bytes memory data
     ) external override onlyKeeperOrOwner {
-        (
-            uint256 preTotalAssets,
-            uint256 preAssetBalance,
-            uint256 preYieldTokenBalance,
-            uint256 postTotalAssets,
-            uint256 postAssetBalance,
-            uint256 postYieldTokenBalance
-        ) = _convert(data);
+        uint256[6] memory stats = _convert(data);
 
         // Total assets should stay the same or increase (with slippage)
         if (
-            postTotalAssets <
-            preTotalAssets.mulDiv(
-                10_000 - slippage,
-                10_000,
-                Math.Rounding.Ceil
-            )
+            stats[3] <
+            stats[0].mulDiv(10_000 - slippage, 10_000, Math.Rounding.Ceil)
         ) revert("Total assets decreased");
-
         // Asset balance should stay the same or decrease
-        if (postAssetBalance >= preAssetBalance)
-            revert("Asset balance increased");
-
+        if (stats[4] >= stats[1]) revert("Asset balance increased");
         // YieldToken balance should stay increase
-        if (postYieldTokenBalance < preYieldTokenBalance)
-            revert("Yield token balance decreased");
+        if (stats[5] < stats[2]) revert("Yield token balance decreased");
 
-        emit PushedFunds(
-            postYieldTokenBalance - preYieldTokenBalance,
-            preAssetBalance - postAssetBalance
-        );
+        emit PushedFunds(stats[5] - stats[2], stats[1] - stats[4]);
     }
 
     /// @notice Convert yieldTokens to assets
@@ -190,42 +176,24 @@ abstract contract AnyConverterV2 is BaseStrategy {
         uint256,
         bytes memory data
     ) external override onlyKeeperOrOwner {
-        (
-            uint256 preTotalAssets,
-            uint256 preAssetBalance,
-            uint256 preYieldTokenBalance,
-            uint256 postTotalAssets,
-            uint256 postAssetBalance,
-            uint256 postYieldTokenBalance
-        ) = _convert(data);
+        uint256[6] memory stats = _convert(data);
 
         // Total assets should stay the same or increase (with slippage)
         if (
-            postTotalAssets <
-            preTotalAssets.mulDiv(
-                10_000 - slippage,
-                10_000,
-                Math.Rounding.Ceil
-            )
+            stats[3] <
+            stats[0].mulDiv(10_000 - slippage, 10_000, Math.Rounding.Ceil)
         ) revert("Total assets decreased");
 
         // YieldToken balance should stay the same or decrease
-        if (postYieldTokenBalance >= preYieldTokenBalance)
-            revert("YieldToken balance increased");
+        if (stats[5] >= stats[2]) revert("YieldToken balance increased");
 
         // Asset balance should increase
-        if (postAssetBalance < preAssetBalance)
-            revert("Asset balance decreased");
+        if (stats[4] < stats[1]) revert("Asset balance decreased");
 
-        emit PulledFunds(
-            postAssetBalance - preAssetBalance,
-            preYieldTokenBalance - postYieldTokenBalance
-        );
+        emit PulledFunds(stats[4] - stats[1], stats[2] - stats[5]);
     }
 
-    function _convert(
-        bytes memory data
-    ) internal returns (uint256, uint256, uint256, uint256, uint256, uint256) {
+    function _convert(bytes memory data) internal returns (uint256[6] memory) {
         // caching
         address _asset = asset();
         address _yieldToken = yieldToken;
@@ -237,27 +205,56 @@ abstract contract AnyConverterV2 is BaseStrategy {
         );
 
         CallStruct[] memory calls = abi.decode(data, (CallStruct[]));
-
+        CallStruct[] memory allowanceCalls = new CallStruct[](calls.length);
         for (uint256 i; i < calls.length; i++) {
             if (!isAllowed[calls[i].target][bytes4(calls[i].data)])
                 revert("Not allowed");
+
+            if (bytes4(calls[i].data) == APPROVE_SELECTOR) {
+                (address to, ) = abi.decode(
+                    calls[i].data.slice(4, calls[i].data.length - 4),
+                    (address, uint256)
+                );
+                allowanceCalls[i] = CallStruct({
+                    target: calls[i].target,
+                    data: abi.encodeWithSelector(
+                        bytes4(keccak256("allowance(address,address)")),
+                        address(this),
+                        to
+                    )
+                });
+            }
 
             (bool success, ) = calls[i].target.call(calls[i].data);
             if (!success) revert("Call failed");
         }
 
-        uint256 postTotalAssets = totalAssets();
+        uint256 outstandingAllowance;
+        for (uint256 i; i < allowanceCalls.length; i++) {
+            if (allowanceCalls[i].target != address(0)) {
+                (bool success, bytes memory result) = allowanceCalls[i]
+                    .target
+                    .call(allowanceCalls[i].data);
+                if (!success) revert("Call failed");
+
+                outstandingAllowance += abi.decode(result, (uint256));
+            }
+        }
+
+        uint256 postTotalAssets = totalAssets() - outstandingAllowance;
         uint256 postAssetBalance = IERC20(_asset).balanceOf(address(this));
         uint256 postYieldTokenBalance = IERC20(_yieldToken).balanceOf(
             address(this)
         );
         return (
-            preTotalAssets,
-            preAssetBalance,
-            preYieldTokenBalance,
-            postTotalAssets,
-            postAssetBalance,
-            postYieldTokenBalance
+            [
+                preTotalAssets,
+                preAssetBalance,
+                preYieldTokenBalance,
+                postTotalAssets,
+                postAssetBalance,
+                postYieldTokenBalance
+            ]
         );
     }
 

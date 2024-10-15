@@ -11,9 +11,10 @@ remappings = [
   'ds-test/=lib/forge-std/lib/ds-test/src/',
   'forge-std/=lib/forge-std/src/',
   'openzeppelin-contracts/=lib/openzeppelin-contracts/contracts/',
-  'openzeppelin-contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts',
+  'openzeppelin-contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/',
   'solmate/=lib/solmate/src/',
-  'solady/=lib/solady/src/'
+  'solady/=lib/solady/src/',
+  'bitlib/=lib/solidity-bytes-utils/contracts/'
 ]
 
 no_match_contract = "Skip"
