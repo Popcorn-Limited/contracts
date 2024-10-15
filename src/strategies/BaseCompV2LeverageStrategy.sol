@@ -5,11 +5,14 @@ pragma solidity ^0.8.25;
 
 import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math} from "src/strategies/BaseStrategy.sol";
 import {Math} from "openzeppelin-contracts/utils/math/Math.sol";
-import {ILendingPool, IAaveIncentives, IAToken, IFlashLoanReceiver, IProtocolDataProvider, IPoolAddressesProvider, DataTypes} from "src/interfaces/external/aave/IAaveV3.sol";
+import {ICToken, IComptroller} from "src/interfaces/external/compound/v2/ICompoundV2.sol";
+import {LibCompound} from "src/interfaces/external/compound/v2/LibCompound.sol";
+import {ILendingPool, IFlashLoanReceiver, IPoolAddressesProvider} from "src/interfaces/external/aave/IAaveV3.sol";
 
 struct LooperBaseValues {
-    address aaveDataProvider;
-    address borrowAsset; // asset to borrow (ie WETH - wMATIC)
+    address aaveLendingPool;
+    address borrowAssetCToken; // asset to borrow (ie WETH - wMATIC)
+    address cToken;
     uint256 maxLTV;
     uint256 maxSlippage;
     address poolAddressesProvider;
@@ -17,34 +20,37 @@ struct LooperBaseValues {
 }
 
 struct FlashLoanCache {
-    bool isWithdraw;
+    bool toIncreaseLeverage;
     bool isFullWithdraw;
     uint256 assetsToWithdraw;
     uint256 depositAmount;
     uint256 slippage;
 }
 
-abstract contract BaseAaveLeverageStrategy is BaseStrategy, IFlashLoanReceiver {
+abstract contract BaseCompoundV2LeverageStrategy is BaseStrategy, IFlashLoanReceiver {
     using SafeERC20 for IERC20;
     using Math for uint256;
 
     string internal _name;
     string internal _symbol;
 
-    ILendingPool public lendingPool; // aave router
-    IPoolAddressesProvider public poolAddressesProvider; // aave pool provider
-    IAaveIncentives public aaveIncentives; // aave incentives
-    IProtocolDataProvider public protocolDataProvider; // aave data provider
+    address constant COMP = address(0xc00e94Cb662C3520282E6f5717214004A7f26888);
+
+    IComptroller public comptroller; // Comp router
 
     IERC20 public borrowAsset; // asset to borrow
-    IERC20 public debtToken; // aave debt token
-    IERC20 public interestToken; // aave deposit token
+    ICToken public borrowCToken; // borrow cToken
+    ICToken public collateralToken; // Comp cToken
+    ILendingPool public aaveLendingPool; // aave pool for flash loan
+    IPoolAddressesProvider public poolAddressesProvider; // aave pool provider
 
     uint256 public slippage; // 1e18 = 100% slippage, 1e14 = 1 BPS slippage
     uint256 public targetLTV; // in 18 decimals - 1e17 being 0.1%
     uint256 public maxLTV; // max ltv the vault can reach
     uint256 public protocolMaxLTV; // underlying money market max LTV
 
+    error InvalidComptroller(address cToken, address borrowCToken);
+    error InvalidCToken(address cToken, address asset);
     error InvalidLTV(uint256 targetLTV, uint256 maxLTV, uint256 protocolLTV);
     error InvalidSlippage(uint256 slippage, uint256 slippageCap);
     error BadLTV(uint256 currentLTV, uint256 maxLTV);
@@ -64,55 +70,45 @@ abstract contract BaseAaveLeverageStrategy is BaseStrategy, IFlashLoanReceiver {
     ) internal onlyInitializing {
         __BaseStrategy_init(asset_, owner_, autoDeposit_);
 
-        // retrieve and set deposit aToken, lending pool
-        protocolDataProvider = IProtocolDataProvider(
-            initValues.aaveDataProvider
+        // init cTokens, comptroller
+        collateralToken = ICToken(initValues.cToken);
+        if(collateralToken.underlying() != asset_)
+            revert InvalidCToken(initValues.cToken, asset_);
+
+        borrowCToken = ICToken(initValues.borrowAssetCToken);
+        borrowAsset = IERC20(borrowCToken.underlying());
+
+        comptroller = IComptroller(collateralToken.comptroller());
+        if(borrowCToken.comptroller() != address(comptroller))
+            revert InvalidComptroller(address(collateralToken), address(borrowCToken));
+
+        // init aave addresses
+        aaveLendingPool = ILendingPool(initValues.aaveLendingPool);
+        poolAddressesProvider = IPoolAddressesProvider(
+            initValues.poolAddressesProvider
         );
 
-        (address _aToken, , ) = protocolDataProvider.getReserveTokensAddresses(
-            asset_
-        );
-        interestToken = IERC20(_aToken);
-        lendingPool = ILendingPool(IAToken(_aToken).POOL());
-        aaveIncentives = IAaveIncentives(
-            IAToken(_aToken).getIncentivesController()
-        );
-
-        // set efficiency mode
-        _setEfficiencyMode();
-
+        // verify LTV values
         protocolMaxLTV = _getMaxLTV();
 
-        // check ltv init values are correct
         _verifyLTV(initValues.targetLTV, initValues.maxLTV, protocolMaxLTV);
 
         targetLTV = initValues.targetLTV;
         maxLTV = initValues.maxLTV;
 
-        poolAddressesProvider = IPoolAddressesProvider(
-            initValues.poolAddressesProvider
-        );
-
-        // retrieve and set aave variable debt token
-        borrowAsset = IERC20(initValues.borrowAsset);
-        (, , address _variableDebtToken) = protocolDataProvider
-            .getReserveTokensAddresses(address(borrowAsset));
-
-        debtToken = IERC20(_variableDebtToken); // variable debt token
-
         _name = string.concat(
-            "VaultCraft Aave Leveraged ",
+            "VaultCraft Compound Leveraged ",
             IERC20Metadata(asset_).name(),
             " Strategy"
         );
         _symbol = string.concat("vc-", IERC20Metadata(asset_).symbol());
 
-        // approve aave router to pull asset
-        IERC20(asset_).approve(address(lendingPool), type(uint256).max);
+        // approve Comp router to pull asset
+        IERC20(asset_).approve(address(comptroller), type(uint256).max);
 
         // approve aave pool to pull borrow asset as part of a flash loan
         IERC20(address(borrowAsset)).approve(
-            address(lendingPool),
+            address(aaveLendingPool),
             type(uint256).max
         );
 
@@ -147,15 +143,14 @@ abstract contract BaseAaveLeverageStrategy is BaseStrategy, IFlashLoanReceiver {
     /*//////////////////////////////////////////////////////////////
                           ACCOUNTING LOGIC
     //////////////////////////////////////////////////////////////*/
-
     function _totalAssets() internal view override returns (uint256) {
         // get value of debt in collateral tokens
         uint256 debtValue = _toCollateralValue(
-            debtToken.balanceOf(address(this))
+            LibCompound.viewBorrowBalance(borrowCToken, address(this))
         );
 
         // get collateral amount
-        uint256 collateral = interestToken.balanceOf(address(this));
+        uint256 collateral = LibCompound.viewUnderlyingBalanceOf(collateralToken, address(this));
 
         if (debtValue >= collateral) return 0;
 
@@ -182,6 +177,11 @@ abstract contract BaseAaveLeverageStrategy is BaseStrategy, IFlashLoanReceiver {
         (ltv, , ) = _getCurrentLTV();
     }
 
+    // must provide logic to retrieve the money market max ltv
+    function _getMaxLTV() internal view returns (uint256 protocolLTV) {
+        (, protocolLTV, ) = comptroller.markets(address(collateralToken));
+    }
+
     function convertToUnderlyingShares(
         uint256 assets,
         uint256 shares
@@ -189,15 +189,9 @@ abstract contract BaseAaveLeverageStrategy is BaseStrategy, IFlashLoanReceiver {
         revert();
     }
 
-    /// @notice The token rewarded if the aave liquidity mining is active
-    function rewardTokens() external view override returns (address[] memory) {
-        return aaveIncentives.getRewardsByAsset(asset());
-    }
-
     /*//////////////////////////////////////////////////////////////
-                          LEVERAGE LOGIC
+                          MANAGEMENT LOGIC
     //////////////////////////////////////////////////////////////*/
-
     function adjustLeverage() public {
         // get vault current leverage : debt/collateral
         (
@@ -217,7 +211,8 @@ abstract contract BaseAaveLeverageStrategy is BaseStrategy, IFlashLoanReceiver {
                     )
                 )).mulDiv(1e18, (1e18 - targetLTV), Math.Rounding.Ceil);
 
-            _leverDown(borrowAmount, slippage);
+            // flash loan debt asset to repay part of the debt
+            _flashLoan(borrowAmount, 0, 0, false, false, slippage);
         } else {
             uint256 depositAmount = (targetLTV.mulDiv(
                 currentCollateral,
@@ -229,58 +224,44 @@ abstract contract BaseAaveLeverageStrategy is BaseStrategy, IFlashLoanReceiver {
                     Math.Rounding.Ceil
                 );
 
-            _leverUp(depositAmount);
+            uint256 dustBalance = address(this).balance;
+
+            if (dustBalance < depositAmount) {
+                // flashloan but use eventual collateral dust remained in the contract as well
+                uint256 borrowAmount = depositAmount - dustBalance;
+
+                // flash loan debt asset from aave, swap for collateral, 
+                // deposit into compound, borrow debt to repay aave flash loan
+                _flashLoan(borrowAmount, depositAmount, 0, true, false, 0);
+            } else {
+                // deposit the dust as collateral- borrow amount is zero
+                // leverage naturally decreases
+                _redepositAsset(0, dustBalance, asset());
+            }
         }
 
         // reverts if LTV got above max
         _assertHealthyLTV();
     }
 
-    function leverUp(uint256 depositAmount) public onlyKeeperOrOwner {
-        _leverUp(depositAmount);
-
-        // reverts if LTV got above max
-        _assertHealthyLTV();
+    /// @notice The token rewarded if the Comp liquidity mining is active
+    function rewardTokens() external view override returns (address[] memory rewAddr) {
+        rewAddr = new address[](1);
+        rewAddr[0] = COMP;
     }
-
-    function leverDown(
-        uint256 borrowAmount,
-        uint256 slippage
-    ) public onlyKeeperOrOwner {
-        _leverDown(borrowAmount, slippage);
-        // reverts if LTV got above max
-        _assertHealthyLTV();
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                        HARVEST LOGIC
-    //////////////////////////////////////////////////////////////*/
 
     /// @notice Claim additional rewards given that it's active.
     function claim() internal override returns (bool success) {
-        if (address(aaveIncentives) == address(0)) return false;
-
-        address[] memory _assets = new address[](1);
-        _assets[0] = address(interestToken);
-
-        try aaveIncentives.claimAllRewardsToSelf(_assets) {
-            success = true;
-        } catch {}
+        comptroller.claimComp(address(this));
+        return true;
     }
 
     function harvest(bytes memory data) external override onlyKeeperOrOwner {
         claim();
 
-        address[] memory _rewardTokens = aaveIncentives.getRewardsByAsset(
-            asset()
-        );
-
-        for (uint256 i; i < _rewardTokens.length; i++) {
-            uint256 balance = IERC20(_rewardTokens[i]).balanceOf(address(this));
-            if (balance > 0) {
-                IERC20(_rewardTokens[i]).transfer(msg.sender, balance);
-            }
-        }
+        uint256 balance = IERC20(COMP).balanceOf(address(this));
+        if (balance > 0)
+            IERC20(COMP).transfer(msg.sender, balance);
 
         uint256 assetAmount = abi.decode(data, (uint256));
 
@@ -293,10 +274,6 @@ abstract contract BaseAaveLeverageStrategy is BaseStrategy, IFlashLoanReceiver {
         emit Harvested();
     }
 
-    /*//////////////////////////////////////////////////////////////
-                        MANAGEMENT LOGIC
-    //////////////////////////////////////////////////////////////*/
-
     function setHarvestValues(bytes memory harvestValues) external onlyOwner {
         _setHarvestValues(harvestValues);
     }
@@ -304,7 +281,7 @@ abstract contract BaseAaveLeverageStrategy is BaseStrategy, IFlashLoanReceiver {
     function setLeverageValues(
         uint256 targetLTV_,
         uint256 maxLTV_
-    ) external onlyKeeperOrOwner {
+    ) external onlyOwner {
         // reverts if targetLTV < maxLTV < protocolLTV is not satisfied
         _verifyLTV(targetLTV_, maxLTV_, protocolMaxLTV);
 
@@ -320,18 +297,8 @@ abstract contract BaseAaveLeverageStrategy is BaseStrategy, IFlashLoanReceiver {
         slippage = slippage_;
     }
 
-    bool internal initCollateral;
-
-    function setUserUseReserveAsCollateral(uint256 amount) external onlyOwner {
-        if (initCollateral) revert InvalidInitialization();
-        address asset_ = asset();
-
-        IERC20(asset_).safeTransferFrom(msg.sender, address(this), amount);
-        lendingPool.supply(asset_, amount, address(this), 0);
-
-        lendingPool.setUserUseReserveAsCollateral(asset_, true);
-
-        initCollateral = true;
+    function withdrawDust(address recipient) public onlyOwner {
+        _withdrawDust(recipient);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -349,7 +316,7 @@ abstract contract BaseAaveLeverageStrategy is BaseStrategy, IFlashLoanReceiver {
     }
 
     function POOL() external view returns (ILendingPool) {
-        return lendingPool;
+        return aaveLendingPool;
     }
 
     // this is triggered after the flash loan is given, ie contract has loaned assets at this point
@@ -360,23 +327,17 @@ abstract contract BaseAaveLeverageStrategy is BaseStrategy, IFlashLoanReceiver {
         address initiator,
         bytes calldata params
     ) external override returns (bool) {
-        if (initiator != address(this) || msg.sender != address(lendingPool)) {
+        if (initiator != address(this) || msg.sender != address(aaveLendingPool)) {
             revert NotFlashLoan();
         }
 
         FlashLoanCache memory cache = abi.decode(params, (FlashLoanCache));
 
-        if (cache.isWithdraw) {
-            // flash loan is to repay debt as part of a withdrawal
-            uint256 flashLoanDebt = amounts[0] + premiums[0];
-
-            // repay cdp debt
-            lendingPool.repay(
-                address(borrowAsset),
-                amounts[0],
-                2,
-                address(this)
-            );
+        uint256 flashLoanDebt = amounts[0] + premiums[0];
+        
+        if (!cache.toIncreaseLeverage) {
+            // repay cdp debt on compound
+            borrowCToken.repayBorrow(amounts[0]);
 
             // withdraw collateral, swap, repay flashloan
             _reduceLeverage(
@@ -388,26 +349,30 @@ abstract contract BaseAaveLeverageStrategy is BaseStrategy, IFlashLoanReceiver {
             );
         } else {
             // flash loan is to leverage UP
+            // deposit assets
             _redepositAsset(amounts[0], cache.depositAmount, asset());
+
+            // borrow from compound in order to repay aave flash loan
+            borrowCToken.borrow(flashLoanDebt);
         }
 
         return true;
     }
 
-    // borrow asset from lending protocol
-    // interestRateMode = 2 -> flash loan asset and deposit into cdp, don't repay
-    // interestRateMode = 0 -> flash loan asset to repay cdp, have to repay flash loan at the end
+    // borrow asset from aave
+    // toIncreaseLeverage = true -> flash loan asset token, deposit into compound, borrow assets to repay the flash loan
+    // toIncreaseLeverage = false -> flash loan debt token, repay compound cdp, withdraw collateral to repay flash loan
     function _flashLoan(
         uint256 borrowAmount,
         uint256 depositAmount,
         uint256 assetsToWithdraw,
-        uint256 interestRateMode,
+        bool toIncreaseLeverage,
         bool isFullWithdraw,
         uint256 slippage
     ) internal {
         // uint256 depositAmount_ = depositAmount; // avoids stack too deep
         FlashLoanCache memory cache = FlashLoanCache(
-            interestRateMode == 0,
+            toIncreaseLeverage,
             isFullWithdraw,
             assetsToWithdraw,
             depositAmount,
@@ -415,15 +380,16 @@ abstract contract BaseAaveLeverageStrategy is BaseStrategy, IFlashLoanReceiver {
         );
 
         address[] memory assets = new address[](1);
-        assets[0] = address(borrowAsset);
+        assets[0] = toIncreaseLeverage ? asset() : address(borrowAsset);
 
         uint256[] memory amounts = new uint256[](1);
         amounts[0] = borrowAmount;
 
+        // always a flash loan to be repaid
         uint256[] memory interestRateModes = new uint256[](1);
-        interestRateModes[0] = interestRateMode;
+        interestRateModes[0] = 0; 
 
-        lendingPool.flashLoan(
+        aaveLendingPool.flashLoan(
             address(this),
             assets,
             amounts,
@@ -435,24 +401,20 @@ abstract contract BaseAaveLeverageStrategy is BaseStrategy, IFlashLoanReceiver {
     }
 
     /*//////////////////////////////////////////////////////////////
-                            OTHER LOGIC
-    //////////////////////////////////////////////////////////////*/
-
-    function withdrawDust(address recipient) public onlyOwner {
-        _withdrawDust(recipient);
-    }
-
-    /*//////////////////////////////////////////////////////////////
                           INTERNAL HOOKS LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Deposit asset into lending protocol - receive aToken here
+    error DepositFailed(uint256 assets, uint256 res);
+
+    /// @notice Deposit asset into compound
     function _protocolDeposit(
         uint256 assets,
         uint256,
         bytes memory
     ) internal override {
-        lendingPool.supply(asset(), assets, address(this), 0);
+        uint256 res = collateralToken.mint(assets);
+        if(res != 0)
+            revert DepositFailed(assets,res);
     }
 
     /// @notice repay part of the vault debt if necessary and withdraw asset
@@ -503,40 +465,19 @@ abstract contract BaseAaveLeverageStrategy is BaseStrategy, IFlashLoanReceiver {
         if (futureLTV <= maxLTV || totalDebt == 0) {
             // 1 - withdraw any asset amount with no debt
             // 2 - withdraw assets with debt but the change doesn't take LTV above max
-            lendingPool.withdraw(asset(), assets, address(this));
+            collateralToken.redeemUnderlying(assets);
         } else {
             // 1 - withdraw assets but repay debt
             uint256 debtToRepay = isFullWithdraw
                 ? totalDebt
                 : totalDebt.mulDiv(ratioDebtToRepay, 1e18, Math.Rounding.Floor);
 
-            // flash loan debtToRepay - mode 0 - flash loan is repaid at the end
-            _flashLoan(debtToRepay, 0, assets, 0, isFullWithdraw, slippage);
+            // flash loan debtToRepay - flash loan is repaid at the end
+            _flashLoan(debtToRepay, 0, assets, false, isFullWithdraw, slippage);
         }
 
         // reverts if LTV got above max
         _assertHealthyLTV();
-    }
-
-    function _leverUp(uint256 depositAmount) internal {
-        uint256 dustBalance = address(this).balance;
-
-        if (dustBalance < depositAmount) {
-            // flashloan but use eventual collateral dust remained in the contract as well
-            uint256 borrowAmount = depositAmount - dustBalance;
-
-            // flash loan debt asset from lending protocol and add to cdp - slippage not used in this case, pass 0
-            _flashLoan(borrowAmount, depositAmount, 0, 2, false, 0);
-        } else {
-            // deposit the dust as collateral- borrow amount is zero
-            // leverage naturally decreases
-            _redepositAsset(0, dustBalance, asset());
-        }
-    }
-
-    function _leverDown(uint256 borrowAmount, uint256 slippage) internal {
-        // flash loan debt asset to repay part of the debt
-        _flashLoan(borrowAmount, 0, 0, 0, false, slippage);
     }
 
     ///@notice called after a flash loan to repay cdp
@@ -564,16 +505,14 @@ abstract contract BaseAaveLeverageStrategy is BaseStrategy, IFlashLoanReceiver {
 
         if (isFullWithdraw) {
             // withdraw all
-            lendingPool.withdraw(asset, type(uint256).max, address(this));
+            collateralToken.redeem(collateralToken.balanceOf(address(this)));
         } else {
-            lendingPool.withdraw(
-                asset,
-                flashLoanCollateralValue + swapBuffer + toWithdraw,
-                address(this)
+            collateralToken.redeemUnderlying(
+                flashLoanCollateralValue + swapBuffer + toWithdraw
             );
         }
 
-        // swap collateral to exact debt asset - will be pulled by AAVE pool as flash loan repayment
+        // swap collateral to exact debt asset - will be pulled by aave pool as flash loan repayment
         _convertCollateralToDebt(
             flashLoanCollateralValue + swapBuffer,
             flashLoanDebt,
@@ -582,7 +521,7 @@ abstract contract BaseAaveLeverageStrategy is BaseStrategy, IFlashLoanReceiver {
         );
     }
 
-    // deposit back into the protocol
+    // deposit back into the protocol 
     // either from flash loan or simply collateral dust held by the strategy
     function _redepositAsset(
         uint256 borrowAmount,
@@ -605,21 +544,14 @@ abstract contract BaseAaveLeverageStrategy is BaseStrategy, IFlashLoanReceiver {
         view
         returns (uint256 loanToValue, uint256 debt, uint256 collateral)
     {
-        debt = debtToken.balanceOf(address(this)); // debt
-        collateral = _toDebtValue(interestToken.balanceOf(address(this))); // collateral converted into debt amount;
+        debt = LibCompound.viewBorrowBalance(borrowCToken, address(this)); // debt
+        collateral = _toDebtValue(
+            LibCompound.viewUnderlyingBalanceOf(collateralToken, address(this))
+        ); // collateral converted into debt amount;
 
-        // get position data from the aave lending pool
-        (, , , uint256 liqThreshold, , uint256 healthFactor) = lendingPool
-            .getUserAccountData(address(this));
-
-        // LTV = LT / HF
-        (healthFactor == type(uint256).max)
-            ? loanToValue = 0
-            : loanToValue = (liqThreshold * 1e14).mulDiv(
-            1e18,
-            healthFactor,
-            Math.Rounding.Ceil
-        );
+        // LTV = borrowedValue / collateralValue
+        if(collateral != 0)
+            loanToValue = debt.mulDiv(1e18, collateral, Math.Rounding.Ceil);
     }
 
     // reverts if targetLTV < maxLTV < protocolLTV is not satisfied
@@ -643,7 +575,7 @@ abstract contract BaseAaveLeverageStrategy is BaseStrategy, IFlashLoanReceiver {
     }
 
     /*//////////////////////////////////////////////////////////////
-                    TO OVERRIDE IN IMPLEMENTATION
+                          TO OVERRIDE IN IMPLEMENTATION
     //////////////////////////////////////////////////////////////*/
 
     // must provide conversion from debt asset to vault (collateral) asset
@@ -672,12 +604,6 @@ abstract contract BaseAaveLeverageStrategy is BaseStrategy, IFlashLoanReceiver {
 
     // must provide logic to decode and assign harvest values
     function _setHarvestValues(bytes memory harvestValues) internal virtual;
-
-    // must provide logic to set the efficiency mode on aave
-    function _setEfficiencyMode() internal virtual;
-
-    // must provide logic to retrieve the money market max ltv
-    function _getMaxLTV() internal virtual returns (uint256 protocolMaxLTV);
 
     // must provide logic to withdraw dust assets
     function _withdrawDust(address recipient) internal virtual;
