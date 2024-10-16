@@ -293,7 +293,7 @@ abstract contract BaseAaveLeverageStrategy is BaseStrategy, IFlashLoanReceiver {
     function setLeverageValues(
         uint256 targetLTV_,
         uint256 maxLTV_
-    ) external onlyOwner {
+    ) external onlyKeeperOrOwner {
         // reverts if targetLTV < maxLTV < protocolLTV is not satisfied
         _verifyLTV(targetLTV_, maxLTV_, protocolMaxLTV);
 
