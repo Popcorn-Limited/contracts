@@ -8,10 +8,12 @@ import {Math} from "openzeppelin-contracts/utils/math/Math.sol";
 import {ICToken, IComptroller} from "src/interfaces/external/compound/v2/ICompoundV2.sol";
 import {LibCompound} from "src/interfaces/external/compound/v2/LibCompound.sol";
 import {ILendingPool, IFlashLoanReceiver, IPoolAddressesProvider} from "src/interfaces/external/aave/IAaveV3.sol";
+import {IWETH as IWAVAX} from "src/interfaces/external/IWETH.sol";
 
 struct LooperBaseValues {
     address aaveLendingPool;
-    address borrowAssetCToken; // asset to borrow (ie WETH - wMATIC)
+    address borrowAsset;
+    address borrowAssetCToken; // cToken of the asset to borrow
     address cToken;
     uint256 maxLTV;
     uint256 maxSlippage;
@@ -27,7 +29,10 @@ struct FlashLoanCache {
     uint256 slippage;
 }
 
-abstract contract BaseCompoundV2LeverageStrategy is BaseStrategy, IFlashLoanReceiver {
+abstract contract BaseCompoundV2LeverageStrategy is
+    BaseStrategy,
+    IFlashLoanReceiver
+{
     using SafeERC20 for IERC20;
     using Math for uint256;
 
@@ -72,15 +77,18 @@ abstract contract BaseCompoundV2LeverageStrategy is BaseStrategy, IFlashLoanRece
 
         // init cTokens, comptroller
         collateralToken = ICToken(initValues.cToken);
-        if(collateralToken.underlying() != asset_)
+        if (collateralToken.underlying() != asset_)
             revert InvalidCToken(initValues.cToken, asset_);
 
         borrowCToken = ICToken(initValues.borrowAssetCToken);
-        borrowAsset = IERC20(borrowCToken.underlying());
+        borrowAsset = IERC20(initValues.borrowAsset);
 
         comptroller = IComptroller(collateralToken.comptroller());
-        if(borrowCToken.comptroller() != address(comptroller))
-            revert InvalidComptroller(address(collateralToken), address(borrowCToken));
+        if (borrowCToken.comptroller() != address(comptroller))
+            revert InvalidComptroller(
+                address(collateralToken),
+                address(borrowCToken)
+            );
 
         // init aave addresses
         aaveLendingPool = ILendingPool(initValues.aaveLendingPool);
@@ -103,14 +111,21 @@ abstract contract BaseCompoundV2LeverageStrategy is BaseStrategy, IFlashLoanRece
         );
         _symbol = string.concat("vc-", IERC20Metadata(asset_).symbol());
 
-        // approve Comp router to pull asset
-        IERC20(asset_).approve(address(comptroller), type(uint256).max);
+        // approve comp cToken to pull asset
+        IERC20(asset_).approve(address(collateralToken), type(uint256).max);
 
         // approve aave pool to pull borrow asset as part of a flash loan
         IERC20(address(borrowAsset)).approve(
             address(aaveLendingPool),
             type(uint256).max
         );
+
+        address[] memory markets = new address[](2);
+        markets[0] = initValues.cToken;
+        markets[1] = initValues.borrowAssetCToken;
+
+        uint256[] memory res = comptroller.enterMarkets(markets);
+        require(res[0] == 0 && res[1] == 0, "Error entering markets");
 
         // set slippage
         if (initValues.maxSlippage > 2e17) {
@@ -145,12 +160,18 @@ abstract contract BaseCompoundV2LeverageStrategy is BaseStrategy, IFlashLoanRece
     //////////////////////////////////////////////////////////////*/
     function _totalAssets() internal view override returns (uint256) {
         // get value of debt in collateral tokens
-        uint256 debtValue = _toCollateralValue(
-            LibCompound.viewBorrowBalance(borrowCToken, address(this))
+        uint256 debtValue = LibCompound.viewBorrowBalance(
+            borrowCToken,
+            address(this)
         );
 
+        if (debtValue > 0) debtValue = _toCollateralValue(debtValue);
+
         // get collateral amount
-        uint256 collateral = LibCompound.viewUnderlyingBalanceOf(collateralToken, address(this));
+        uint256 collateral = LibCompound.viewUnderlyingBalanceOf(
+            collateralToken,
+            address(this)
+        );
 
         if (debtValue >= collateral) return 0;
 
@@ -189,6 +210,11 @@ abstract contract BaseCompoundV2LeverageStrategy is BaseStrategy, IFlashLoanRece
         revert();
     }
 
+    // returns cToken to underlying rate
+    function exchangeRate(address cToken) public view returns (uint256) {
+        return LibCompound.viewExchangeRate(ICToken(cToken));
+    }
+
     /*//////////////////////////////////////////////////////////////
                           MANAGEMENT LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -223,14 +249,14 @@ abstract contract BaseCompoundV2LeverageStrategy is BaseStrategy, IFlashLoanRece
                     (1e18 - targetLTV),
                     Math.Rounding.Ceil
                 );
-
+            
             uint256 dustBalance = address(this).balance;
 
             if (dustBalance < depositAmount) {
                 // flashloan but use eventual collateral dust remained in the contract as well
                 uint256 borrowAmount = depositAmount - dustBalance;
 
-                // flash loan debt asset from aave, swap for collateral, 
+                // flash loan debt asset from aave, swap for collateral,
                 // deposit into compound, borrow debt to repay aave flash loan
                 _flashLoan(borrowAmount, depositAmount, 0, true, false, 0);
             } else {
@@ -245,7 +271,12 @@ abstract contract BaseCompoundV2LeverageStrategy is BaseStrategy, IFlashLoanRece
     }
 
     /// @notice The token rewarded if the Comp liquidity mining is active
-    function rewardTokens() external view override returns (address[] memory rewAddr) {
+    function rewardTokens()
+        external
+        view
+        override
+        returns (address[] memory rewAddr)
+    {
         rewAddr = new address[](1);
         rewAddr[0] = COMP;
     }
@@ -260,8 +291,7 @@ abstract contract BaseCompoundV2LeverageStrategy is BaseStrategy, IFlashLoanRece
         claim();
 
         uint256 balance = IERC20(COMP).balanceOf(address(this));
-        if (balance > 0)
-            IERC20(COMP).transfer(msg.sender, balance);
+        if (balance > 0) IERC20(COMP).transfer(msg.sender, balance);
 
         uint256 assetAmount = abi.decode(data, (uint256));
 
@@ -327,14 +357,16 @@ abstract contract BaseCompoundV2LeverageStrategy is BaseStrategy, IFlashLoanRece
         address initiator,
         bytes calldata params
     ) external override returns (bool) {
-        if (initiator != address(this) || msg.sender != address(aaveLendingPool)) {
+        if (
+            initiator != address(this) || msg.sender != address(aaveLendingPool)
+        ) {
             revert NotFlashLoan();
         }
 
         FlashLoanCache memory cache = abi.decode(params, (FlashLoanCache));
 
         uint256 flashLoanDebt = amounts[0] + premiums[0];
-        
+    
         if (!cache.toIncreaseLeverage) {
             // repay cdp debt on compound
             borrowCToken.repayBorrow(amounts[0]);
@@ -348,19 +380,22 @@ abstract contract BaseCompoundV2LeverageStrategy is BaseStrategy, IFlashLoanRece
                 cache.slippage
             );
         } else {
-            // flash loan is to leverage UP
+            // flash loan is to leverage UP            
             // deposit assets
             _redepositAsset(amounts[0], cache.depositAmount, asset());
 
             // borrow from compound in order to repay aave flash loan
-            borrowCToken.borrow(flashLoanDebt);
+            uint256 res = borrowCToken.borrow(flashLoanDebt);
+
+            if(address(this).balance > 0)
+                IWAVAX(address(borrowAsset)).deposit{value: address(this).balance}();
         }
 
         return true;
     }
 
     // borrow asset from aave
-    // toIncreaseLeverage = true -> flash loan asset token, deposit into compound, borrow assets to repay the flash loan
+    // toIncreaseLeverage = true -> flash loan debt token, stake for asset, deposit into compound, borrow assets to repay the flash loan
     // toIncreaseLeverage = false -> flash loan debt token, repay compound cdp, withdraw collateral to repay flash loan
     function _flashLoan(
         uint256 borrowAmount,
@@ -380,15 +415,15 @@ abstract contract BaseCompoundV2LeverageStrategy is BaseStrategy, IFlashLoanRece
         );
 
         address[] memory assets = new address[](1);
-        assets[0] = toIncreaseLeverage ? asset() : address(borrowAsset);
+        assets[0] = address(borrowAsset);
 
         uint256[] memory amounts = new uint256[](1);
         amounts[0] = borrowAmount;
 
         // always a flash loan to be repaid
         uint256[] memory interestRateModes = new uint256[](1);
-        interestRateModes[0] = 0; 
-
+        interestRateModes[0] = 0;
+    
         aaveLendingPool.flashLoan(
             address(this),
             assets,
@@ -413,8 +448,7 @@ abstract contract BaseCompoundV2LeverageStrategy is BaseStrategy, IFlashLoanRece
         bytes memory
     ) internal override {
         uint256 res = collateralToken.mint(assets);
-        if(res != 0)
-            revert DepositFailed(assets,res);
+        if (res != 0) revert DepositFailed(assets, res);
     }
 
     /// @notice repay part of the vault debt if necessary and withdraw asset
@@ -521,7 +555,7 @@ abstract contract BaseCompoundV2LeverageStrategy is BaseStrategy, IFlashLoanRece
         );
     }
 
-    // deposit back into the protocol 
+    // deposit back into the protocol
     // either from flash loan or simply collateral dust held by the strategy
     function _redepositAsset(
         uint256 borrowAmount,
@@ -550,7 +584,7 @@ abstract contract BaseCompoundV2LeverageStrategy is BaseStrategy, IFlashLoanRece
         ); // collateral converted into debt amount;
 
         // LTV = borrowedValue / collateralValue
-        if(collateral != 0)
+        if (collateral != 0)
             loanToValue = debt.mulDiv(1e18, collateral, Math.Rounding.Ceil);
     }
 

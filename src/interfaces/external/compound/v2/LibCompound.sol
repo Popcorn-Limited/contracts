@@ -7,6 +7,7 @@ import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
 import {Math} from "openzeppelin-contracts/utils/math/Math.sol";
 
 import {ICToken} from "./ICompoundV2.sol";
+import "forge-std/console.sol";
 
 /// @notice Get up to date cToken data without mutating state.
 /// @author Transmissions11 (https://github.com/transmissions11/libcompound)
@@ -27,9 +28,9 @@ library LibCompound {
     }
 
     function viewExchangeRate(ICToken cToken) internal view returns (uint256) {
-        uint256 accrualBlockNumberPrior = cToken.accrualBlockNumber();
+        uint256 accrualBlockNumberPrior = cToken.accrualBlockTimestamp();
 
-        if (accrualBlockNumberPrior == block.number) {
+        if (accrualBlockNumberPrior == block.timestamp) {
             return cToken.exchangeRateStored();
         }
 
@@ -37,12 +38,12 @@ library LibCompound {
         uint256 borrowsPrior = cToken.totalBorrows();
         uint256 reservesPrior = cToken.totalReserves();
 
-        uint256 borrowRateMantissa = cToken.borrowRatePerBlock();
+        uint256 borrowRateMantissa = cToken.borrowRatePerTimestamp();
 
         require(borrowRateMantissa <= 0.0005e16, "RATE_TOO_HIGH"); // Same as borrowRateMaxMantissa in ICTokenInterfaces.sol
 
         uint256 interestAccumulated =
-            (borrowRateMantissa * (block.number - accrualBlockNumberPrior)).mulWadDown(borrowsPrior);
+            (borrowRateMantissa * (block.timestamp - accrualBlockNumberPrior)).mulWadDown(borrowsPrior);
 
         uint256 totalReserves = cToken.reserveFactorMantissa().mulWadDown(interestAccumulated) + reservesPrior;
         uint256 totalBorrows = interestAccumulated + borrowsPrior;
@@ -56,8 +57,8 @@ library LibCompound {
     function viewBorrowBalance(ICToken cToken, address user) internal view returns (uint256) {
         // Get stored borrow balance and last update block
         uint256 storedBorrowBalance = cToken.borrowBalanceStored(user);
-        uint256 lastUpdateBlock = cToken.accrualBlockNumber();
-        uint256 currentBlockNumber = block.number;
+        uint256 lastUpdateBlock = cToken.accrualBlockTimestamp();
+        uint256 currentBlockNumber = block.timestamp;
 
         if (lastUpdateBlock == currentBlockNumber) {
             return storedBorrowBalance;
@@ -67,7 +68,7 @@ library LibCompound {
         uint256 borrowIndex = cToken.borrowIndex();
 
         // Calculate the current borrow index (with accrued interest)
-        uint256 currentBorrowIndex = borrowIndex + (cToken.borrowRatePerBlock() * (currentBlockNumber - lastUpdateBlock));
+        uint256 currentBorrowIndex = borrowIndex + (cToken.borrowRatePerTimestamp() * (currentBlockNumber - lastUpdateBlock));
 
         // Calculate the updated borrow balance (including accrued interest)
         return (storedBorrowBalance * currentBorrowIndex) / borrowIndex;
