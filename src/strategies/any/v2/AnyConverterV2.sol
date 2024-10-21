@@ -38,10 +38,12 @@ abstract contract AnyConverterV2 is BaseStrategy {
     using Math for uint256;
     using SafeERC20 for IERC20;
     using BytesLib for bytes;
+
     address public yieldToken;
     address[] public tokens;
-
     IPriceOracle public oracle;
+
+    uint256 public outstandingAllowance;
 
     bytes4 public constant APPROVE_SELECTOR =
         bytes4(keccak256("approve(address,uint256)"));
@@ -90,7 +92,7 @@ abstract contract AnyConverterV2 is BaseStrategy {
                 IERC20(yieldToken).balanceOf(address(this)),
                 yieldToken,
                 asset()
-            );
+            ) - outstandingAllowance;
     }
 
     function convertToUnderlyingShares(
@@ -229,7 +231,7 @@ abstract contract AnyConverterV2 is BaseStrategy {
             if (!success) revert("Call failed");
         }
 
-        uint256 outstandingAllowance;
+        uint256 _outstandingAllowance;
         for (uint256 i; i < allowanceCalls.length; i++) {
             if (allowanceCalls[i].target != address(0)) {
                 (bool success, bytes memory result) = allowanceCalls[i]
@@ -237,11 +239,12 @@ abstract contract AnyConverterV2 is BaseStrategy {
                     .call(allowanceCalls[i].data);
                 if (!success) revert("Call failed");
 
-                outstandingAllowance += abi.decode(result, (uint256));
+                _outstandingAllowance += abi.decode(result, (uint256));
             }
         }
 
-        uint256 postTotalAssets = totalAssets() - outstandingAllowance;
+        uint256 outstandingAllowance = _outstandingAllowance;
+        uint256 postTotalAssets = totalAssets() - _outstandingAllowance;
         uint256 postAssetBalance = IERC20(_asset).balanceOf(address(this));
         uint256 postYieldTokenBalance = IERC20(_yieldToken).balanceOf(
             address(this)
