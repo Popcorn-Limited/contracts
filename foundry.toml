@@ -26,6 +26,7 @@ optimism = "${OPTIMISM_RPC_URL}"
 arbitrum = "${ARBITRUM_RPC_URL}"
 goerli = "${GOERLI_RPC_URL}"
 sepolia = "${SEPOLIA_RPC_URL}"
+avalanche = "${AVALANCHE_RPC_URL}"
 
 [etherscan]
 mainnet = { key = "${ETH_EXPLORE_KEY}" }
@@ -34,3 +35,4 @@ optimism = { key = "${OPTIMISM_EXPLORE_KEY}", url = "https://api-optimistic.ethe
 arbitrum = { key = "${ARBITRUM_EXPLORE_KEY}", url = "https://api.arbiscan.io/api" }
 goerli = { key = "${ETH_EXPLORE_KEY}", url = "https://api-goerli.etherscan.io/api?" }
 sepolia = { key = "${ETH_EXPLORE_KEY}", url = ""}
+avalanche = { key = "${AVALANCHE_EXPLORE_KEY}", url = "https://api.snowtrace.io/api" }

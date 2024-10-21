@@ -1,0 +1,26 @@
+{
+  "length": 1,
+  "configs": [
+    {
+      "base": {
+        "asset": "0x6e84a6216eA6dACC71eE8E6b0a5B7322EEbC0fDd",
+        "blockNumber": 52057786,
+        "defaultAmount": 100000000000000000000,
+        "delta": 10,
+        "maxDeposit": 100000000000000000000000,
+        "maxWithdraw": 100000000000000000000000,
+        "minDeposit": 100000000000000000,
+        "minWithdraw": 100000000000000000,
+        "network": "avalanche",
+        "testId": "AnyLBTManager JOE-AVAX"
+      },
+      "specific": {
+        "yieldToken": "0xEA7309636E7025Fda0Ee2282733Ea248c3898495",
+        "whale": "0x799d4C5E577cF80221A076064a2054430D2af5cD",
+        "rescueToken": "0x8729438EB15e2C8B576fCc6AeCdA6A148776C0F5",
+        "exchange": "0x18556DA13313f3532c54711497A8FedAC273220E",
+        "depositIds": [8386854, 8386855, 8386856]
+      }
+    }
+  ]
+}
