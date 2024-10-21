@@ -21,7 +21,7 @@ contract AnyLBTManager is AnyCompounderNaiveV2 {
     using Math for uint256;
     using BytesLib for bytes;
 
-    uint256[] public depositIds;
+    uint24[] public depositIds;
 
     event DepositIdSet(uint256 depositId);
 
@@ -91,7 +91,7 @@ contract AnyLBTManager is AnyCompounderNaiveV2 {
         }
     }
 
-    function setDepositIds(uint256[] memory ids) external onlyKeeperOrOwner {
+    function setDepositIds(uint24[] memory ids) external onlyKeeperOrOwner {
         delete depositIds;
 
         for (uint256 i = 0; i < ids.length; i++) {

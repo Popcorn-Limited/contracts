@@ -40,7 +40,7 @@ interface ILBT {
      * @return binReserveX The reserve of token X in the bin
      * @return binReserveY The reserve of token Y in the bin
      */
-    function getBin(uint256 id) external view returns (uint128, uint128);
+    function getBin(uint24 id) external view returns (uint128, uint128);
 
     /**
      * @notice Returns the active id of the Liquidity Book Pair

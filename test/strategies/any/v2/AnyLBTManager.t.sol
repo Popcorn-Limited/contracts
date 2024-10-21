@@ -26,13 +26,6 @@ contract AnyLBTManagerTest is BaseStrategyTest {
             "./test/strategies/any/v2/AnyLBTManagerTestConfig.json"
         );
         exchange = ILBRouter(json.readAddress(".configs[0].specific.exchange"));
-        oracle = new MockOracle();
-
-        oracle.setPrice(
-            json.readAddress(".configs[0].specific.tokenY"),
-            testConfig.asset,
-            json.readUint(".configs[0].specific.price")
-        );
 
         _setUpBase();
     }
@@ -51,12 +44,12 @@ contract AnyLBTManagerTest is BaseStrategyTest {
         });
         changes[2] = PendingCallAllowance({
             target: address(exchange),
-            selector: ILBRouter.addLiquidity.selector,
+            selector: ILBRouter.addLiquidityNATIVE.selector,
             allowed: true
         });
-        changes[2] = PendingCallAllowance({
+        changes[3] = PendingCallAllowance({
             target: address(exchange),
-            selector: ILBRouter.removeLiquidity.selector,
+            selector: ILBRouter.removeLiquidityNATIVE.selector,
             allowed: true
         });
 
@@ -79,6 +72,7 @@ contract AnyLBTManagerTest is BaseStrategyTest {
         string memory index_,
         TestConfig memory testConfig_
     ) internal override returns (IBaseStrategy) {
+        _setUpOracle();
         AnyLBTManager _strategy = new AnyLBTManager();
 
         yieldToken = json_.readAddress(
@@ -92,13 +86,29 @@ contract AnyLBTManagerTest is BaseStrategyTest {
             abi.encode(yieldToken, address(oracle), uint256(0))
         );
 
-        _strategy.setDepositIds(
-            json_.readUintArray(".configs[0].specific.depositIds")
+        uint256[] memory depositIdsUint = json_.readUintArray(
+            string.concat(".configs[", index_, "].specific.depositIds")
         );
+        uint24[] memory depositIds = new uint24[](depositIdsUint.length);
+        for (uint256 i; i < depositIdsUint.length; i++) {
+            depositIds[i] = uint24(depositIdsUint[i]);
+        }
+        _strategy.setDepositIds(depositIds);
 
         // TODO: Set up liquidity bins
 
         return IBaseStrategy(address(_strategy));
+    }
+
+    function _setUpOracle() internal {
+        oracle = new MockOracle();
+
+        oracle.setPrice(
+            json.readAddress(".configs[0].specific.tokenY"),
+            testConfig.asset,
+            json.readUint(".configs[0].specific.price")
+        );
+
     }
 
     function _mintYieldToken(
@@ -129,7 +139,7 @@ contract AnyLBTManagerTest is BaseStrategyTest {
         uint256[] memory distributionY = new uint256[](3);
 
         bytes memory encodedSwap = abi.encodeWithSelector(
-            ILBRouter.addLiquidity.selector,
+            ILBRouter.addLiquidityNATIVE.selector,
             ILBRouter.LiquidityParameters({
                 tokenX: json.readAddress(".configs[0].specific.tokenX"),
                 tokenY: json.readAddress(".configs[0].specific.tokenY"),
@@ -183,7 +193,7 @@ contract AnyLBTManagerTest is BaseStrategyTest {
         amounts[2] = ILBT(yieldToken).balanceOf(address(this), ids[2]);
 
         bytes memory encodedSwap = abi.encodeWithSelector(
-            ILBRouter.removeLiquidity.selector,
+            ILBRouter.removeLiquidityNATIVE.selector,
             json.readAddress(".configs[0].specific.tokenX"), // tokenX
             json.readAddress(".configs[0].specific.tokenY"), // tokenY
             25, // binStep
@@ -306,7 +316,7 @@ contract AnyLBTManagerTest is BaseStrategyTest {
                             PUSH/PULL FUNDS
     //////////////////////////////////////////////////////////////*/
 
-    function test__pushFunds() public override {
+    function test__pushFundsOnly() public {
         strategy.toggleAutoDeposit();
         _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
 

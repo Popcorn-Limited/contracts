@@ -71,6 +71,9 @@ abstract contract AnyConverterV2 is BaseStrategy {
             strategyInitData_,
             (address, address, uint256)
         );
+        if (oracle_ == address(0)) revert Misconfigured();
+        if (yieldToken == address(0)) revert Misconfigured();
+
         oracle = IPriceOracle(oracle_);
 
         tokens.push(asset_);
