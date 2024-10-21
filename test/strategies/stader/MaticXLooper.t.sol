@@ -647,6 +647,84 @@ contract MaticXLooperTest is BaseStrategyTest {
     //     );
     // }
 
+    function test__leverUp() public {
+        uint256 amountDeposit = 1e18;
+        deal(address(maticX), bob, amountDeposit);
+
+        vm.startPrank(bob);
+        maticX.approve(address(strategy), amountDeposit);
+        strategy.deposit(amountDeposit, bob);
+        vm.stopPrank();
+
+        uint256 initialABalance = aMaticX.balanceOf(address(strategy));
+        uint256 initialLTV = strategyContract.getLTV();
+        uint256 depositAmount = 0.5e18; // Example deposit amount
+
+        // Call leverUp with a specific deposit amount
+        strategyContract.leverUp(depositAmount);
+
+        uint256 finalABalance = aMaticX.balanceOf(address(strategy));
+        uint256 finalLTV = strategyContract.getLTV();
+
+        // Check that the aToken balance has increased
+        assertGt(
+            finalABalance,
+            initialABalance,
+            "aToken balance should increase after leverUp"
+        );
+
+        // Check that the LTV has increased
+        assertGt(finalLTV, initialLTV, "LTV should increase after leverUp");
+
+        // Check that the final LTV is not above the max LTV
+        assertLe(
+            finalLTV,
+            strategyContract.maxLTV(),
+            "Final LTV should not exceed max LTV"
+        );
+    }
+
+    function test__leverDown() public {
+        uint256 amountDeposit = 1e18;
+        deal(address(maticX), bob, amountDeposit);
+
+        vm.startPrank(bob);
+        maticX.approve(address(strategy), amountDeposit);
+        strategy.deposit(amountDeposit, bob);
+        vm.stopPrank();
+
+        // First, lever up to create some debt
+        strategyContract.leverUp(0.5e18);
+
+        uint256 initialABalance = aMaticX.balanceOf(address(strategy));
+        uint256 initialLTV = strategyContract.getLTV();
+        uint256 borrowAmount = 0.2e18; // Example borrow amount to reduce
+        uint256 slippage = 1e16; // 1% slippage
+
+        // Now call leverDown
+        strategyContract.leverDown(borrowAmount, slippage);
+
+        uint256 finalABalance = aMaticX.balanceOf(address(strategy));
+        uint256 finalLTV = strategyContract.getLTV();
+
+        // Check that the aToken balance has decreased
+        assertLt(
+            finalABalance,
+            initialABalance,
+            "aToken balance should decrease after leverDown"
+        );
+
+        // Check that the LTV has decreased
+        assertLt(finalLTV, initialLTV, "LTV should decrease after leverDown");
+
+        // Check that the final LTV is not above the max LTV
+        assertLe(
+            finalLTV,
+            strategyContract.maxLTV(),
+            "Final LTV should not exceed max LTV"
+        );
+    }
+
     /*//////////////////////////////////////////////////////////////
                           INITIALIZATION
     //////////////////////////////////////////////////////////////*/
