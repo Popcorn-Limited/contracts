@@ -87,12 +87,14 @@ abstract contract AnyConverterV2 is BaseStrategy {
      * @dev Return assets held by adapter if paused.
      */
     function _totalAssets() internal view override returns (uint256) {
-        return
-            oracle.getQuote(
-                IERC20(yieldToken).balanceOf(address(this)),
-                yieldToken,
-                asset()
-            ) - outstandingAllowance;
+        uint256 _outstandingAllowance = outstandingAllowance;
+        uint256 _totalAssets = oracle.getQuote(
+            IERC20(yieldToken).balanceOf(address(this)),
+            yieldToken,
+            asset()
+        );
+        if (_outstandingAllowance > _totalAssets) return 0;
+        return _totalAssets - _outstandingAllowance;
     }
 
     function convertToUnderlyingShares(
