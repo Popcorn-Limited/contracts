@@ -190,9 +190,15 @@ abstract contract BaseAaveLeverageStrategy is BaseStrategy, IFlashLoanReceiver {
         revert();
     }
 
+    /// @notice The token rewarded if the aave liquidity mining is active
+    function rewardTokens() external view override returns (address[] memory) {
+        return aaveIncentives.getRewardsByAsset(asset());
+    }
+
     /*//////////////////////////////////////////////////////////////
-                          MANAGEMENT LOGIC
+                          LEVERAGE LOGIC
     //////////////////////////////////////////////////////////////*/
+
     function adjustLeverage() public {
         // get vault current leverage : debt/collateral
         (
@@ -212,8 +218,7 @@ abstract contract BaseAaveLeverageStrategy is BaseStrategy, IFlashLoanReceiver {
                     )
                 )).mulDiv(1e18, (1e18 - targetLTV), Math.Rounding.Ceil);
 
-            // flash loan debt asset to repay part of the debt
-            _flashLoan(borrowAmount, 0, 0, 0, false, slippage);
+            _leverDown(borrowAmount, slippage);
         } else {
             uint256 depositAmount = (targetLTV.mulDiv(
                 currentCollateral,
@@ -225,29 +230,32 @@ abstract contract BaseAaveLeverageStrategy is BaseStrategy, IFlashLoanReceiver {
                     Math.Rounding.Ceil
                 );
 
-            uint256 dustBalance = address(this).balance;
-
-            if (dustBalance < depositAmount) {
-                // flashloan but use eventual collateral dust remained in the contract as well
-                uint256 borrowAmount = depositAmount - dustBalance;
-
-                // flash loan debt asset from lending protocol and add to cdp - slippage not used in this case, pass 0
-                _flashLoan(borrowAmount, depositAmount, 0, 2, false, 0);
-            } else {
-                // deposit the dust as collateral- borrow amount is zero
-                // leverage naturally decreases
-                _redepositAsset(0, dustBalance, asset());
-            }
+            _leverUp(depositAmount);
         }
 
         // reverts if LTV got above max
         _assertHealthyLTV();
     }
 
-    /// @notice The token rewarded if the aave liquidity mining is active
-    function rewardTokens() external view override returns (address[] memory) {
-        return aaveIncentives.getRewardsByAsset(asset());
+    function leverUp(uint256 depositAmount) public onlyKeeperOrOwner {
+        _leverUp(depositAmount);
+
+        // reverts if LTV got above max
+        _assertHealthyLTV();
     }
+
+    function leverDown(
+        uint256 borrowAmount,
+        uint256 slippage
+    ) public onlyKeeperOrOwner {
+        _leverDown(borrowAmount, slippage);
+        // reverts if LTV got above max
+        _assertHealthyLTV();
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        HARVEST LOGIC
+    //////////////////////////////////////////////////////////////*/
 
     /// @notice Claim additional rewards given that it's active.
     function claim() internal override returns (bool success) {
@@ -286,6 +294,10 @@ abstract contract BaseAaveLeverageStrategy is BaseStrategy, IFlashLoanReceiver {
         emit Harvested();
     }
 
+    /*//////////////////////////////////////////////////////////////
+                        MANAGEMENT LOGIC
+    //////////////////////////////////////////////////////////////*/
+
     function setHarvestValues(bytes memory harvestValues) external onlyOwner {
         _setHarvestValues(harvestValues);
     }
@@ -321,10 +333,6 @@ abstract contract BaseAaveLeverageStrategy is BaseStrategy, IFlashLoanReceiver {
         lendingPool.setUserUseReserveAsCollateral(asset_, true);
 
         initCollateral = true;
-    }
-
-    function withdrawDust(address recipient) public onlyOwner {
-        _withdrawDust(recipient);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -428,6 +436,14 @@ abstract contract BaseAaveLeverageStrategy is BaseStrategy, IFlashLoanReceiver {
     }
 
     /*//////////////////////////////////////////////////////////////
+                            OTHER LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    function withdrawDust(address recipient) public onlyOwner {
+        _withdrawDust(recipient);
+    }
+
+    /*//////////////////////////////////////////////////////////////
                           INTERNAL HOOKS LOGIC
     //////////////////////////////////////////////////////////////*/
 
@@ -501,6 +517,27 @@ abstract contract BaseAaveLeverageStrategy is BaseStrategy, IFlashLoanReceiver {
 
         // reverts if LTV got above max
         _assertHealthyLTV();
+    }
+
+    function _leverUp(uint256 depositAmount) internal {
+        uint256 dustBalance = address(this).balance;
+
+        if (dustBalance < depositAmount) {
+            // flashloan but use eventual collateral dust remained in the contract as well
+            uint256 borrowAmount = depositAmount - dustBalance;
+
+            // flash loan debt asset from lending protocol and add to cdp - slippage not used in this case, pass 0
+            _flashLoan(borrowAmount, depositAmount, 0, 2, false, 0);
+        } else {
+            // deposit the dust as collateral- borrow amount is zero
+            // leverage naturally decreases
+            _redepositAsset(0, dustBalance, asset());
+        }
+    }
+
+    function _leverDown(uint256 borrowAmount, uint256 slippage) internal {
+        // flash loan debt asset to repay part of the debt
+        _flashLoan(borrowAmount, 0, 0, 0, false, slippage);
     }
 
     ///@notice called after a flash loan to repay cdp
@@ -607,7 +644,7 @@ abstract contract BaseAaveLeverageStrategy is BaseStrategy, IFlashLoanReceiver {
     }
 
     /*//////////////////////////////////////////////////////////////
-                          TO OVERRIDE IN IMPLEMENTATION
+                    TO OVERRIDE IN IMPLEMENTATION
     //////////////////////////////////////////////////////////////*/
 
     // must provide conversion from debt asset to vault (collateral) asset
