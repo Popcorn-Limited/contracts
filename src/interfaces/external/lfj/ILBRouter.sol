@@ -138,7 +138,7 @@ interface ILBRouter {
         uint256 amountNATIVEMin,
         uint256[] memory ids,
         uint256[] memory amounts,
-        address payable to,
+        address to,
         uint256 deadline
     ) external returns (uint256 amountToken, uint256 amountNATIVE);
 }

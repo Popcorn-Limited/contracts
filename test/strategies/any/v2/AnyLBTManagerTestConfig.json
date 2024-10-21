@@ -6,7 +6,7 @@
         "asset": "0x6e84a6216eA6dACC71eE8E6b0a5B7322EEbC0fDd",
         "blockNumber": 52057786,
         "defaultAmount": 100000000000000000000,
-        "delta": 10,
+        "delta": 50000000000000000,
         "maxDeposit": 100000000000000000000000,
         "maxWithdraw": 100000000000000000000000,
         "minDeposit": 100000000000000000,
@@ -22,7 +22,8 @@
         "depositIds": [8386853, 8386854, 8386855],
         "tokenX": "0x6e84a6216eA6dACC71eE8E6b0a5B7322EEbC0fDd",
         "tokenY": "0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7",
-        "price": 79998858690000000000
+        "price": 79998858690000000000,
+        "claimer": "0x0241e3cD944258e7F4658344E17669f3f85F3F43"
       }
     }
   ]

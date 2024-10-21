@@ -21,6 +21,8 @@ contract AnyLBTManager is AnyCompounderNaiveV2 {
     using Math for uint256;
     using BytesLib for bytes;
 
+    address public tokenX;
+    address public tokenY;
     uint24[] public depositIds;
 
     event DepositIdSet(uint256 depositId);
@@ -39,6 +41,8 @@ contract AnyLBTManager is AnyCompounderNaiveV2 {
         bytes memory strategyInitData_
     ) external initializer {
         __AnyConverter_init(asset_, owner_, autoDeposit_, strategyInitData_);
+        tokenX = ILBT(yieldToken).getTokenX();
+        tokenY = ILBT(yieldToken).getTokenY();
     }
 
     /**
@@ -73,21 +77,28 @@ contract AnyLBTManager is AnyCompounderNaiveV2 {
                 amountX += (balance * uint256(reserveX)) / totalSupply;
             }
         }
-
-        address tokenX = ILBT(yieldToken).getTokenX();
-        address tokenY = ILBT(yieldToken).getTokenY();
+        address _tokenX = tokenX;
+        address _tokenY = tokenY;
         address _asset = asset();
 
-        if (tokenX == _asset) {
+        if (_tokenX == _asset) {
             totalAssets = amountX;
         } else {
-            totalAssets = oracle.getQuote(amountX, tokenX, _asset);
+            totalAssets = oracle.getQuote(
+                IERC20(_tokenX).balanceOf(address(this)) + amountX,
+                _tokenX,
+                _asset
+            );
         }
 
-        if (tokenY == _asset) {
+        if (_tokenY == _asset) {
             totalAssets += amountY;
         } else {
-            totalAssets += oracle.getQuote(amountY, tokenY, _asset);
+            totalAssets += oracle.getQuote(
+                IERC20(_tokenY).balanceOf(address(this)) + amountY,
+                _tokenY,
+                _asset
+            );
         }
     }
 
@@ -136,6 +147,8 @@ contract AnyLBTManager is AnyCompounderNaiveV2 {
         emit PulledFunds(0, 0);
     }
 
+    event LogUint(string, uint);
+
     function _execute(
         bytes memory data
     ) internal override returns (uint256[6] memory) {
@@ -181,7 +194,39 @@ contract AnyLBTManager is AnyCompounderNaiveV2 {
                 outstandingAllowance += abi.decode(result, (uint256));
             }
         }
+        uint24 activeId = ILBT(yieldToken).getActiveId();
 
+        uint256 amountY = 0;
+        uint256 amountX = 0;
+        for (uint256 i = 0; i < depositIds.length; i++) {
+            uint256 balance = ILBT(yieldToken).balanceOf(
+                address(this),
+                depositIds[i]
+            );
+            (uint128 reserveX, uint128 reserveY) = ILBT(yieldToken).getBin(
+                depositIds[i]
+            );
+            uint256 totalSupply = ILBT(yieldToken).totalSupply(depositIds[i]);
+
+            if (depositIds[i] <= activeId) {
+                amountY += (balance * uint256(reserveY)) / totalSupply;
+            }
+
+            if (depositIds[i] >= activeId) {
+                amountX += (balance * uint256(reserveX)) / totalSupply;
+            }
+        }
+
+        emit LogUint("amountY", amountY);
+        emit LogUint("amountX", amountX);
+        emit LogUint("balance", IERC20(_asset).balanceOf(address(this)));
+        emit LogUint(
+            "balance tokenY",
+            IERC20(0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7).balanceOf(
+                address(this)
+            )
+        );
+        emit LogUint("totalAssets", totalAssets());
         uint256 postTotalAssets = totalAssets() - outstandingAllowance;
 
         return ([preTotalAssets, postTotalAssets, 0, 0, 0, 0]);

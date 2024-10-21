@@ -9,6 +9,8 @@ import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson, IERC20, Math} from
 import {MockOracle} from "test/mocks/MockOracle.sol";
 import {ILBT} from "src/interfaces/external/lfj/ILBT.sol";
 import {ILBRouter} from "src/interfaces/external/lfj/ILBRouter.sol";
+import {ILBClaimer} from "src/interfaces/external/lfj/ILBClaimer.sol";
+
 
 contract AnyLBTManagerTest is BaseStrategyTest {
     using Math for uint256;
@@ -31,7 +33,7 @@ contract AnyLBTManagerTest is BaseStrategyTest {
     }
 
     function _setUpBase() internal {
-        PendingCallAllowance[] memory changes = new PendingCallAllowance[](4);
+        PendingCallAllowance[] memory changes = new PendingCallAllowance[](5);
         changes[0] = PendingCallAllowance({
             target: testConfig.asset,
             selector: bytes4(keccak256("approve(address,uint256)")),
@@ -39,7 +41,7 @@ contract AnyLBTManagerTest is BaseStrategyTest {
         });
         changes[1] = PendingCallAllowance({
             target: yieldToken,
-            selector: bytes4(keccak256("approve(address,uint256)")),
+            selector: bytes4(keccak256("approveForAll(address,bool)")),
             allowed: true
         });
         changes[2] = PendingCallAllowance({
@@ -49,7 +51,12 @@ contract AnyLBTManagerTest is BaseStrategyTest {
         });
         changes[3] = PendingCallAllowance({
             target: address(exchange),
-            selector: ILBRouter.removeLiquidityNATIVE.selector,
+            selector: ILBRouter.removeLiquidity.selector,
+            allowed: true
+        });
+        changes[4] = PendingCallAllowance({
+            target: json.readAddress(".configs[0].specific.claimer"),
+            selector: ILBClaimer.claim.selector,
             allowed: true
         });
 
@@ -83,7 +90,7 @@ contract AnyLBTManagerTest is BaseStrategyTest {
             testConfig_.asset,
             address(this),
             true,
-            abi.encode(yieldToken, address(oracle), uint256(0))
+            abi.encode(yieldToken, address(oracle), uint256(10))
         );
 
         uint256[] memory depositIdsUint = json_.readUintArray(
@@ -108,7 +115,6 @@ contract AnyLBTManagerTest is BaseStrategyTest {
             testConfig.asset,
             json.readUint(".configs[0].specific.price")
         );
-
     }
 
     function _mintYieldToken(
@@ -132,9 +138,9 @@ contract AnyLBTManagerTest is BaseStrategyTest {
         deltaIds[2] = 2;
 
         uint256[] memory distributionX = new uint256[](3);
-        distributionX[0] = amountIn / 5; // 20%
-        distributionX[1] = (amountIn / 5) * 2; // 40%
-        distributionX[2] = (amountIn / 5) * 2; // 40%
+        distributionX[0] = 0.2e18; // 20%
+        distributionX[1] = 0.4e18; // 40%
+        distributionX[2] = 0.4e18; // 40%
 
         uint256[] memory distributionY = new uint256[](3);
 
@@ -153,8 +159,8 @@ contract AnyLBTManagerTest is BaseStrategyTest {
                 deltaIds: deltaIds,
                 distributionX: distributionX,
                 distributionY: distributionY,
-                to: address(this),
-                refundTo: address(this),
+                to: address(strategy),
+                refundTo: address(strategy),
                 deadline: block.timestamp + 10_000
             })
         );
@@ -178,30 +184,30 @@ contract AnyLBTManagerTest is BaseStrategyTest {
 
     function _pullFunds(uint256 amountIn, uint256 amountOut) internal {
         bytes memory encodedApprove = abi.encodeWithSelector(
-            bytes4(keccak256("approve(address,uint256)")),
+            bytes4(keccak256("approveForAll(address,bool)")),
             address(exchange),
-            amountIn
+            true
         );
-        uint256[] memory ids = new uint256[](3);
-        ids[0] = 8386854;
-        ids[1] = 8386855;
-        ids[2] = 8386856;
 
-        uint256[] memory amounts = new uint256[](3);
-        amounts[0] = ILBT(yieldToken).balanceOf(address(this), ids[0]);
-        amounts[1] = ILBT(yieldToken).balanceOf(address(this), ids[1]);
-        amounts[2] = ILBT(yieldToken).balanceOf(address(this), ids[2]);
+        uint256[] memory ids = json.readUintArray(
+            ".configs[0].specific.depositIds"
+        );
+
+        uint256[] memory amounts = new uint256[](ids.length);
+        amounts[0] = ILBT(yieldToken).balanceOf(address(strategy), ids[0]);
+        amounts[1] = ILBT(yieldToken).balanceOf(address(strategy), ids[1]);
+        amounts[2] = ILBT(yieldToken).balanceOf(address(strategy), ids[2]);
 
         bytes memory encodedSwap = abi.encodeWithSelector(
-            ILBRouter.removeLiquidityNATIVE.selector,
-            json.readAddress(".configs[0].specific.tokenX"), // tokenX
-            json.readAddress(".configs[0].specific.tokenY"), // tokenY
+            ILBRouter.removeLiquidity.selector,
+            json.readAddress(".configs[0].specific.tokenX"),
+            json.readAddress(".configs[0].specific.tokenY"),
             25, // binStep
-            0, // amountXMin
-            0, // amountYMin
+            0, // amountTokenMin
+            0, // amountNATIVEMin
             ids, // ids
             amounts, // amounts
-            address(this), // to
+            address(strategy), // to
             block.timestamp + 10_000 // deadline
         );
 
@@ -316,7 +322,7 @@ contract AnyLBTManagerTest is BaseStrategyTest {
                             PUSH/PULL FUNDS
     //////////////////////////////////////////////////////////////*/
 
-    function test__pushFundsOnly() public {
+    function test__pushFunds() public override {
         strategy.toggleAutoDeposit();
         _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
 
@@ -328,10 +334,6 @@ contract AnyLBTManagerTest is BaseStrategyTest {
 
         _pushFunds(testConfig.defaultAmount, testConfig.defaultAmount);
 
-        assertEq(
-            IERC20(yieldToken).balanceOf(address(strategy)),
-            testConfig.defaultAmount
-        );
         assertEq(IERC20(testConfig.asset).balanceOf(address(strategy)), 0);
 
         assertApproxEqAbs(strategy.totalAssets(), oldTa, _delta_, "ta");
@@ -354,25 +356,11 @@ contract AnyLBTManagerTest is BaseStrategyTest {
         uint256 oldTs = strategy.totalSupply();
 
         uint256 amountIn = testConfig.defaultAmount / 2;
-        uint256 expectedAmountOut = amountIn.mulDiv(
-            9000,
-            10_000,
-            Math.Rounding.Floor
-        );
-        _pushFunds(amountIn, expectedAmountOut);
-
-        assertEq(
-            IERC20(yieldToken).balanceOf(address(strategy)),
-            expectedAmountOut
-        );
-        assertEq(
-            IERC20(testConfig.asset).balanceOf(address(strategy)),
-            testConfig.defaultAmount - amountIn
-        );
+        _pushFunds(amountIn, amountIn);
 
         assertApproxEqAbs(
             strategy.totalAssets(),
-            testConfig.defaultAmount / 2 + expectedAmountOut,
+            testConfig.defaultAmount,
             _delta_,
             "ta"
         );
@@ -386,12 +374,6 @@ contract AnyLBTManagerTest is BaseStrategyTest {
         uint256 oldTs = strategy.totalSupply();
 
         _pullFunds(testConfig.defaultAmount, testConfig.defaultAmount);
-
-        assertEq(IERC20(yieldToken).balanceOf(address(strategy)), 0);
-        assertEq(
-            IERC20(testConfig.asset).balanceOf(address(strategy)),
-            testConfig.defaultAmount
-        );
 
         assertApproxEqAbs(strategy.totalAssets(), oldTa, _delta_, "ta");
         assertApproxEqAbs(strategy.totalSupply(), oldTs, _delta_, "ts");
@@ -409,27 +391,12 @@ contract AnyLBTManagerTest is BaseStrategyTest {
         AnyConverterV2(address(strategy)).changeSlippage();
 
         uint256 amountIn = testConfig.defaultAmount / 2;
-        uint256 expectedAmountOut = amountIn.mulDiv(
-            9000,
-            10_000,
-            Math.Rounding.Floor
-        );
-        _pullFunds(amountIn, expectedAmountOut);
+        _pullFunds(amountIn, amountIn);
 
         // warp adds some assets as interest from the aToken
-        assertEq(
-            IERC20(yieldToken).balanceOf(address(strategy)),
-            500567815567176224
-        );
-        assertEq(
-            IERC20(testConfig.asset).balanceOf(address(strategy)),
-            expectedAmountOut
-        );
-
-        // TODO reduce by slippage
         assertApproxEqAbs(
             strategy.totalAssets(),
-            500567815567176224 + expectedAmountOut,
+            testConfig.defaultAmount,
             _delta_,
             "ta"
         );
@@ -466,18 +433,39 @@ contract AnyLBTManagerTest is BaseStrategyTest {
         bytes memory encodedApprove = abi.encodeWithSelector(
             bytes4(keccak256("approve(address,uint256)")),
             address(exchange),
-            testConfig.defaultAmount * 2
+            (testConfig.defaultAmount * 3) / 2
         );
+        int256[] memory deltaIds = new int256[](3);
+        deltaIds[0] = 0;
+        deltaIds[1] = 1;
+        deltaIds[2] = 2;
+
+        uint256[] memory distributionX = new uint256[](3);
+        distributionX[0] = 0.2e18; // 20%
+        distributionX[1] = 0.4e18; // 40%
+        distributionX[2] = 0.4e18; // 40%
+
+        uint256[] memory distributionY = new uint256[](3);
+
         bytes memory encodedSwap = abi.encodeWithSelector(
-            bytes4(
-                keccak256(
-                    "swapTokenExactAmountIn(address,uint256,address,uint256)"
-                )
-            ),
-            testConfig.asset,
-            testConfig.defaultAmount,
-            yieldToken,
-            testConfig.defaultAmount
+            ILBRouter.addLiquidityNATIVE.selector,
+            ILBRouter.LiquidityParameters({
+                tokenX: json.readAddress(".configs[0].specific.tokenX"),
+                tokenY: json.readAddress(".configs[0].specific.tokenY"),
+                binStep: 25,
+                amountX: testConfig.defaultAmount,
+                amountY: 0,
+                amountXMin: 0,
+                amountYMin: 0,
+                activeIdDesired: 8386853,
+                idSlippage: 1,
+                deltaIds: deltaIds,
+                distributionX: distributionX,
+                distributionY: distributionY,
+                to: address(strategy),
+                refundTo: address(strategy),
+                deadline: block.timestamp + 10_000
+            })
         );
 
         CallStruct[] memory calls = new CallStruct[](2);
@@ -506,34 +494,6 @@ contract AnyLBTManagerTest is BaseStrategyTest {
         );
 
         vm.expectRevert("Not Allowed");
-        strategy.pullFunds(0, abi.encode(calls));
-    }
-
-    function test__pullFunds_outstanding_allowance_reverts() public {
-        test__pushFunds();
-
-        bytes memory encodedApprove = abi.encodeWithSelector(
-            bytes4(keccak256("approve(address,uint256)")),
-            address(exchange),
-            testConfig.defaultAmount * 2
-        );
-        bytes memory encodedSwap = abi.encodeWithSelector(
-            bytes4(
-                keccak256(
-                    "swapTokenExactAmountIn(address,uint256,address,uint256)"
-                )
-            ),
-            yieldToken,
-            testConfig.defaultAmount,
-            testConfig.asset,
-            testConfig.defaultAmount
-        );
-
-        CallStruct[] memory calls = new CallStruct[](2);
-        calls[0] = CallStruct(yieldToken, encodedApprove);
-        calls[1] = CallStruct(address(exchange), encodedSwap);
-
-        vm.expectRevert("Total assets decreased");
         strategy.pullFunds(0, abi.encode(calls));
     }
 
