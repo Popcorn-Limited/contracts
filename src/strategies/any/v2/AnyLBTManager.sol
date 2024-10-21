@@ -100,6 +100,10 @@ contract AnyLBTManager is AnyCompounderNaiveV2 {
                 _asset
             );
         }
+
+        uint256 _outstandingAllowance = outstandingAllowance;
+        if (_outstandingAllowance > totalAssets) return 0;
+        totalAssets -= _outstandingAllowance;
     }
 
     function setDepositIds(uint24[] memory ids) external onlyKeeperOrOwner {

@@ -41,8 +41,9 @@ abstract contract AnyConverterV2 is BaseStrategy {
 
     address public yieldToken;
     address[] public tokens;
-
     IPriceOracle public oracle;
+
+    uint256 public outstandingAllowance;
 
     bytes4 public constant APPROVE_SELECTOR =
         bytes4(keccak256("approve(address,uint256)"));
@@ -89,12 +90,14 @@ abstract contract AnyConverterV2 is BaseStrategy {
      * @dev Return assets held by adapter if paused.
      */
     function _totalAssets() internal view virtual override returns (uint256) {
-        return
-            oracle.getQuote(
-                IERC20(yieldToken).balanceOf(address(this)),
-                yieldToken,
-                asset()
-            );
+        uint256 _outstandingAllowance = outstandingAllowance;
+        uint256 _totalAssets = oracle.getQuote(
+            IERC20(yieldToken).balanceOf(address(this)),
+            yieldToken,
+            asset()
+        );
+        if (_outstandingAllowance > _totalAssets) return 0;
+        return _totalAssets - _outstandingAllowance;
     }
 
     function convertToUnderlyingShares(
@@ -235,7 +238,7 @@ abstract contract AnyConverterV2 is BaseStrategy {
             if (!success) revert("Call failed");
         }
 
-        uint256 outstandingAllowance;
+        uint256 _outstandingAllowance;
         for (uint256 i; i < allowanceCalls.length; i++) {
             if (allowanceCalls[i].target != address(0)) {
                 (bool success, bytes memory result) = allowanceCalls[i]
@@ -243,11 +246,12 @@ abstract contract AnyConverterV2 is BaseStrategy {
                     .call(allowanceCalls[i].data);
                 if (!success) revert("Call failed");
 
-                outstandingAllowance += abi.decode(result, (uint256));
+                _outstandingAllowance += abi.decode(result, (uint256));
             }
         }
 
-        uint256 postTotalAssets = totalAssets() - outstandingAllowance;
+        uint256 outstandingAllowance = _outstandingAllowance;
+        uint256 postTotalAssets = totalAssets() - _outstandingAllowance;
         uint256 postAssetBalance = IERC20(_asset).balanceOf(address(this));
         uint256 postYieldTokenBalance = IERC20(_yieldToken).balanceOf(
             address(this)
