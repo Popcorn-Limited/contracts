@@ -20,10 +20,11 @@
             "borrowAsset": "0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7",
             "borrowAssetCToken": "0x5C0401e81Bc07Ca70fAD469b451682c0d747Ef1c",
             "cToken": "0xF362feA9659cf036792c9cb02f8ff8198E21B4cB",
-            "maxLTV": 690000000000000000,
+            "isNativeDebt": true,
+            "maxLTV": 650000000000000000,
             "maxSlippage": 5000000000000000,
             "poolAddressesProvider": "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb",
-            "targetLTV": 650000000000000000
+            "targetLTV": 620000000000000000
           },
           "init": {
             "balancerVault": "0xBA12222222228d8Ba445958a75a0704d566BF2C8",

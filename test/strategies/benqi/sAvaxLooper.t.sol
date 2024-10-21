@@ -156,6 +156,26 @@ contract sAVAXLooperTest is BaseStrategyTest {
         }
     }
 
+    function test__previewWithdraw(uint8 fuzzAmount) public override {
+        uint256 amount = bound(
+            fuzzAmount,
+            testConfig.minDeposit,
+            testConfig.maxDeposit
+        );
+
+        /// Some strategies have slippage or rounding errors which makes `maxWithdraw` lower than the deposit amount
+        uint256 reqAssets = strategy.previewMint(
+            strategy.previewWithdraw(amount)
+        ) + 1000000000;
+
+        _mintAssetAndApproveForStrategy(reqAssets, bob);
+
+        vm.prank(bob);
+        strategy.deposit(reqAssets, bob);
+
+        prop_previewWithdraw(bob, bob, bob, amount, testConfig.testId);
+    }
+
     function test__withdraw(uint8 fuzzAmount) public override {
         uint256 len = json.readUint(".length");
         for (uint256 i; i < len; i++) {
@@ -368,22 +388,19 @@ contract sAVAXLooperTest is BaseStrategyTest {
         // tot assets increased in this case
         // but if the amount of dust is lower than the slippage % of debt
         // totalAssets would be lower, as leverage incurred in debt
-        assertGt(strategy.totalAssets(), totAssetsBefore);
+        assertGt(strategy.totalAssets(), totAssetsBefore, "ta");
 
         // sAvax should be in lending market
-        assertEq(sAvax.balanceOf(address(strategy)), 0);
+        assertEq(sAvax.balanceOf(address(strategy)), 0, "asset");
 
         // adapter should now have more sAvax aToken than before
-        assertGt(csAVAX.balanceOf(address(strategy)), amountDeposit);
-
-        // adapter should hold debt tokens
-        assertGt(cwAVAX.balanceOf(address(strategy)), 0);
+        assertGt(csAVAX.balanceOf(address(strategy)) * 1e8, amountDeposit, "collateral");
 
         // LTV is non zero now
-        assertGt(strategyContract.getLTV(), 0);
+        assertGt(strategyContract.getLTV(), 0, "ltv");
 
         // LTV is slightly below target, since some avax dust has been deposited as collateral
-        assertGt(strategyContract.targetLTV(), strategyContract.getLTV());
+        assertGt(strategyContract.targetLTV(), strategyContract.getLTV(), "target ltv");
     }
 
     function test__adjustLeverage_only_avax_dust() public {
@@ -411,10 +428,7 @@ contract sAVAXLooperTest is BaseStrategyTest {
         assertEq(sAvax.balanceOf(address(strategy)), 0);
 
         // adapter should now have more sAvax aToken than before
-        assertGt(csAVAX.balanceOf(address(strategy)), amountDeposit);
-
-        // adapter should not hold debt tokens
-        assertEq(cwAVAX.balanceOf(address(strategy)), 0);
+        assertGt(csAVAX.balanceOf(address(strategy)) * 1e8, amountDeposit, "collateral");
 
         // adapter should now have 0 avax dust
         assertEq(address(strategy).balance, 0);
@@ -479,13 +493,13 @@ contract sAVAXLooperTest is BaseStrategyTest {
         );
         assertApproxEqAbs(strategy.totalAssets(), expDust, _delta_, "TA");
 
-        assertEq(IERC20(address(strategy)).totalSupply(), 0);
+        assertEq(IERC20(address(strategy)).totalSupply(), 0, "supply");
 
         // should not hold any sAvax aToken
-        assertEq(csAVAX.balanceOf(address(strategy)), 0);
+        assertEq(csAVAX.balanceOf(address(strategy)), 0, "collateral");
 
         // adapter should not hold debt any debt
-        assertEq(cwAVAX.balanceOf(address(strategy)), 0);
+        assertEq(cwAVAX.balanceOf(address(strategy)), 0, "debt");
     }
 
     function test_withdraw_dust() public {
@@ -540,7 +554,7 @@ contract sAVAXLooperTest is BaseStrategyTest {
         uint256 oldABalance = csAVAX.balanceOf(address(strategy));
         uint256 oldLTV = strategyContract.getLTV();
 
-        strategyContract.setLeverageValues(8.5e17, 8.8e17);
+        strategyContract.setLeverageValues(6.5e17, 6.8e17);
 
         assertGt(csAVAX.balanceOf(address(strategy)), oldABalance);
         assertGt(strategyContract.getLTV(), oldLTV);

@@ -30,14 +30,17 @@ interface ICToken {
      */
     function mint(uint256) external returns (uint256 success);
 
-    function redeem(uint256) external;
-
+    function redeem(uint redeemTokens) external returns (uint256);
+    
     function borrow(uint256 borrowAmount) external returns (uint256);
     
 
     function redeemUnderlying(uint256) external returns (uint256);
 
     function repayBorrow(uint256 repayAmount) external returns (uint256);
+
+    // repay msg.value amount
+    function repayBorrow() external payable;
 
     /**
      * @dev Returns exchange rate from the underlying to the cToken.

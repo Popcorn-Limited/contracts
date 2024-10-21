@@ -15,6 +15,7 @@ struct LooperBaseValues {
     address borrowAsset;
     address borrowAssetCToken; // cToken of the asset to borrow
     address cToken;
+    bool isNativeDebt; // if debt is in native asset and not wrapped version
     uint256 maxLTV;
     uint256 maxSlippage;
     address poolAddressesProvider;
@@ -45,10 +46,11 @@ abstract contract BaseCompoundV2LeverageStrategy is
 
     IERC20 public borrowAsset; // asset to borrow
     ICToken public borrowCToken; // borrow cToken
-    ICToken public collateralToken; // Comp cToken
+    ICToken public collateralToken; // collateral cToken
     ILendingPool public aaveLendingPool; // aave pool for flash loan
     IPoolAddressesProvider public poolAddressesProvider; // aave pool provider
 
+    bool public isNativeDebtAsset; 
     uint256 public slippage; // 1e18 = 100% slippage, 1e14 = 1 BPS slippage
     uint256 public targetLTV; // in 18 decimals - 1e17 being 0.1%
     uint256 public maxLTV; // max ltv the vault can reach
@@ -103,6 +105,8 @@ abstract contract BaseCompoundV2LeverageStrategy is
 
         targetLTV = initValues.targetLTV;
         maxLTV = initValues.maxLTV;
+
+        isNativeDebtAsset = initValues.isNativeDebt;
 
         _name = string.concat(
             "VaultCraft Compound Leveraged ",
@@ -368,8 +372,18 @@ abstract contract BaseCompoundV2LeverageStrategy is
         uint256 flashLoanDebt = amounts[0] + premiums[0];
     
         if (!cache.toIncreaseLeverage) {
-            // repay cdp debt on compound
-            borrowCToken.repayBorrow(amounts[0]);
+            if(isNativeDebtAsset) {
+                // native asset is used to repay debt
+                IWAVAX(address(borrowAsset)).withdraw(amounts[0]);
+
+                // repay cdp debt on compound - reverts internally
+                borrowCToken.repayBorrow{value: amounts[0]}();
+            } else {
+                // regular ERC20 to repay debt
+                uint256 res = borrowCToken.repayBorrow(amounts[0]);
+                require(res == 0, "Failed repaying debt");
+            }
+
 
             // withdraw collateral, swap, repay flashloan
             _reduceLeverage(
@@ -539,7 +553,8 @@ abstract contract BaseCompoundV2LeverageStrategy is
 
         if (isFullWithdraw) {
             // withdraw all
-            collateralToken.redeem(collateralToken.balanceOf(address(this)));
+            uint256 res = collateralToken.redeem(collateralToken.balanceOf(address(this)));
+            require(res == 0, "Failed redeeming collateral");
         } else {
             collateralToken.redeemUnderlying(
                 flashLoanCollateralValue + swapBuffer + toWithdraw
