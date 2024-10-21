@@ -26,6 +26,14 @@ contract AnyLBTManagerTest is BaseStrategyTest {
             "./test/strategies/any/v2/AnyLBTManagerTestConfig.json"
         );
         exchange = ILBRouter(json.readAddress(".configs[0].specific.exchange"));
+        oracle = new MockOracle();
+
+        oracle.setPrice(
+            json.readAddress(".configs[0].specific.tokenY"),
+            testConfig.asset,
+            json.readUint(".configs[0].specific.price")
+        );
+
         _setUpBase();
     }
 
@@ -72,7 +80,6 @@ contract AnyLBTManagerTest is BaseStrategyTest {
         TestConfig memory testConfig_
     ) internal override returns (IBaseStrategy) {
         AnyLBTManager _strategy = new AnyLBTManager();
-        oracle = new MockOracle();
 
         yieldToken = json_.readAddress(
             string.concat(".configs[", index_, "].specific.yieldToken")
@@ -85,7 +92,9 @@ contract AnyLBTManagerTest is BaseStrategyTest {
             abi.encode(yieldToken, address(oracle), uint256(0))
         );
 
-        _strategy.setDepositIds(json_.readUintArray(".configs[0].specific.depositIds"));
+        _strategy.setDepositIds(
+            json_.readUintArray(".configs[0].specific.depositIds")
+        );
 
         // TODO: Set up liquidity bins
 
@@ -122,8 +131,8 @@ contract AnyLBTManagerTest is BaseStrategyTest {
         bytes memory encodedSwap = abi.encodeWithSelector(
             ILBRouter.addLiquidity.selector,
             ILBRouter.LiquidityParameters({
-                tokenX: 0x6e84a6216eA6dACC71eE8E6b0a5B7322EEbC0fDd,
-                tokenY: 0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7,
+                tokenX: json.readAddress(".configs[0].specific.tokenX"),
+                tokenY: json.readAddress(".configs[0].specific.tokenY"),
                 binStep: 25,
                 amountX: amountIn,
                 amountY: 0,
@@ -175,8 +184,8 @@ contract AnyLBTManagerTest is BaseStrategyTest {
 
         bytes memory encodedSwap = abi.encodeWithSelector(
             ILBRouter.removeLiquidity.selector,
-            0x6e84a6216eA6dACC71eE8E6b0a5B7322EEbC0fDd, // tokenX
-            0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7, // tokenY
+            json.readAddress(".configs[0].specific.tokenX"), // tokenX
+            json.readAddress(".configs[0].specific.tokenY"), // tokenY
             25, // binStep
             0, // amountXMin
             0, // amountYMin
