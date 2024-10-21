@@ -220,7 +220,7 @@ abstract contract BaseCompoundV2LeverageStrategy is
     }
 
     /*//////////////////////////////////////////////////////////////
-                          MANAGEMENT LOGIC
+                          LEVERAGE LOGIC
     //////////////////////////////////////////////////////////////*/
     function adjustLeverage() public {
         // get vault current leverage : debt/collateral
@@ -241,8 +241,7 @@ abstract contract BaseCompoundV2LeverageStrategy is
                     )
                 )).mulDiv(1e18, (1e18 - targetLTV), Math.Rounding.Ceil);
 
-            // flash loan debt asset to repay part of the debt
-            _flashLoan(borrowAmount, 0, 0, false, false, slippage);
+            _leverDown(borrowAmount, slippage);
         } else {
             uint256 depositAmount = (targetLTV.mulDiv(
                 currentCollateral,
@@ -254,22 +253,26 @@ abstract contract BaseCompoundV2LeverageStrategy is
                     Math.Rounding.Ceil
                 );
             
-            uint256 dustBalance = address(this).balance;
-
-            if (dustBalance < depositAmount) {
-                // flashloan but use eventual collateral dust remained in the contract as well
-                uint256 borrowAmount = depositAmount - dustBalance;
-
-                // flash loan debt asset from aave, swap for collateral,
-                // deposit into compound, borrow debt to repay aave flash loan
-                _flashLoan(borrowAmount, depositAmount, 0, true, false, 0);
-            } else {
-                // deposit the dust as collateral- borrow amount is zero
-                // leverage naturally decreases
-                _redepositAsset(0, dustBalance, asset());
-            }
+            _leverUp(depositAmount);
         }
 
+        // reverts if LTV got above max
+        _assertHealthyLTV();
+    }
+
+    function leverUp(uint256 depositAmount) public onlyKeeperOrOwner {
+        _leverUp(depositAmount);
+
+        // reverts if LTV got above max
+        _assertHealthyLTV();
+    }
+
+    function leverDown(
+        uint256 borrowAmount,
+        uint256 slippage
+    ) public onlyKeeperOrOwner {
+        _leverDown(borrowAmount, slippage);
+        
         // reverts if LTV got above max
         _assertHealthyLTV();
     }
@@ -526,6 +529,27 @@ abstract contract BaseCompoundV2LeverageStrategy is
 
         // reverts if LTV got above max
         _assertHealthyLTV();
+    }
+
+    function _leverUp(uint256 depositAmount) internal {
+        uint256 dustBalance = address(this).balance;
+
+        if (dustBalance < depositAmount) {
+            // flashloan but use eventual collateral dust remained in the contract as well
+            uint256 borrowAmount = depositAmount - dustBalance;
+
+            // flash loan debt asset from lending protocol and add to cdp - slippage not used in this case, pass 0
+            _flashLoan(borrowAmount, depositAmount, 0, true, false, 0);
+        } else {
+            // deposit the dust as collateral- borrow amount is zero
+            // leverage naturally decreases
+            _redepositAsset(0, dustBalance, asset());
+        }
+    }
+
+    function _leverDown(uint256 borrowAmount, uint256 slippage) internal {
+        // flash loan debt asset to repay part of the debt
+        _flashLoan(borrowAmount, 0, 0, false, false, slippage);
     }
 
     ///@notice called after a flash loan to repay cdp
