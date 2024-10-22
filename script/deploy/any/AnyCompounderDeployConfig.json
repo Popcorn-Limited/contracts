@@ -1,17 +1,16 @@
 {
   "baseInit": {
-    "asset": "",
-    "owner": "",
+    "asset": "0x8236a87084f8B84306f72007F36F2618A5634494",
+    "owner": "0x2C3B135cd7dc6C673b358BEF214843DAb3464278",
     "autoDeposit": false
   },
   "strategyInit": {
-    "yieldAsset": "0x028171bCA77440897B824Ca71D1c56caC55b68A3",
-    "oracle": "0x07ede94cf6316f4809f2b725f5d79ad303fb4dc8",
+    "yieldAsset": "0x70B70Ac0445C3eF04E314DFdA6caafd825428221",
+    "oracle": "0xb3404F101F11A14988c4111E30006972EdbB99aB",
     "slippage": 10,
-    "floatRatio": 10,
+    "floatRatio": 0,
     "rewardTokens": [
-      "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
-      "0xcE246eEa10988C495B4A90a905Ee9237a0f91543"
+      "0x808507121B80c02388fAd14726482e061B8da827"
     ]
   },
   "harvest": {}

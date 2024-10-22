@@ -49,12 +49,16 @@ contract VaultRouter {
         uint256 minOut,
         address receiver
     ) external {
+        uint256 preBal = IERC4626(vault).balanceOf(address(this));
+
         IERC20(gauge).safeTransferFrom(msg.sender, address(this), burnAmount);
 
         ICurveGauge(gauge).withdraw(burnAmount);
 
+        uint256 postBal = IERC4626(vault).balanceOf(address(this));
+
         uint256 assets = IERC4626(vault).redeem(
-            burnAmount,
+            postBal - preBal,
             receiver,
             address(this)
         );
@@ -68,24 +72,33 @@ contract VaultRouter {
 
     event WithdrawalRequested(
         address indexed vault,
+        address indexed asset,
         address indexed receiver,
-        address indexed user,
-        uint256 burnAmount
+        address caller,
+        uint256 amount
     );
     event WithdrawalFullfilled(
         address indexed vault,
+        address indexed asset,
         address indexed receiver,
-        uint256 shares
+        uint256 amount
+    );
+    event WithdrawalClaimed(
+        address indexed asset,
+        address indexed receiver,
+        uint256 amount
     );
     event WithdrawalCancelled(
         address indexed vault,
         address indexed receiver,
-        uint256 shares
+        uint256 amount
     );
 
     error ArrayMismatch();
-
+    //      Vault              Receiver   Amount
     mapping(address => mapping(address => uint256)) public requestShares;
+    //      Asset              Receiver   Amount
+    mapping(address => mapping(address => uint256)) public claimableAssets;
 
     function unstakeAndRequestWithdrawal(
         address gauge,
@@ -116,7 +129,22 @@ contract VaultRouter {
     ) internal {
         requestShares[vault][receiver] += shares;
 
-        emit WithdrawalRequested(vault, receiver, msg.sender, shares);
+        emit WithdrawalRequested(
+            vault,
+            IERC4626(vault).asset(),
+            receiver,
+            msg.sender,
+            shares
+        );
+    }
+
+    function claimWithdrawal(address asset, address receiver) external {
+        uint256 amount = claimableAssets[asset][receiver];
+        claimableAssets[asset][receiver] = 0;
+
+        IERC20(asset).safeTransfer(receiver, amount);
+
+        emit WithdrawalClaimed(asset, receiver, amount);
     }
 
     function fullfillWithdrawal(
@@ -158,9 +186,9 @@ contract VaultRouter {
             address(this)
         );
 
-        asset.safeTransfer(receiver, assetAmount);
+        claimableAssets[address(asset)][receiver] += assetAmount;
 
-        emit WithdrawalFullfilled(vault, receiver, shares);
+        emit WithdrawalFullfilled(vault, address(asset), receiver, shares);
     }
 
     function cancelRequest(address vault, uint256 shares) external {
