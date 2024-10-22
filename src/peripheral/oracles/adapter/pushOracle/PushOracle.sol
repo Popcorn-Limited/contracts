@@ -25,12 +25,39 @@ contract PushOracle is BaseAdapter, Owned {
 
     constructor(address _owner) Owned(_owner) {}
 
+    /*//////////////////////////////////////////////////////////////
+                        SET PRICE LOGIC
+    //////////////////////////////////////////////////////////////*/
+
     function setPrice(
         address base,
         address quote,
         uint256 bqPrice,
         uint256 qbPrice
     ) external onlyOwner {
+        _setPrice(base, quote, bqPrice, qbPrice);
+    }
+
+    function setPrices(
+        address[] memory bases,
+        address[] memory quotes,
+        uint256[] memory bqPrices,
+        uint256[] memory qbPrices
+    ) external onlyOwner checkLength(bases.length, quotes.length) {
+        _checkLength(bases.length, bqPrices.length);
+        _checkLength(bases.length, qbPrices.length);
+
+        for (uint256 i = 0; i < bases.length; i++) {
+            _setPrice(bases[i], quotes[i], bqPrices[i], qbPrices[i]);
+        }
+    }
+
+    function _setPrice(
+        address base,
+        address quote,
+        uint256 bqPrice,
+        uint256 qbPrice
+    ) internal {
         // Both prices must be set
         if ((bqPrice == 0 && qbPrice != 0) || (qbPrice == 0 && bqPrice != 0))
             revert Misconfigured();
@@ -40,6 +67,10 @@ contract PushOracle is BaseAdapter, Owned {
 
         emit PriceUpdated(base, quote, bqPrice, qbPrice);
     }
+
+    /*//////////////////////////////////////////////////////////////
+                            QUOTE LOGIC
+    //////////////////////////////////////////////////////////////*/
 
     function _getQuote(
         uint256 inAmount,
@@ -61,5 +92,18 @@ contract PushOracle is BaseAdapter, Owned {
                 scale,
                 false
             );
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            UTILS
+    //////////////////////////////////////////////////////////////*/
+
+    modifier checkLength(uint256 lengthA, uint256 lengthB) {
+        _checkLength(lengthA, lengthB);
+        _;
+    }
+
+    function _checkLength(uint256 lengthA, uint256 lengthB) internal pure {
+        if (lengthA != lengthB) revert Misconfigured();
     }
 }

@@ -9,6 +9,13 @@ interface IPushOracle {
         uint256 bqPrice,
         uint256 qbPrice
     ) external;
+
+    function setPrices(
+        address[] memory bases,
+        address[] memory quotes,
+        uint256[] memory bqPrices,
+        uint256[] memory qbPrices
+    ) external;
 }
 
 contract PushOracleOwner is Owned {
@@ -24,6 +31,10 @@ contract PushOracleOwner is Owned {
         oracle = IPushOracle(_oracle);
     }
 
+    /*//////////////////////////////////////////////////////////////
+                        SET PRICE LOGIC
+    //////////////////////////////////////////////////////////////*/
+
     function setPrice(
         address base,
         address quote,
@@ -32,6 +43,19 @@ contract PushOracleOwner is Owned {
     ) external onlyKeeperOrOwner {
         oracle.setPrice(base, quote, bqPrice, qbPrice);
     }
+
+    function setPrices(
+        address[] memory bases,
+        address[] memory quotes,
+        uint256[] memory bqPrices,
+        uint256[] memory qbPrices
+    ) external onlyKeeperOrOwner {
+        oracle.setPrices(bases, quotes, bqPrices, qbPrices);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        MANAGEMENT LOGIC
+    //////////////////////////////////////////////////////////////*/
 
     function setKeeper(address _keeper) external onlyOwner {
         emit KeeperUpdated(keeper, _keeper);
