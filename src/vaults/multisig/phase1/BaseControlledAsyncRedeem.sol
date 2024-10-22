@@ -105,15 +105,18 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
     //////////////////////////////////////////////////////////////*/
 
     function fulfillRedeem(
-        uint256 requestId,
+        uint256 shares,
         address controller
     ) external virtual returns (uint256 assets) {
-        return _fulfillRedeem(controller, requestId);
+        assets = convertToAssets(shares);
+
+        return _fulfillRedeem(shares, assets, controller);
     }
 
     function _fulfillRedeem(
-        address controller,
-        uint256 shares
+        uint256 shares,
+        uint256 assets,
+        address controller
     ) internal returns (uint256 assets) {
         RequestBalance storage currentBalance = requestBalances[controller];
         require(
@@ -121,8 +124,6 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
                 shares <= currentBalance.pendingShares,
             "ZERO_SHARES"
         );
-
-        assets = convertToAssets(shares);
 
         SafeTransferLib.safeTransferFrom(
             asset,
@@ -166,7 +167,8 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
         );
 
         currentBalance.claimableAssets -= assets;
-        currentBalance.claimableShares = currentBalance.claimableShares > sharesUp
+        currentBalance.claimableShares = currentBalance.claimableShares >
+            sharesUp
             ? currentBalance.claimableShares - sharesUp
             : 0;
 
@@ -203,7 +205,8 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
             currentBalance.claimableShares
         );
 
-        currentBalance.claimableAssets = currentBalance.claimableAssets > assetsUp
+        currentBalance.claimableAssets = currentBalance.claimableAssets >
+            assetsUp
             ? currentBalance.claimableAssets - assetsUp
             : 0;
         currentBalance.claimableShares -= shares;

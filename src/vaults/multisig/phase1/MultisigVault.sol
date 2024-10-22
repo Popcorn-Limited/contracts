@@ -117,7 +117,7 @@ contract MultisigVault is BaseControlledAsyncRedeem {
     }
 
     /*//////////////////////////////////////////////////////////////
-                            REQUEST REDEEM LOGIC
+                        REQUEST REDEEM LOGIC
     //////////////////////////////////////////////////////////////*/
 
     function requestRedeem(
@@ -128,6 +128,20 @@ contract MultisigVault is BaseControlledAsyncRedeem {
         require(shares >= limits.minAmount, "ERC7540Vault/min-amount");
 
         return _requestRedeem(shares, recipient, owner);
+    }
+
+    function fulfillRedeem(
+        uint256 shares,
+        address controller
+    ) external virtual returns (uint256 assets) {
+        assets = convertToAssets(shares);
+
+        return
+            _fulfillRedeem(
+                shares,
+                assets.mulDivDown(1e18 - fees.withdrawalIncentive, 1e18),
+                controller
+            );
     }
 
     /*//////////////////////////////////////////////////////////////
