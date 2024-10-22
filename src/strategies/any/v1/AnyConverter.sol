@@ -4,7 +4,7 @@
 pragma solidity ^0.8.25;
 
 import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
-import {BaseStrategy, IERC20Metadata, ERC20, IERC20, Math} from "./BaseStrategy.sol";
+import {BaseStrategy, IERC20Metadata, ERC20, IERC20, Math} from "src/strategies/BaseStrategy.sol";
 import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
 
 /**
@@ -216,11 +216,7 @@ abstract contract AnyConverter is BaseStrategy {
         IERC20(_asset).safeTransferFrom(msg.sender, address(this), assets);
 
         // raise it by slippage
-        assets = assets.mulDiv(
-            10_000,
-            10_000 - slippage,
-            Math.Rounding.Floor
-        );
+        assets = assets.mulDiv(10_000, 10_000 - slippage, Math.Rounding.Floor);
         uint256 withdrawable = oracle.getQuote(assets, _asset, _yieldToken);
         _reserveToken(assets, withdrawable, _asset, true);
 

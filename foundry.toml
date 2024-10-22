@@ -11,12 +11,11 @@ remappings = [
   'ds-test/=lib/forge-std/lib/ds-test/src/',
   'forge-std/=lib/forge-std/src/',
   'openzeppelin-contracts/=lib/openzeppelin-contracts/contracts/',
-  'openzeppelin-contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts',
+  'openzeppelin-contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/',
   'solmate/=lib/solmate/src/',
   'safe-smart-account/=lib/safe-smart-account/',
   'solady/=lib/solady/src/',
-  '@uniswap/v3-core/=lib/v3-core/contracts/',
-  '@uniswap/v3-periphery/=lib/v3-periphery/contracts/',
+  'bitlib/=lib/solidity-bytes-utils/contracts/',
   'ERC-7540/=lib/ERC-7540-Reference/src/'
 ]
 
@@ -29,6 +28,9 @@ optimism = "${OPTIMISM_RPC_URL}"
 arbitrum = "${ARBITRUM_RPC_URL}"
 goerli = "${GOERLI_RPC_URL}"
 sepolia = "${SEPOLIA_RPC_URL}"
+base = "${BASE_RPC_URL}"
+fraxtal = "${FRAXTAL_RPC_URL}"
+avalanche = "${AVALANCHE_RPC_URL}"
 
 [etherscan]
 mainnet = { key = "${ETH_EXPLORE_KEY}" }
@@ -37,3 +39,6 @@ optimism = { key = "${OPTIMISM_EXPLORE_KEY}", url = "https://api-optimistic.ethe
 arbitrum = { key = "${ARBITRUM_EXPLORE_KEY}", url = "https://api.arbiscan.io/api" }
 goerli = { key = "${ETH_EXPLORE_KEY}", url = "https://api-goerli.etherscan.io/api?" }
 sepolia = { key = "${ETH_EXPLORE_KEY}", url = ""}
+base = { key = "${BASE_EXPLORE_KEY}", url = "https://api.basescan.org/api"}
+fraxtal = { key = "${FRAXTAL_EXPLORE_KEY}", url = "https://api.fraxscan.com/api"}
+avalanche = { key = "${AVALANCHE_EXPLORE_KEY}", url = "https://api.snowscan.xyz/api"}

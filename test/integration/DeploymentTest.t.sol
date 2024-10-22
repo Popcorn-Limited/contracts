@@ -9,9 +9,9 @@ import {stdJson} from "forge-std/StdJson.sol";
 import {IERC4626, IERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import {Clones} from "openzeppelin-contracts/proxy/Clones.sol";
 
-import {MockERC4626} from "../utils/mocks/MockERC4626.sol";
+import {MockERC4626} from "../mocks/MockERC4626.sol";
 
-import {MultiStrategyVault} from "src/vaults/MultiStrategyVault.sol";
+import {MultiStrategyVault, InitializeParams} from "src/vaults/MultiStrategyVault.sol";
 import {AaveV3Depositor, IERC20} from "src/strategies/aave/aaveV3/AaveV3Depositor.sol";
 
 struct TestConfig {
@@ -58,25 +58,34 @@ contract DeploymentTest is Test {
         json = vm.readFile("./test/integration/DeploymentTestConfig.json");
 
         testConfig = abi.decode(json.parseRaw(".testConfig"), (TestConfig));
-        deployConfig = abi.decode(json.parseRaw(".deployConfig"), (DeployConfig));
+        deployConfig = abi.decode(
+            json.parseRaw(".deployConfig"),
+            (DeployConfig)
+        );
 
         asset = IERC20(deployConfig.asset);
 
         // Setup fork environment
         testConfig.blockNumber > 0
-            ? vm.createSelectFork(vm.rpcUrl(testConfig.network), testConfig.blockNumber)
+            ? vm.createSelectFork(
+                vm.rpcUrl(testConfig.network),
+                testConfig.blockNumber
+            )
             : vm.createSelectFork(vm.rpcUrl(testConfig.network));
 
         address implementation = address(new MultiStrategyVault());
         vault = MultiStrategyVault(Clones.clone(implementation));
 
         vault.initialize(
-            IERC20(asset),
-            deployConfig.strategies,
-            deployConfig.depositIndex,
-            deployConfig.withdrawalQueue,
-            deployConfig.depositLimit,
-            deployConfig.owner
+            InitializeParams(
+                IERC20(asset),
+                deployConfig.strategies,
+                deployConfig.depositIndex,
+                deployConfig.withdrawalQueue,
+                deployConfig.depositLimit,
+                deployConfig.owner,
+                address(0x47fd36ABcEeb9954ae9eA1581295Ce9A8308655E)
+            )
         );
 
         vm.label(address(vault), "vault");
@@ -88,16 +97,32 @@ contract DeploymentTest is Test {
                                 HELPER
     //////////////////////////////////////////////////////////////*/
 
-    function _mintAsset(address token, address receiver, uint256 amount) internal virtual {
+    function _mintAsset(
+        address token,
+        address receiver,
+        uint256 amount
+    ) internal virtual {
         // USDC on mainnet cant be dealt (find(StdStorage): Slot(s) not found) therefore we transfer from a whale
-        if (block.chainid == 1 && address(token) == 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48) {
+        if (
+            block.chainid == 1 &&
+            address(token) == 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48
+        ) {
             vm.prank(0x4B16c5dE96EB2117bBE5fd171E4d203624B014aa);
-            IERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48).transfer(receiver, amount);
+            IERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48).transfer(
+                receiver,
+                amount
+            );
         }
         // USDC on optimism cant be dealt (find(StdStorage): Slot(s) not found) therefore we transfer from a whale
-        else if (block.chainid == 10 && address(token) == 0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85) {
+        else if (
+            block.chainid == 10 &&
+            address(token) == 0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85
+        ) {
             vm.prank(0xf89d7b9c864f589bbF53a82105107622B35EaA40);
-            IERC20(0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85).transfer(receiver, amount);
+            IERC20(0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85).transfer(
+                receiver,
+                amount
+            );
         } else {
             deal(address(token), receiver, amount);
         }
@@ -106,7 +131,11 @@ contract DeploymentTest is Test {
     function _createMockStrategy(IERC20 _asset) internal returns (IERC4626) {
         address strategyImplementation = address(new MockERC4626());
         address strategyAddress = Clones.clone(strategyImplementation);
-        MockERC4626(strategyAddress).initialize(_asset, "Mock Token Vault", "vwTKN");
+        MockERC4626(strategyAddress).initialize(
+            _asset,
+            "Mock Token Vault",
+            "vwTKN"
+        );
         return IERC4626(strategyAddress);
     }
 
@@ -115,7 +144,11 @@ contract DeploymentTest is Test {
     //////////////////////////////////////////////////////////////*/
 
     function test__deposit_withdraw(uint128 depositAmount) public {
-        uint256 amount = bound(uint256(depositAmount), 10, testConfig.maxDeposit);
+        uint256 amount = bound(
+            uint256(depositAmount),
+            10,
+            testConfig.maxDeposit
+        );
 
         _mintAsset(address(asset), alice, amount);
 
@@ -130,17 +163,34 @@ contract DeploymentTest is Test {
 
         assertEq(amount, shares);
         assertApproxEqAbs(
-            vault.previewWithdraw(amount), shares, testConfig.delta, "previewWithdraw should match share amount"
+            vault.previewWithdraw(amount),
+            shares,
+            testConfig.delta,
+            "previewWithdraw should match share amount"
         );
         assertApproxEqAbs(
-            vault.previewDeposit(amount), shares, testConfig.delta, "previewDeposit should match share amount"
+            vault.previewDeposit(amount),
+            shares,
+            testConfig.delta,
+            "previewDeposit should match share amount"
         );
-        assertApproxEqAbs(vault.totalSupply(), shares, testConfig.delta, "totalSupply should be equal to minted shares");
         assertApproxEqAbs(
-            vault.totalAssets(), amount, testConfig.delta, "totalAssets should be equal to deposited amount"
+            vault.totalSupply(),
+            shares,
+            testConfig.delta,
+            "totalSupply should be equal to minted shares"
         );
         assertApproxEqAbs(
-            vault.balanceOf(alice), shares, testConfig.delta, "alice should own all the minted vault shares"
+            vault.totalAssets(),
+            amount,
+            testConfig.delta,
+            "totalAssets should be equal to deposited amount"
+        );
+        assertApproxEqAbs(
+            vault.balanceOf(alice),
+            shares,
+            testConfig.delta,
+            "alice should own all the minted vault shares"
         );
         assertApproxEqAbs(
             vault.convertToAssets(vault.balanceOf(alice)),
@@ -187,13 +237,37 @@ contract DeploymentTest is Test {
 
         // Expect exchange rate to be 1:1 on initial mint.
         assertApproxEqAbs(amount, aliceAssetAmount, 10, "share = assets");
-        assertApproxEqAbs(vault.previewWithdraw(aliceAssetAmount), amount, 10, "pw");
-        assertApproxEqAbs(vault.previewDeposit(aliceAssetAmount), amount, 10, "pd");
+        assertApproxEqAbs(
+            vault.previewWithdraw(aliceAssetAmount),
+            amount,
+            10,
+            "pw"
+        );
+        assertApproxEqAbs(
+            vault.previewDeposit(aliceAssetAmount),
+            amount,
+            10,
+            "pd"
+        );
         assertEq(vault.totalSupply(), amount, "ts");
-        assertApproxEqAbs(vault.totalAssets(), aliceAssetAmount, testConfig.delta, "ta");
+        assertApproxEqAbs(
+            vault.totalAssets(),
+            aliceAssetAmount,
+            testConfig.delta,
+            "ta"
+        );
         assertEq(vault.balanceOf(alice), amount, "bal");
-        assertApproxEqAbs(vault.convertToAssets(vault.balanceOf(alice)), aliceAssetAmount, 10, "convert");
-        assertEq(asset.balanceOf(alice), alicePreDepositBal - aliceAssetAmount, "a bal");
+        assertApproxEqAbs(
+            vault.convertToAssets(vault.balanceOf(alice)),
+            aliceAssetAmount,
+            10,
+            "convert"
+        );
+        assertEq(
+            asset.balanceOf(alice),
+            alicePreDepositBal - aliceAssetAmount,
+            "a bal"
+        );
 
         uint256 redeemAmount = vault.maxRedeem(alice);
         vm.prank(alice);
@@ -237,7 +311,11 @@ contract DeploymentTest is Test {
 
         assertEq(vault.balanceOf(alice), 0);
         assertEq(vault.balanceOf(bob), testConfig.defaultAmount);
-        assertApproxEqAbs(asset.balanceOf(bob), testConfig.defaultAmount, testConfig.delta);
+        assertApproxEqAbs(
+            asset.balanceOf(bob),
+            testConfig.defaultAmount,
+            testConfig.delta
+        );
 
         // bob withdraw testConfig.defaultAmount for alice
         uint256 maxWithdraw = vault.maxWithdraw(bob);
@@ -246,7 +324,11 @@ contract DeploymentTest is Test {
 
         assertEq(vault.balanceOf(alice), 0);
         assertEq(vault.balanceOf(bob), 0);
-        assertApproxEqAbs(asset.balanceOf(alice), testConfig.defaultAmount, testConfig.delta);
+        assertApproxEqAbs(
+            asset.balanceOf(alice),
+            testConfig.defaultAmount,
+            testConfig.delta
+        );
     }
 
     function test__changeStrategies() public {
@@ -285,7 +367,10 @@ contract DeploymentTest is Test {
 
         assertEq(asset.balanceOf(address(newStrategy)), 0);
         assertGe(asset.balanceOf(address(vault)), depositAmount);
-        assertEq(asset.allowance(address(vault), address(newStrategy)), type(uint256).max);
+        assertEq(
+            asset.allowance(address(vault), address(newStrategy)),
+            type(uint256).max
+        );
 
         IERC4626[] memory changedStrategies = vault.getStrategies();
         uint256[] memory changedWithdrawalQueue = vault.getWithdrawalQueue();
@@ -322,7 +407,11 @@ contract DeploymentTest is Test {
 
         // Preparation to change the strategies
         vm.prank(deployConfig.owner);
-        vault.proposeStrategies(newStrategies, newWithdrawalQueue, type(uint256).max);
+        vault.proposeStrategies(
+            newStrategies,
+            newWithdrawalQueue,
+            type(uint256).max
+        );
 
         vm.warp(block.timestamp + 3 days);
 

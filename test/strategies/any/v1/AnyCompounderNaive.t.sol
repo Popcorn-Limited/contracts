@@ -2,9 +2,9 @@
 // Docgen-SOLC: 0.8.0
 pragma solidity ^0.8.25;
 
-import {AnyCompounder, AnyCompounderNaive, AnyConverter, ClaimInteraction, IERC20} from "src/strategies/AnyCompounder.sol";
-import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson} from "../BaseStrategyTest.sol";
-import {MockOracle} from "test/utils/mocks/MockOracle.sol";
+import {AnyCompounder, AnyCompounderNaive, AnyConverter, ClaimInteraction, IERC20} from "src/strategies/any/v1/AnyCompounder.sol";
+import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson} from "test/strategies/BaseStrategyTest.sol";
+import {MockOracle} from "test/mocks/MockOracle.sol";
 import {AnyBaseTest} from "./AnyBase.t.sol";
 import "forge-std/console.sol";
 
@@ -35,7 +35,7 @@ contract AnyCompounderNaiveTest is AnyBaseTest {
     function setUp() public {
         _setUpBaseTest(
             0,
-            "./test/strategies/any/AnyCompounderNaiveTestConfig.json"
+            "./test/strategies/any/v1/AnyCompounderNaiveTestConfig.json"
         );
     }
 

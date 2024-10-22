@@ -22,7 +22,7 @@ contract MockERC4626 is ERC4626Upgradeable {
     uint256 public afterDepositHookCalledCounter = 0;
 
     uint8 internal _decimals;
-    uint8 public constant decimalOffset = 9;
+    uint8 public constant decimalOffset = 0;
 
     /*//////////////////////////////////////////////////////////////
                                IMMUTABLES

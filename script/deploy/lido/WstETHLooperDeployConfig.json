@@ -4,12 +4,15 @@
     "owner": "",
     "autoDeposit": false
   },
-  "strategyInit": {
+  "baseLeverage": {
     "aaveDataProvider": "0x7B4EB56E7CD4b454BA8ff71E4518426369a138a3",
-    "curvePool": "0xDC24316b9AE028F1497c275EB9192a3Ea0f67022",
+    "borrowAsset": "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270",
     "maxLTV": 850000000000000000,
+    "maxSlippage": 10000000000000000,
     "poolAddressesProvider": "0x2f39d218133AFaB8F2B819B1066c7E434Ad94E9e",
-    "slippage": 10000000000000000,
     "targetLTV": 800000000000000000
+  },
+  "strategy": {
+    "curvePool": "0xDC24316b9AE028F1497c275EB9192a3Ea0f67022"
   }
 }

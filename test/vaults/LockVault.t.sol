@@ -4,8 +4,8 @@
 pragma solidity ^0.8.15;
 
 import {Test} from "forge-std/Test.sol";
-import {MockERC20} from "../utils/mocks/MockERC20.sol";
-import {MockERC4626} from "../utils/mocks/MockERC4626.sol";
+import {MockERC20} from "../mocks/MockERC20.sol";
+import {MockERC4626} from "../mocks/MockERC4626.sol";
 import {IERC4626, IERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import {Clones} from "openzeppelin-contracts/proxy/Clones.sol";
 import {LockVault, Lock} from "src/vaults/LockVault.sol";
