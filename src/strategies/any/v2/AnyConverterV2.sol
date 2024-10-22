@@ -72,6 +72,9 @@ abstract contract AnyConverterV2 is BaseStrategy {
             strategyInitData_,
             (address, address, uint256)
         );
+        if (oracle_ == address(0)) revert Misconfigured();
+        if (yieldToken == address(0)) revert Misconfigured();
+
         oracle = IPriceOracle(oracle_);
 
         tokens.push(asset_);
@@ -86,7 +89,7 @@ abstract contract AnyConverterV2 is BaseStrategy {
      * @notice Total amount of underlying `asset` token managed by adapter.
      * @dev Return assets held by adapter if paused.
      */
-    function _totalAssets() internal view override returns (uint256) {
+    function _totalAssets() internal view virtual override returns (uint256) {
         uint256 _outstandingAllowance = outstandingAllowance;
         uint256 _totalAssets = oracle.getQuote(
             IERC20(yieldToken).balanceOf(address(this)),
@@ -159,8 +162,8 @@ abstract contract AnyConverterV2 is BaseStrategy {
     function pushFunds(
         uint256,
         bytes memory data
-    ) external override onlyKeeperOrOwner {
-        uint256[6] memory stats = _convert(data);
+    ) external virtual override onlyKeeperOrOwner {
+        uint256[6] memory stats = _execute(data);
 
         // Total assets should stay the same or increase (with slippage)
         if (
@@ -179,8 +182,8 @@ abstract contract AnyConverterV2 is BaseStrategy {
     function pullFunds(
         uint256,
         bytes memory data
-    ) external override onlyKeeperOrOwner {
-        uint256[6] memory stats = _convert(data);
+    ) external virtual override onlyKeeperOrOwner {
+        uint256[6] memory stats = _execute(data);
 
         // Total assets should stay the same or increase (with slippage)
         if (
@@ -197,7 +200,9 @@ abstract contract AnyConverterV2 is BaseStrategy {
         emit PulledFunds(stats[4] - stats[1], stats[2] - stats[5]);
     }
 
-    function _convert(bytes memory data) internal returns (uint256[6] memory) {
+    function _execute(
+        bytes memory data
+    ) internal virtual returns (uint256[6] memory) {
         // caching
         address _asset = asset();
         address _yieldToken = yieldToken;
@@ -261,6 +266,16 @@ abstract contract AnyConverterV2 is BaseStrategy {
                 postYieldTokenBalance
             ]
         );
+    }
+
+    function execute(bytes memory data) external virtual onlyKeeperOrOwner {
+        uint256[6] memory stats = _execute(data);
+
+        // Total assets should stay the same or increase (with slippage)
+        if (
+            stats[3] <
+            stats[0].mulDiv(10_000 - slippage, 10_000, Math.Rounding.Ceil)
+        ) revert("Total assets decreased");
     }
 
     /*//////////////////////////////////////////////////////////////
