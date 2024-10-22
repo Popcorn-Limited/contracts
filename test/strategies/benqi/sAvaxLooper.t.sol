@@ -4,7 +4,7 @@
 pragma solidity ^0.8.25;
 
 import {sAVAXLooper, BaseCompoundV2LeverageStrategy, LooperValues, LooperBaseValues, IERC20, IAvaxStaking} from "src/strategies/benqi/sAVAXLooper.sol";
-import {IERC20Metadata, ILendingPool, Math, ICToken} from "src/strategies/BaseCompV2LeverageStrategy.sol";
+import {IERC20Metadata, ILendingPool, Math, ICToken, LibCompound} from "src/strategies/BaseCompV2LeverageStrategy.sol";
 
 import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson, Math} from "../BaseStrategyTest.sol";
 import "forge-std/console.sol";
@@ -335,19 +335,18 @@ contract sAVAXLooperTest is BaseStrategyTest {
         // check total assets - should be lt than totalDeposits
         assertLt(strategy.totalAssets(), expectedUnderlying, "ta");
 
-        // TODO
-        // (uint256 slippageDebt, , ) = sAvaxPool.convertavaxTosAvax(
-        //     cwAVAX.balanceOf(address(strategy))
-        // );
+        uint256 slippageDebt = sAvaxStaking.getSharesByPooledAvax(
+            LibCompound.viewBorrowBalance(cwAVAX, address(strategy))
+        );
 
-        // slippageDebt = slippageDebt.mulDiv(slippage, 1e18, Math.Rounding.Ceil);
+        slippageDebt = slippageDebt.mulDiv(slippage, 1e18, Math.Rounding.Ceil);
 
-        // assertApproxEqAbs(
-        //     strategy.totalAssets(),
-        //     amountDeposit - slippageDebt,
-        //     _delta_,
-        //     string.concat("totalAssets != expected")
-        // );
+        assertApproxEqAbs(
+            strategy.totalAssets(),
+            amountDeposit - slippageDebt,
+            _delta_,
+            string.concat("totalAssets != expected")
+        );
 
         // // sAvax should be in lending market
         assertEq(sAvax.balanceOf(address(strategy)), 0, "sAvax");
