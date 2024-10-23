@@ -5,8 +5,8 @@ pragma solidity ^0.8.15;
 
 import {IPendleMarket} from "./IPendle.sol";
 import {PendleDepositor, IERC20} from "./PendleDepositor.sol";
-import {BaseBalancerCompounder, TradePath} from "src/peripheral/BaseBalancerCompounder.sol";
-import {BaseCurveCompounder, CurveSwap} from "src/peripheral/BaseCurveCompounder.sol";
+import {BaseBalancerCompounder, TradePath} from "src/peripheral/compounder/balancer/BaseBalancerCompounder.sol";
+import {BaseCurveCompounder, CurveSwap} from "src/peripheral/compounder/curve/BaseCurveCompounder.sol";
 
 /**
  * @title   ERC4626 Pendle Protocol Vault Adapter

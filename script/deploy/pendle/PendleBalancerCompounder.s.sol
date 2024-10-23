@@ -8,7 +8,7 @@ import {stdJson} from "forge-std/StdJson.sol";
 
 import {IPendleRouter, IPendleSYToken, ISYTokenV3} from "src/strategies/pendle/IPendle.sol";
 import {PendleBalancerCompounder, IERC20, PendleDepositor} from "src/strategies/pendle/PendleBalancerCompounder.sol";
-import {TradePath, IAsset, BatchSwapStep} from "src/peripheral/BaseBalancerCompounder.sol";
+import {TradePath, IAsset, BatchSwapStep} from "src/peripheral/compounder/balancer/BaseBalancerCompounder.sol";
 
 contract Deploy is Script {
     using stdJson for string;

@@ -1,11 +1,11 @@
 {
   "baseInit": {
-    "asset": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+    "asset": "0x8236a87084f8B84306f72007F36F2618A5634494",
     "owner": "0x2C3B135cd7dc6C673b358BEF214843DAb3464278",
     "autoDeposit": true
   },
   "strategyInit": {
-    "aaveDataProvider": "0x69FA688f1Dc47d4B5d8029D5a35FB7a548310654"
+    "aaveDataProvider": "0x47223D4eA966a93b2cC96FFB4D42c22651FADFcf"
   },
   "harvest": {}
 }

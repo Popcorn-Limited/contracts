@@ -5,7 +5,7 @@ pragma solidity ^0.8.25;
 
 import {BaseStrategy, IERC20, IERC20Metadata, SafeERC20, ERC20, Math} from "src/strategies/BaseStrategy.sol";
 import {IAuraBooster, IAuraRewards} from "./IAura.sol";
-import {BaseBalancerLpCompounder, HarvestValues, TradePath} from "src/peripheral/BaseBalancerLpCompounder.sol";
+import {BaseBalancerLpCompounder, HarvestValues, TradePath} from "src/peripheral/compounder/balancer/BaseBalancerLpCompounder.sol";
 
 /**
  * @title  Aura Adapter

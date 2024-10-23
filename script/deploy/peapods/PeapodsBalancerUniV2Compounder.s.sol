@@ -8,7 +8,7 @@ import {stdJson} from "forge-std/StdJson.sol";
 
 import {PeapodsBalancerUniV2Compounder, SwapStep} from "src/strategies/peapods/PeapodsBalancerUniV2Compounder.sol";
 import {BalancerCompounder, IERC20, HarvestValues, TradePath} from "src/strategies/balancer/BalancerCompounder.sol";
-import {IAsset, BatchSwapStep} from "src/peripheral/BalancerTradeLibrary.sol";
+import {IAsset, BatchSwapStep} from "src/peripheral/compounder/balancer/BalancerTradeLibrary.sol";
 import {IStakedToken} from "src/strategies/peapods/PeapodsStrategy.sol";
 
 contract Deploy is Script {
