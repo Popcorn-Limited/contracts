@@ -13,7 +13,6 @@ contract MultisigVault is BaseControlledAsyncRedeem {
     using FixedPointMathLib for uint256;
 
     address public multisig;
-    address public oracle;
 
     error ZeroAmount();
     error Misconfigured();
@@ -21,7 +20,6 @@ contract MultisigVault is BaseControlledAsyncRedeem {
     struct InitializeParams {
         address asset;
         address multisig;
-        address oracle;
         address owner;
         Limits limits;
         Fees fees;
@@ -31,10 +29,8 @@ contract MultisigVault is BaseControlledAsyncRedeem {
         InitializeParams memory params
     ) BaseERC7540(params.owner, params.asset, "Multisig Vault", "mVault") {
         if (params.multisig == address(0)) revert Misconfigured();
-        if (params.oracle == address(0)) revert Misconfigured();
 
         multisig = params.multisig;
-        oracle = params.oracle;
         _setLimits(params.limits);
         _setFees(params.fees);
     }
@@ -43,15 +39,34 @@ contract MultisigVault is BaseControlledAsyncRedeem {
                             ACCOUNTING LOGIC
     //////////////////////////////////////////////////////////////*/
 
+    uint256 totalDeposits;
+    uint256 public totalAssets_;
+    uint256 lastUpdateTime;
+
+    modifier updateTotalAssets() {
+        uint256 _totalAssets = totalAssets_;
+
+        uint256 yieldEarned = (rate *
+            (block.timestamp - lastUpdateTime) *
+            _totalAssets) /
+            365.25 days /
+            1e18;
+
+        if (yieldEarned > 0) {
+            totalAssets_ = _totalAssets + yieldEarned;
+            lastUpdateTime = block.timestamp;
+        }
+        _;
+    }
+
     // TODO: Use an adjustable interest rate per second
     /// @return Total amount of underlying `asset` token managed by vault. Delegates to adapter.
     function totalAssets() public view override returns (uint256) {
-        return
-            IPriceOracle(oracle).getQuote(
-                totalSupply,
-                address(this),
-                address(asset)
-            );
+        return totalAssets_;
+    }
+
+    function accruedYield() public view returns (uint256) {
+        return;
     }
 
     // Override to add minAmount check (Which is used in mint and will revert the function)
@@ -133,27 +148,53 @@ contract MultisigVault is BaseControlledAsyncRedeem {
     function fulfillRedeem(
         uint256 shares,
         address controller
-    ) external virtual returns (uint256 assets) {
-        assets = convertToAssets(shares);
+    ) external override returns (uint256) {
+        uint256 assets = convertToAssets(shares);
 
-        return
+        _fulfillRedeem(
+            shares,
+            assets.mulDivDown(1e18 - uint256(fees.withdrawalIncentive), 1e18),
+            controller
+        );
+
+        return assets;
+    }
+
+    function fulfillMultipleRedeems(
+        uint256[] memory shares,
+        address[] memory controllers
+    ) external override returns (uint256) {
+        if (shares.length != controllers.length) revert Misconfigured();
+        uint256 withdrawalIncentive = uint256(fees.withdrawalIncentive);
+
+        uint256 total;
+        for (uint256 i; i < shares.length; i++) {
+            uint256 assets = convertToAssets(shares[i]);
+            total += assets;
+
             _fulfillRedeem(
-                shares,
-                assets.mulDivDown(1e18 - fees.withdrawalIncentive, 1e18),
-                controller
+                shares[i],
+                assets.mulDivDown(1e18 - withdrawalIncentive, 1e18),
+                controllers[i]
             );
+        }
+        return total;
     }
 
     /*//////////////////////////////////////////////////////////////
                             ERC-4626 OVERRIDES
     //////////////////////////////////////////////////////////////*/
 
-    function beforeWithdraw(uint256, uint256) internal override {
+    function beforeWithdraw(uint256 assets, uint256) internal override {
         _takeFees();
+
+        totalDeposits -= assets;
     }
 
     function afterDeposit(uint256 assets, uint256) internal override {
         _takeFees();
+
+        totalDeposits += assets;
 
         SafeTransferLib.safeTransfer(asset, multisig, assets);
     }
@@ -162,12 +203,11 @@ contract MultisigVault is BaseControlledAsyncRedeem {
                             FEE LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    // TODO: pack fees into a single uint256
     struct Fees {
-        uint256 performanceFee;
-        uint256 managementFee;
-        uint256 withdrawalIncentive;
-        uint256 feesUpdatedAt;
+        uint64 performanceFee;
+        uint64 managementFee;
+        uint64 withdrawalIncentive;
+        uint64 feesUpdatedAt;
         uint256 highWaterMark;
         address feeRecipient;
     }
@@ -198,7 +238,7 @@ contract MultisigVault is BaseControlledAsyncRedeem {
         Fees memory fees_
     ) internal view returns (uint256) {
         uint256 shareValue = convertToAssets(1e18);
-        uint256 performanceFee = fees_.performanceFee;
+        uint256 performanceFee = uint256(fees_.performanceFee);
         uint256 highWaterMark = fees_.highWaterMark;
 
         return
@@ -220,7 +260,7 @@ contract MultisigVault is BaseControlledAsyncRedeem {
     function _accruedManagementFee(
         Fees memory fees_
     ) internal view returns (uint256) {
-        uint256 managementFee = fees_.managementFee;
+        uint256 managementFee = uint256(fees_.managementFee);
 
         return
             managementFee > 0
@@ -238,14 +278,12 @@ contract MultisigVault is BaseControlledAsyncRedeem {
     }
 
     function _setFees(Fees memory fees_) internal {
-        // Dont take more than 20% performanceFee
-        if (fees_.performanceFee > 2e17)
-            revert InvalidFee(fees_.performanceFee);
-        // Dont take more than 10% managementFee
-        if (fees_.managementFee > 1e17) revert InvalidFee(fees_.managementFee);
-        // Dont take more than 10% withdrawalIncentive
-        if (fees_.withdrawalIncentive > 1e17)
-            revert InvalidFee(fees_.withdrawalIncentive);
+        // Dont take more than 20% performanceFee, 5% managementFee, 5% withdrawalIncentive
+        if (
+            fees_.performanceFee > 2e17 ||
+            fees_.managementFee > 5e16 ||
+            fees_.withdrawalIncentive > 5e16
+        ) revert Misconfigured();
         if (fees_.feeRecipient == address(0)) revert Misconfigured();
 
         // Dont rely on user input here
@@ -270,7 +308,7 @@ contract MultisigVault is BaseControlledAsyncRedeem {
 
         if (fee > 0) _mint(fees_.feeRecipient, convertToShares(fee));
 
-        fees.feesUpdatedAt = block.timestamp;
+        fees.feesUpdatedAt = uint64(block.timestamp);
     }
 
     /*//////////////////////////////////////////////////////////////

@@ -63,7 +63,7 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
     }
 
     /*//////////////////////////////////////////////////////////////
-                        ERC7540 LOGIC
+                        REQUEST REDEEM LOGIC
     //////////////////////////////////////////////////////////////*/
 
     /// @notice this deposit request is added to any pending deposit request
@@ -101,14 +101,56 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
     }
 
     /*//////////////////////////////////////////////////////////////
+                        CANCEL REDEEM REQUEST LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    event RedeemRequestCanceled(
+        address indexed controller,
+        address indexed receiver,
+        uint256 shares
+    );
+
+    function cancelRedeemRequest(address controller) external virtual {
+        return _cancelRedeemRequest(controller, msg.sender);
+    }
+
+    function cancelRedeemRequest(
+        address controller,
+        address receiver
+    ) public virtual {
+        return _cancelRedeemRequest(controller, receiver);
+    }
+
+    function _cancelRedeemRequest(
+        address controller,
+        address receiver
+    ) internal virtual {
+        require(
+            controller == msg.sender || isOperator[controller][msg.sender],
+            "ERC7540Vault/invalid-caller"
+        );
+
+        RequestBalance storage currentBalance = requestBalances[controller];
+        uint256 shares = currentBalance.pendingShares;
+        require(shares > 0, "ERC7540Vault/no-pending-request");
+
+        SafeTransferLib.safeTransfer(ERC20(share), receiver, shares);
+
+        currentBalance.pendingShares = 0;
+        currentBalance.requestTime = 0;
+
+        emit RedeemRequestCanceled(controller, receiver, shares);
+    }
+
+    /*//////////////////////////////////////////////////////////////
                         DEPOSIT FULFILLMENT LOGIC
     //////////////////////////////////////////////////////////////*/
 
     function fulfillRedeem(
         uint256 shares,
         address controller
-    ) external virtual returns (uint256 assets) {
-        assets = convertToAssets(shares);
+    ) external virtual returns (uint256) {
+        uint256 assets = convertToAssets(shares);
 
         return _fulfillRedeem(shares, assets, controller);
     }
@@ -117,7 +159,7 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
         uint256 shares,
         uint256 assets,
         address controller
-    ) internal returns (uint256 assets) {
+    ) internal returns (uint256) {
         RequestBalance storage currentBalance = requestBalances[controller];
         require(
             currentBalance.pendingShares != 0 &&
@@ -137,11 +179,86 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
         currentBalance.pendingShares -= shares;
 
         if (currentBalance.pendingShares == 0) currentBalance.requestTime = 0;
+
+        return assets;
     }
 
     /*//////////////////////////////////////////////////////////////
                         ERC4626 OVERRIDDEN LOGIC
     //////////////////////////////////////////////////////////////*/
+
+    function deposit(
+        uint256 assets,
+        address receiver
+    ) public override returns (uint256 shares) {
+        // Check for rounding error since we round down in previewDeposit.
+        require((shares = previewDeposit(assets)) != 0, "ZERO_SHARES");
+
+        // Utilise claimable balance first
+        uint256 assetsToTransfer = assets;
+        RequestBalance storage currentBalance = requestBalances[msg.sender];
+        if (currentBalance.claimableAssets > 0) {
+            uint256 claimableAssets = assetsToTransfer >
+                currentBalance.claimableAssets
+                ? currentBalance.claimableAssets
+                : assetsToTransfer;
+
+            _withdrawClaimableBalance(claimableAssets, currentBalance);
+            assetsToTransfer -= claimableAssets;
+        }
+
+        if (assetsToTransfer > 0) {
+            // Need to transfer before minting or ERC777s could reenter.
+            SafeTransferLib.safeTransferFrom(
+                asset,
+                msg.sender,
+                address(this),
+                assetsToTransfer
+            );
+        }
+
+        _mint(receiver, shares);
+
+        emit Deposit(msg.sender, receiver, assets, shares);
+
+        afterDeposit(assets, shares);
+    }
+
+    function mint(
+        uint256 shares,
+        address receiver
+    ) public override returns (uint256 assets) {
+        assets = previewMint(shares); // No need to check for rounding error, previewMint rounds up.
+
+        // Utilise claimable balance first
+        uint256 assetsToTransfer = assets;
+        RequestBalance storage currentBalance = requestBalances[msg.sender];
+        if (currentBalance.claimableAssets > 0) {
+            uint256 claimableAssets = assetsToTransfer >
+                currentBalance.claimableAssets
+                ? currentBalance.claimableAssets
+                : assetsToTransfer;
+
+            _withdrawClaimableBalance(claimableAssets, currentBalance);
+            assetsToTransfer -= claimableAssets;
+        }
+
+        if (assetsToTransfer > 0) {
+            // Need to transfer before minting or ERC777s could reenter.
+            SafeTransferLib.safeTransferFrom(
+                asset,
+                msg.sender,
+                address(this),
+                assetsToTransfer
+            );
+        }
+
+        _mint(receiver, shares);
+
+        emit Deposit(msg.sender, receiver, assets, shares);
+
+        afterDeposit(assets, shares);
+    }
 
     function withdraw(
         uint256 assets,
@@ -157,10 +274,26 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
         // Claiming partially introduces precision loss. The user therefore receives a rounded down amount,
         // while the claimable balance is reduced by a rounded up amount.
         RequestBalance storage currentBalance = requestBalances[controller];
-        shares = assets.mulDivDown(
+        uint256 shares = assets.mulDivDown(
             currentBalance.claimableShares,
             currentBalance.claimableAssets
         );
+        _withdrawClaimableBalance(assets, currentBalance);
+
+        // Just here to take fees
+        beforeWithdraw(assets, shares);
+
+        _burn(controller, shares);
+
+        SafeTransferLib.safeTransfer(asset, receiver, assets);
+
+        emit Withdraw(msg.sender, receiver, controller, assets, shares);
+    }
+
+    function _withdrawClaimableBalance(
+        uint256 assets,
+        RequestBalance storage currentBalance
+    ) internal {
         uint256 sharesUp = assets.mulDivUp(
             currentBalance.claimableShares,
             currentBalance.claimableAssets
@@ -171,15 +304,6 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
             sharesUp
             ? currentBalance.claimableShares - sharesUp
             : 0;
-
-        // Just here to take fees
-        beforeWithdraw(assets, shares);
-
-        _burn(controller, shares);
-
-        SafeTransferLib.safeTransfer(asset, receiver, assets);
-
-        emit Withdraw(msg.sender, receiver, controller, assets, shares);
     }
 
     function redeem(
@@ -200,6 +324,22 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
             currentBalance.claimableAssets,
             currentBalance.claimableShares
         );
+        _redeemClaimableBalance(shares, currentBalance);
+
+        // Just here to take fees
+        beforeWithdraw(assets, shares);
+
+        _burn(controller, shares);
+
+        SafeTransferLib.safeTransfer(asset, receiver, assets);
+
+        emit Withdraw(msg.sender, receiver, controller, assets, shares);
+    }
+
+    function _redeemClaimableBalance(
+        uint256 shares,
+        RequestBalance storage currentBalance
+    ) internal {
         uint256 assetsUp = shares.mulDivUp(
             currentBalance.claimableAssets,
             currentBalance.claimableShares
@@ -210,15 +350,6 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
             ? currentBalance.claimableAssets - assetsUp
             : 0;
         currentBalance.claimableShares -= shares;
-
-        // Just here to take fees
-        beforeWithdraw(assets, shares);
-
-        _burn(controller, shares);
-
-        SafeTransferLib.safeTransfer(asset, receiver, assets);
-
-        emit Withdraw(msg.sender, receiver, controller, assets, shares);
     }
 
     /*//////////////////////////////////////////////////////////////
