@@ -39,34 +39,19 @@ contract MultisigVault is BaseControlledAsyncRedeem {
                             ACCOUNTING LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    uint256 totalDeposits;
-    uint256 public totalAssets_;
-    uint256 lastUpdateTime;
+    uint256 internal totalAssets_;
+    uint256 public lastUpdateTime;
 
-    modifier updateTotalAssets() {
-        uint256 _totalAssets = totalAssets_;
-
-        uint256 yieldEarned = (rate *
-            (block.timestamp - lastUpdateTime) *
-            _totalAssets) /
-            365.25 days /
-            1e18;
-
-        if (yieldEarned > 0) {
-            totalAssets_ = _totalAssets + yieldEarned;
-            lastUpdateTime = block.timestamp;
-        }
-        _;
-    }
-
-    // TODO: Use an adjustable interest rate per second
     /// @return Total amount of underlying `asset` token managed by vault. Delegates to adapter.
     function totalAssets() public view override returns (uint256) {
-        return totalAssets_;
+        return totalAssets_ + accruedYield();
     }
 
     function accruedYield() public view returns (uint256) {
-        return;
+        return
+            (rate * (block.timestamp - lastUpdateTime) * totalAssets_) /
+            365.25 days /
+            1e18;
     }
 
     // Override to add minAmount check (Which is used in mint and will revert the function)
@@ -87,6 +72,13 @@ contract MultisigVault is BaseControlledAsyncRedeem {
 
         return supply == 0 ? shares : shares.mulDivUp(totalAssets(), supply);
     }
+
+    function convertToLowBoundAssets(uint256 shares) public view returns (uint256) {
+        uint256 supply = totalSupply; // Saves an extra SLOAD if totalSupply is non-zero.
+        uint256 assets = totalAssets().mulDivDown(bounds.lower, 1e18);
+
+        return supply == 0 ? shares : shares.mulDivDown(assets, supply);
+    }   
 
     /*//////////////////////////////////////////////////////////////
                      DEPOSIT/WITHDRAWAL LIMIT LOGIC
@@ -149,7 +141,7 @@ contract MultisigVault is BaseControlledAsyncRedeem {
         uint256 shares,
         address controller
     ) external override returns (uint256) {
-        uint256 assets = convertToAssets(shares);
+        uint256 assets = convertToLowBoundAssets(shares);
 
         _fulfillRedeem(
             shares,
@@ -169,7 +161,7 @@ contract MultisigVault is BaseControlledAsyncRedeem {
 
         uint256 total;
         for (uint256 i; i < shares.length; i++) {
-            uint256 assets = convertToAssets(shares[i]);
+            uint256 assets = convertToLowBoundAssets(shares[i]);
             total += assets;
 
             _fulfillRedeem(
@@ -188,15 +180,45 @@ contract MultisigVault is BaseControlledAsyncRedeem {
     function beforeWithdraw(uint256 assets, uint256) internal override {
         _takeFees();
 
-        totalDeposits -= assets;
+        totalAssets_ -= assets;
     }
 
     function afterDeposit(uint256 assets, uint256) internal override {
         _takeFees();
 
-        totalDeposits += assets;
+        totalAssets_ += assets;
 
         SafeTransferLib.safeTransfer(asset, multisig, assets);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            YIELD RATE LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    struct Bounds {
+        uint256 upper;
+        uint256 lower;
+    }
+
+    Bounds public bounds;
+    uint256 public rate;
+
+    function setRate(uint256 rate_) external onlyOwner {
+        rate = rate_;
+    }
+
+    function setBounds(Bounds memory bounds_) external onlyOwner {
+        bounds = bounds_;
+    }
+
+    modifier updateTotalAssets() {
+        uint256 yieldEarned = accruedYield();
+
+        if (yieldEarned > 0) {
+            totalAssets_ = _totalAssets + yieldEarned;
+            lastUpdateTime = block.timestamp;
+        }
+        _;
     }
 
     /*//////////////////////////////////////////////////////////////

@@ -172,6 +172,25 @@ contract ScopeGuard is BaseGuard, Owned {
         bytes memory,
         address
     ) external view override {
+        _checkTransaction(to, value, data, operation);
+    }
+
+    function checkModuleTransaction(
+        address to,
+        uint256 value,
+        bytes memory data,
+        Enum.Operation operation,
+        address
+    ) external view override {
+        _checkTransaction(to, value, data, operation);
+    }
+
+    function _checkTransaction(
+        address to,
+        uint256 value,
+        bytes memory data,
+        Enum.Operation operation
+    ) internal view {
         require(
             operation != Enum.Operation.DelegateCall ||
                 allowedTargets[to].delegateCallAllowed,
@@ -201,4 +220,6 @@ contract ScopeGuard is BaseGuard, Owned {
     }
 
     function checkAfterExecution(bytes32, bool) external view override {}
+
+    function checkAfterModuleExecution(bytes32, bool) external view override {}
 }
