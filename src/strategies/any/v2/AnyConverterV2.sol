@@ -13,7 +13,7 @@ struct CallStruct {
     bytes data;
 }
 
-struct PendingCallAllowance {
+struct PendingTarget {
     address target;
     bytes4 selector;
     bool allowed;
@@ -43,11 +43,6 @@ abstract contract AnyConverterV2 is BaseStrategy {
     address[] public tokens;
     IPriceOracle public oracle;
 
-    uint256 public outstandingAllowance;
-
-    bytes4 public constant APPROVE_SELECTOR =
-        bytes4(keccak256("approve(address,uint256)"));
-
     /*//////////////////////////////////////////////////////////////
                             INITIALIZATION
     //////////////////////////////////////////////////////////////*/
@@ -67,18 +62,48 @@ abstract contract AnyConverterV2 is BaseStrategy {
     ) internal onlyInitializing {
         __BaseStrategy_init(asset_, owner_, autoDeposit_);
 
-        address oracle_;
-        (yieldToken, oracle_, slippage) = abi.decode(
-            strategyInitData_,
-            (address, address, uint256)
-        );
+        (
+            address yieldToken_,
+            address oracle_,
+            uint256 slippage_,
+            PendingTarget[] memory pendingTargets_,
+            CallStruct[] memory pendingAllowances_
+        ) = abi.decode(
+                strategyInitData_,
+                (address, address, uint256, PendingTarget[], CallStruct[])
+            );
+
+        if (yieldToken_ == address(0)) revert Misconfigured();
         if (oracle_ == address(0)) revert Misconfigured();
-        if (yieldToken == address(0)) revert Misconfigured();
 
-        oracle = IPriceOracle(oracle_);
-
+        yieldToken = yieldToken_;
         tokens.push(asset_);
         tokens.push(yieldToken);
+
+        oracle = IPriceOracle(oracle_);
+        slippage = slippage_;
+
+        for (uint256 i; i < pendingTargets.length; i++) {
+            isAllowed[pendingTargets[i].target][
+                pendingTargets[i].selector
+            ] = pendingTargets[i].allowed;
+
+            emit TargetUpdated(
+                pendingTargets[i].target,
+                pendingTargets[i].selector,
+                pendingTargets[i].allowed
+            );
+        }
+
+        for (uint256 i; i < pendingAllowances.length; i++) {
+            if (
+                !isAllowed[pendingAllowances[i].target][
+                    bytes4(pendingAllowances[i].data)
+                ]
+            ) revert("Not allowed");
+
+            pendingAllowances[i].target.call(pendingAllowances[i].data);
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -90,14 +115,12 @@ abstract contract AnyConverterV2 is BaseStrategy {
      * @dev Return assets held by adapter if paused.
      */
     function _totalAssets() internal view virtual override returns (uint256) {
-        uint256 _outstandingAllowance = outstandingAllowance;
-        uint256 _totalAssets = oracle.getQuote(
-            IERC20(yieldToken).balanceOf(address(this)),
-            yieldToken,
-            asset()
-        );
-        if (_outstandingAllowance > _totalAssets) return 0;
-        return _totalAssets - _outstandingAllowance;
+        return
+            oracle.getQuote(
+                IERC20(yieldToken).balanceOf(address(this)),
+                yieldToken,
+                asset()
+            );
     }
 
     function convertToUnderlyingShares(
@@ -214,44 +237,15 @@ abstract contract AnyConverterV2 is BaseStrategy {
         );
 
         CallStruct[] memory calls = abi.decode(data, (CallStruct[]));
-        CallStruct[] memory allowanceCalls = new CallStruct[](calls.length);
         for (uint256 i; i < calls.length; i++) {
             if (!isAllowed[calls[i].target][bytes4(calls[i].data)])
                 revert("Not allowed");
-
-            if (bytes4(calls[i].data) == APPROVE_SELECTOR) {
-                (address to, ) = abi.decode(
-                    calls[i].data.slice(4, calls[i].data.length - 4),
-                    (address, uint256)
-                );
-                allowanceCalls[i] = CallStruct({
-                    target: calls[i].target,
-                    data: abi.encodeWithSelector(
-                        bytes4(keccak256("allowance(address,address)")),
-                        address(this),
-                        to
-                    )
-                });
-            }
 
             (bool success, ) = calls[i].target.call(calls[i].data);
             if (!success) revert("Call failed");
         }
 
-        uint256 _outstandingAllowance;
-        for (uint256 i; i < allowanceCalls.length; i++) {
-            if (allowanceCalls[i].target != address(0)) {
-                (bool success, bytes memory result) = allowanceCalls[i]
-                    .target
-                    .call(allowanceCalls[i].data);
-                if (!success) revert("Call failed");
-
-                _outstandingAllowance += abi.decode(result, (uint256));
-            }
-        }
-
-        uint256 outstandingAllowance = _outstandingAllowance;
-        uint256 postTotalAssets = totalAssets() - _outstandingAllowance;
+        uint256 postTotalAssets = totalAssets();
         uint256 postAssetBalance = IERC20(_asset).balanceOf(address(this));
         uint256 postYieldTokenBalance = IERC20(_yieldToken).balanceOf(
             address(this)
@@ -317,63 +311,106 @@ abstract contract AnyConverterV2 is BaseStrategy {
     }
 
     /*//////////////////////////////////////////////////////////////
-                        ALLOWED FUNCTION LOGIC
+                        SET TARGET LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    event CallAllowanceProposed(
-        address target,
-        bytes4 selector,
-        bool isAllowed
-    );
-    event CallAllowanceChanged(address target, bytes4 selector, bool isAllowed);
+    event TargetProposed(address target, bytes4 selector, bool isAllowed);
+    event TargetUpdated(address target, bytes4 selector, bool isAllowed);
 
-    PendingCallAllowance[] public pendingCallAllowances;
-    uint256 public pendingCallAllowanceTime;
+    PendingTarget[] public pendingTargets;
+    uint256 public pendingTargetTime;
     mapping(address => mapping(bytes4 => bool)) public isAllowed;
 
-    function proposeCallAllowance(
-        PendingCallAllowance[] calldata callAllowances
+    function proposeTargets(
+        PendingTarget[] calldata targets
     ) external onlyOwner {
-        for (uint256 i; i < callAllowances.length; i++) {
-            pendingCallAllowances.push(callAllowances[i]);
+        for (uint256 i; i < targets.length; i++) {
+            pendingTargets.push(targets[i]);
 
-            emit CallAllowanceProposed(
-                callAllowances[i].target,
-                callAllowances[i].selector,
-                callAllowances[i].allowed
+            emit TargetProposed(
+                targets[i].target,
+                targets[i].selector,
+                targets[i].allowed
             );
         }
-        pendingCallAllowanceTime = block.timestamp + 3 days;
+        pendingTargetTime = block.timestamp + 3 days;
     }
 
-    function changeCallAllowances() external onlyOwner {
-        if (
-            pendingCallAllowanceTime == 0 ||
-            pendingCallAllowanceTime > block.timestamp
-        ) revert Misconfigured();
+    function updateTargets() external onlyOwner {
+        if (pendingTargetTime == 0 || pendingTargetTime > block.timestamp)
+            revert Misconfigured();
 
-        for (uint256 i; i < pendingCallAllowances.length; i++) {
-            isAllowed[pendingCallAllowances[i].target][
-                pendingCallAllowances[i].selector
-            ] = pendingCallAllowances[i].allowed;
+        for (uint256 i; i < pendingTargets.length; i++) {
+            isAllowed[pendingTargets[i].target][
+                pendingTargets[i].selector
+            ] = pendingTargets[i].allowed;
 
-            emit CallAllowanceChanged(
-                pendingCallAllowances[i].target,
-                pendingCallAllowances[i].selector,
-                pendingCallAllowances[i].allowed
+            emit TargetUpdated(
+                pendingTargets[i].target,
+                pendingTargets[i].selector,
+                pendingTargets[i].allowed
             );
         }
 
-        delete pendingCallAllowances;
-        delete pendingCallAllowanceTime;
+        delete pendingTargets;
+        delete pendingTargetTime;
     }
 
-    function getProposedCallAllowance()
+    function getProposedTargets()
         external
         view
-        returns (uint256, PendingCallAllowance[] memory)
+        returns (uint256, PendingTarget[] memory)
     {
-        return (pendingCallAllowanceTime, pendingCallAllowances);
+        return (pendingTargetTime, pendingTargets);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            ALLOWANCE LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    CallStruct[] public pendingAllowances;
+    uint256 public pendingAllowanceTime;
+
+    event AllowanceProposed(address target, bytes data);
+
+    function proposeAllowances(
+        CallStruct[] calldata allowanceCalls
+    ) external onlyOwner {
+        for (uint256 i; i < allowanceCalls.length; i++) {
+            if (
+                !isAllowed[allowanceCalls[i].target][
+                    bytes4(allowanceCalls[i].data)
+                ]
+            ) revert("Not allowed");
+
+            pendingAllowances.push(allowanceCalls[i]);
+
+            emit AllowanceProposed(
+                allowanceCalls[i].target,
+                allowanceCalls[i].data
+            );
+        }
+        pendingAllowanceTime = block.timestamp + 3 days;
+    }
+
+    function updateAllowances() external onlyOwner {
+        if (pendingAllowanceTime == 0 || pendingAllowanceTime > block.timestamp)
+            revert Misconfigured();
+
+        for (uint256 i; i < pendingAllowances.length; i++) {
+            pendingAllowances[i].target.call(pendingAllowances[i].data);
+        }
+
+        delete pendingAllowances;
+        delete pendingAllowanceTime;
+    }
+
+    function getProposedAllowances()
+        external
+        view
+        returns (uint256, CallStruct[] memory)
+    {
+        return (pendingAllowanceTime, pendingAllowances);
     }
 
     /*//////////////////////////////////////////////////////////////
