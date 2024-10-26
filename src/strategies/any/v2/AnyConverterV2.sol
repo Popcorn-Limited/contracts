@@ -96,12 +96,6 @@ abstract contract AnyConverterV2 is BaseStrategy {
         }
 
         for (uint256 i; i < pendingAllowances.length; i++) {
-            if (
-                !isAllowed[pendingAllowances[i].target][
-                    bytes4(pendingAllowances[i].data)
-                ]
-            ) revert("Not allowed");
-
             pendingAllowances[i].target.call(pendingAllowances[i].data);
         }
     }
@@ -377,12 +371,6 @@ abstract contract AnyConverterV2 is BaseStrategy {
         CallStruct[] calldata allowanceCalls
     ) external onlyOwner {
         for (uint256 i; i < allowanceCalls.length; i++) {
-            if (
-                !isAllowed[allowanceCalls[i].target][
-                    bytes4(allowanceCalls[i].data)
-                ]
-            ) revert("Not allowed");
-
             pendingAllowances.push(allowanceCalls[i]);
 
             emit AllowanceProposed(
