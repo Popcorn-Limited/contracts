@@ -3,7 +3,7 @@
 
 pragma solidity ^0.8.25;
 
-import {AnyCompounderNaiveV2, AnyConverterV2, CallStruct, PendingCallAllowance, IERC20Metadata, ERC20, IERC20, Math} from "./AnyCompounderNaiveV2.sol";
+import {AnyCompounderNaiveV2, AnyConverterV2, CallStruct, PendingTarget, IERC20Metadata, ERC20, IERC20, Math} from "./AnyCompounderNaiveV2.sol";
 
 /**
  * @title   BaseStrategy

@@ -4,13 +4,12 @@ pragma solidity ^0.8.25;
 
 import "forge-std/console.sol";
 import {AnyLBTManager} from "src/strategies/any/v2/AnyLBTManager.sol";
-import {AnyConverterV2, CallStruct, ProposedChange, PendingCallAllowance} from "src/strategies/any/v2/AnyConverterV2.sol";
+import {AnyConverterV2, CallStruct, ProposedChange, PendingTarget} from "src/strategies/any/v2/AnyConverterV2.sol";
 import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson, IERC20, Math} from "test/strategies/BaseStrategyTest.sol";
 import {MockOracle} from "test/mocks/MockOracle.sol";
 import {ILBT} from "src/interfaces/external/lfj/ILBT.sol";
 import {ILBRouter} from "src/interfaces/external/lfj/ILBRouter.sol";
 import {ILBClaimer} from "src/interfaces/external/lfj/ILBClaimer.sol";
-
 
 contract AnyLBTManagerTest is BaseStrategyTest {
     using Math for uint256;
@@ -20,7 +19,8 @@ contract AnyLBTManagerTest is BaseStrategyTest {
     MockOracle oracle;
     ILBRouter exchange;
 
-    using stdJson for string;
+    PendingTarget[] initialTargets;
+    CallStruct[] initialAllowances;
 
     function setUp() public {
         _setUpBaseTest(
@@ -33,37 +33,37 @@ contract AnyLBTManagerTest is BaseStrategyTest {
     }
 
     function _setUpBase() internal {
-        PendingCallAllowance[] memory changes = new PendingCallAllowance[](5);
-        changes[0] = PendingCallAllowance({
+        PendingTarget[] memory changes = new PendingTarget[](5);
+        changes[0] = PendingTarget({
             target: testConfig.asset,
             selector: bytes4(keccak256("approve(address,uint256)")),
             allowed: true
         });
-        changes[1] = PendingCallAllowance({
+        changes[1] = PendingTarget({
             target: yieldToken,
             selector: bytes4(keccak256("approveForAll(address,bool)")),
             allowed: true
         });
-        changes[2] = PendingCallAllowance({
+        changes[2] = PendingTarget({
             target: address(exchange),
             selector: ILBRouter.addLiquidityNATIVE.selector,
             allowed: true
         });
-        changes[3] = PendingCallAllowance({
+        changes[3] = PendingTarget({
             target: address(exchange),
             selector: ILBRouter.removeLiquidity.selector,
             allowed: true
         });
-        changes[4] = PendingCallAllowance({
+        changes[4] = PendingTarget({
             target: json.readAddress(".configs[0].specific.claimer"),
             selector: ILBClaimer.claim.selector,
             allowed: true
         });
 
-        AnyConverterV2(address(strategy)).proposeCallAllowance(changes);
+        AnyConverterV2(address(strategy)).proposeTargets(changes);
 
         vm.warp(block.timestamp + 3 days + 1);
-        AnyConverterV2(address(strategy)).changeCallAllowances();
+        AnyConverterV2(address(strategy)).updateTargets();
     }
 
     function _increasePricePerShare(uint256 amount) internal override {
@@ -90,7 +90,13 @@ contract AnyLBTManagerTest is BaseStrategyTest {
             testConfig_.asset,
             address(this),
             true,
-            abi.encode(yieldToken, address(oracle), uint256(10))
+            abi.encode(
+                yieldToken,
+                address(oracle),
+                uint256(10),
+                initialTargets,
+                initialAllowances
+            )
         );
 
         uint256[] memory depositIdsUint = json_.readUintArray(
@@ -101,8 +107,6 @@ contract AnyLBTManagerTest is BaseStrategyTest {
             depositIds[i] = uint24(depositIdsUint[i]);
         }
         _strategy.setDepositIds(depositIds);
-
-        // TODO: Set up liquidity bins
 
         return IBaseStrategy(address(_strategy));
     }
@@ -423,59 +427,6 @@ contract AnyLBTManagerTest is BaseStrategyTest {
         strategy.pushFunds(0, abi.encode(calls));
     }
 
-    function test__pushFunds_outstanding_allowance_reverts() public {
-        strategy.toggleAutoDeposit();
-        _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
-
-        vm.prank(bob);
-        strategy.deposit(testConfig.defaultAmount, bob);
-
-        bytes memory encodedApprove = abi.encodeWithSelector(
-            bytes4(keccak256("approve(address,uint256)")),
-            address(exchange),
-            (testConfig.defaultAmount * 3) / 2
-        );
-        int256[] memory deltaIds = new int256[](3);
-        deltaIds[0] = 0;
-        deltaIds[1] = 1;
-        deltaIds[2] = 2;
-
-        uint256[] memory distributionX = new uint256[](3);
-        distributionX[0] = 0.2e18; // 20%
-        distributionX[1] = 0.4e18; // 40%
-        distributionX[2] = 0.4e18; // 40%
-
-        uint256[] memory distributionY = new uint256[](3);
-
-        bytes memory encodedSwap = abi.encodeWithSelector(
-            ILBRouter.addLiquidityNATIVE.selector,
-            ILBRouter.LiquidityParameters({
-                tokenX: json.readAddress(".configs[0].specific.tokenX"),
-                tokenY: json.readAddress(".configs[0].specific.tokenY"),
-                binStep: 25,
-                amountX: testConfig.defaultAmount,
-                amountY: 0,
-                amountXMin: 0,
-                amountYMin: 0,
-                activeIdDesired: 8386853,
-                idSlippage: 1,
-                deltaIds: deltaIds,
-                distributionX: distributionX,
-                distributionY: distributionY,
-                to: address(strategy),
-                refundTo: address(strategy),
-                deadline: block.timestamp + 10_000
-            })
-        );
-
-        CallStruct[] memory calls = new CallStruct[](2);
-        calls[0] = CallStruct(testConfig.asset, encodedApprove);
-        calls[1] = CallStruct(address(exchange), encodedSwap);
-
-        vm.expectRevert("Total assets decreased");
-        strategy.pushFunds(0, abi.encode(calls));
-    }
-
     function testFail__pullFunds_invalid_call() public {
         _mintAssetAndApproveForStrategy(testConfig.defaultAmount, bob);
 
@@ -622,18 +573,18 @@ contract AnyLBTManagerTest is BaseStrategyTest {
     }
 
     /*//////////////////////////////////////////////////////////////
-                            SET ALLOWED FUNCTIONS
+                            SET TARGETS
     //////////////////////////////////////////////////////////////*/
 
-    function _getProposedAllowance()
+    function _getProposedTargets()
         internal
         view
-        returns (PendingCallAllowance[] memory)
+        returns (PendingTarget[] memory)
     {
         address target = address(0x444);
         bytes4 selector = bytes4(keccak256("someFunction(uint256)"));
-        PendingCallAllowance[] memory changes = new PendingCallAllowance[](1);
-        changes[0] = PendingCallAllowance({
+        PendingTarget[] memory changes = new PendingTarget[](1);
+        changes[0] = PendingTarget({
             target: target,
             selector: selector,
             allowed: true
@@ -641,14 +592,14 @@ contract AnyLBTManagerTest is BaseStrategyTest {
         return changes;
     }
 
-    function test__proposeCallAllowance() public {
-        PendingCallAllowance[] memory changes = _getProposedAllowance();
-        AnyConverterV2(address(strategy)).proposeCallAllowance(changes);
+    function test__proposeTargets() public {
+        PendingTarget[] memory changes = _getProposedTargets();
+        AnyConverterV2(address(strategy)).proposeTargets(changes);
 
         (
             uint256 proposedTime,
-            PendingCallAllowance[] memory proposed
-        ) = AnyConverterV2(address(strategy)).getProposedCallAllowance();
+            PendingTarget[] memory proposed
+        ) = AnyConverterV2(address(strategy)).getProposedTargets();
 
         assertEq(proposed.length, 1);
         assertEq(proposed[0].selector, changes[0].selector);
@@ -657,33 +608,33 @@ contract AnyLBTManagerTest is BaseStrategyTest {
         assertEq(proposedTime, block.timestamp + 3 days);
     }
 
-    function test__proposeCallAllowance_owner_only() public {
-        PendingCallAllowance[] memory changes = _getProposedAllowance();
+    function test__proposeTargets_owner_only() public {
+        PendingTarget[] memory changes = _getProposedTargets();
 
         vm.prank(bob);
         vm.expectRevert("Only the contract owner may perform this action");
-        AnyConverterV2(address(strategy)).proposeCallAllowance(changes);
+        AnyConverterV2(address(strategy)).proposeTargets(changes);
     }
 
-    function test__proposeCallAllowance_multiple_proposal() public {
+    function test__proposeTargets_multiple_proposal() public {
         uint256 firstCallTime = block.timestamp;
-        PendingCallAllowance[] memory changes = _getProposedAllowance();
-        AnyConverterV2(address(strategy)).proposeCallAllowance(changes);
+        PendingTarget[] memory changes = _getProposedTargets();
+        AnyConverterV2(address(strategy)).proposeTargets(changes);
 
         // Warp time forward
         vm.warp(block.timestamp + 1 days);
 
-        changes[0] = PendingCallAllowance({
+        changes[0] = PendingTarget({
             target: address(0x333),
             selector: bytes4(keccak256("someOtherFunction(uint256)")),
             allowed: true
         });
 
-        AnyConverterV2(address(strategy)).proposeCallAllowance(changes);
+        AnyConverterV2(address(strategy)).proposeTargets(changes);
         (
             uint256 proposedTime,
-            PendingCallAllowance[] memory proposed
-        ) = AnyConverterV2(address(strategy)).getProposedCallAllowance();
+            PendingTarget[] memory proposed
+        ) = AnyConverterV2(address(strategy)).getProposedTargets();
 
         // Should add both proposals
         assertEq(proposed.length, 2);
@@ -702,20 +653,20 @@ contract AnyLBTManagerTest is BaseStrategyTest {
         assertEq(proposedTime, firstCallTime + 4 days);
     }
 
-    function test__changeCallAllowances() public {
-        PendingCallAllowance[] memory changes = _getProposedAllowance();
-        AnyConverterV2(address(strategy)).proposeCallAllowance(changes);
+    function test__updateTargets() public {
+        PendingTarget[] memory changes = _getProposedTargets();
+        AnyConverterV2(address(strategy)).proposeTargets(changes);
 
         // Warp time forward past the required delay
         vm.warp(block.timestamp + 3 days + 1);
 
         // Change allowances
-        AnyConverterV2(address(strategy)).changeCallAllowances();
+        AnyConverterV2(address(strategy)).updateTargets();
 
         (
             uint256 proposedTime,
-            PendingCallAllowance[] memory proposed
-        ) = AnyConverterV2(address(strategy)).getProposedCallAllowance();
+            PendingTarget[] memory proposed
+        ) = AnyConverterV2(address(strategy)).getProposedTargets();
 
         assertEq(proposedTime, 0);
         assertEq(proposed.length, 0);
@@ -728,29 +679,170 @@ contract AnyLBTManagerTest is BaseStrategyTest {
         );
     }
 
-    function test__changeCallAllowances_owner_only() public {
-        PendingCallAllowance[] memory changes = _getProposedAllowance();
-        AnyConverterV2(address(strategy)).proposeCallAllowance(changes);
+    function test__updateTargets_owner_only() public {
+        PendingTarget[] memory changes = _getProposedTargets();
+        AnyConverterV2(address(strategy)).proposeTargets(changes);
 
         // Warp time forward past the required delay
         vm.warp(block.timestamp + 3 days + 1);
 
         vm.prank(bob);
         vm.expectRevert("Only the contract owner may perform this action");
-        AnyConverterV2(address(strategy)).changeCallAllowances();
+        AnyConverterV2(address(strategy)).updateTargets();
     }
 
-    function test__changeCallAllowances_before_delay() public {
-        PendingCallAllowance[] memory changes = _getProposedAllowance();
-        AnyConverterV2(address(strategy)).proposeCallAllowance(changes);
+    function test__updateTargets_before_delay() public {
+        PendingTarget[] memory changes = _getProposedTargets();
+        AnyConverterV2(address(strategy)).proposeTargets(changes);
 
         vm.expectRevert(AnyConverterV2.Misconfigured.selector);
-        AnyConverterV2(address(strategy)).changeCallAllowances();
+        AnyConverterV2(address(strategy)).updateTargets();
     }
 
-    function test__changeCallAllowances_no_proposal() public {
+    function test__updateTargets_no_proposal() public {
         vm.expectRevert(AnyConverterV2.Misconfigured.selector);
-        AnyConverterV2(address(strategy)).changeCallAllowances();
+        AnyConverterV2(address(strategy)).updateTargets();
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            SET ALLOWANCE
+    //////////////////////////////////////////////////////////////*/
+
+    function _getProposedAllowances()
+        internal
+        view
+        returns (CallStruct[] memory)
+    {
+        CallStruct[] memory changes = new CallStruct[](1);
+        changes[0] = CallStruct({
+            target: testConfig.asset,
+            data: abi.encodeWithSelector(
+                bytes4(keccak256("approve(address,uint256)")),
+                address(exchange),
+                type(uint256).max
+            )
+        });
+        return changes;
+    }
+
+    function test__proposeAllowances() public {
+        CallStruct[] memory changes = _getProposedAllowances();
+        AnyConverterV2(address(strategy)).proposeAllowances(changes);
+
+        (uint256 proposedTime, CallStruct[] memory proposed) = AnyConverterV2(
+            address(strategy)
+        ).getProposedAllowances();
+
+        console.log("proposedTime", proposedTime);
+
+        assertEq(proposed.length, 1);
+        assertEq(proposed[0].target, changes[0].target, "target");
+        assertEq(proposed[0].data, changes[0].data, "data");
+        assertEq(proposedTime, block.timestamp + 3 days, "time");
+    }
+
+    function test__proposeAllowances_owner_only() public {
+        CallStruct[] memory changes = _getProposedAllowances();
+
+        vm.prank(bob);
+        vm.expectRevert("Only the contract owner may perform this action");
+        AnyConverterV2(address(strategy)).proposeAllowances(changes);
+    }
+
+    function test__proposeAllowances_multiple_proposal() public {
+        uint256 firstCallTime = block.timestamp;
+        CallStruct[] memory changes = _getProposedAllowances();
+        AnyConverterV2(address(strategy)).proposeAllowances(changes);
+
+        // Warp time forward
+        vm.warp(block.timestamp + 1 days);
+
+        changes[0] = CallStruct({
+            target: testConfig.asset,
+            data: abi.encodeWithSelector(
+                bytes4(keccak256("approve(address,uint256)")),
+                address(exchange),
+                0
+            )
+        });
+
+        AnyConverterV2(address(strategy)).proposeAllowances(changes);
+        (uint256 proposedTime, CallStruct[] memory proposed) = AnyConverterV2(
+            address(strategy)
+        ).getProposedAllowances();
+
+        // Should add both proposals
+        assertEq(proposed.length, 2);
+        assertEq(proposed[0].target, testConfig.asset);
+        assertEq(
+            proposed[0].data,
+            abi.encodeWithSelector(
+                bytes4(keccak256("approve(address,uint256)")),
+                address(exchange),
+                type(uint256).max
+            )
+        );
+        assertEq(proposed[1].target, testConfig.asset);
+        assertEq(
+            proposed[1].data,
+            abi.encodeWithSelector(
+                bytes4(keccak256("approve(address,uint256)")),
+                address(exchange),
+                0
+            )
+        );
+        assertEq(proposedTime, firstCallTime + 4 days);
+    }
+
+    function test__updateAllowances() public {
+        CallStruct[] memory changes = _getProposedAllowances();
+        AnyConverterV2(address(strategy)).proposeAllowances(changes);
+
+        // Warp time forward past the required delay
+        vm.warp(block.timestamp + 3 days + 1);
+
+        // Change allowances
+        AnyConverterV2(address(strategy)).updateAllowances();
+
+        (uint256 proposedTime, CallStruct[] memory proposed) = AnyConverterV2(
+            address(strategy)
+        ).getProposedAllowances();
+
+        assertEq(proposedTime, 0);
+        assertEq(proposed.length, 0);
+
+        assertEq(
+            IERC20(testConfig.asset).allowance(
+                address(strategy),
+                address(exchange)
+            ),
+            type(uint256).max
+        );
+    }
+
+    function test__updateAllowances_owner_only() public {
+        CallStruct[] memory changes = _getProposedAllowances();
+        AnyConverterV2(address(strategy)).proposeAllowances(changes);
+
+        // Warp time forward past the required delay
+        vm.warp(block.timestamp + 3 days + 1);
+
+        vm.prank(bob);
+        vm.expectRevert("Only the contract owner may perform this action");
+        AnyConverterV2(address(strategy)).updateAllowances();
+    }
+
+    function test__updateAllowances_before_delay() public {
+        CallStruct[] memory changes = _getProposedAllowances();
+        AnyConverterV2(address(strategy)).proposeAllowances(changes);
+
+        vm.expectRevert(AnyConverterV2.Misconfigured.selector);
+        AnyConverterV2(address(strategy)).updateAllowances();
+    }
+
+    function test__updateAllowances_no_proposal() public {
+        vm.expectRevert(AnyConverterV2.Misconfigured.selector);
+        AnyConverterV2(address(strategy)).updateAllowances();
     }
 
     /*//////////////////////////////////////////////////////////////

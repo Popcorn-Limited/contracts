@@ -2,7 +2,7 @@
 // Docgen-SOLC: 0.8.0
 pragma solidity ^0.8.25;
 
-import {AnyCompounderV2, AnyCompounderNaiveV2, AnyConverterV2, CallStruct, PendingCallAllowance, IERC20} from "src/strategies/any/v2/AnyCompounderV2.sol";
+import {AnyCompounderV2, AnyCompounderNaiveV2, AnyConverterV2, CallStruct, PendingTarget, IERC20} from "src/strategies/any/v2/AnyCompounderV2.sol";
 import {BaseStrategyTest, IBaseStrategy, TestConfig, stdJson} from "test/strategies/BaseStrategyTest.sol";
 import {MockOracle} from "test/mocks/MockOracle.sol";
 import {AnyBaseTest} from "./AnyBase.t.sol";
@@ -58,7 +58,13 @@ contract AnyCompounderNaiveV2Test is AnyBaseTest {
             testConfig_.asset,
             address(this),
             true,
-            abi.encode(yieldToken, address(oracle), uint256(0), uint256(0))
+            abi.encode(
+                yieldToken,
+                address(oracle),
+                uint256(0),
+                initialTargets,
+                initialAllowances
+            )
         );
 
         _strategy.setRewardTokens(
@@ -87,15 +93,15 @@ contract AnyCompounderNaiveV2Test is AnyBaseTest {
         bytes4 selector = bytes4(
             abi.encodeWithSelector(ClaimContract.claim.selector)
         );
-        PendingCallAllowance[] memory changes = new PendingCallAllowance[](1);
-        changes[0] = PendingCallAllowance({
+        PendingTarget[] memory changes = new PendingTarget[](1);
+        changes[0] = PendingTarget({
             target: target,
             selector: selector,
             allowed: true
         });
-        AnyConverterV2(address(strategy)).proposeCallAllowance(changes);
+        AnyConverterV2(address(strategy)).proposeTargets(changes);
         vm.warp(block.timestamp + 3 days + 1);
-        AnyConverterV2(address(strategy)).changeCallAllowances();
+        AnyConverterV2(address(strategy)).updateTargets();
     }
 
     /*//////////////////////////////////////////////////////////////

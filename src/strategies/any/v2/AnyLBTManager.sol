@@ -3,7 +3,7 @@
 
 pragma solidity ^0.8.25;
 
-import {AnyCompounderNaiveV2, AnyConverterV2, CallStruct, PendingCallAllowance, IERC20Metadata, ERC20, IERC20, Math} from "./AnyCompounderNaiveV2.sol";
+import {AnyCompounderNaiveV2, AnyConverterV2, CallStruct, PendingTarget, IERC20Metadata, ERC20, IERC20, Math} from "./AnyCompounderNaiveV2.sol";
 import {ILBT} from "src/interfaces/external/lfj/ILBT.sol";
 import {BytesLib} from "bitlib/BytesLib.sol";
 
@@ -100,10 +100,6 @@ contract AnyLBTManager is AnyCompounderNaiveV2 {
                 _asset
             );
         }
-
-        uint256 _outstandingAllowance = outstandingAllowance;
-        if (_outstandingAllowance > totalAssets) return 0;
-        totalAssets -= _outstandingAllowance;
     }
 
     function setDepositIds(uint24[] memory ids) external onlyKeeperOrOwner {
@@ -151,8 +147,6 @@ contract AnyLBTManager is AnyCompounderNaiveV2 {
         emit PulledFunds(0, 0);
     }
 
-    event LogUint(string, uint);
-
     function _execute(
         bytes memory data
     ) internal override returns (uint256[6] memory) {
@@ -163,41 +157,14 @@ contract AnyLBTManager is AnyCompounderNaiveV2 {
         uint256 preTotalAssets = totalAssets();
 
         CallStruct[] memory calls = abi.decode(data, (CallStruct[]));
-        CallStruct[] memory allowanceCalls = new CallStruct[](calls.length);
         for (uint256 i; i < calls.length; i++) {
             if (!isAllowed[calls[i].target][bytes4(calls[i].data)])
                 revert("Not allowed");
-
-            if (bytes4(calls[i].data) == APPROVE_SELECTOR) {
-                (address to, ) = abi.decode(
-                    calls[i].data.slice(4, calls[i].data.length - 4),
-                    (address, uint256)
-                );
-                allowanceCalls[i] = CallStruct({
-                    target: calls[i].target,
-                    data: abi.encodeWithSelector(
-                        bytes4(keccak256("allowance(address,address)")),
-                        address(this),
-                        to
-                    )
-                });
-            }
 
             (bool success, ) = calls[i].target.call(calls[i].data);
             if (!success) revert("Call failed");
         }
 
-        uint256 outstandingAllowance;
-        for (uint256 i; i < allowanceCalls.length; i++) {
-            if (allowanceCalls[i].target != address(0)) {
-                (bool success, bytes memory result) = allowanceCalls[i]
-                    .target
-                    .call(allowanceCalls[i].data);
-                if (!success) revert("Call failed");
-
-                outstandingAllowance += abi.decode(result, (uint256));
-            }
-        }
         uint24 activeId = ILBT(yieldToken).getActiveId();
 
         uint256 amountY = 0;
@@ -221,17 +188,7 @@ contract AnyLBTManager is AnyCompounderNaiveV2 {
             }
         }
 
-        emit LogUint("amountY", amountY);
-        emit LogUint("amountX", amountX);
-        emit LogUint("balance", IERC20(_asset).balanceOf(address(this)));
-        emit LogUint(
-            "balance tokenY",
-            IERC20(0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7).balanceOf(
-                address(this)
-            )
-        );
-        emit LogUint("totalAssets", totalAssets());
-        uint256 postTotalAssets = totalAssets() - outstandingAllowance;
+        uint256 postTotalAssets = totalAssets();
 
         return ([preTotalAssets, postTotalAssets, 0, 0, 0, 0]);
     }
