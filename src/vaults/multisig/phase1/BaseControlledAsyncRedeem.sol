@@ -161,7 +161,7 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
         uint256 shares,
         uint256 assets,
         address controller
-    ) internal returns (uint256) {
+    ) internal virtual returns (uint256) {
         RequestBalance storage currentBalance = requestBalances[controller];
         require(
             currentBalance.pendingShares != 0 &&

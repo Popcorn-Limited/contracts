@@ -3,12 +3,21 @@
 
 pragma solidity ^0.8.25;
 
-import {MultisigVault, InitializeParams} from "./MultisigVault.sol";
+import {AsyncVault, InitializeParams} from "./AsyncVault.sol";
 import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
 import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
 
-contract RateVault is MultisigVault {
-    constructor(InitializeParams memory params) MultisigVault(params) {}
+contract RateVault is AsyncVault {
+    address public multisig;
+
+    constructor(
+        InitializeParams memory params,
+        address multisig_
+    ) AsyncVault(params) {
+        if (multisig_ == address(0)) revert Misconfigured();
+
+        multisig = params.multisig;
+    }
 
     /*//////////////////////////////////////////////////////////////
                             ACCOUNTING LOGIC

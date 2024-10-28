@@ -10,7 +10,8 @@ import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
 
 struct InitializeParams {
     address asset;
-    address multisig;
+    string name;
+    string symbol;
     address owner;
     Limits limits;
     Fees fees;
@@ -30,20 +31,15 @@ struct Fees {
     address feeRecipient;
 }
 
-abstract contract MultisigVault is BaseControlledAsyncRedeem {
+abstract contract AsyncVault is BaseControlledAsyncRedeem {
     using FixedPointMathLib for uint256;
-
-    address public multisig;
 
     error ZeroAmount();
     error Misconfigured();
 
     constructor(
         InitializeParams memory params
-    ) BaseERC7540(params.owner, params.asset, "Multisig Vault", "mVault") {
-        if (params.multisig == address(0)) revert Misconfigured();
-
-        multisig = params.multisig;
+    ) BaseERC7540(params.owner, params.asset, params.name, params.symbol) {
         _setLimits(params.limits);
         _setFees(params.fees);
     }
@@ -183,8 +179,6 @@ abstract contract MultisigVault is BaseControlledAsyncRedeem {
 
     function afterDeposit(uint256 assets, uint256) internal virtual override {
         if (!paused) _takeFees();
-
-        SafeTransferLib.safeTransfer(asset, multisig, assets);
     }
 
     /*//////////////////////////////////////////////////////////////
