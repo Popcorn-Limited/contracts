@@ -11,9 +11,9 @@ import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
 contract OracleVault is MultisigVault {
     constructor(
         InitializeParams memory params,
-        address oracle
+        address oracle_
     ) MultisigVault(params) {
-        oracle = IPriceOracle(oracle);
+        oracle = IPriceOracle(oracle_);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -24,6 +24,6 @@ contract OracleVault is MultisigVault {
 
     /// @return Total amount of underlying `asset` token managed by vault. Delegates to adapter.
     function totalAssets() public view override returns (uint256) {
-        return IPriceOracle(oracle).getQuote(totalSupply(), share, asset);
+        return oracle.getQuote(totalSupply, share, address(asset));
     }
 }

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity >=0.8.12 <0.9.0;
 
-import {BaseGuard, Guard, Enum} from "safe-smart-account/base/GuardManager.sol";
-import {IModuleGuard} from "src/interfaces/external/safe/IModuleGuard.sol";
+import {BaseGuard, ITransactionGuard, IModuleGuard} from "safe-smart-account/examples/guards/BaseGuard.sol";
+import {Enum} from "safe-smart-account/libraries/Enum.sol";
 import {Owned} from "src/utils/Owned.sol";
 
 contract MainTransactionGuard is BaseGuard, Owned {
@@ -49,7 +49,7 @@ contract MainTransactionGuard is BaseGuard, Owned {
         address[] memory hooks = getHooks();
 
         for (uint256 i; i < hooks.length; i++) {
-            Guard(hooks[i]).checkTransaction(
+            ITransactionGuard(hooks[i]).checkTransaction(
                 to,
                 value,
                 data,
@@ -77,7 +77,7 @@ contract MainTransactionGuard is BaseGuard, Owned {
         address[] memory hooks = getHooks();
 
         for (uint256 i; i < hooks.length; i++) {
-            Guard(hooks[i]).checkAfterExecution(txHash, success);
+            ITransactionGuard(hooks[i]).checkAfterExecution(txHash, success);
         }
     }
 
@@ -105,7 +105,7 @@ contract MainTransactionGuard is BaseGuard, Owned {
         address[] memory hooks = getHooks();
 
         for (uint256 i; i < hooks.length; i++) {
-            Guard(hooks[i]).checkModuleTransaction(
+            IModuleGuard(hooks[i]).checkModuleTransaction(
                 to,
                 value,
                 data,
@@ -125,7 +125,7 @@ contract MainTransactionGuard is BaseGuard, Owned {
         address[] memory hooks = getHooks();
 
         for (uint256 i; i < hooks.length; i++) {
-            Guard(hooks[i]).checkAfterModuleExecution(txHash, success);
+            IModuleGuard(hooks[i]).checkAfterModuleExecution(txHash, success);
         }
     }
 
