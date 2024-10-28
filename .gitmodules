@@ -16,10 +16,6 @@
 [submodule "lib/solady"]
 	path = lib/solady
 	url = https://github.com/vectorized/solady
-[submodule "lib/ERC-7540-Reference"]
-	path = lib/ERC-7540-Reference
-	url = https://github.com/ERC4626-Alliance/ERC-7540-Reference
-	branch = main
 [submodule "lib/solidity-bytes-utils"]
 	path = lib/solidity-bytes-utils
 	url = https://github.com/GNSPS/solidity-bytes-utils
