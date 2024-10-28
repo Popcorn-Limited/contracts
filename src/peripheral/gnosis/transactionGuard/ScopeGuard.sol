@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity >=0.8.12 <0.9.0;
 
-import {BaseGuard, Guard, Enum} from "safe-smart-account/contracts/base/GuardManager.sol";
+import {BaseGuard, Guard, Enum} from "safe-smart-account/base/GuardManager.sol";
 import {Owned} from "src/utils/Owned.sol";
 
 contract ScopeGuard is BaseGuard, Owned {
@@ -181,7 +181,7 @@ contract ScopeGuard is BaseGuard, Owned {
         bytes memory data,
         Enum.Operation operation,
         address
-    ) external view override {
+    ) external view {
         _checkTransaction(to, value, data, operation);
     }
 
@@ -221,5 +221,5 @@ contract ScopeGuard is BaseGuard, Owned {
 
     function checkAfterExecution(bytes32, bool) external view override {}
 
-    function checkAfterModuleExecution(bytes32, bool) external view override {}
+    function checkAfterModuleExecution(bytes32, bool) external view {}
 }

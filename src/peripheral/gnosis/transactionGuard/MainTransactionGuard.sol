@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity >=0.8.12 <0.9.0;
 
-import {BaseGuard, Guard, Enum} from "safe-smart-account/contracts/base/GuardManager.sol";
+import {BaseGuard, Guard, Enum} from "safe-smart-account/base/GuardManager.sol";
+import {IModuleGuard} from "safe-smart-account/base/ModuleManager.sol";
 import {Owned} from "src/utils/Owned.sol";
 
 contract MainTransactionGuard is BaseGuard, Owned {

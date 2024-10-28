@@ -1,12 +1,16 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 pragma solidity ^0.8.25;
 
-import {ControllerModule, ModuleCall} from "src/peripheral/gnosis/controllerModule/MainControllerModule.sol";
+import {ControllerModule, ModuleCall, ISafe, Operation} from "src/peripheral/gnosis/controllerModule/MainControllerModule.sol";
 import {MultisigVault} from "src/vaults/multisig/phase1/MultisigVault.sol";
 import {ERC20} from "solmate/tokens/ERC20.sol";
 import {Owned} from "src/utils/Owned.sol";
+import {OwnerManager} from "safe-smart-account/base/OwnerManager.sol";
+import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
 
 contract DrawdownModule is Owned {
+    using FixedPointMathLib for uint256;
+
     MultisigVault public vault;
     ControllerModule public controller;
     ModuleCall[] public tokenBalanceCalls;
@@ -39,7 +43,7 @@ contract DrawdownModule is Owned {
             if (abi.decode(data, (uint256)) > 0) revert("Leftover token");
         }
 
-        address asset = vault.asset();
+        address asset = address(vault.asset());
         uint256 assetBalance = ERC20(asset).balanceOf(controller.gnosisSafe());
         uint256 totalAssets = vault.totalAssets();
         // TODO add a drawdown parameter
@@ -66,25 +70,25 @@ contract DrawdownModule is Owned {
             ERC20(asset).transfer(address(vault), assetBalance - bounty);
 
             // Put DAO in control of the safe
-            _takeoverSafe();
+            _takeoverSafe(newOwners, newThreshold);
         }
     }
 
     function _takeoverSafe(
-        address[] memory newOwners,
-        uint256 newThreshold
+        address[] memory newOwners_,
+        uint256 newThreshold_
     ) internal {
-        address _gnosisSafe = gnosisSafe;
-        ISafe safe = ISafe(_gnosisSafe);
+        address gnosisSafe = controller.gnosisSafe();
+        ISafe safe = ISafe(gnosisSafe);
         address[] memory owners = safe.getOwners();
 
         // remove owners
         for (uint256 i = (owners.length - 1); i > 0; --i) {
             bool success = safe.execTransactionFromModule({
-                to: _gnosisSafe,
+                to: gnosisSafe,
                 value: 0,
                 data: abi.encodeCall(
-                    IOwnerManager.removeOwner,
+                    OwnerManager.removeOwner,
                     (owners[i - 1], owners[i], 1)
                 ),
                 operation: Operation.Call
@@ -94,16 +98,16 @@ contract DrawdownModule is Owned {
             }
         }
 
-        for (uint256 i = 0; i < newOwners.length; i++) {
+        for (uint256 i = 0; i < newOwners_.length; i++) {
             bool success;
             if (i == 0) {
-                if (newOwners[i] == owners[i]) continue;
+                if (newOwners_[i] == owners[i]) continue;
                 success = safe.execTransactionFromModule({
-                    to: _gnosisSafe,
+                    to: gnosisSafe,
                     value: 0,
                     data: abi.encodeCall(
-                        IOwnerManager.swapOwner,
-                        (SENTINEL_OWNERS, owners[i], newOwners[i])
+                        OwnerManager.swapOwner,
+                        (address(0x1), owners[i], newOwners_[i])
                     ),
                     operation: Operation.Call
                 });
@@ -113,11 +117,11 @@ contract DrawdownModule is Owned {
                 continue;
             }
             success = safe.execTransactionFromModule({
-                to: _gnosisSafe,
+                to: gnosisSafe,
                 value: 0,
                 data: abi.encodeCall(
-                    IOwnerManager.addOwnerWithThreshold,
-                    (newOwners[i], 1)
+                    OwnerManager.addOwnerWithThreshold,
+                    (newOwners_[i], 1)
                 ),
                 operation: Operation.Call
             });
@@ -126,13 +130,13 @@ contract DrawdownModule is Owned {
             }
         }
 
-        if (newThreshold > 1) {
+        if (newThreshold_ > 1) {
             bool success = safe.execTransactionFromModule({
-                to: _gnosisSafe,
+                to: gnosisSafe,
                 value: 0,
                 data: abi.encodeCall(
-                    IOwnerManager.changeThreshold,
-                    (newThreshold)
+                    OwnerManager.changeThreshold,
+                    (newThreshold_)
                 ),
                 operation: Operation.Call
             });
@@ -153,7 +157,7 @@ contract DrawdownModule is Owned {
                 revert("Invalid call operation");
 
             // We want to get the balance of all tokens in the safe that are not the vault asset
-            if (calls[i].to == vault.asset()) revert("Invalid call");
+            if (calls[i].to == address(vault.asset())) revert("Invalid call");
 
             delete tokenBalanceCalls;
 

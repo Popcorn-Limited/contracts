@@ -10,7 +10,7 @@ interface IAsyncVault {
     function redeemRequests(
         address recipient,
         address multisig
-    ) external view returns (RedeemRequest);
+    ) external view returns (RedeemRequest memory);
 }
 
 contract WithdrawalModule {

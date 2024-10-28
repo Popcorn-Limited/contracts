@@ -1,4 +1,4 @@
-import {DebugTransactionGuard, Enum} from "safe-smart-account/contracts/examples/guards/DebugTransactionGuard.sol";
+import {DebugTransactionGuard, Enum} from "safe-smart-account/examples/guards/DebugTransactionGuard.sol";
 
 contract LoggerGuard is DebugTransactionGuard {
     event ModuleTransactionDetails(

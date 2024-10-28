@@ -7,23 +7,36 @@ import {BaseControlledAsyncRedeem} from "./BaseControlledAsyncRedeem.sol";
 import {BaseERC7540} from "./BaseERC7540.sol";
 import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
 import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
-import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
 
-contract MultisigVault is BaseControlledAsyncRedeem {
+struct InitializeParams {
+    address asset;
+    address multisig;
+    address owner;
+    Limits limits;
+    Fees fees;
+}
+
+struct Limits {
+    uint256 depositLimit;
+    uint256 minAmount;
+}
+
+struct Fees {
+    uint64 performanceFee;
+    uint64 managementFee;
+    uint64 withdrawalIncentive;
+    uint64 feesUpdatedAt;
+    uint256 highWaterMark;
+    address feeRecipient;
+}
+
+abstract contract MultisigVault is BaseControlledAsyncRedeem {
     using FixedPointMathLib for uint256;
 
     address public multisig;
 
     error ZeroAmount();
     error Misconfigured();
-
-    struct InitializeParams {
-        address asset;
-        address multisig;
-        address owner;
-        Limits limits;
-        Fees fees;
-    }
 
     constructor(
         InitializeParams memory params
@@ -38,21 +51,6 @@ contract MultisigVault is BaseControlledAsyncRedeem {
     /*//////////////////////////////////////////////////////////////
                             ACCOUNTING LOGIC
     //////////////////////////////////////////////////////////////*/
-
-    uint256 internal totalAssets_;
-    uint256 public lastUpdateTime;
-
-    /// @return Total amount of underlying `asset` token managed by vault. Delegates to adapter.
-    function totalAssets() public view override returns (uint256) {
-        return totalAssets_ + accruedYield();
-    }
-
-    function accruedYield() public view returns (uint256) {
-        return
-            (rate * (block.timestamp - lastUpdateTime) * totalAssets_) /
-            365.25 days /
-            1e18;
-    }
 
     // Override to add minAmount check (Which is used in mint and will revert the function)
     function previewDeposit(
@@ -73,12 +71,14 @@ contract MultisigVault is BaseControlledAsyncRedeem {
         return supply == 0 ? shares : shares.mulDivUp(totalAssets(), supply);
     }
 
-    function convertToLowBoundAssets(uint256 shares) public view returns (uint256) {
+    function convertToLowBoundAssets(
+        uint256 shares
+    ) public view returns (uint256) {
         uint256 supply = totalSupply; // Saves an extra SLOAD if totalSupply is non-zero.
         uint256 assets = totalAssets().mulDivDown(bounds.lower, 1e18);
 
         return supply == 0 ? shares : shares.mulDivDown(assets, supply);
-    }   
+    }
 
     /*//////////////////////////////////////////////////////////////
                      DEPOSIT/WITHDRAWAL LIMIT LOGIC
@@ -155,7 +155,7 @@ contract MultisigVault is BaseControlledAsyncRedeem {
     function fulfillMultipleRedeems(
         uint256[] memory shares,
         address[] memory controllers
-    ) external override returns (uint256) {
+    ) external returns (uint256) {
         if (shares.length != controllers.length) revert Misconfigured();
         uint256 withdrawalIncentive = uint256(fees.withdrawalIncentive);
 
@@ -177,16 +177,12 @@ contract MultisigVault is BaseControlledAsyncRedeem {
                             ERC-4626 OVERRIDES
     //////////////////////////////////////////////////////////////*/
 
-    function beforeWithdraw(uint256 assets, uint256) internal override {
+    function beforeWithdraw(uint256 assets, uint256) internal virtual override {
         _takeFees();
-
-        totalAssets_ -= assets;
     }
 
-    function afterDeposit(uint256 assets, uint256) internal override {
+    function afterDeposit(uint256 assets, uint256) internal virtual override {
         _takeFees();
-
-        totalAssets_ += assets;
 
         SafeTransferLib.safeTransfer(asset, multisig, assets);
     }
@@ -201,38 +197,14 @@ contract MultisigVault is BaseControlledAsyncRedeem {
     }
 
     Bounds public bounds;
-    uint256 public rate;
-
-    function setRate(uint256 rate_) external onlyOwner {
-        rate = rate_;
-    }
 
     function setBounds(Bounds memory bounds_) external onlyOwner {
         bounds = bounds_;
     }
 
-    modifier updateTotalAssets() {
-        uint256 yieldEarned = accruedYield();
-
-        if (yieldEarned > 0) {
-            totalAssets_ = _totalAssets + yieldEarned;
-            lastUpdateTime = block.timestamp;
-        }
-        _;
-    }
-
     /*//////////////////////////////////////////////////////////////
                             FEE LOGIC
     //////////////////////////////////////////////////////////////*/
-
-    struct Fees {
-        uint64 performanceFee;
-        uint64 managementFee;
-        uint64 withdrawalIncentive;
-        uint64 feesUpdatedAt;
-        uint256 highWaterMark;
-        address feeRecipient;
-    }
 
     Fees public fees;
 
@@ -309,7 +281,7 @@ contract MultisigVault is BaseControlledAsyncRedeem {
         if (fees_.feeRecipient == address(0)) revert Misconfigured();
 
         // Dont rely on user input here
-        fees_.feesUpdatedAt = block.timestamp;
+        fees_.feesUpdatedAt = uint64(block.timestamp);
         fees_.highWaterMark = convertToAssets(1e18);
 
         emit FeesUpdated(fees, fees_);
@@ -336,11 +308,6 @@ contract MultisigVault is BaseControlledAsyncRedeem {
     /*//////////////////////////////////////////////////////////////
                           LIMIT LOGIC
     //////////////////////////////////////////////////////////////*/
-
-    struct Limits {
-        uint256 depositLimit;
-        uint256 minAmount;
-    }
 
     Limits public limits;
 
