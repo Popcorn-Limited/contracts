@@ -179,7 +179,7 @@ abstract contract AnyConverterV2 is BaseStrategy {
     function pushFunds(
         uint256,
         bytes memory data
-    ) external virtual override onlyKeeperOrOwner {
+    ) external virtual override onlyKeeperOrOwner whenNotPaused {
         uint256[6] memory stats = _execute(data);
 
         // Total assets should stay the same or increase (with slippage)
