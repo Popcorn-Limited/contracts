@@ -43,4 +43,12 @@ abstract contract Pausable {
         paused = false;
         emit Unpaused(msg.sender);
     }
+
+    function pause() external virtual whenNotPaused {
+        _pause();
+    }
+
+    function unpause() external virtual whenPaused {
+        _unpause();
+    }
 }

@@ -178,11 +178,11 @@ abstract contract MultisigVault is BaseControlledAsyncRedeem {
     //////////////////////////////////////////////////////////////*/
 
     function beforeWithdraw(uint256 assets, uint256) internal virtual override {
-        _takeFees();
+        if (!paused) _takeFees();
     }
 
     function afterDeposit(uint256 assets, uint256) internal virtual override {
-        _takeFees();
+        if (!paused) _takeFees();
 
         SafeTransferLib.safeTransfer(asset, multisig, assets);
     }
@@ -265,7 +265,7 @@ abstract contract MultisigVault is BaseControlledAsyncRedeem {
                 : 0;
     }
 
-    function setFees(Fees memory fees_) public onlyOwner {
+    function setFees(Fees memory fees_) public onlyOwner whenNotPaused {
         _takeFees();
 
         _setFees(fees_);
@@ -289,7 +289,7 @@ abstract contract MultisigVault is BaseControlledAsyncRedeem {
         fees = fees_;
     }
 
-    function takeFees() external {
+    function takeFees() external whenNotPaused {
         _takeFees();
     }
 

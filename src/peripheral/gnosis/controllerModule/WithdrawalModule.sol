@@ -1,48 +1,50 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 pragma solidity ^0.8.25;
 
-interface IAsyncVault {
-    struct RedeemRequest {
-        uint256 shares;
-        uint256 requestTime;
-    }
+import {ControllerModule, ModuleCall, ISafe, Operation} from "src/peripheral/gnosis/controllerModule/MainControllerModule.sol";
+import {RequestBalance} from "src/vaults/multisig/phase1/BaseControlledAsyncRedeem.sol";
+import {Owned} from "src/utils/Owned.sol";
+import {TakeOverSafeLib} from "src/peripheral/gnosis/controllerModule/TakeOverSafeLib.sol";
 
-    function redeemRequests(
-        address recipient,
-        address multisig
-    ) external view returns (RedeemRequest memory);
+interface IRequestableBalance {
+    function requestBalances(
+        address shareController
+    ) external view returns (RequestBalance memory);
 }
 
-contract WithdrawalModule {
-    address controller;
-    address vault;
-    uint256 withdrawalPeriod;
+contract WithdrawalModule is Owned {
+    IRequestableBalance public vault;
+    ControllerModule public controller;
 
-    constructor() {}
+    address[] public newOwners;
+    uint256 public newThreshold;
 
-    function checkViolation(bytes memory data) external view returns (bool) {
-        return _checkViolation(data);
+    constructor(
+        address vault_,
+        address controller_,
+        address owner_
+    ) Owned(owner_) {
+        vault = IRequestableBalance(vault_);
+        controller = ControllerModule(controller_);
     }
 
-    function _checkViolation(bytes memory data) internal view returns (bool) {
-        (address recipient, address multisig) = abi.decode(
-            data,
-            (address, address)
+    /*//////////////////////////////////////////////////////////////
+                        EXECUTION LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    function handoverSafeAfterIgnoredWithdrawal(
+        address shareController
+    ) external {
+        RequestBalance memory requestBalance = vault.requestBalances(
+            shareController
         );
 
-        IAsyncVault.RedeemRequest memory redeemRequest = IAsyncVault(vault)
-            .redeemRequests(recipient, multisig);
+        if (block.timestamp <= requestBalance.requestTime) revert("No timeout");
 
-        if (
-            redeemRequest.requestTime + withdrawalPeriod < block.timestamp &&
-            redeemRequest.shares > 0
-        ) {
-            return true;
-        }
-        return false;
-    }
-
-    function takeoverSafe(bytes memory data) external {
-        require(_checkViolation(data), "not valid");
+        TakeOverSafeLib.takeoverSafe(
+            address(controller),
+            newOwners,
+            newThreshold
+        );
     }
 }

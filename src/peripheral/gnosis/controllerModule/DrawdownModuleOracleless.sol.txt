@@ -2,19 +2,17 @@
 pragma solidity ^0.8.25;
 
 import {ControllerModule, ModuleCall, ISafe, Operation} from "src/peripheral/gnosis/controllerModule/MainControllerModule.sol";
-import {OracleVault, IPriceOracle} from "src/vaults/multisig/phase1/OracleVault.sol";
+import {MultisigVault} from "src/vaults/multisig/phase1/MultisigVault.sol";
 import {ERC20} from "solmate/tokens/ERC20.sol";
 import {Owned} from "src/utils/Owned.sol";
 import {OwnerManager} from "safe-smart-account/base/OwnerManager.sol";
 import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
 import {TakeOverSafeLib} from "src/peripheral/gnosis/controllerModule/TakeOverSafeLib.sol";
-import {OracleVaultController, Limit} from "src/peripheral/OracleVaultController.sol";
-
 
 contract DrawdownModule is Owned {
     using FixedPointMathLib for uint256;
 
-    OracleVault public vault;
+    MultisigVault public vault;
     ControllerModule public controller;
     ISafe public safe;
     ModuleCall[] public tokenBalanceCalls;
@@ -27,7 +25,7 @@ contract DrawdownModule is Owned {
         uint256 newThreshold_,
         uint256 liquidationBonus_
     ) Owned(owner_) {
-        vault = OracleVault(vault_);
+        vault = MultisigVault(vault_);
         controller = ControllerModule(controller_);
         safe = ISafe(ControllerModule(controller_).gnosisSafe());
 
@@ -41,25 +39,6 @@ contract DrawdownModule is Owned {
     //////////////////////////////////////////////////////////////*/
 
     function liquidateSafe(ModuleCall[] memory calls) external {
-        IPriceOracle oracle = vault.oracle();
-        address asset = address(vault.asset());
-        uint256 shareValue = oracle.getQuote(
-            10 ** vault.decimals(),
-            address(vault),
-            asset
-        );
-
-        OracleVaultController oracleController = OracleVaultController(
-            Owned(address(oracle)).owner()
-        );
-        uint256 hwm = oracleController.highWaterMarks(address(vault));
-        (uint256 jump, uint256 drawdown) = oracleController.limits(
-            address(vault)
-        );
-
-        if (shareValue >= hwm.mulDivDown(1e18 - drawdown, 1e18))
-            revert("Drawdown acceptable");
-
         // Execute calls to liquidate all positions in the safe to the vault asset
         controller.executeModuleTransactions(calls);
 
@@ -75,34 +54,45 @@ contract DrawdownModule is Owned {
             if (abi.decode(data, (uint256)) > 0) revert("Leftover token");
         }
 
-        // Transfer funds into this module
+        address asset = address(vault.asset());
         uint256 assetBalance = ERC20(asset).balanceOf(controller.gnosisSafe());
-        ModuleCall[] memory calls = new ModuleCall[](1);
-        calls[0] = ModuleCall({
-            to: asset,
-            value: 0,
-            data: abi.encodeWithSelector(
-                ERC20.transfer.selector,
-                assetBalance,
-                address(this)
-            ),
-            operation: Operation.Call
-        });
-        controller.executeModuleTransactions(calls);
+        uint256 totalAssets = vault.totalAssets();
+        // TODO add a drawdown parameter
+        if (assetBalance < totalAssets) {
+            // Transfer funds into this module
+            ModuleCall[] memory calls = new ModuleCall[](1);
+            calls[0] = ModuleCall({
+                to: asset,
+                value: 0,
+                data: abi.encodeWithSelector(
+                    ERC20.transfer.selector,
+                    assetBalance,
+                    address(this)
+                ),
+                operation: Operation.Call
+            });
+            controller.executeModuleTransactions(calls);
 
-        // Pay out liquidation bounty
-        uint256 bounty = assetBalance.mulDivDown(1e18 - liquidationBonus, 1e18);
-        ERC20(asset).transfer(msg.sender, bounty);
+            // Pay out liquidation bounty
+            uint256 bounty = assetBalance.mulDivDown(
+                1e18 - liquidationBonus,
+                1e18
+            );
+            ERC20(asset).transfer(msg.sender, bounty);
 
-        // Transfer remaining assets back to the safe
-        ERC20(asset).transfer(address(safe), assetBalance - bounty);
+            // Transfer remaining assets back to the safe
+            ERC20(asset).transfer(address(safe), assetBalance - bounty);
 
-        // Put DAO in control of the safe
-        TakeOverSafeLib.takeoverSafe(
-            address(controller),
-            newOwners,
-            newThreshold
-        );
+            // Put DAO in control of the safe
+            TakeOverSafeLib.takeoverSafe(
+                address(controller),
+                newOwners,
+                newThreshold
+            );
+
+            // Pause vault
+            vault.pause();
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -126,5 +116,24 @@ contract DrawdownModule is Owned {
     function setLiquidationBonus(uint256 liquidationBonus_) external onlyOwner {
         if (liquidationBonus_ >= 1e18) revert("Invalid bonus");
         liquidationBonus = liquidationBonus_;
+    }
+
+    function setTokenBalanceCalls(
+        ModuleCall[] memory calls
+    ) external onlyOwner {
+        for (uint256 i; i < calls.length; i++) {
+            if (calls[i].to == address(0)) revert("Invalid call");
+            if (calls[i].data.length == 0) revert("Invalid call data");
+            if (calls[i].value != 0) revert("Invalid call value");
+            if (calls[i].operation != Operation.Call)
+                revert("Invalid call operation");
+
+            // We want to get the balance of all tokens in the safe that are not the vault asset
+            if (calls[i].to == address(vault.asset())) revert("Invalid call");
+
+            delete tokenBalanceCalls;
+
+            tokenBalanceCalls.push(calls[i]);
+        }
     }
 }

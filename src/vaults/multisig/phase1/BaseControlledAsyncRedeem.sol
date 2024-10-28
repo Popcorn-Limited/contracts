@@ -1,5 +1,7 @@
-// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.15;
+// SPDX-License-Identifier: GPL-3.0
+// Docgen-SOLC: 0.8.25
+
+pragma solidity ^0.8.25;
 
 import {BaseERC7540} from "./BaseERC7540.sol";
 import {ERC20} from "solmate/tokens/ERC20.sol";
@@ -7,17 +9,17 @@ import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
 import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
 import {IERC7540Redeem} from "ERC-7540/interfaces/IERC7540.sol";
 
+struct RequestBalance {
+    uint256 pendingShares;
+    uint256 requestTime;
+    uint256 claimableShares;
+    uint256 claimableAssets;
+}
+
 abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
     using FixedPointMathLib for uint256;
 
-    struct RequestBalance {
-        uint256 pendingShares;
-        uint256 requestTime;
-        uint256 claimableShares;
-        uint256 claimableAssets;
-    }
-
-    mapping(address => RequestBalance) internal requestBalances;
+    mapping(address => RequestBalance) public requestBalances;
 
     /*//////////////////////////////////////////////////////////////
                         ACCOUNTNG LOGIC

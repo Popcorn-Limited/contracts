@@ -1,5 +1,7 @@
-// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.15;
+// SPDX-License-Identifier: GPL-3.0
+// Docgen-SOLC: 0.8.25
+
+pragma solidity ^0.8.25;
 
 import {ERC4626} from "solmate/tokens/ERC4626.sol";
 import {ERC20} from "solmate/tokens/ERC20.sol";
@@ -31,16 +33,40 @@ abstract contract BaseERC7540 is
     ) Owned(_owner) ERC4626(ERC20(_asset), _name, _symbol) {}
 
     /*//////////////////////////////////////////////////////////////
+                            ROLE LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    mapping(bytes32 => mapping(address => bool)) public hasRole;
+
+    event RoleUpdated(bytes32 role, address account, bool approved);
+
+    function updateRole(bytes32 role, address account, bool approved) public {
+        hasRole[role][account] = approved;
+
+        emit RoleUpdated(role, account, approved);
+    }
+
+    modifier onlyRoleOrOwner(bytes32 role) {
+        require(
+            hasRole[role][msg.sender] || msg.sender == owner,
+            "BaseERC7540/not-authorized"
+        );
+        _;
+    }
+
+    /*//////////////////////////////////////////////////////////////
                             PAUSING LOGIC
     //////////////////////////////////////////////////////////////*/
 
+    bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
+
     /// @notice Pause Deposits. Caller must be owner.
-    function pause() external virtual onlyOwner {
+    function pause() external override onlyRoleOrOwner(PAUSER_ROLE) {
         _pause();
     }
 
     /// @notice Unpause Deposits. Caller must be owner.
-    function unpause() external virtual onlyOwner {
+    function unpause() external override onlyOwner {
         _unpause();
     }
 
