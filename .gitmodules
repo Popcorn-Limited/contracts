@@ -22,3 +22,6 @@
 [submodule "lib/weiroll"]
 	path = lib/weiroll
 	url = https://github.com/weiroll/weiroll
+[submodule "lib/ERC-7540-Reference"]
+	path = lib/ERC-7540-Reference
+	url = https://github.com/ERC4626-Alliance/ERC-7540-Reference
