@@ -6,6 +6,7 @@ pragma solidity ^0.8.25;
 import {AnyCompounderNaiveV2, AnyConverterV2, CallStruct, PendingTarget, IERC20Metadata, ERC20, IERC20, Math} from "./AnyCompounderNaiveV2.sol";
 import {ILBT} from "src/interfaces/external/lfj/ILBT.sol";
 import {BytesLib} from "bitlib/BytesLib.sol";
+import {WETH} from "solmate/tokens/WETH.sol";
 
 /**
  * @title   BaseStrategy
@@ -43,6 +44,12 @@ contract AnyLBTManager is AnyCompounderNaiveV2 {
         __AnyConverter_init(asset_, owner_, autoDeposit_, strategyInitData_);
         tokenX = ILBT(yieldToken).getTokenX();
         tokenY = ILBT(yieldToken).getTokenY();
+    }
+
+    WETH public wNative = WETH(payable(0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7));
+
+    receive() external payable {
+        wNative.deposit{value: msg.value}();
     }
 
     /**

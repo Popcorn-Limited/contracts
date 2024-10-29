@@ -1,22 +1,36 @@
 {
   "baseInit": {
-    "asset": "0x8236a87084f8B84306f72007F36F2618A5634494",
+    "asset": "0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E",
     "owner": "0x2C3B135cd7dc6C673b358BEF214843DAb3464278",
     "autoDeposit": false
   },
   "strategyInit": {
-    "yieldAsset": "0x70B70Ac0445C3eF04E314DFdA6caafd825428221",
-    "oracle": "0xb3404F101F11A14988c4111E30006972EdbB99aB",
+    "yieldAsset": "0x2823299af89285fF1a1abF58DB37cE57006FEf5D",
+    "oracle": "0x9bb694F1205d69BEF07367d77Fd07e2c30a5d8fc",
     "slippage": 10,
     "targets": {
-      "address": [],
-      "selector": []
+      "address": [
+        "0x18556DA13313f3532c54711497A8FedAC273220E",
+        "0x18556DA13313f3532c54711497A8FedAC273220E",
+        "0x90014c5E78Bd8a3E2bbBaA8e5a0Aee2C1D2131CD"
+      ],
+      "selector": [
+        "0xa3c7271a00000000000000000000000000000000000000000000000000000000",
+        "0xc22159b600000000000000000000000000000000000000000000000000000000",
+        "0x4571827800000000000000000000000000000000000000000000000000000000"
+      ]
     },
     "pendingAllowances": {
-      "address": [],
-      "data": []
+      "address": [
+        "0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E",
+        "0x2823299af89285fF1a1abF58DB37cE57006FEf5D"
+      ],
+      "data": [
+        "0x095ea7b300000000000000000000000018556da13313f3532c54711497a8fedac273220effffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "0xe584b65400000000000000000000000018556da13313f3532c54711497a8fedac273220e0000000000000000000000000000000000000000000000000000000000000001"
+      ]
     },
-    "rewardTokens": ["0x808507121B80c02388fAd14726482e061B8da827"]
+    "rewardTokens": ["0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7"]
   },
   "harvest": {}
 }
