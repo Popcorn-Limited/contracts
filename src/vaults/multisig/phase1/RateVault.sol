@@ -16,7 +16,7 @@ contract RateVault is AsyncVault {
     ) AsyncVault(params) {
         if (multisig_ == address(0)) revert Misconfigured();
 
-        multisig = params.multisig;
+        multisig = multisig_;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -74,5 +74,18 @@ contract RateVault is AsyncVault {
         totalAssets_ += assets;
 
         SafeTransferLib.safeTransfer(asset, multisig, assets);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                    BaseControlledAsyncRedeem OVERRIDES
+    //////////////////////////////////////////////////////////////*/
+
+    function beforeFulfillRedeem(uint256 assets, uint256) internal override {
+        SafeTransferLib.safeTransferFrom(
+            asset,
+            multisig,
+            address(this),
+            assets
+        );
     }
 }

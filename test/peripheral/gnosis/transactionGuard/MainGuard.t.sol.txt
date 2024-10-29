@@ -3,7 +3,7 @@ pragma solidity ^0.8.25;
 
 import {Test} from "forge-std/Test.sol";
 import {MainTransactionGuard} from "src/peripheral/gnosis/transactionGuard/MainTransactionGuard.sol";
-import {IGnosisSafe} from "src/interfaces/external/IGnosisSafe.sol";
+import {ISafe, Enum} from "safe-smart-account/interfaces/ISafe.sol";
 
 contract MainGuardTest is Test {
     // Constants
@@ -12,7 +12,7 @@ contract MainGuardTest is Test {
     uint256 constant FORK_BLOCK = 164793616; // Replace with appropriate block
 
     // Contracts
-    IGnosisSafe safe;
+    ISafe safe;
     MainTransactionGuard guard;
 
     function setUp() public {
@@ -24,7 +24,7 @@ contract MainGuardTest is Test {
         vm.label(SAFE_OWNER, "Safe Owner");
 
         // Get Safe contract instance
-        safe = IGnosisSafe(SAFE);
+        safe = ISafe(SAFE);
 
         // Deploy guard
         guard = new MainTransactionGuard(SAFE_OWNER);

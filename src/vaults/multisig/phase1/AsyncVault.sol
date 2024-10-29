@@ -17,6 +17,11 @@ struct InitializeParams {
     Fees fees;
 }
 
+struct Bounds {
+    uint256 upper;
+    uint256 lower;
+}
+
 struct Limits {
     uint256 depositLimit;
     uint256 minAmount;
@@ -71,7 +76,7 @@ abstract contract AsyncVault is BaseControlledAsyncRedeem {
         uint256 shares
     ) public view returns (uint256) {
         uint256 supply = totalSupply; // Saves an extra SLOAD if totalSupply is non-zero.
-        uint256 assets = totalAssets().mulDivDown(bounds.lower, 1e18);
+        uint256 assets = totalAssets().mulDivDown(1e18 - bounds.lower, 1e18);
 
         return supply == 0 ? shares : shares.mulDivDown(assets, supply);
     }
@@ -140,8 +145,8 @@ abstract contract AsyncVault is BaseControlledAsyncRedeem {
         uint256 assets = convertToLowBoundAssets(shares);
 
         _fulfillRedeem(
-            shares,
             assets.mulDivDown(1e18 - uint256(fees.withdrawalIncentive), 1e18),
+            shares,
             controller
         );
 
@@ -161,8 +166,8 @@ abstract contract AsyncVault is BaseControlledAsyncRedeem {
             total += assets;
 
             _fulfillRedeem(
-                shares[i],
                 assets.mulDivDown(1e18 - withdrawalIncentive, 1e18),
+                shares[i],
                 controllers[i]
             );
         }
@@ -178,21 +183,27 @@ abstract contract AsyncVault is BaseControlledAsyncRedeem {
     }
 
     function afterDeposit(uint256 assets, uint256) internal virtual override {
-        if (!paused) _takeFees();
+        _requireNotPaused();
     }
 
     /*//////////////////////////////////////////////////////////////
                             YIELD RATE LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    struct Bounds {
-        uint256 upper;
-        uint256 lower;
-    }
-
     Bounds public bounds;
 
+    event BoundsUpdated(Bounds prev, Bounds next);
+
+    function getBounds() public view returns (Bounds memory) {
+        return bounds;
+    }
+
     function setBounds(Bounds memory bounds_) external onlyOwner {
+        if (bounds_.lower >= 1e18 || bounds_.upper >= 1e18)
+            revert Misconfigured();
+
+        emit BoundsUpdated(bounds, bounds_);
+
         bounds = bounds_;
     }
 
@@ -205,6 +216,10 @@ abstract contract AsyncVault is BaseControlledAsyncRedeem {
     event FeesUpdated(Fees prev, Fees next);
 
     error InvalidFee(uint256 fee);
+
+    function getFees() public view returns (Fees memory) {
+        return fees;
+    }
 
     function accruedFees() public view returns (uint256) {
         Fees memory fees_ = fees;

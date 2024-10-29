@@ -40,7 +40,11 @@ abstract contract BaseERC7540 is
 
     event RoleUpdated(bytes32 role, address account, bool approved);
 
-    function updateRole(bytes32 role, address account, bool approved) public {
+    function updateRole(
+        bytes32 role,
+        address account,
+        bool approved
+    ) public onlyOwner {
         hasRole[role][account] = approved;
 
         emit RoleUpdated(role, account, approved);

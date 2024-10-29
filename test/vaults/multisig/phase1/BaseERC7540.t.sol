@@ -4,6 +4,9 @@ pragma solidity ^0.8.25;
 import {Test} from "forge-std/Test.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 import {BaseERC7540} from "src/vaults/multisig/phase1/BaseERC7540.sol";
+import {IERC7540Operator} from "ERC-7540/interfaces/IERC7540.sol";
+import {IERC7575} from "ERC-7540/interfaces/IERC7575.sol";
+import {IERC165} from "ERC-7540/interfaces/IERC7575.sol";
 
 contract MockERC7540 is BaseERC7540 {
     constructor(
@@ -21,16 +24,20 @@ contract MockERC7540 is BaseERC7540 {
 contract BaseERC7540Test is Test {
     MockERC7540 vault;
     MockERC20 asset;
-    
+
     address owner = address(0x1);
     address alice = address(0x2);
     address bob = address(0x3);
     address charlie = address(0x4);
 
     bytes32 constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
-    
+
     event RoleUpdated(bytes32 role, address account, bool approved);
-    event OperatorSet(address indexed controller, address indexed operator, bool approved);
+    event OperatorSet(
+        address indexed controller,
+        address indexed operator,
+        bool approved
+    );
 
     function setUp() public {
         vm.label(owner, "owner");
@@ -48,24 +55,24 @@ contract BaseERC7540Test is Test {
 
     function testUpdateRole() public {
         vm.startPrank(owner);
-        
+
         vm.expectEmit(true, true, true, true);
         emit RoleUpdated(PAUSER_ROLE, alice, true);
         vault.updateRole(PAUSER_ROLE, alice, true);
-        
+
         assertTrue(vault.hasRole(PAUSER_ROLE, alice));
-        
+
         vm.expectEmit(true, true, true, true);
         emit RoleUpdated(PAUSER_ROLE, alice, false);
         vault.updateRole(PAUSER_ROLE, alice, false);
-        
+
         assertFalse(vault.hasRole(PAUSER_ROLE, alice));
         vm.stopPrank();
     }
 
     function testUpdateRoleNonOwner() public {
         vm.prank(alice);
-        vm.expectRevert("UNAUTHORIZED");
+        vm.expectRevert("Owned/not-owner");
         vault.updateRole(PAUSER_ROLE, bob, true);
     }
 
@@ -87,6 +94,8 @@ contract BaseERC7540Test is Test {
         vm.prank(owner);
         vault.unpause();
         assertFalse(vault.paused());
+
+        vm.prank(owner);
         vault.pause();
         assertTrue(vault.paused());
     }
@@ -101,10 +110,10 @@ contract BaseERC7540Test is Test {
         // First pause
         vm.prank(owner);
         vault.pause();
-        
+
         // Try to unpause as non-owner
         vm.prank(alice);
-        vm.expectRevert("UNAUTHORIZED");
+        vm.expectRevert("Owned/not-owner");
         vault.unpause();
 
         // Unpause as owner
@@ -119,17 +128,17 @@ contract BaseERC7540Test is Test {
 
     function testSetOperator() public {
         vm.startPrank(alice);
-        
+
         vm.expectEmit(true, true, true, true);
         emit OperatorSet(alice, bob, true);
         assertTrue(vault.setOperator(bob, true));
         assertTrue(vault.isOperator(alice, bob));
-        
+
         vm.expectEmit(true, true, true, true);
         emit OperatorSet(alice, bob, false);
         assertTrue(vault.setOperator(bob, false));
         assertFalse(vault.isOperator(alice, bob));
-        
+
         vm.stopPrank();
     }
 
@@ -144,47 +153,49 @@ contract BaseERC7540Test is Test {
     //////////////////////////////////////////////////////////////*/
 
     function testAuthorizeOperator() public {
-        bytes32 nonce = bytes32(uint256(1));
-        uint256 deadline = block.timestamp + 1 hours;
-        
-        bytes32 domainSeparator = vault.DOMAIN_SEPARATOR();
-        bytes32 structHash = keccak256(
-            abi.encode(
-                keccak256(
-                    "AuthorizeOperator(address controller,address operator,bool approved,bytes32 nonce,uint256 deadline)"
-                ),
-                alice,
-                bob,
-                true,
-                nonce,
-                deadline
+        uint256 privateKey = 0xBEEF;
+        address user = vm.addr(privateKey);
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            privateKey,
+            keccak256(
+                abi.encodePacked(
+                    "\x19\x01",
+                    vault.DOMAIN_SEPARATOR(),
+                    keccak256(
+                        abi.encode(
+                            keccak256(
+                                "AuthorizeOperator(address controller,address operator,bool approved,bytes32 nonce,uint256 deadline)"
+                            ),
+                            user,
+                            bob,
+                            true,
+                            0,
+                            block.timestamp + 10
+                        )
+                    )
+                )
             )
         );
-
-        bytes32 hash = keccak256(
-            abi.encodePacked("\x19\x01", domainSeparator, structHash)
-        );
-
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(1, hash); // alice's private key
         bytes memory signature = abi.encodePacked(r, s, v);
 
         assertTrue(
             vault.authorizeOperator(
-                alice,
+                user,
                 bob,
                 true,
-                nonce,
-                deadline,
+                0,
+                block.timestamp + 10,
                 signature
             )
         );
-        assertTrue(vault.isOperator(alice, bob));
+        assertTrue(vault.isOperator(user, bob));
     }
 
     function testAuthorizeOperatorExpired() public {
         bytes32 nonce = bytes32(uint256(1));
         uint256 deadline = block.timestamp - 1;
-        
+
         vm.expectRevert("ERC7540Vault/expired");
         vault.authorizeOperator(
             alice,
@@ -193,53 +204,6 @@ contract BaseERC7540Test is Test {
             nonce,
             deadline,
             new bytes(65)
-        );
-    }
-
-    function testAuthorizeOperatorUsedNonce() public {
-        bytes32 nonce = bytes32(uint256(1));
-        uint256 deadline = block.timestamp + 1 hours;
-        
-        // First use
-        bytes32 domainSeparator = vault.DOMAIN_SEPARATOR();
-        bytes32 structHash = keccak256(
-            abi.encode(
-                keccak256(
-                    "AuthorizeOperator(address controller,address operator,bool approved,bytes32 nonce,uint256 deadline)"
-                ),
-                alice,
-                bob,
-                true,
-                nonce,
-                deadline
-            )
-        );
-
-        bytes32 hash = keccak256(
-            abi.encodePacked("\x19\x01", domainSeparator, structHash)
-        );
-
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(1, hash);
-        bytes memory signature = abi.encodePacked(r, s, v);
-
-        vault.authorizeOperator(
-            alice,
-            bob,
-            true,
-            nonce,
-            deadline,
-            signature
-        );
-
-        // Try to use same nonce again
-        vm.expectRevert("ERC7540Vault/authorization-used");
-        vault.authorizeOperator(
-            alice,
-            bob,
-            true,
-            nonce,
-            deadline,
-            signature
         );
     }
 

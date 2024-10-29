@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 pragma solidity ^0.8.25;
 
-import {ControllerModule, ModuleCall, ISafe, Operation} from "src/peripheral/gnosis/controllerModule/MainControllerModule.sol";
+import {ControllerModule, ModuleCall, ISafe, Enum} from "src/peripheral/gnosis/controllerModule/MainControllerModule.sol";
 import {OracleVault, IPriceOracle} from "src/vaults/multisig/phase1/OracleVault.sol";
 import {ERC20} from "solmate/tokens/ERC20.sol";
 import {Owned} from "src/utils/Owned.sol";
@@ -86,7 +86,7 @@ contract DrawdownModule is Owned {
                 assetBalance,
                 address(this)
             ),
-            operation: Operation.Call
+            operation: Enum.Operation.Call
         });
         controller.executeModuleTransactions(calls);
 

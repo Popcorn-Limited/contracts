@@ -21,6 +21,12 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
 
     mapping(address => RequestBalance) public requestBalances;
 
+    function getRequestBalance(
+        address controller
+    ) public view returns (RequestBalance memory) {
+        return requestBalances[controller];
+    }
+
     /*//////////////////////////////////////////////////////////////
                         ACCOUNTNG LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -154,12 +160,12 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
     ) external virtual returns (uint256) {
         uint256 assets = convertToAssets(shares);
 
-        return _fulfillRedeem(shares, assets, controller);
+        return _fulfillRedeem(assets, shares, controller);
     }
 
     function _fulfillRedeem(
-        uint256 shares,
         uint256 assets,
+        uint256 shares,
         address controller
     ) internal virtual returns (uint256) {
         RequestBalance storage currentBalance = requestBalances[controller];
@@ -169,12 +175,7 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
             "ZERO_SHARES"
         );
 
-        SafeTransferLib.safeTransferFrom(
-            asset,
-            msg.sender,
-            address(this),
-            assets
-        );
+        beforeFulfillRedeem(assets, shares);
 
         currentBalance.claimableShares += shares;
         currentBalance.claimableAssets += assets;
@@ -184,6 +185,11 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
 
         return assets;
     }
+
+    function beforeFulfillRedeem(
+        uint256 assets,
+        uint256 shares
+    ) internal virtual {}
 
     /*//////////////////////////////////////////////////////////////
                         ERC4626 OVERRIDDEN LOGIC
@@ -262,6 +268,8 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
         afterDeposit(assets, shares);
     }
 
+    event log(uint256);
+
     function withdraw(
         uint256 assets,
         address receiver,
@@ -276,7 +284,7 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
         // Claiming partially introduces precision loss. The user therefore receives a rounded down amount,
         // while the claimable balance is reduced by a rounded up amount.
         RequestBalance storage currentBalance = requestBalances[controller];
-        uint256 shares = assets.mulDivDown(
+        shares = assets.mulDivUp(
             currentBalance.claimableShares,
             currentBalance.claimableAssets
         );
@@ -285,7 +293,7 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
         // Just here to take fees
         beforeWithdraw(assets, shares);
 
-        _burn(controller, shares);
+        _burn(address(this), shares);
 
         SafeTransferLib.safeTransfer(asset, receiver, assets);
 
@@ -331,7 +339,7 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
         // Just here to take fees
         beforeWithdraw(assets, shares);
 
-        _burn(controller, shares);
+        _burn(address(this), shares);
 
         SafeTransferLib.safeTransfer(asset, receiver, assets);
 

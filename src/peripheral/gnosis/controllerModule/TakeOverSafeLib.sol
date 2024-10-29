@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 pragma solidity ^0.8.25;
 
-import {ControllerModule, ModuleCall, ISafe, Operation} from "src/peripheral/gnosis/controllerModule/MainControllerModule.sol";
-import {MultisigVault} from "src/vaults/multisig/phase1/MultisigVault.sol";
+import {ControllerModule, ModuleCall, ISafe, Enum} from "src/peripheral/gnosis/controllerModule/MainControllerModule.sol";
 import {ERC20} from "solmate/tokens/ERC20.sol";
 import {Owned} from "src/utils/Owned.sol";
 import {OwnerManager} from "safe-smart-account/base/OwnerManager.sol";
@@ -27,7 +26,7 @@ library TakeOverSafeLib {
                     OwnerManager.removeOwner,
                     (owners[i - 1], owners[i], 1)
                 ),
-                operation: Operation.Call
+                operation: Enum.Operation.Call
             });
             if (!success) {
                 revert("SM: owner removal failed");
@@ -45,7 +44,7 @@ library TakeOverSafeLib {
                         OwnerManager.swapOwner,
                         (address(0x1), owners[i], newOwners_[i])
                     ),
-                    operation: Operation.Call
+                    operation: Enum.Operation.Call
                 });
                 if (!success) {
                     revert("SM: owner replacement failed");
@@ -59,7 +58,7 @@ library TakeOverSafeLib {
                     OwnerManager.addOwnerWithThreshold,
                     (newOwners_[i], 1)
                 ),
-                operation: Operation.Call
+                operation: Enum.Operation.Call
             });
             if (!success) {
                 revert("SM: owner addition failed");
@@ -74,7 +73,7 @@ library TakeOverSafeLib {
                     OwnerManager.changeThreshold,
                     (newThreshold_)
                 ),
-                operation: Operation.Call
+                operation: Enum.Operation.Call
             });
             if (!success) {
                 revert("SM: change threshold failed");

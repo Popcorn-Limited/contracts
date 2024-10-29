@@ -2,19 +2,13 @@
 // Docgen-SOLC: 0.8.15
 pragma solidity ^0.8.15;
 
-import {
-    IERC4626,
-    IERC20,
-    IERC20Metadata
-} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
-import {
-    ERC4626Upgradeable,
-    ERC20Upgradeable as ERC20
-} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
+import {IERC4626, IERC20, IERC20Metadata} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
+import {ERC4626Upgradeable, ERC20Upgradeable as ERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 import {Math} from "openzeppelin-contracts/utils/math/Math.sol";
+import {Pausable} from "src/utils/Pausable.sol";
 
-contract MockERC4626 is ERC4626Upgradeable {
+contract MockERC4626 is ERC4626Upgradeable, Pausable {
     using SafeERC20 for IERC20;
     using Math for uint256;
 
@@ -28,7 +22,11 @@ contract MockERC4626 is ERC4626Upgradeable {
                                IMMUTABLES
     //////////////////////////////////////////////////////////////*/
 
-    function initialize(IERC20 _asset, string memory, string memory) external initializer {
+    function initialize(
+        IERC20 _asset,
+        string memory,
+        string memory
+    ) external initializer {
         __ERC4626_init(IERC20Metadata(address(_asset)));
         _decimals = IERC20Metadata(address(_asset)).decimals() + decimalOffset;
     }
@@ -45,19 +43,40 @@ contract MockERC4626 is ERC4626Upgradeable {
                             ACCOUNTING LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function _convertToShares(uint256 assets, Math.Rounding rounding) internal view override returns (uint256 shares) {
-        return assets.mulDiv(totalSupply() + 10 ** decimalOffset, totalAssets() + 1, rounding);
+    function _convertToShares(
+        uint256 assets,
+        Math.Rounding rounding
+    ) internal view override returns (uint256 shares) {
+        return
+            assets.mulDiv(
+                totalSupply() + 10 ** decimalOffset,
+                totalAssets() + 1,
+                rounding
+            );
     }
 
-    function _convertToAssets(uint256 shares, Math.Rounding rounding) internal view override returns (uint256) {
-        return shares.mulDiv(totalAssets() + 1, totalSupply() + 10 ** decimalOffset, rounding);
+    function _convertToAssets(
+        uint256 shares,
+        Math.Rounding rounding
+    ) internal view override returns (uint256) {
+        return
+            shares.mulDiv(
+                totalAssets() + 1,
+                totalSupply() + 10 ** decimalOffset,
+                rounding
+            );
     }
 
     /*//////////////////////////////////////////////////////////////
                           INTERNAL HOOKS LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function _deposit(address caller, address receiver, uint256 assets, uint256 shares) internal override {
+    function _deposit(
+        address caller,
+        address receiver,
+        uint256 assets,
+        uint256 shares
+    ) internal override {
         IERC20(asset()).safeTransferFrom(caller, address(this), assets);
         _mint(receiver, shares);
 
@@ -66,10 +85,13 @@ contract MockERC4626 is ERC4626Upgradeable {
         emit Deposit(caller, receiver, assets, shares);
     }
 
-    function _withdraw(address caller, address receiver, address owner, uint256 assets, uint256 shares)
-        internal
-        override
-    {
+    function _withdraw(
+        address caller,
+        address receiver,
+        address owner,
+        uint256 assets,
+        uint256 shares
+    ) internal override {
         if (caller != owner) {
             _spendAllowance(owner, caller, shares);
         }
@@ -80,5 +102,17 @@ contract MockERC4626 is ERC4626Upgradeable {
         IERC20(asset()).safeTransfer(receiver, assets);
 
         emit Withdraw(caller, receiver, owner, assets, shares);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                          PAUSABLE LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    function pause() public override {
+        _pause();
+    }
+
+    function unpause() public override {
+        _unpause();
     }
 }

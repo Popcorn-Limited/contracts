@@ -4,15 +4,16 @@ pragma solidity ^0.8.25;
 import {Test} from "forge-std/Test.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 import {OracleVaultController, Limit} from "src/peripheral/OracleVaultController.sol";
-import {MockPushOracle} from "test/mocks/MockPushOracle.sol";
+import {MockOracle} from "test/mocks/MockOracle.sol";
 import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
+import {MockERC4626} from "test/mocks/MockERC4626.sol";
 
 contract OracleVaultControllerTest is Test {
     using FixedPointMathLib for uint256;
 
     OracleVaultController controller;
-    MockPushOracle oracle;
-    MockPausable vault;
+    MockOracle oracle;
+    MockERC4626 vault;
     MockERC20 asset;
     
     address owner = address(0x1);
@@ -30,8 +31,8 @@ contract OracleVaultControllerTest is Test {
         vm.label(keeper, "keeper");
         vm.label(alice, "alice");
 
-        oracle = new MockPushOracle();
-        vault = new MockPausable();
+        oracle = new MockOracle();
+        vault = new MockERC4626();
         asset = new MockERC20("Test Token", "TEST", 18);
         
         controller = new OracleVaultController(address(oracle), owner);
@@ -140,13 +141,13 @@ contract OracleVaultControllerTest is Test {
         vm.prank(owner);
         controller.setLimits(vaults, limits);
 
-        Limit memory storedLimit0 = controller.limits(vaults[0]);
-        Limit memory storedLimit1 = controller.limits(vaults[1]);
+        (uint256 jump0, uint256 drawdown0) = controller.limits(vaults[0]);
+        (uint256 jump1, uint256 drawdown1) = controller.limits(vaults[1]);
         
-        assertEq(storedLimit0.jump, limits[0].jump);
-        assertEq(storedLimit0.drawdown, limits[0].drawdown);
-        assertEq(storedLimit1.jump, limits[1].jump);
-        assertEq(storedLimit1.drawdown, limits[1].drawdown);
+        assertEq(jump0, limits[0].jump);
+        assertEq(drawdown0, limits[0].drawdown);
+        assertEq(jump1, limits[1].jump);
+        assertEq(drawdown1, limits[1].drawdown);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -302,42 +303,5 @@ contract OracleVaultControllerTest is Test {
         vm.prank(alice);
         vm.expectRevert("UNAUTHORIZED");
         controller.acceptOracleOwnership();
-    }
-}
-
-// Mock contracts needed for testing
-contract MockPushOracle {
-    mapping(address => mapping(address => uint256)) public prices;
-
-    function setPrice(
-        address base,
-        address quote,
-        uint256 bqPrice,
-        uint256 qbPrice
-    ) external {
-        prices[base][quote] = bqPrice;
-    }
-
-    function setPrices(
-        address[] memory bases,
-        address[] memory quotes,
-        uint256[] memory bqPrices,
-        uint256[] memory qbPrices
-    ) external {
-        for (uint256 i = 0; i < bases.length; i++) {
-            prices[bases[i]][quotes[i]] = bqPrices[i];
-        }
-    }
-}
-
-contract MockPausable {
-    bool public paused;
-
-    function pause() external {
-        paused = true;
-    }
-
-    function unpause() external {
-        paused = false;
     }
 }

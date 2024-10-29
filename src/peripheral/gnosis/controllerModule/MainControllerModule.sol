@@ -2,30 +2,13 @@
 pragma solidity >=0.8.12 <0.9.0;
 
 import {Owned} from "src/utils/Owned.sol";
+import {ISafe, Enum} from "safe-smart-account/interfaces/ISafe.sol";
 
 struct ModuleCall {
     address to;
     uint256 value;
     bytes data;
-    Operation operation;
-}
-
-enum Operation {
-    Call,
-    DelegateCall
-}
-
-interface ISafe {
-    function getOwners() external view returns (address[] memory);
-
-    function getThreshold() external view returns (uint256);
-
-    function execTransactionFromModule(
-        address to,
-        uint256 value,
-        bytes memory data,
-        Operation operation
-    ) external returns (bool success);
+    Enum.Operation operation;
 }
 
 /// @title Controller Module

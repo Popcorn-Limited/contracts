@@ -8,6 +8,7 @@ import {IERC4626, IERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/e
 import {ILBT} from "src/interfaces/external/lfj/ILBT.sol";
 import {ILBRouter} from "src/interfaces/external/lfj/ILBRouter.sol";
 import {BaseAaveLeverageStrategy} from "src/strategies/BaseAaveLeverageStrategy.sol";
+import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
 
 struct CallStruct {
     address target;
@@ -18,18 +19,17 @@ event LogBytes4(bytes4);
 event LogBytes(bytes);
 
 contract Tester is Test {
+    using FixedPointMathLib for uint256;
+
+
     function setUp() public {
-        vm.createSelectFork("polygon", 63342440);
+        //vm.createSelectFork("polygon", 63342440);
     }
 
     function test__stuff() public {
-        console2.log(
-            BaseAaveLeverageStrategy(payable(0x40B74aC60F4133b31F297767B455B4328d917809))
-                .maxLTV()
-        );
-        console2.log(
-            BaseAaveLeverageStrategy(payable(0x40B74aC60F4133b31F297767B455B4328d917809))
-                .targetLTV()
-        );
+       uint256 x = 100e18;
+       uint256 y = 100e18;
+       uint256 z = 100e18;
+       console2.log(x.mulDivUp(y, z));
     }
 }
