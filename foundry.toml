@@ -14,7 +14,8 @@ remappings = [
   'openzeppelin-contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/',
   'solmate/=lib/solmate/src/',
   'solady/=lib/solady/src/',
-  'bitlib/=lib/solidity-bytes-utils/contracts/'
+  'bitlib/=lib/solidity-bytes-utils/contracts/',
+  'weiroll/=lib/weiroll/contracts/'
 ]
 
 no_match_contract = "Skip"
