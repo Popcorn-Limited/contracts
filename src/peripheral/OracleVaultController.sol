@@ -6,6 +6,7 @@ pragma solidity ^0.8.25;
 import {Owned} from "src/utils/Owned.sol";
 import {Pausable} from "src/utils/Pausable.sol";
 import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
+import {ERC4626} from "solmate/tokens/ERC4626.sol";
 
 interface IPushOracle {
     function setPrice(
@@ -59,6 +60,8 @@ contract OracleVaultController is Owned {
 
     mapping(address => uint256) public highWaterMarks;
 
+    event VaultAdded(address vault);
+
     function updatePrice(PriceUpdate calldata priceUpdate) external {
         _updatePrice(priceUpdate);
     }
@@ -89,7 +92,9 @@ contract OracleVaultController is Owned {
             priceUpdate.shareValueInAssets <
             hwm.mulDivDown(1e18 - limit.drawdown, 1e18)
         ) {
-            if (!paused) Pausable(priceUpdate.vault).pause();
+            if (!Pausable(priceUpdate.vault).paused()) {
+                Pausable(priceUpdate.vault).pause();
+            }
         } else if (priceUpdate.shareValueInAssets > hwm) {
             // Update HWM if there wasnt a jump or drawdown
             highWaterMarks[priceUpdate.vault] = priceUpdate.shareValueInAssets;
@@ -101,6 +106,19 @@ contract OracleVaultController is Owned {
             priceUpdate.shareValueInAssets,
             priceUpdate.assetValueInShares
         );
+    }
+
+    function addVault(address vault) external onlyOwner {
+        highWaterMarks[vault] = 1e18;
+
+        oracle.setPrice(
+            vault,
+            address(ERC4626(vault).asset()),
+            1e18,
+            1e18
+        );
+
+        emit VaultAdded(vault);
     }
 
     /*//////////////////////////////////////////////////////////////

@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.25;
 
-import {Test} from "forge-std/Test.sol";
+import {Test, console} from "forge-std/Test.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 import {OracleVaultController, Limit} from "src/peripheral/OracleVaultController.sol";
-import {MockOracle} from "test/mocks/MockOracle.sol";
+import {PushOracle} from "src/peripheral/oracles/adapter/pushOracle/PushOracle.sol";
 import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
 import {MockERC4626} from "test/mocks/MockERC4626.sol";
 
@@ -12,10 +12,10 @@ contract OracleVaultControllerTest is Test {
     using FixedPointMathLib for uint256;
 
     OracleVaultController controller;
-    MockOracle oracle;
+    PushOracle oracle;
     MockERC4626 vault;
     MockERC20 asset;
-    
+
     address owner = address(0x1);
     address keeper = address(0x2);
     address alice = address(0x3);
@@ -31,14 +31,18 @@ contract OracleVaultControllerTest is Test {
         vm.label(keeper, "keeper");
         vm.label(alice, "alice");
 
-        oracle = new MockOracle();
+        oracle = new PushOracle(owner);
         vault = new MockERC4626();
         asset = new MockERC20("Test Token", "TEST", 18);
-        
+
         controller = new OracleVaultController(address(oracle), owner);
 
         // Setup initial state
-        oracle.setPrice(address(vault), address(asset), INITIAL_PRICE, ONE);
+        vm.startPrank(owner);
+        oracle.nominateNewOwner(address(controller));
+        controller.acceptOracleOwnership();
+        controller.addVault(address(vault));
+        vm.stopPrank();
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -47,18 +51,18 @@ contract OracleVaultControllerTest is Test {
 
     function testSetKeeper() public {
         vm.startPrank(owner);
-        
+
         vm.expectEmit(true, true, true, true);
         emit KeeperUpdated(address(vault), address(0), keeper);
         controller.setKeeper(address(vault), keeper);
-        
+
         assertEq(controller.keepers(address(vault)), keeper);
         vm.stopPrank();
     }
 
     function testSetKeeperUnauthorized() public {
         vm.prank(alice);
-        vm.expectRevert("UNAUTHORIZED");
+        vm.expectRevert("Owned/not-owner");
         controller.setKeeper(address(vault), keeper);
     }
 
@@ -85,36 +89,33 @@ contract OracleVaultControllerTest is Test {
 
     function testSetLimit() public {
         Limit memory limit = Limit({
-            jump: 0.1e18,    // 10%
+            jump: 0.1e18, // 10%
             drawdown: 0.2e18 // 20%
         });
 
         vm.startPrank(owner);
-        
+
         vm.expectEmit(true, true, true, true);
         emit LimitUpdated(address(vault), Limit(0, 0), limit);
         controller.setLimit(address(vault), limit);
-        
-        Limit memory storedLimit = controller.limits(address(vault));
-        assertEq(storedLimit.jump, limit.jump);
-        assertEq(storedLimit.drawdown, limit.drawdown);
+
+        (uint256 jump, uint256 drawdown) = controller.limits(address(vault));
+        assertEq(jump, limit.jump);
+        assertEq(drawdown, limit.drawdown);
         vm.stopPrank();
     }
 
     function testSetLimitUnauthorized() public {
-        Limit memory limit = Limit({
-            jump: 0.1e18,
-            drawdown: 0.2e18
-        });
+        Limit memory limit = Limit({jump: 0.1e18, drawdown: 0.2e18});
 
         vm.prank(alice);
-        vm.expectRevert("UNAUTHORIZED");
+        vm.expectRevert("Owned/not-owner");
         controller.setLimit(address(vault), limit);
     }
 
     function testSetLimitInvalid() public {
         Limit memory limit = Limit({
-            jump: 1.1e18,    // 110% - invalid
+            jump: 1.1e18, // 110% - invalid
             drawdown: 0.2e18
         });
 
@@ -129,21 +130,15 @@ contract OracleVaultControllerTest is Test {
         vaults[1] = address(0x123);
 
         Limit[] memory limits = new Limit[](2);
-        limits[0] = Limit({
-            jump: 0.1e18,
-            drawdown: 0.2e18
-        });
-        limits[1] = Limit({
-            jump: 0.15e18,
-            drawdown: 0.25e18
-        });
+        limits[0] = Limit({jump: 0.1e18, drawdown: 0.2e18});
+        limits[1] = Limit({jump: 0.15e18, drawdown: 0.25e18});
 
         vm.prank(owner);
         controller.setLimits(vaults, limits);
 
         (uint256 jump0, uint256 drawdown0) = controller.limits(vaults[0]);
         (uint256 jump1, uint256 drawdown1) = controller.limits(vaults[1]);
-        
+
         assertEq(jump0, limits[0].jump);
         assertEq(drawdown0, limits[0].drawdown);
         assertEq(jump1, limits[1].jump);
@@ -156,10 +151,13 @@ contract OracleVaultControllerTest is Test {
 
     function testUpdatePrice() public {
         vm.prank(owner);
-        controller.setLimit(address(vault), Limit({
-            jump: 0.1e18,    // 10%
-            drawdown: 0.2e18 // 20%
-        }));
+        controller.setLimit(
+            address(vault),
+            Limit({
+                jump: 0.1e18, // 10%
+                drawdown: 0.2e18 // 20%
+            })
+        );
 
         vm.prank(owner);
         controller.updatePrice(
@@ -171,23 +169,23 @@ contract OracleVaultControllerTest is Test {
             })
         );
 
-        assertEq(
-            oracle.prices(address(vault), address(asset)),
-            INITIAL_PRICE
-        );
+        assertEq(oracle.prices(address(vault), address(asset)), INITIAL_PRICE);
     }
 
     function testUpdatePriceWithJumpUp() public {
         // Set limit
         vm.prank(owner);
-        controller.setLimit(address(vault), Limit({
-            jump: 0.1e18,    // 10%
-            drawdown: 0.2e18 // 20%
-        }));
+        controller.setLimit(
+            address(vault),
+            Limit({
+                jump: 0.1e18, // 10%
+                drawdown: 0.2e18 // 20%
+            })
+        );
 
         // Update price with >10% jump up
-        uint256 newPrice = INITIAL_PRICE.mulDivUp(11, 10); // 11% increase
-        
+        uint256 newPrice = INITIAL_PRICE.mulDivUp(1.11e18, 1e18); // 11% increase
+
         vm.prank(owner);
         controller.updatePrice(
             OracleVaultController.PriceUpdate({
@@ -204,14 +202,17 @@ contract OracleVaultControllerTest is Test {
     function testUpdatePriceWithJumpDown() public {
         // Set limit
         vm.prank(owner);
-        controller.setLimit(address(vault), Limit({
-            jump: 0.1e18,    // 10%
-            drawdown: 0.2e18 // 20%
-        }));
+        controller.setLimit(
+            address(vault),
+            Limit({
+                jump: 0.1e18, // 10%
+                drawdown: 0.2e18 // 20%
+            })
+        );
 
         // Update price with >10% jump down
-        uint256 newPrice = INITIAL_PRICE.mulDivDown(89, 100); // 11% decrease
-        
+        uint256 newPrice = INITIAL_PRICE.mulDivDown(0.89e18, 1e18); // 11% decrease
+
         vm.prank(owner);
         controller.updatePrice(
             OracleVaultController.PriceUpdate({
@@ -228,10 +229,13 @@ contract OracleVaultControllerTest is Test {
     function testUpdatePriceWithDrawdown() public {
         // Set limit and initial high water mark
         vm.startPrank(owner);
-        controller.setLimit(address(vault), Limit({
-            jump: 0.1e18,    // 10%
-            drawdown: 0.2e18 // 20%
-        }));
+        controller.setLimit(
+            address(vault),
+            Limit({
+                jump: 0.1e18, // 10%
+                drawdown: 0.2e18 // 20%
+            })
+        );
 
         // Set initial price and HWM
         controller.updatePrice(
@@ -246,7 +250,7 @@ contract OracleVaultControllerTest is Test {
 
         // Update price with >20% drawdown from HWM
         uint256 newPrice = INITIAL_PRICE.mulDivDown(79, 100); // 21% decrease
-        
+
         vm.prank(owner);
         controller.updatePrice(
             OracleVaultController.PriceUpdate({
@@ -261,8 +265,14 @@ contract OracleVaultControllerTest is Test {
     }
 
     function testUpdateMultiplePrices() public {
-        OracleVaultController.PriceUpdate[] memory updates = new OracleVaultController.PriceUpdate[](2);
-        
+        // Add the second vault
+        MockERC4626 vault2 = new MockERC4626();
+        vm.prank(owner);
+        controller.addVault(address(vault2));
+
+        OracleVaultController.PriceUpdate[]
+            memory updates = new OracleVaultController.PriceUpdate[](2);
+
         updates[0] = OracleVaultController.PriceUpdate({
             vault: address(vault),
             asset: address(asset),
@@ -271,7 +281,7 @@ contract OracleVaultControllerTest is Test {
         });
 
         updates[1] = OracleVaultController.PriceUpdate({
-            vault: address(0x123),
+            vault: address(vault2),
             asset: address(asset),
             shareValueInAssets: INITIAL_PRICE,
             assetValueInShares: ONE
@@ -280,28 +290,7 @@ contract OracleVaultControllerTest is Test {
         vm.prank(owner);
         controller.updatePrices(updates);
 
-        assertEq(
-            oracle.prices(address(vault), address(asset)),
-            INITIAL_PRICE
-        );
-        assertEq(
-            oracle.prices(address(0x123), address(asset)),
-            INITIAL_PRICE
-        );
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                        ORACLE OWNERSHIP TESTS
-    //////////////////////////////////////////////////////////////*/
-
-    function testAcceptOracleOwnership() public {
-        vm.prank(owner);
-        controller.acceptOracleOwnership();
-    }
-
-    function testAcceptOracleOwnershipUnauthorized() public {
-        vm.prank(alice);
-        vm.expectRevert("UNAUTHORIZED");
-        controller.acceptOracleOwnership();
+        assertEq(oracle.prices(address(vault), address(asset)), INITIAL_PRICE);
+        assertEq(oracle.prices(address(vault2), address(asset)), INITIAL_PRICE);
     }
 }
