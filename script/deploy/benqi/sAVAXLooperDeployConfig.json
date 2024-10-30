@@ -17,7 +17,8 @@
     },
     "strategy": {
         "balancerVault": "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
-        "poolId": "0xfd2620c9cfcec7d152467633b3b0ca338d3d78cc00000000000000000000001c"
+        "poolId": "0xfd2620c9cfcec7d152467633b3b0ca338d3d78cc00000000000000000000001c",
+        "rewardToken": "0x8729438EB15e2C8B576fCc6AeCdA6A148776C0F5"
     }
 }
   

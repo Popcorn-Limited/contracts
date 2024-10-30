@@ -25,6 +25,7 @@ contract sAVAXLooperTest is BaseStrategyTest {
     uint256 defaultAmount;
     uint256 slippage;
 
+    receive() external payable {}
 
     function setUp() public {
         _setUpBaseTest(
@@ -290,7 +291,7 @@ contract sAVAXLooperTest is BaseStrategyTest {
         strategy.deposit(amountDeposit, bob);
         vm.stopPrank();
 
-        // HARVEST - trigger leverage loop
+        // adjust leverage - trigger leverage loop
         strategyContract.adjustLeverage();
 
         // check total assets - should be lt than totalDeposits
@@ -325,7 +326,7 @@ contract sAVAXLooperTest is BaseStrategyTest {
         strategy.deposit(amountDeposit, bob);
         vm.stopPrank();
 
-        // HARVEST - trigger leverage loop
+        // adjust leverage - trigger leverage loop
         strategyContract.adjustLeverage();
 
         uint256 balance = IERC20(address(csAVAX)).balanceOf(address(strategy));
@@ -381,7 +382,7 @@ contract sAVAXLooperTest is BaseStrategyTest {
 
         vm.deal(address(strategy), 1e18);
 
-        // HARVEST - trigger leverage loop
+        // adjust leverage - trigger leverage loop
         strategyContract.adjustLeverage();
 
         // tot assets increased in this case
@@ -526,7 +527,7 @@ contract sAVAXLooperTest is BaseStrategyTest {
         strategy.deposit(amountDeposit, bob);
         vm.stopPrank();
 
-        // HARVEST - trigger leverage loop
+        // adjust leverage - trigger leverage loop
         strategyContract.adjustLeverage();
 
         vm.prank(bob);
@@ -536,7 +537,7 @@ contract sAVAXLooperTest is BaseStrategyTest {
         uint256 currentLTV = strategyContract.getLTV();
         assertGt(currentLTV, strategyContract.targetLTV());
 
-        // HARVEST - should reduce leverage closer to target since we are above target LTV
+        // adjust leverage - should reduce leverage closer to target since we are above target LTV
         strategyContract.adjustLeverage();
 
         // ltv before should be higher than now
@@ -554,7 +555,7 @@ contract sAVAXLooperTest is BaseStrategyTest {
         strategy.deposit(amountDeposit, bob);
         vm.stopPrank();
 
-        // HARVEST - trigger leverage loop - get debt
+        // adjust leverage - trigger leverage loop - get debt
         strategyContract.adjustLeverage();
 
         // withdraw full amount - repay full debt
@@ -625,7 +626,7 @@ contract sAVAXLooperTest is BaseStrategyTest {
         strategy.deposit(amountDeposit, bob);
         vm.stopPrank();
 
-        // HARVEST - trigger leverage loop
+        // adjust leverage - trigger leverage loop
         strategyContract.adjustLeverage();
 
         uint256 oldABalance = csAVAX.balanceOf(address(strategy));
@@ -648,7 +649,7 @@ contract sAVAXLooperTest is BaseStrategyTest {
         strategy.deposit(amountDeposit, bob);
         vm.stopPrank();
 
-        // HARVEST - trigger leverage loop
+        // adjust leverage - trigger leverage loop
         strategyContract.adjustLeverage();
 
         uint256 oldABalance = csAVAX.balanceOf(address(strategy));
@@ -734,25 +735,30 @@ contract sAVAXLooperTest is BaseStrategyTest {
         );
     }
 
-    // function test__harvest() public override {
-    //     _mintAssetAndApproveForStrategy(100e18, bob);
+    function test__harvest() public override {
+        _mintAssetAndApproveForStrategy(1e18, bob);
 
-    //     vm.prank(bob);
-    //     strategy.deposit(100e18, bob);
+        vm.prank(bob);
+        strategy.deposit(1e18, bob);
 
-    //     // LTV should be 0
-    //     assertEq(strategyContract.getLTV(), 0);
+        strategyContract.adjustLeverage();
 
-    //     strategy.harvest(hex"");
+        vm.warp(block.timestamp + 100 days);
 
-    //     // LTV should be at target now
-    //     assertApproxEqAbs(
-    //         strategyContract.targetLTV(),
-    //         strategyContract.getLTV(),
-    //         _delta_,
-    //         string.concat("ltv != expected")
-    //     );
-    // }
+        _mintAssetAndApproveForStrategy(10e18, address(this));
+        bytes memory data = abi.encode(10e18);
+
+        uint256 qiBalBefore = IERC20(0x8729438EB15e2C8B576fCc6AeCdA6A148776C0F5).balanceOf(address(this));
+        uint256 totAssetsBefore = strategy.totalAssets();
+
+        strategy.harvest(data);
+
+        uint256 qiBalAfter = IERC20(0x8729438EB15e2C8B576fCc6AeCdA6A148776C0F5).balanceOf(address(this));
+        uint256 totAssetsAfter = strategy.totalAssets();
+
+        assertGt(qiBalAfter, qiBalBefore);
+        assertGt(totAssetsAfter, totAssetsBefore);
+    }
 
     /*//////////////////////////////////////////////////////////////
                           INITIALIZATION

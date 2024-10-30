@@ -11,6 +11,7 @@ import {IBalancerVault, SwapKind, SingleSwap, FundManagement} from "src/interfac
 struct LooperValues {
     address balancerVault;
     bytes32 poolId;
+    address rewardToken;
 }
 
 contract sAVAXLooper is BaseCompoundV2LeverageStrategy {
@@ -20,6 +21,7 @@ contract sAVAXLooper is BaseCompoundV2LeverageStrategy {
     IBalancerVault public balancerVault;
     bytes32 public balancerPoolId;
     IAvaxStaking public sAVAX;
+    IERC20 public rewardToken;
 
     function initialize(
         address asset_,
@@ -37,10 +39,49 @@ contract sAVAXLooper is BaseCompoundV2LeverageStrategy {
 
         sAVAX = IAvaxStaking(asset_);
 
+        rewardToken = IERC20(strategyValues.rewardToken);
+
         // swap logic - balancer
         balancerPoolId = strategyValues.poolId;
         balancerVault = IBalancerVault(strategyValues.balancerVault);
         IERC20(asset_).approve(address(balancerVault), type(uint256).max);
+    }
+
+    function claim() internal override returns (bool success) {
+        try comptroller.claimReward(0, payable(this)) {
+            success = true;
+        } catch {} // avax
+
+        try comptroller.claimReward(1, payable(this)) {
+            success = true;
+        } catch {
+            success = false;
+        } // benqi token
+    }
+
+    function harvest(bytes memory data) external override onlyKeeperOrOwner {
+        claim();
+
+        // transfer benqi token
+        uint256 balance = rewardToken.balanceOf(address(this));
+        if (balance > 0) rewardToken.transfer(msg.sender, balance);
+
+        // transfer avax
+        balance = address(this).balance;
+        if (balance > 0) {
+            (bool res, ) = payable(msg.sender).call{value: balance}("");
+            require(res, "failed sending avax rewards");
+        }
+
+        uint256 assetAmount = abi.decode(data, (uint256));
+
+        if (assetAmount == 0) revert ZeroAmount();
+
+        IERC20(asset()).transferFrom(msg.sender, address(this), assetAmount);
+
+        _protocolDeposit(assetAmount, 0, bytes(""));
+
+        emit Harvested();
     }
 
     // provides conversion from avax to sAvax
@@ -90,7 +131,7 @@ contract sAVAXLooper is BaseCompoundV2LeverageStrategy {
         if (debtAmount > 0) IWAVAX(address(borrowAsset)).withdraw(debtAmount);
 
         // stake borrowed Avax and receive sAvax
-        sAVAX.submit{value:totCollateralAmount}();
+        sAVAX.submit{value: totCollateralAmount}();
     }
 
     // assign balancer data for swaps

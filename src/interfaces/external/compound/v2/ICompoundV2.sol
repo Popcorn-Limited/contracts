@@ -95,4 +95,6 @@ interface IComptroller {
     function markets(address) external view returns (bool, uint256, bool);
 
     function claimComp(address holder) external;
+
+    function claimReward(uint8 rewardType, address payable holder) external;
 }

@@ -289,12 +289,12 @@ abstract contract BaseCompoundV2LeverageStrategy is
     }
 
     /// @notice Claim additional rewards given that it's active.
-    function claim() internal override returns (bool success) {
+    function claim() internal override virtual returns (bool success) {
         comptroller.claimComp(address(this));
         return true;
     }
 
-    function harvest(bytes memory data) external override onlyKeeperOrOwner {
+    function harvest(bytes memory data) external override virtual onlyKeeperOrOwner {
         claim();
 
         uint256 balance = IERC20(COMP).balanceOf(address(this));
