@@ -139,15 +139,23 @@ abstract contract AsyncVault is BaseControlledAsyncRedeem {
                         REQUEST REDEEM LOGIC
     //////////////////////////////////////////////////////////////*/
 
+    function requestRedeem(uint256 shares) external returns (uint256) {
+        return requestRedeem(shares, msg.sender, msg.sender);
+    }
+
     function requestRedeem(
         uint256 shares,
         address recipient,
         address owner
-    ) external override returns (uint256 requestId) {
+    ) public override returns (uint256 requestId) {
         require(shares >= limits.minAmount, "ERC7540Vault/min-amount");
 
         return _requestRedeem(shares, recipient, owner);
     }
+
+    /*//////////////////////////////////////////////////////////////
+                        FULFILL REDEEM LOGIC
+    //////////////////////////////////////////////////////////////*/
 
     function fulfillRedeem(
         uint256 shares,
