@@ -50,26 +50,57 @@ abstract contract AsyncVault is BaseControlledAsyncRedeem {
     }
 
     /*//////////////////////////////////////////////////////////////
+                        DEPOSIT/WITHDRAWAL LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    function deposit(uint256 assets) external returns (uint256) {
+        return deposit(assets, msg.sender);
+    }
+
+    function mint(uint256 shares) external returns (uint256) {
+        return mint(shares, msg.sender);
+    }
+
+    function withdraw(uint256 assets) external returns (uint256) {
+        return withdraw(assets, msg.sender, msg.sender);
+    }
+
+    function redeem(uint256 shares) external returns (uint256) {
+        return redeem(shares, msg.sender, msg.sender);
+    }
+
+    /*//////////////////////////////////////////////////////////////
                             ACCOUNTING LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    // Override to add minAmount check (Which is used in mint and will revert the function)
     function previewDeposit(
         uint256 assets
     ) public view override returns (uint256) {
+        Limits memory limits_ = limits;
         uint256 shares = convertToShares(assets);
-        return shares < limits.minAmount ? 0 : shares;
+
+        if (
+            paused ||
+            totalAssets() + assets > limits_.depositLimit ||
+            shares < limits_.minAmount
+        ) return 0;
+
+        return super.previewDeposit(assets);
     }
 
-    // Override to add minAmount check (Which is used in deposit and will revert the function)
     function previewMint(
         uint256 shares
     ) public view override returns (uint256) {
-        if (shares < limits.minAmount) return 0;
+        Limits memory limits_ = limits;
+        uint256 assets = convertToAssets(shares);
 
-        uint256 supply = totalSupply; // Saves an extra SLOAD if totalSupply is non-zero.
+        if (
+            paused ||
+            totalAssets() + assets > limits_.depositLimit ||
+            shares < limits_.minAmount
+        ) return 0;
 
-        return supply == 0 ? shares : shares.mulDivUp(totalAssets(), supply);
+        return super.previewMint(shares);
     }
 
     function convertToLowBoundAssets(
@@ -105,26 +136,6 @@ abstract contract AsyncVault is BaseControlledAsyncRedeem {
     }
 
     /*//////////////////////////////////////////////////////////////
-                        DEPOSIT/WITHDRAWAL LOGIC
-    //////////////////////////////////////////////////////////////*/
-
-    function deposit(uint256 assets) external returns (uint256) {
-        return deposit(assets, msg.sender);
-    }
-
-    function mint(uint256 shares) external returns (uint256) {
-        return mint(shares, msg.sender);
-    }
-
-    function withdraw(uint256 assets) external returns (uint256) {
-        return withdraw(assets, msg.sender, msg.sender);
-    }
-
-    function redeem(uint256 shares) external returns (uint256) {
-        return redeem(shares, msg.sender, msg.sender);
-    }
-
-    /*//////////////////////////////////////////////////////////////
                         REQUEST REDEEM LOGIC
     //////////////////////////////////////////////////////////////*/
 
@@ -143,12 +154,15 @@ abstract contract AsyncVault is BaseControlledAsyncRedeem {
         address controller
     ) external override returns (uint256) {
         uint256 assets = convertToLowBoundAssets(shares);
-
-        _fulfillRedeem(
-            assets.mulDivDown(1e18 - uint256(fees.withdrawalIncentive), 1e18),
-            shares,
-            controller
+        Fees memory fees_ = fees;
+        uint256 fees = assets.mulDivDown(
+            uint256(fees_.withdrawalIncentive),
+            1e18
         );
+
+        _fulfillRedeem(assets - fees, shares, controller);
+
+        handleWithdrawalIncentive(fees, fees_.feeRecipient);
 
         return assets;
     }
@@ -158,20 +172,33 @@ abstract contract AsyncVault is BaseControlledAsyncRedeem {
         address[] memory controllers
     ) external returns (uint256) {
         if (shares.length != controllers.length) revert Misconfigured();
-        uint256 withdrawalIncentive = uint256(fees.withdrawalIncentive);
+        Fees memory fees_ = fees;
 
         uint256 total;
+        uint256 totalFees;
         for (uint256 i; i < shares.length; i++) {
             uint256 assets = convertToLowBoundAssets(shares[i]);
-            total += assets;
-
-            _fulfillRedeem(
-                assets.mulDivDown(1e18 - withdrawalIncentive, 1e18),
-                shares[i],
-                controllers[i]
+            uint256 fees = assets.mulDivDown(
+                uint256(fees_.withdrawalIncentive),
+                1e18
             );
+
+            _fulfillRedeem(assets - fees, shares[i], controllers[i]);
+
+            total += assets;
+            totalFees += fees;
         }
+
+        handleWithdrawalIncentive(totalFees, fees_.feeRecipient);
+
         return total;
+    }
+
+    function handleWithdrawalIncentive(
+        uint256 fee,
+        address feeRecipient
+    ) internal virtual {
+        if (fee > 0) SafeTransferLib.safeTransfer(asset, feeRecipient, fee);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -183,7 +210,8 @@ abstract contract AsyncVault is BaseControlledAsyncRedeem {
     }
 
     function afterDeposit(uint256 assets, uint256) internal virtual override {
-        _requireNotPaused();
+        // deposit and mint already have the `whenNotPaused` modifier so we don't need to check it here
+        _takeFees();
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -327,6 +355,7 @@ abstract contract AsyncVault is BaseControlledAsyncRedeem {
     }
 
     function _setLimits(Limits memory limits_) internal {
+        // TODO this can lock user deposits if lowered too much
         emit LimitsUpdated(limits, limits_);
 
         limits = limits_;

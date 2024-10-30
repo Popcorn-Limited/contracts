@@ -19,6 +19,180 @@ struct RequestBalance {
 abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
     using FixedPointMathLib for uint256;
 
+    /*//////////////////////////////////////////////////////////////
+                        ERC4626 OVERRIDDEN LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    function deposit(
+        uint256 assets,
+        address receiver
+    ) public override whenNotPaused returns (uint256 shares) {
+        // Check for rounding error since we round down in previewDeposit.
+        require((shares = previewDeposit(assets)) != 0, "ZERO_SHARES");
+
+        // Utilise claimable balance first
+        uint256 assetsToTransfer = assets;
+        RequestBalance storage currentBalance = requestBalances[msg.sender];
+        if (currentBalance.claimableAssets > 0) {
+            uint256 claimableAssets = assetsToTransfer >
+                currentBalance.claimableAssets
+                ? currentBalance.claimableAssets
+                : assetsToTransfer;
+
+            _withdrawClaimableBalance(claimableAssets, currentBalance);
+            assetsToTransfer -= claimableAssets;
+        }
+
+        if (assetsToTransfer > 0) {
+            // Need to transfer before minting or ERC777s could reenter.
+            SafeTransferLib.safeTransferFrom(
+                asset,
+                msg.sender,
+                address(this),
+                assetsToTransfer
+            );
+        }
+
+        _mint(receiver, shares);
+
+        emit Deposit(msg.sender, receiver, assets, shares);
+
+        afterDeposit(assets, shares);
+    }
+
+    function mint(
+        uint256 shares,
+        address receiver
+    ) public override whenNotPaused returns (uint256 assets) {
+        require(shares != 0, "ZERO_SHARES");
+        assets = previewMint(shares); // No need to check for rounding error, previewMint rounds up.
+
+        // Utilise claimable balance first
+        uint256 assetsToTransfer = assets;
+        RequestBalance storage currentBalance = requestBalances[msg.sender];
+        if (currentBalance.claimableAssets > 0) {
+            uint256 claimableAssets = assetsToTransfer >
+                currentBalance.claimableAssets
+                ? currentBalance.claimableAssets
+                : assetsToTransfer;
+
+            _withdrawClaimableBalance(claimableAssets, currentBalance);
+            assetsToTransfer -= claimableAssets;
+        }
+
+        if (assetsToTransfer > 0) {
+            // Need to transfer before minting or ERC777s could reenter.
+            SafeTransferLib.safeTransferFrom(
+                asset,
+                msg.sender,
+                address(this),
+                assetsToTransfer
+            );
+        }
+
+        _mint(receiver, shares);
+
+        emit Deposit(msg.sender, receiver, assets, shares);
+
+        afterDeposit(assets, shares);
+    }
+
+    function withdraw(
+        uint256 assets,
+        address receiver,
+        address controller
+    ) public virtual override returns (uint256 shares) {
+        require(
+            controller == msg.sender || isOperator[controller][msg.sender],
+            "ERC7540Vault/invalid-caller"
+        );
+        require(assets != 0, "ZERO_ASSETS");
+
+        // Claiming partially introduces precision loss. The user therefore receives a rounded down amount,
+        // while the claimable balance is reduced by a rounded up amount.
+        RequestBalance storage currentBalance = requestBalances[controller];
+        shares = assets.mulDivUp(
+            currentBalance.claimableShares,
+            currentBalance.claimableAssets
+        );
+        _withdrawClaimableBalance(assets, currentBalance);
+
+        // Just here to take fees
+        beforeWithdraw(assets, shares);
+
+        _burn(address(this), shares);
+
+        SafeTransferLib.safeTransfer(asset, receiver, assets);
+
+        emit Withdraw(msg.sender, receiver, controller, assets, shares);
+    }
+
+    function _withdrawClaimableBalance(
+        uint256 assets,
+        RequestBalance storage currentBalance
+    ) internal {
+        uint256 sharesUp = assets.mulDivUp(
+            currentBalance.claimableShares,
+            currentBalance.claimableAssets
+        );
+
+        currentBalance.claimableAssets -= assets;
+        currentBalance.claimableShares = currentBalance.claimableShares >
+            sharesUp
+            ? currentBalance.claimableShares - sharesUp
+            : 0;
+    }
+
+    function redeem(
+        uint256 shares,
+        address receiver,
+        address controller
+    ) public virtual override returns (uint256 assets) {
+        require(
+            controller == msg.sender || isOperator[controller][msg.sender],
+            "ERC7540Vault/invalid-caller"
+        );
+        require(shares != 0, "ZERO_SHARES");
+
+        // Claiming partially introduces precision loss. The user therefore receives a rounded down amount,
+        // while the claimable balance is reduced by a rounded up amount.
+        RequestBalance storage currentBalance = requestBalances[controller];
+        assets = shares.mulDivDown(
+            currentBalance.claimableAssets,
+            currentBalance.claimableShares
+        );
+        _redeemClaimableBalance(shares, currentBalance);
+
+        // Just here to take fees
+        beforeWithdraw(assets, shares);
+
+        _burn(address(this), shares);
+
+        SafeTransferLib.safeTransfer(asset, receiver, assets);
+
+        emit Withdraw(msg.sender, receiver, controller, assets, shares);
+    }
+
+    function _redeemClaimableBalance(
+        uint256 shares,
+        RequestBalance storage currentBalance
+    ) internal {
+        uint256 assetsUp = shares.mulDivUp(
+            currentBalance.claimableAssets,
+            currentBalance.claimableShares
+        );
+
+        currentBalance.claimableAssets = currentBalance.claimableAssets >
+            assetsUp
+            ? currentBalance.claimableAssets - assetsUp
+            : 0;
+        currentBalance.claimableShares -= shares;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        ACCOUNTNG LOGIC
+    //////////////////////////////////////////////////////////////*/
+
     mapping(address => RequestBalance) public requestBalances;
 
     function getRequestBalance(
@@ -26,10 +200,6 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
     ) public view returns (RequestBalance memory) {
         return requestBalances[controller];
     }
-
-    /*//////////////////////////////////////////////////////////////
-                        ACCOUNTNG LOGIC
-    //////////////////////////////////////////////////////////////*/
 
     function pendingRedeemRequest(
         uint256,
@@ -45,6 +215,16 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
         return requestBalances[controller].claimableShares;
     }
 
+    function maxDeposit(
+        address
+    ) public view virtual override returns (uint256) {
+        return paused ? 0 : type(uint256).max;
+    }
+
+    function maxMint(address) public view virtual override returns (uint256) {
+        return paused ? 0 : type(uint256).max;
+    }
+
     function maxWithdraw(
         address controller
     ) public view virtual override returns (uint256) {
@@ -55,6 +235,18 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
         address controller
     ) public view virtual override returns (uint256) {
         return requestBalances[controller].claimableShares;
+    }
+
+    function previewDeposit(
+        uint256 assets
+    ) public view virtual override returns (uint256) {
+        return paused ? 0 : super.previewDeposit(assets);
+    }
+
+    function previewMint(
+        uint256 shares
+    ) public view virtual override returns (uint256) {
+        return paused ? 0 : super.previewMint(shares);
     }
 
     // Preview functions always revert for async flows
@@ -168,6 +360,8 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
         uint256 shares,
         address controller
     ) internal virtual returns (uint256) {
+        if (assets == 0 || shares == 0) revert("ZERO_SHARES");
+
         RequestBalance storage currentBalance = requestBalances[controller];
         require(
             currentBalance.pendingShares != 0 &&
@@ -190,177 +384,6 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
         uint256 assets,
         uint256 shares
     ) internal virtual {}
-
-    /*//////////////////////////////////////////////////////////////
-                        ERC4626 OVERRIDDEN LOGIC
-    //////////////////////////////////////////////////////////////*/
-
-    function deposit(
-        uint256 assets,
-        address receiver
-    ) public override returns (uint256 shares) {
-        // Check for rounding error since we round down in previewDeposit.
-        require((shares = previewDeposit(assets)) != 0, "ZERO_SHARES");
-
-        // Utilise claimable balance first
-        uint256 assetsToTransfer = assets;
-        RequestBalance storage currentBalance = requestBalances[msg.sender];
-        if (currentBalance.claimableAssets > 0) {
-            uint256 claimableAssets = assetsToTransfer >
-                currentBalance.claimableAssets
-                ? currentBalance.claimableAssets
-                : assetsToTransfer;
-
-            _withdrawClaimableBalance(claimableAssets, currentBalance);
-            assetsToTransfer -= claimableAssets;
-        }
-
-        if (assetsToTransfer > 0) {
-            // Need to transfer before minting or ERC777s could reenter.
-            SafeTransferLib.safeTransferFrom(
-                asset,
-                msg.sender,
-                address(this),
-                assetsToTransfer
-            );
-        }
-
-        _mint(receiver, shares);
-
-        emit Deposit(msg.sender, receiver, assets, shares);
-
-        afterDeposit(assets, shares);
-    }
-
-    function mint(
-        uint256 shares,
-        address receiver
-    ) public override returns (uint256 assets) {
-        assets = previewMint(shares); // No need to check for rounding error, previewMint rounds up.
-
-        // Utilise claimable balance first
-        uint256 assetsToTransfer = assets;
-        RequestBalance storage currentBalance = requestBalances[msg.sender];
-        if (currentBalance.claimableAssets > 0) {
-            uint256 claimableAssets = assetsToTransfer >
-                currentBalance.claimableAssets
-                ? currentBalance.claimableAssets
-                : assetsToTransfer;
-
-            _withdrawClaimableBalance(claimableAssets, currentBalance);
-            assetsToTransfer -= claimableAssets;
-        }
-
-        if (assetsToTransfer > 0) {
-            // Need to transfer before minting or ERC777s could reenter.
-            SafeTransferLib.safeTransferFrom(
-                asset,
-                msg.sender,
-                address(this),
-                assetsToTransfer
-            );
-        }
-
-        _mint(receiver, shares);
-
-        emit Deposit(msg.sender, receiver, assets, shares);
-
-        afterDeposit(assets, shares);
-    }
-
-    event log(uint256);
-
-    function withdraw(
-        uint256 assets,
-        address receiver,
-        address controller
-    ) public virtual override returns (uint256 shares) {
-        require(
-            controller == msg.sender || isOperator[controller][msg.sender],
-            "ERC7540Vault/invalid-caller"
-        );
-        require(assets != 0, "ZERO_ASSETS");
-
-        // Claiming partially introduces precision loss. The user therefore receives a rounded down amount,
-        // while the claimable balance is reduced by a rounded up amount.
-        RequestBalance storage currentBalance = requestBalances[controller];
-        shares = assets.mulDivUp(
-            currentBalance.claimableShares,
-            currentBalance.claimableAssets
-        );
-        _withdrawClaimableBalance(assets, currentBalance);
-
-        // Just here to take fees
-        beforeWithdraw(assets, shares);
-
-        _burn(address(this), shares);
-
-        SafeTransferLib.safeTransfer(asset, receiver, assets);
-
-        emit Withdraw(msg.sender, receiver, controller, assets, shares);
-    }
-
-    function _withdrawClaimableBalance(
-        uint256 assets,
-        RequestBalance storage currentBalance
-    ) internal {
-        uint256 sharesUp = assets.mulDivUp(
-            currentBalance.claimableShares,
-            currentBalance.claimableAssets
-        );
-
-        currentBalance.claimableAssets -= assets;
-        currentBalance.claimableShares = currentBalance.claimableShares >
-            sharesUp
-            ? currentBalance.claimableShares - sharesUp
-            : 0;
-    }
-
-    function redeem(
-        uint256 shares,
-        address receiver,
-        address controller
-    ) public virtual override returns (uint256 assets) {
-        require(
-            controller == msg.sender || isOperator[controller][msg.sender],
-            "ERC7540Vault/invalid-caller"
-        );
-        require(shares != 0, "ZERO_SHARES");
-
-        // Claiming partially introduces precision loss. The user therefore receives a rounded down amount,
-        // while the claimable balance is reduced by a rounded up amount.
-        RequestBalance storage currentBalance = requestBalances[controller];
-        assets = shares.mulDivDown(
-            currentBalance.claimableAssets,
-            currentBalance.claimableShares
-        );
-        _redeemClaimableBalance(shares, currentBalance);
-
-        // Just here to take fees
-        beforeWithdraw(assets, shares);
-
-        _burn(address(this), shares);
-
-        SafeTransferLib.safeTransfer(asset, receiver, assets);
-
-        emit Withdraw(msg.sender, receiver, controller, assets, shares);
-    }
-
-    function _redeemClaimableBalance(
-        uint256 shares,
-        RequestBalance storage currentBalance
-    ) internal {
-        uint256 assetsUp = shares.mulDivUp(
-            currentBalance.claimableAssets,
-            currentBalance.claimableShares
-        );
-
-        currentBalance.claimableAssets = currentBalance.claimableAssets >
-            assetsUp
-            ? currentBalance.claimableAssets - assetsUp
-            : 0;
-        currentBalance.claimableShares -= shares;
-    }
 
     /*//////////////////////////////////////////////////////////////
                         ERC165 LOGIC

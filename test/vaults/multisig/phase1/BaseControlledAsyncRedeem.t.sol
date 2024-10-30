@@ -15,13 +15,14 @@ contract MockControlledAsyncRedeem is BaseControlledAsyncRedeem {
         string memory _symbol
     ) BaseERC7540(_owner, _asset, _name, _symbol) {}
 
-    function totalAssets() public view override returns (uint256) {
+    function totalAssets() public virtual view override returns (uint256) {
         return asset.balanceOf(address(this));
     }
 }
 
 contract BaseControlledAsyncRedeemTest is Test {
-    MockControlledAsyncRedeem vault;
+    MockControlledAsyncRedeem baseVault;
+    address assetReceiver;
     MockERC20 asset;
 
     address owner = address(0x1);
@@ -46,43 +47,396 @@ contract BaseControlledAsyncRedeemTest is Test {
         uint256 shares
     );
 
-    function setUp() public {
+    function setUp() public virtual {
         vm.label(owner, "owner");
         vm.label(alice, "alice");
         vm.label(bob, "bob");
         vm.label(charlie, "charlie");
 
         asset = new MockERC20("Test Token", "TEST", 18);
-        vault = new MockControlledAsyncRedeem(
+        baseVault = new MockControlledAsyncRedeem(
             owner,
             address(asset),
-            "Vault Token",
+            "baseVault Token",
             "vTEST"
         );
+        assetReceiver = address(baseVault);
 
         // Setup initial state
         asset.mint(alice, INITIAL_DEPOSIT);
         vm.startPrank(alice);
-        asset.approve(address(vault), type(uint256).max);
-        vault.deposit(INITIAL_DEPOSIT, alice);
+        asset.approve(address(baseVault), type(uint256).max);
+        baseVault.deposit(INITIAL_DEPOSIT, alice);
         vm.stopPrank();
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        DEPOSIT / MINT TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function testDeposit() public virtual {
+        uint256 depositAmount = 50e18;
+
+        asset.mint(bob, depositAmount);
+
+        vm.startPrank(bob);
+        asset.approve(address(baseVault), depositAmount);
+        uint256 shares = baseVault.deposit(depositAmount, bob);
+        vm.stopPrank();
+
+        assertEq(shares, depositAmount);
+        assertEq(baseVault.balanceOf(bob), depositAmount);
+        assertEq(
+            asset.balanceOf(assetReceiver),
+            INITIAL_DEPOSIT + depositAmount
+        );
+    }
+
+    function testDepositToReceiver() public virtual {
+        uint256 depositAmount = 50e18;
+        asset.mint(bob, depositAmount);
+
+        vm.startPrank(bob);
+        asset.approve(address(baseVault), depositAmount);
+        uint256 shares = baseVault.deposit(depositAmount, charlie);
+        vm.stopPrank();
+
+        assertEq(shares, depositAmount);
+        assertEq(baseVault.balanceOf(charlie), depositAmount);
+        assertEq(
+            asset.balanceOf(assetReceiver),
+            INITIAL_DEPOSIT + depositAmount
+        );
+    }
+
+    function testDepositWithClaimableAssets() public virtual {
+        uint256 redeemAmount = 50e18;
+        uint256 depositAmount = 30e18;
+
+        // Setup and fulfill redeem request
+        vm.startPrank(alice);
+        baseVault.approve(address(baseVault), redeemAmount);
+        baseVault.requestRedeem(redeemAmount, alice, alice);
+        vm.stopPrank();
+
+        vm.startPrank(owner);
+        baseVault.fulfillRedeem(redeemAmount, alice);
+        vm.stopPrank();
+
+        // Deposit using claimable assets
+        vm.startPrank(alice);
+        uint256 shares = baseVault.deposit(depositAmount, alice);
+        vm.stopPrank();
+
+        assertEq(shares, depositAmount);
+        assertEq(
+            baseVault.balanceOf(alice),
+            INITIAL_DEPOSIT - redeemAmount + depositAmount
+        );
+
+        // Check that claimable assets were reduced
+        RequestBalance memory balance = baseVault.getRequestBalance(alice);
+        assertEq(balance.claimableAssets, redeemAmount - depositAmount);
+        assertEq(balance.claimableShares, redeemAmount - depositAmount);
+    }
+
+    function testFailDepositZero() public virtual {
+        vm.prank(bob);
+        baseVault.deposit(0, bob);
+    }
+
+    function testFailDepositWhenPaused() public virtual {
+        asset.mint(bob, 100e18);
+
+        vm.prank(owner);
+        baseVault.pause();
+
+        vm.prank(bob);
+        baseVault.deposit(100e18, bob);
+    }
+
+    function testMint() public virtual {
+        uint256 mintAmount = 50e18;
+
+        asset.mint(bob, mintAmount);
+
+        vm.startPrank(bob);
+        asset.approve(address(baseVault), mintAmount);
+        uint256 assets = baseVault.mint(mintAmount, bob);
+        vm.stopPrank();
+
+        assertEq(assets, mintAmount);
+        assertEq(baseVault.balanceOf(bob), mintAmount);
+        assertEq(asset.balanceOf(assetReceiver), INITIAL_DEPOSIT + mintAmount);
+    }
+
+    function testMintToReceiver() public virtual {
+        uint256 mintAmount = 50e18;
+        asset.mint(bob, mintAmount);
+
+        vm.startPrank(bob);
+        asset.approve(address(baseVault), mintAmount);
+        uint256 assets = baseVault.mint(mintAmount, charlie);
+        vm.stopPrank();
+
+        assertEq(assets, mintAmount);
+        assertEq(baseVault.balanceOf(charlie), mintAmount);
+        assertEq(asset.balanceOf(assetReceiver), INITIAL_DEPOSIT + mintAmount);
+    }
+
+    function testMintWithClaimableAssets() public virtual {
+        uint256 redeemAmount = 50e18;
+        uint256 mintAmount = 30e18;
+
+        // Setup and fulfill redeem request
+        vm.startPrank(alice);
+        baseVault.approve(address(baseVault), redeemAmount);
+        baseVault.requestRedeem(redeemAmount, alice, alice);
+        vm.stopPrank();
+
+        vm.startPrank(owner);
+        baseVault.fulfillRedeem(redeemAmount, alice);
+        vm.stopPrank();
+
+        // Deposit using claimable assets
+        vm.startPrank(alice);
+        uint256 shares = baseVault.mint(mintAmount, alice);
+        vm.stopPrank();
+
+        assertEq(shares, mintAmount);
+        assertEq(
+            baseVault.balanceOf(alice),
+            INITIAL_DEPOSIT - redeemAmount + mintAmount
+        );
+
+        // Check that claimable assets were reduced
+        RequestBalance memory balance = baseVault.getRequestBalance(alice);
+        assertEq(balance.claimableAssets, redeemAmount - mintAmount);
+        assertEq(balance.claimableShares, redeemAmount - mintAmount);
+    }
+
+    function testFailMintZero() public virtual {
+        vm.prank(bob);
+        baseVault.mint(0, bob);
+    }
+
+    function testFailMintWhenPaused() public virtual {
+        asset.mint(bob, 100e18);
+
+        vm.prank(owner);
+        baseVault.pause();
+
+        vm.prank(bob);
+        baseVault.mint(100e18, bob);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        WITHDRAW / REDEEM TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function testWithdraw() public virtual {
+        uint256 redeemAmount = INITIAL_DEPOSIT;
+
+        // Setup and fulfill redeem request
+        vm.startPrank(alice);
+        baseVault.approve(address(baseVault), redeemAmount);
+        baseVault.requestRedeem(redeemAmount, alice, alice);
+        vm.stopPrank();
+
+        vm.prank(owner);
+        uint256 assets = baseVault.fulfillRedeem(redeemAmount, alice);
+
+        // Withdraw
+        vm.prank(alice);
+        uint256 shares = baseVault.withdraw(assets, alice, alice);
+
+        assertEq(shares, redeemAmount);
+        assertEq(asset.balanceOf(alice), assets);
+    }
+
+    function testWithdrawWithOperator() public virtual {
+        uint256 redeemAmount = INITIAL_DEPOSIT;
+
+        // Setup operator
+        vm.prank(alice);
+        baseVault.setOperator(bob, true);
+
+        // Setup and fulfill redeem request
+        vm.startPrank(alice);
+        baseVault.approve(address(baseVault), redeemAmount);
+        baseVault.requestRedeem(redeemAmount, alice, alice);
+        vm.stopPrank();
+
+        vm.startPrank(owner);
+        asset.mint(owner, redeemAmount);
+        asset.approve(address(baseVault), redeemAmount);
+        uint256 assets = baseVault.fulfillRedeem(redeemAmount, alice);
+        vm.stopPrank();
+
+        // Withdraw using operator
+        vm.prank(bob);
+        baseVault.withdraw(assets, bob, alice);
+
+        assertEq(asset.balanceOf(bob), assets);
+    }
+
+    function testFailWithdrawZero() public virtual {
+        vm.prank(alice);
+        baseVault.withdraw(0, alice, alice);
+    }
+
+    function testRedeem() public virtual {
+        uint256 redeemAmount = INITIAL_DEPOSIT;
+
+        // Setup and fulfill redeem request
+        vm.startPrank(alice);
+        baseVault.approve(address(baseVault), redeemAmount);
+        baseVault.requestRedeem(redeemAmount, alice, alice);
+        vm.stopPrank();
+
+        vm.prank(owner);
+        baseVault.fulfillRedeem(redeemAmount, alice);
+
+        // Redeem
+        vm.prank(alice);
+        uint256 assets = baseVault.redeem(redeemAmount, alice, alice);
+
+        assertEq(asset.balanceOf(alice), assets);
+        assertEq(assets, redeemAmount);
+    }
+
+    function testRedeemWithOperator() public virtual {
+        uint256 redeemAmount = INITIAL_DEPOSIT;
+
+        // Setup operator
+        vm.prank(alice);
+        baseVault.setOperator(bob, true);
+
+        // Setup and fulfill redeem request
+        vm.startPrank(alice);
+        baseVault.approve(address(baseVault), redeemAmount);
+        baseVault.requestRedeem(redeemAmount, alice, alice);
+        vm.stopPrank();
+
+        vm.startPrank(owner);
+        asset.mint(owner, redeemAmount);
+        asset.approve(address(baseVault), redeemAmount);
+        baseVault.fulfillRedeem(redeemAmount, alice);
+        vm.stopPrank();
+
+        // Redeem using operator
+        vm.prank(bob);
+        uint256 assets = baseVault.redeem(redeemAmount, bob, alice);
+
+        assertEq(asset.balanceOf(bob), assets);
+        assertEq(assets, redeemAmount);
+    }
+
+    function testFailRedeemZero() public virtual {
+        vm.prank(alice);
+        baseVault.redeem(0, alice, alice);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        VIEW FUNCTION TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function testPendingRedeemRequest() public virtual {
+        uint256 redeemAmount = INITIAL_DEPOSIT;
+
+        vm.startPrank(alice);
+        baseVault.approve(address(baseVault), redeemAmount);
+        baseVault.requestRedeem(redeemAmount, alice, alice);
+        vm.stopPrank();
+
+        assertEq(
+            baseVault.pendingRedeemRequest(REQUEST_ID, alice),
+            redeemAmount
+        );
+    }
+
+    function testClaimableRedeemRequest() public virtual {
+        uint256 redeemAmount = INITIAL_DEPOSIT;
+
+        // Setup and fulfill redeem request
+        vm.startPrank(alice);
+        baseVault.approve(address(baseVault), redeemAmount);
+        baseVault.requestRedeem(redeemAmount, alice, alice);
+        vm.stopPrank();
+
+        vm.startPrank(owner);
+        asset.mint(owner, redeemAmount);
+        asset.approve(address(baseVault), redeemAmount);
+        baseVault.fulfillRedeem(redeemAmount, alice);
+        vm.stopPrank();
+
+        assertEq(
+            baseVault.claimableRedeemRequest(REQUEST_ID, alice),
+            redeemAmount
+        );
+    }
+
+    function testMaxWithdraw() public virtual {
+        uint256 redeemAmount = INITIAL_DEPOSIT;
+
+        // Setup and fulfill redeem request
+        vm.startPrank(alice);
+        baseVault.approve(address(baseVault), redeemAmount);
+        baseVault.requestRedeem(redeemAmount, alice, alice);
+        vm.stopPrank();
+
+        vm.startPrank(owner);
+        asset.mint(owner, redeemAmount);
+        asset.approve(address(baseVault), redeemAmount);
+        uint256 assets = baseVault.fulfillRedeem(redeemAmount, alice);
+        vm.stopPrank();
+
+        assertEq(baseVault.maxWithdraw(alice), assets);
+    }
+
+    function testMaxRedeem() public virtual {
+        uint256 redeemAmount = INITIAL_DEPOSIT;
+
+        // Setup and fulfill redeem request
+        vm.startPrank(alice);
+        baseVault.approve(address(baseVault), redeemAmount);
+        baseVault.requestRedeem(redeemAmount, alice, alice);
+        vm.stopPrank();
+
+        vm.startPrank(owner);
+        asset.mint(owner, redeemAmount);
+        asset.approve(address(baseVault), redeemAmount);
+        baseVault.fulfillRedeem(redeemAmount, alice);
+        vm.stopPrank();
+
+        assertEq(baseVault.maxRedeem(alice), redeemAmount);
+    }
+
+    function testPreviewWithdrawReverts() public virtual {
+        vm.expectRevert("ERC7540Vault/async-flow");
+        baseVault.previewWithdraw(INITIAL_DEPOSIT);
+    }
+
+    function testPreviewRedeemReverts() public virtual {
+        vm.expectRevert("ERC7540Vault/async-flow");
+        baseVault.previewRedeem(INITIAL_DEPOSIT);
     }
 
     /*//////////////////////////////////////////////////////////////
                         REQUEST REDEEM TESTS
     //////////////////////////////////////////////////////////////*/
 
-    function testRequestRedeem() public {
+    function testRequestRedeem() public virtual {
         uint256 redeemAmount = INITIAL_DEPOSIT;
 
         vm.startPrank(alice);
-        vault.approve(address(vault), redeemAmount);
+        baseVault.approve(address(baseVault), redeemAmount);
 
         vm.expectEmit(true, true, true, true);
         emit RedeemRequest(alice, alice, REQUEST_ID, alice, redeemAmount);
-        vault.requestRedeem(redeemAmount, alice, alice);
+        baseVault.requestRedeem(redeemAmount, alice, alice);
 
-        RequestBalance memory balance = vault.getRequestBalance(alice);
+        RequestBalance memory balance = baseVault.getRequestBalance(alice);
         assertEq(balance.pendingShares, redeemAmount);
         assertEq(balance.requestTime, block.timestamp);
         assertEq(balance.claimableShares, 0);
@@ -90,298 +444,160 @@ contract BaseControlledAsyncRedeemTest is Test {
         vm.stopPrank();
     }
 
-    function testRequestRedeemWithOperator() public {
+    function testRequestRedeemWithOperator() public virtual {
         uint256 redeemAmount = INITIAL_DEPOSIT;
 
         vm.prank(alice);
-        vault.approve(address(vault), redeemAmount);
+        baseVault.approve(address(baseVault), redeemAmount);
 
         vm.prank(alice);
-        vault.setOperator(bob, true);
+        baseVault.setOperator(bob, true);
 
         vm.startPrank(bob);
         vm.expectEmit(true, true, true, true);
         emit RedeemRequest(alice, alice, REQUEST_ID, bob, redeemAmount);
-        vault.requestRedeem(redeemAmount, alice, alice);
+        baseVault.requestRedeem(redeemAmount, alice, alice);
         vm.stopPrank();
     }
 
-    function testFailRequestRedeemUnauthorized() public {
+    function testFailRequestRedeemUnauthorized() public virtual {
         vm.prank(bob);
-        vault.requestRedeem(100e18, alice, alice);
+        baseVault.requestRedeem(100e18, alice, alice);
     }
 
-    function testFailRequestRedeemInsufficientBalance() public {
+    function testFailRequestRedeemZeroShares() public virtual {
         vm.prank(alice);
-        vault.requestRedeem(INITIAL_DEPOSIT + 1, alice, alice);
+        baseVault.requestRedeem(0, alice, alice);
     }
 
     /*//////////////////////////////////////////////////////////////
                     CANCEL REDEEM REQUEST TESTS
     //////////////////////////////////////////////////////////////*/
 
-    function testCancelRedeemRequest() public {
+    function testCancelRedeemRequest() public virtual {
         uint256 redeemAmount = INITIAL_DEPOSIT;
 
         // Setup redeem request
         vm.startPrank(alice);
-        vault.approve(address(vault), redeemAmount);
-        vault.requestRedeem(redeemAmount, alice, alice);
+        baseVault.approve(address(baseVault), redeemAmount);
+        baseVault.requestRedeem(redeemAmount, alice, alice);
+
+        baseVault.fulfillRedeem(redeemAmount / 2, alice);
 
         vm.expectEmit(true, true, true, true);
-        emit RedeemRequestCanceled(alice, alice, redeemAmount);
-        vault.cancelRedeemRequest(alice);
+        emit RedeemRequestCanceled(alice, alice, redeemAmount / 2);
+        baseVault.cancelRedeemRequest(alice);
 
-        RequestBalance memory balance = vault.getRequestBalance(alice);
+        RequestBalance memory balance = baseVault.getRequestBalance(alice);
         assertEq(balance.pendingShares, 0);
         assertEq(balance.requestTime, 0);
-        vm.stopPrank();
+        assertEq(balance.claimableShares, redeemAmount / 2);
+        assertEq(balance.claimableAssets, redeemAmount / 2);
+        assertEq(baseVault.balanceOf(alice), redeemAmount / 2);
     }
 
-    function testCancelRedeemRequestWithReceiver() public {
+    function testCancelRedeemRequestWithReceiver() public virtual {
         uint256 redeemAmount = INITIAL_DEPOSIT;
 
         // Setup redeem request
         vm.startPrank(alice);
-        vault.approve(address(vault), redeemAmount);
-        vault.requestRedeem(redeemAmount, alice, alice);
+        baseVault.approve(address(baseVault), redeemAmount);
+        baseVault.requestRedeem(redeemAmount, alice, alice);
 
         vm.expectEmit(true, true, true, true);
         emit RedeemRequestCanceled(alice, bob, redeemAmount);
-        vault.cancelRedeemRequest(alice, bob);
-        vm.stopPrank();
+        baseVault.cancelRedeemRequest(alice, bob);
     }
 
-    function testFailCancelRedeemRequestUnauthorized() public {
+    function testFailCancelRedeemRequestUnauthorized() public virtual {
         vm.prank(bob);
-        vault.cancelRedeemRequest(alice);
+        baseVault.cancelRedeemRequest(alice);
+    }
+
+    function testFailCancelRedeemRequestNoPendingRequest() public virtual {
+        vm.prank(alice);
+        baseVault.cancelRedeemRequest(alice);
+    }
+
+    function testFailCancelRedeemRequestZeroShares() public virtual {
+        uint256 redeemAmount = INITIAL_DEPOSIT;
+        vm.startPrank(alice);
+        baseVault.approve(address(baseVault), redeemAmount);
+        baseVault.requestRedeem(redeemAmount, alice, alice);
+
+        baseVault.fulfillRedeem(redeemAmount / 2, alice);
+
+        vm.expectRevert("ERC7540Vault/no-pending-request");
+        baseVault.cancelRedeemRequest(alice, bob);
     }
 
     /*//////////////////////////////////////////////////////////////
                     FULFILL REDEEM REQUEST TESTS
     //////////////////////////////////////////////////////////////*/
 
-    function testFulfillRedeem() public {
+    function testFulfillRedeem() public virtual {
         uint256 redeemAmount = INITIAL_DEPOSIT;
 
         // Setup redeem request
         vm.startPrank(alice);
-        vault.approve(address(vault), redeemAmount);
-        vault.requestRedeem(redeemAmount, alice, alice);
+        baseVault.approve(address(baseVault), redeemAmount);
+        baseVault.requestRedeem(redeemAmount, alice, alice);
         vm.stopPrank();
 
         // Fulfill request
         vm.startPrank(owner);
         asset.mint(owner, redeemAmount);
-        asset.approve(address(vault), redeemAmount);
-        uint256 assets = vault.fulfillRedeem(redeemAmount, alice);
+        asset.approve(address(baseVault), redeemAmount);
+        uint256 assets = baseVault.fulfillRedeem(redeemAmount, alice);
 
-        RequestBalance memory balance = vault.getRequestBalance(alice);
+        RequestBalance memory balance = baseVault.getRequestBalance(alice);
         assertEq(balance.pendingShares, 0);
         assertEq(balance.claimableShares, redeemAmount);
         assertEq(balance.claimableAssets, assets);
         vm.stopPrank();
 
-        assertEq(asset.balanceOf(address(vault)), redeemAmount);
-        assertEq(vault.totalAssets(), redeemAmount);
+        assertEq(asset.balanceOf(assetReceiver), redeemAmount);
+        assertEq(baseVault.totalAssets(), redeemAmount);
     }
 
-    function testPartialFulfillRedeem() public {
+    function testPartialFulfillRedeem() public virtual {
         uint256 redeemAmount = INITIAL_DEPOSIT;
         uint256 partialAmount = 60e18;
 
         // Setup redeem request
         vm.startPrank(alice);
-        vault.approve(address(vault), redeemAmount);
-        vault.requestRedeem(redeemAmount, alice, alice);
+        baseVault.approve(address(baseVault), redeemAmount);
+        baseVault.requestRedeem(redeemAmount, alice, alice);
         vm.stopPrank();
 
         // Partially fulfill request
         vm.startPrank(owner);
         asset.mint(owner, partialAmount);
-        asset.approve(address(vault), partialAmount);
-        uint256 assets = vault.fulfillRedeem(partialAmount, alice);
+        asset.approve(address(baseVault), partialAmount);
+        uint256 assets = baseVault.fulfillRedeem(partialAmount, alice);
 
-        RequestBalance memory balance = vault.getRequestBalance(alice);
+        RequestBalance memory balance = baseVault.getRequestBalance(alice);
         assertEq(balance.pendingShares, redeemAmount - partialAmount);
         assertEq(balance.claimableShares, partialAmount);
         assertEq(balance.claimableAssets, assets);
         vm.stopPrank();
     }
 
-    /*//////////////////////////////////////////////////////////////
-                        WITHDRAW TESTS
-    //////////////////////////////////////////////////////////////*/
-
-    function testWithdraw() public {
+    function testFulfillRedeemWithEmptyRequestBalance() public virtual {
         uint256 redeemAmount = INITIAL_DEPOSIT;
 
-        // Setup and fulfill redeem request
-        vm.startPrank(alice);
-        vault.approve(address(vault), redeemAmount);
-        vault.requestRedeem(redeemAmount, alice, alice);
-        vm.stopPrank();
+        vm.expectRevert("ZERO_SHARES");
+        baseVault.fulfillRedeem(redeemAmount, alice);
 
-        vm.prank(owner);
-        uint256 assets = vault.fulfillRedeem(redeemAmount, alice);
-
-        // Withdraw
-        vm.prank(alice);
-        uint256 shares = vault.withdraw(assets, alice, alice);
-
-        assertEq(shares, redeemAmount);
-        assertEq(asset.balanceOf(alice), assets);
+        // Verify request balance remains empty
+        RequestBalance memory balance = baseVault.getRequestBalance(alice);
+        assertEq(balance.pendingShares, 0);
+        assertEq(balance.claimableShares, 0);
+        assertEq(balance.claimableAssets, 0);
     }
 
-    function testWithdrawWithOperator() public {
-        uint256 redeemAmount = INITIAL_DEPOSIT;
-
-        // Setup operator
-        vm.prank(alice);
-        vault.setOperator(bob, true);
-
-        // Setup and fulfill redeem request
-        vm.startPrank(alice);
-        vault.approve(address(vault), redeemAmount);
-        vault.requestRedeem(redeemAmount, alice, alice);
-        vm.stopPrank();
-
+    function testFailFulfillRedeemZeroShares() public virtual {
         vm.startPrank(owner);
-        asset.mint(owner, redeemAmount);
-        asset.approve(address(vault), redeemAmount);
-        uint256 assets = vault.fulfillRedeem(redeemAmount, alice);
-        vm.stopPrank();
-
-        // Withdraw using operator
-        vm.prank(bob);
-        vault.withdraw(assets, bob, alice);
-
-        assertEq(asset.balanceOf(bob), assets);
-    }
-
-    function testRedeem() public {
-        uint256 redeemAmount = INITIAL_DEPOSIT;
-
-        // Setup and fulfill redeem request
-        vm.startPrank(alice);
-        vault.approve(address(vault), redeemAmount);
-        vault.requestRedeem(redeemAmount, alice, alice);
-        vm.stopPrank();
-
-        vm.prank(owner);
-        vault.fulfillRedeem(redeemAmount, alice);
-
-        // Redeem
-        vm.prank(alice);
-        uint256 assets = vault.redeem(redeemAmount, alice, alice);
-
-        assertEq(asset.balanceOf(alice), assets);
-        assertEq(assets, redeemAmount);
-    }
-
-    function testRedeemWithOperator() public {
-        uint256 redeemAmount = INITIAL_DEPOSIT;
-
-        // Setup operator
-        vm.prank(alice);
-        vault.setOperator(bob, true);
-
-        // Setup and fulfill redeem request
-        vm.startPrank(alice);
-        vault.approve(address(vault), redeemAmount);
-        vault.requestRedeem(redeemAmount, alice, alice);
-        vm.stopPrank();
-
-        vm.startPrank(owner);
-        asset.mint(owner, redeemAmount);
-        asset.approve(address(vault), redeemAmount);
-        vault.fulfillRedeem(redeemAmount, alice);
-        vm.stopPrank();
-
-        // Redeem using operator
-        vm.prank(bob);
-        uint256 assets = vault.redeem(redeemAmount, bob, alice);
-
-        assertEq(asset.balanceOf(bob), assets);
-        assertEq(assets, redeemAmount);
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                        VIEW FUNCTION TESTS
-    //////////////////////////////////////////////////////////////*/
-
-    function testPendingRedeemRequest() public {
-        uint256 redeemAmount = INITIAL_DEPOSIT;
-
-        vm.startPrank(alice);
-        vault.approve(address(vault), redeemAmount);
-        vault.requestRedeem(redeemAmount, alice, alice);
-        vm.stopPrank();
-
-        assertEq(vault.pendingRedeemRequest(REQUEST_ID, alice), redeemAmount);
-    }
-
-    function testClaimableRedeemRequest() public {
-        uint256 redeemAmount = INITIAL_DEPOSIT;
-
-        // Setup and fulfill redeem request
-        vm.startPrank(alice);
-        vault.approve(address(vault), redeemAmount);
-        vault.requestRedeem(redeemAmount, alice, alice);
-        vm.stopPrank();
-
-        vm.startPrank(owner);
-        asset.mint(owner, redeemAmount);
-        asset.approve(address(vault), redeemAmount);
-        vault.fulfillRedeem(redeemAmount, alice);
-        vm.stopPrank();
-
-        assertEq(vault.claimableRedeemRequest(REQUEST_ID, alice), redeemAmount);
-    }
-
-    function testMaxWithdraw() public {
-        uint256 redeemAmount = INITIAL_DEPOSIT;
-
-        // Setup and fulfill redeem request
-        vm.startPrank(alice);
-        vault.approve(address(vault), redeemAmount);
-        vault.requestRedeem(redeemAmount, alice, alice);
-        vm.stopPrank();
-
-        vm.startPrank(owner);
-        asset.mint(owner, redeemAmount);
-        asset.approve(address(vault), redeemAmount);
-        uint256 assets = vault.fulfillRedeem(redeemAmount, alice);
-        vm.stopPrank();
-
-        assertEq(vault.maxWithdraw(alice), assets);
-    }
-
-    function testMaxRedeem() public {
-        uint256 redeemAmount = INITIAL_DEPOSIT;
-
-        // Setup and fulfill redeem request
-        vm.startPrank(alice);
-        vault.approve(address(vault), redeemAmount);
-        vault.requestRedeem(redeemAmount, alice, alice);
-        vm.stopPrank();
-
-        vm.startPrank(owner);
-        asset.mint(owner, redeemAmount);
-        asset.approve(address(vault), redeemAmount);
-        vault.fulfillRedeem(redeemAmount, alice);
-        vm.stopPrank();
-
-        assertEq(vault.maxRedeem(alice), redeemAmount);
-    }
-
-    function testPreviewWithdrawReverts() public {
-        vm.expectRevert("ERC7540Vault/async-flow");
-        vault.previewWithdraw(INITIAL_DEPOSIT);
-    }
-
-    function testPreviewRedeemReverts() public {
-        vm.expectRevert("ERC7540Vault/async-flow");
-        vault.previewRedeem(INITIAL_DEPOSIT);
+        baseVault.fulfillRedeem(0, alice);
     }
 }

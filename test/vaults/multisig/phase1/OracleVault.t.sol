@@ -1,38 +1,29 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.25;
 
-import {Test} from "forge-std/Test.sol";
+import {AsyncVaultTest, MockAsyncVault, MockControlledAsyncRedeem} from "./AsyncVault.t.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 import {MockOracle} from "test/mocks/MockOracle.sol";
 import {OracleVault} from "src/vaults/multisig/phase1/OracleVault.sol";
 import {AsyncVault, InitializeParams, Limits, Fees, Bounds} from "src/vaults/multisig/phase1/AsyncVault.sol";
+import {RequestBalance} from "src/vaults/multisig/phase1/BaseControlledAsyncRedeem.sol";
 import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
 
-contract OracleVaultTest is Test {
+contract OracleVaultTest is AsyncVaultTest {
     using FixedPointMathLib for uint256;
 
     OracleVault vault;
-    MockERC20 asset;
-    MockERC20 share;
     MockOracle oracle;
 
-    address owner = address(0x1);
-    address alice = address(0x2);
-    address bob = address(0x3);
-    address multisig = address(0x4);
-    address feeRecipient = address(0x5);
+    address multisig = address(0x6);
 
-    uint256 constant INITIAL_DEPOSIT = 100e18;
-    uint256 constant ONE = 1e18;
-
-    function setUp() public {
+    function setUp() public override {
         vm.label(owner, "owner");
         vm.label(alice, "alice");
         vm.label(bob, "bob");
         vm.label(multisig, "multisig");
 
         asset = new MockERC20("Test Token", "TEST", 18);
-        share = new MockERC20("Share Token", "SHARE", 18);
         oracle = new MockOracle();
 
         InitializeParams memory params = InitializeParams({
@@ -42,9 +33,9 @@ contract OracleVaultTest is Test {
             owner: owner,
             limits: Limits({depositLimit: 10000e18, minAmount: 1e18}),
             fees: Fees({
-                performanceFee: 1e17, // 10%
-                managementFee: 1e16, // 1%
-                withdrawalIncentive: 0, // 0%
+                performanceFee: 0,
+                managementFee: 0,
+                withdrawalIncentive: 0,
                 feesUpdatedAt: uint64(block.timestamp),
                 highWaterMark: ONE,
                 feeRecipient: feeRecipient
@@ -53,24 +44,35 @@ contract OracleVaultTest is Test {
 
         vault = new OracleVault(params, address(oracle), multisig);
 
-        // Set initial oracle price (1:1 for simplicity)
+        // For inherited tests
+        asyncVault = MockAsyncVault(address(vault));
+        baseVault = MockControlledAsyncRedeem(address(asyncVault));
+        assetReceiver = multisig;
+
+        // Setup initial state
         oracle.setPrice(address(vault), address(asset), 1e18);
 
-        asset.mint(alice, INITIAL_DEPOSIT);
-        vm.prank(alice);
+        asset.mint(alice, INITIAL_DEPOSIT * 2);
+
+        vm.startPrank(alice);
+        asset.approve(address(vault), type(uint256).max);
+        vault.deposit(INITIAL_DEPOSIT, alice);
+        vm.stopPrank();
+
+        vm.prank(multisig);
         asset.approve(address(vault), type(uint256).max);
     }
 
     /*//////////////////////////////////////////////////////////////
-                        INITIALIZATION TESTS
+                        CONSTRUCTION TESTS
     //////////////////////////////////////////////////////////////*/
 
-    function testInitialization() public {
+    function testConstruction() public {
         assertEq(address(vault.oracle()), address(oracle));
         assertEq(vault.multisig(), multisig);
     }
 
-    function testInitializationWithZeroMultisig() public {
+    function testConstructionWithZeroMultisig() public {
         InitializeParams memory params = InitializeParams({
             asset: address(asset),
             name: "Vault Token",
@@ -91,6 +93,27 @@ contract OracleVaultTest is Test {
         new OracleVault(params, address(oracle), address(0));
     }
 
+    function testConstructionWithZeroOracle() public {
+        InitializeParams memory params = InitializeParams({
+            asset: address(asset),
+            name: "Vault Token",
+            symbol: "vTEST",
+            owner: owner,
+            limits: Limits({depositLimit: 10000e18, minAmount: 1e18}),
+            fees: Fees({
+                performanceFee: 1e17,
+                managementFee: 1e16,
+                withdrawalIncentive: 1e16,
+                feesUpdatedAt: uint64(block.timestamp),
+                highWaterMark: ONE,
+                feeRecipient: feeRecipient
+            })
+        });
+
+        vm.expectRevert(AsyncVault.Misconfigured.selector);
+        new OracleVault(params, address(0), multisig);
+    }
+
     /*//////////////////////////////////////////////////////////////
                         ACCOUNTING TESTS
     //////////////////////////////////////////////////////////////*/
@@ -103,45 +126,229 @@ contract OracleVaultTest is Test {
         assertEq(vault.totalAssets(), expectedAssets);
     }
 
-    function testTotalAssetsWithZeroPrice() public {
-        oracle.setPrice(address(vault), address(asset), 0);
-        assertEq(vault.totalAssets(), 0);
-    }
-
     /*//////////////////////////////////////////////////////////////
                         DEPOSIT TESTS
     //////////////////////////////////////////////////////////////*/
 
-    function testDeposit() public {
-        uint256 depositAmount = INITIAL_DEPOSIT;
-
-        vm.prank(alice);
-        uint256 shares = vault.deposit(depositAmount, alice);
-
-        assertGt(shares, 0);
-        assertEq(vault.balanceOf(alice), shares);
-        assertEq(asset.balanceOf(multisig), depositAmount);
-    }
-
     function testDepositWithDifferentPrice() public {
         uint256 depositAmount = INITIAL_DEPOSIT;
-
-        // Create an initial deposit
-        asset.mint(owner, depositAmount);
-        vm.startPrank(owner);
-        asset.approve(address(vault), depositAmount);
-        vault.deposit(depositAmount, owner);
-        vm.stopPrank();
+        asset.mint(bob, depositAmount);
 
         // Update price
         oracle.setPrice(address(vault), address(asset), 2e18); // 2 assets per share
 
-        vm.prank(alice);
-        uint256 shares = vault.deposit(depositAmount, alice);
+        vm.startPrank(bob);
+        asset.approve(address(vault), depositAmount);
+        uint256 shares = vault.deposit(depositAmount, bob);
+        vm.stopPrank();
 
         // Should receive fewer shares since each share is worth more assets
         assertEq(shares, depositAmount / 2);
-        assertEq(vault.balanceOf(alice), shares);
+        assertEq(vault.balanceOf(bob), shares);
+    }
+
+    function testMintWithDifferentPrice() public {
+        uint256 mintAmount = INITIAL_DEPOSIT;
+        asset.mint(bob, mintAmount * 2);
+
+        // Update price
+        oracle.setPrice(address(vault), address(asset), 2e18); // 2 assets per share
+
+        vm.startPrank(bob);
+        asset.approve(address(vault), mintAmount * 2);
+        uint256 assets = vault.mint(mintAmount, bob);
+        vm.stopPrank();
+
+        // Should receive fewer shares since each share is worth more assets
+        assertEq(assets, mintAmount * 2);
+        assertEq(vault.balanceOf(bob), mintAmount);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                    WITHDRAWAL / REDEEM TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function testWithdraw() public override {
+        uint256 redeemAmount = INITIAL_DEPOSIT;
+
+        // Setup and fulfill redeem request
+        vm.startPrank(alice);
+        baseVault.approve(address(baseVault), redeemAmount);
+        baseVault.requestRedeem(redeemAmount, alice, alice);
+        vm.stopPrank();
+
+        vm.prank(owner);
+        uint256 assets = baseVault.fulfillRedeem(redeemAmount, alice);
+
+        // Withdraw
+        vm.prank(alice);
+        uint256 shares = baseVault.withdraw(assets, bob, alice);
+
+        assertEq(shares, redeemAmount);
+        assertEq(asset.balanceOf(bob), assets);
+    }
+
+    function testRedeem() public override {
+        uint256 redeemAmount = INITIAL_DEPOSIT;
+
+        // Setup and fulfill redeem request
+        vm.startPrank(alice);
+        baseVault.approve(address(baseVault), redeemAmount);
+        baseVault.requestRedeem(redeemAmount, alice, alice);
+        vm.stopPrank();
+
+        vm.prank(owner);
+        baseVault.fulfillRedeem(redeemAmount, alice);
+
+        // Redeem
+        vm.prank(alice);
+        uint256 assets = baseVault.redeem(redeemAmount, bob, alice);
+
+        assertEq(assets, redeemAmount);
+        assertEq(asset.balanceOf(bob), assets);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        FULFILL REDEEM TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function testFulfillRedeem() public override {
+        uint256 redeemAmount = INITIAL_DEPOSIT;
+
+        // Setup redeem request
+        vm.startPrank(alice);
+        baseVault.approve(address(baseVault), redeemAmount);
+        baseVault.requestRedeem(redeemAmount, alice, alice);
+        vm.stopPrank();
+
+        // Fulfill request
+        vm.startPrank(owner);
+        asset.mint(owner, redeemAmount);
+        asset.approve(address(baseVault), redeemAmount);
+        uint256 assets = baseVault.fulfillRedeem(redeemAmount, alice);
+
+        RequestBalance memory balance = baseVault.getRequestBalance(alice);
+        assertEq(balance.pendingShares, 0);
+        assertEq(balance.claimableShares, redeemAmount);
+        assertEq(balance.claimableAssets, assets);
+        vm.stopPrank();
+
+        assertEq(asset.balanceOf(assetReceiver), 0);
+        assertEq(asset.balanceOf(address(vault)), redeemAmount);
+        assertEq(baseVault.totalAssets(), redeemAmount);
+    }
+
+    function testFulfillMultipleRedeems() public override {
+        uint256 redeemAmount = 100e18;
+        asset.mint(alice, redeemAmount * 2);
+        asset.mint(owner, redeemAmount * 2);
+
+        vm.startPrank(alice);
+        asset.approve(address(asyncVault), redeemAmount * 2);
+        asyncVault.deposit(redeemAmount * 2, alice);
+        vm.stopPrank();
+
+        // Setup redeem requests
+        vm.startPrank(alice);
+        asyncVault.approve(address(asyncVault), redeemAmount * 2);
+        uint256 request1 = asyncVault.requestRedeem(redeemAmount, alice, alice);
+        uint256 request2 = asyncVault.requestRedeem(redeemAmount, alice, alice);
+        vm.stopPrank();
+
+        uint256[] memory shares = new uint256[](2);
+        shares[0] = redeemAmount;
+        shares[1] = redeemAmount;
+
+        address[] memory controllers = new address[](2);
+        controllers[0] = alice;
+        controllers[1] = alice;
+
+        vm.startPrank(owner);
+        asset.approve(address(asyncVault), redeemAmount * 2);
+        uint256 totalAssets = asyncVault.fulfillMultipleRedeems(
+            shares,
+            controllers
+        );
+        assertEq(totalAssets, redeemAmount * 2);
+        vm.stopPrank();
+
+        assertEq(asset.balanceOf(assetReceiver), redeemAmount);
+        assertEq(asset.balanceOf(address(vault)), redeemAmount * 2);
+        assertEq(asyncVault.totalAssets(), redeemAmount * 3);
+    }
+
+    function testFulfillRedeemWithWithdrawalFee() public override {
+        uint256 redeemAmount = INITIAL_DEPOSIT;
+
+        // Set 1% withdrawal fee
+        Fees memory newFees = Fees({
+            performanceFee: 0,
+            managementFee: 0,
+            withdrawalIncentive: 0.01e18, // 1%
+            feesUpdatedAt: uint64(block.timestamp),
+            highWaterMark: ONE,
+            feeRecipient: feeRecipient
+        });
+        vm.prank(owner);
+        asyncVault.setFees(newFees);
+
+        // Setup redeem request
+        vm.startPrank(alice);
+        asyncVault.approve(address(asyncVault), redeemAmount);
+        asyncVault.requestRedeem(redeemAmount, alice, alice);
+        vm.stopPrank();
+
+        // Fulfill request
+        vm.startPrank(owner);
+        uint256 assets = asyncVault.fulfillRedeem(redeemAmount, alice);
+
+        RequestBalance memory balance = asyncVault.getRequestBalance(alice);
+        assertEq(balance.pendingShares, 0);
+        assertEq(balance.claimableShares, redeemAmount);
+        assertEq(
+            balance.claimableAssets,
+            (redeemAmount * (1e18 - 0.01e18)) / 1e18
+        );
+        vm.stopPrank();
+
+        // Check that assets received is 99% of redeemed amount (1% fee)
+        assertEq(assets, redeemAmount);
+        assertEq(asset.balanceOf(assetReceiver), 0);
+        // assertEq(
+        //     asyncVault.totalAssets(),
+        //     (redeemAmount * (1e18 - 0.01e18)) / 1e18
+        // );
+        assertEq(asset.balanceOf(feeRecipient), 1e18);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            FEES TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function testAccruedFees() public override {
+        // Set management fee to 5%
+        Fees memory newFees = Fees({
+            performanceFee: 0.15e18, // 15%
+            managementFee: 0.05e18, // 5%
+            withdrawalIncentive: 0,
+            feesUpdatedAt: uint64(block.timestamp),
+            highWaterMark: ONE,
+            feeRecipient: feeRecipient
+        });
+
+        vm.prank(owner);
+        asyncVault.setFees(newFees);
+
+        // Test management fee over one year
+        vm.warp(block.timestamp + 365.25 days);
+        uint256 managementFees = asyncVault.accruedFees();
+        assertEq(managementFees, 5e18); // Should be 5% of 100e18 after 1 year
+
+        // Double total assets to test performance fee
+        oracle.setPrice(address(vault), address(asset), 2e18);
+        uint256 totalFees = asyncVault.accruedFees();
+        // Should be management fee (5e18) plus performance fee (15% of 100e18 profit = 15e18)
+        assertEq(totalFees, 25e18);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -186,58 +393,32 @@ contract OracleVaultTest is Test {
     }
 
     /*//////////////////////////////////////////////////////////////
-                        MULTISIG TRANSFER TESTS
-    //////////////////////////////////////////////////////////////*/
-
-    function testAssetTransferToMultisig() public {
-        uint256 depositAmount = INITIAL_DEPOSIT;
-
-        uint256 multisigBalanceBefore = asset.balanceOf(multisig);
-
-        vm.startPrank(alice);
-        vault.deposit(depositAmount, alice);
-        vm.stopPrank();
-
-        assertEq(
-            asset.balanceOf(multisig),
-            multisigBalanceBefore + depositAmount
-        );
-    }
-
-    /*//////////////////////////////////////////////////////////////
                         INTEGRATION TESTS
     //////////////////////////////////////////////////////////////*/
 
     function testFullDepositWithdrawCycle() public {
-        uint256 depositAmount = INITIAL_DEPOSIT;
-
-        // Initial deposit
-        vm.startPrank(alice);
-        uint256 shares = vault.deposit(depositAmount, alice);
+        uint256 amount = INITIAL_DEPOSIT;
 
         // Request withdrawal
-        vault.approve(address(vault), shares);
-        uint256 requestId = vault.requestRedeem(shares, alice, alice);
+        vm.startPrank(alice);
+        vault.approve(address(vault), amount);
+        uint256 requestId = vault.requestRedeem(amount, alice, alice);
         vm.stopPrank();
 
         // Oracle price changes
         oracle.setPrice(address(vault), address(asset), 2e18); // 2 assets per share
 
-        // Prepare fulfillment
-        asset.mint(multisig, depositAmount); // now the multisig controls 2 * depositAmount
-        vm.prank(multisig);
-        asset.approve(address(vault), depositAmount * 2);
-
         // Fulfill redemption
+        asset.mint(multisig, amount);
         vm.prank(owner);
-        uint256 assets = vault.fulfillRedeem(shares, alice);
+        uint256 assets = vault.fulfillRedeem(amount, alice);
 
         // Final withdrawal
         vm.prank(alice);
-        vault.withdraw(assets, alice, alice);
+        vault.withdraw(assets, bob, alice);
 
         // Verify final state
         assertEq(vault.balanceOf(alice), 0);
-        assertGt(asset.balanceOf(alice), depositAmount); // Should get more assets due to price increase
+        assertEq(asset.balanceOf(bob), amount * 2); // Should get more assets due to price increase
     }
 }

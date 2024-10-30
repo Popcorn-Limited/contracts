@@ -2,6 +2,7 @@
 pragma solidity ^0.8.25;
 
 import {Test} from "forge-std/Test.sol";
+import {BaseControlledAsyncRedeemTest, MockControlledAsyncRedeem} from "./BaseControlledAsyncRedeem.t.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 import {AsyncVault, InitializeParams, Limits, Fees, Bounds} from "src/vaults/multisig/phase1/AsyncVault.sol";
 import {RequestBalance} from "src/vaults/multisig/phase1/BaseControlledAsyncRedeem.sol";
@@ -15,23 +16,19 @@ contract MockAsyncVault is AsyncVault {
     }
 }
 
-contract AsyncVaultTest is Test {
+contract AsyncVaultTest is BaseControlledAsyncRedeemTest {
     using FixedPointMathLib for uint256;
 
-    MockAsyncVault vault;
-    MockERC20 asset;
+    MockAsyncVault asyncVault;
 
-    address owner = address(0x1);
-    address alice = address(0x2);
-    address bob = address(0x3);
-    address feeRecipient = address(0x4);
+    address feeRecipient = address(0x5);
 
     uint256 constant ONE = 1e18;
 
     event FeesUpdated(Fees prev, Fees next);
     event LimitsUpdated(Limits prev, Limits next);
 
-    function setUp() public {
+    function setUp() public override virtual {
         vm.label(owner, "owner");
         vm.label(alice, "alice");
         vm.label(bob, "bob");
@@ -44,47 +41,68 @@ contract AsyncVaultTest is Test {
             name: "Vault Token",
             symbol: "vTEST",
             owner: owner,
-            limits: Limits({depositLimit: 10000e18, minAmount: 1e18}),
+            limits: Limits({depositLimit: type(uint256).max, minAmount: 0}),
             fees: Fees({
-                performanceFee: 1e17, // 10%
-                managementFee: 1e16, // 1%
-                withdrawalIncentive: 1e16, // 1%
+                performanceFee: 0,
+                managementFee: 0,
+                withdrawalIncentive: 0,
                 feesUpdatedAt: uint64(block.timestamp),
                 highWaterMark: ONE,
                 feeRecipient: feeRecipient
             })
         });
 
-        vault = new MockAsyncVault(params);
+        asyncVault = new MockAsyncVault(params);
+
+        // For inherited tests
+        baseVault = MockControlledAsyncRedeem(address(asyncVault));
+        assetReceiver = address(asyncVault);
+
+        // Setup initial state
+        asset.mint(alice, INITIAL_DEPOSIT);
+        vm.startPrank(alice);
+        asset.approve(address(baseVault), type(uint256).max);
+        baseVault.deposit(INITIAL_DEPOSIT, alice);
+        vm.stopPrank();
     }
 
     /*//////////////////////////////////////////////////////////////
                         ACCOUNTING TESTS
     //////////////////////////////////////////////////////////////*/
 
-    function testPreviewDeposit() public {
+    function testPreviewDeposit() public virtual {
         uint256 depositAmount = 100e18;
-        uint256 expectedShares = vault.convertToShares(depositAmount);
-        assertEq(vault.previewDeposit(depositAmount), expectedShares);
+        uint256 expectedShares = asyncVault.convertToShares(depositAmount);
+        assertEq(asyncVault.previewDeposit(depositAmount), expectedShares);
     }
 
-    function testPreviewDepositBelowMin() public {
+    function testPreviewDepositBelowMin() public virtual {
+        vm.prank(owner);
+        asyncVault.setLimits(
+            Limits({depositLimit: type(uint256).max, minAmount: 1e18})
+        );
+
         uint256 depositAmount = 0.5e18;
-        assertEq(vault.previewDeposit(depositAmount), 0);
+        assertEq(asyncVault.previewDeposit(depositAmount), 0);
     }
 
-    function testPreviewMint() public {
+    function testPreviewMint() public virtual {
         uint256 mintAmount = 100e18;
-        uint256 expectedAssets = vault.convertToAssets(mintAmount);
-        assertEq(vault.previewMint(mintAmount), expectedAssets);
+        uint256 expectedAssets = asyncVault.convertToAssets(mintAmount);
+        assertEq(asyncVault.previewMint(mintAmount), expectedAssets);
     }
 
-    function testPreviewMintBelowMin() public {
+    function testPreviewMintBelowMin() public virtual {
+        vm.prank(owner);
+        asyncVault.setLimits(
+            Limits({depositLimit: type(uint256).max, minAmount: 1e18})
+        );
+
         uint256 mintAmount = 0.5e18;
-        assertEq(vault.previewMint(mintAmount), 0);
+        assertEq(asyncVault.previewMint(mintAmount), 0);
     }
 
-    function testConvertToLowBoundAssets() public {
+    function testConvertToLowBoundAssets() public virtual {
         testDeposit();
 
         // Set bounds
@@ -93,149 +111,96 @@ contract AsyncVaultTest is Test {
             lower: 0.9e18 // 90%
         });
         vm.prank(owner);
-        vault.setBounds(bounds);
+        asyncVault.setBounds(bounds);
 
         uint256 shares = 100e18;
-        uint256 expectedAssets = vault.totalAssets().mulDivDown(
+        uint256 expectedAssets = asyncVault.totalAssets().mulDivDown(
             1e18 - bounds.lower,
             1e18
         );
         uint256 expectedShares = shares.mulDivDown(
             expectedAssets,
-            vault.totalSupply()
+            asyncVault.totalSupply()
         );
 
-        assertEq(vault.convertToLowBoundAssets(shares), expectedShares);
+        assertEq(asyncVault.convertToLowBoundAssets(shares), expectedShares);
     }
 
     /*//////////////////////////////////////////////////////////////
                     DEPOSIT/WITHDRAWAL LIMIT TESTS
     //////////////////////////////////////////////////////////////*/
 
-    function testMaxDeposit() public {
-        (uint256 depositLimit, uint256 minAmount) = vault.limits();
-        uint256 currentAssets = vault.totalAssets();
-        assertEq(vault.maxDeposit(alice), depositLimit - currentAssets);
-    }
-
-    function testMaxDepositWhenPaused() public {
+    function testMaxDeposit() public virtual {
         vm.prank(owner);
-        vault.pause();
-        assertEq(vault.maxDeposit(alice), 0);
+        asyncVault.setLimits(Limits({depositLimit: 10000e18, minAmount: 0}));
+
+        uint256 currentAssets = asyncVault.totalAssets();
+        assertEq(asyncVault.maxDeposit(alice), 10000e18 - currentAssets);
     }
 
-    function testMaxMint() public {
-        (uint256 depositLimit, uint256 minAmount) = vault.limits();
-        uint256 currentAssets = vault.totalAssets();
-        uint256 expectedShares = vault.convertToShares(
-            depositLimit - currentAssets
+    function testMaxDepositWhenPaused() public virtual {
+        vm.prank(owner);
+        asyncVault.pause();
+
+        assertEq(asyncVault.maxDeposit(alice), 0);
+    }
+
+    function testMaxMint() public virtual {
+        vm.prank(owner);
+        asyncVault.setLimits(Limits({depositLimit: 10000e18, minAmount: 0}));
+
+        uint256 currentAssets = asyncVault.totalAssets();
+        uint256 expectedShares = asyncVault.convertToShares(
+            10000e18 - currentAssets
         );
-        assertEq(vault.maxMint(alice), expectedShares);
+        assertEq(asyncVault.maxMint(alice), expectedShares);
     }
 
-    function testMaxMintWhenPaused() public {
+    function testMaxMintWhenPaused() public virtual {
         vm.prank(owner);
-        vault.pause();
-        assertEq(vault.maxMint(alice), 0);
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                    DEPOSIT/WITHDRAWAL TESTS
-    //////////////////////////////////////////////////////////////*/
-
-    function testDeposit() public {
-        uint256 depositAmount = 100e18;
-        asset.mint(alice, depositAmount);
-
-        vm.startPrank(alice);
-        asset.approve(address(vault), depositAmount);
-        uint256 shares = vault.deposit(depositAmount);
-
-        assertGt(shares, 0);
-        assertEq(vault.balanceOf(alice), shares);
-        vm.stopPrank();
-    }
-
-    function testMint() public {
-        uint256 mintAmount = 100e18;
-        asset.mint(alice, mintAmount);
-
-        vm.startPrank(alice);
-        asset.approve(address(vault), mintAmount);
-        uint256 assets = vault.mint(mintAmount);
-
-        assertGt(assets, 0);
-        assertEq(vault.balanceOf(alice), mintAmount);
-        vm.stopPrank();
+        asyncVault.pause();
+        assertEq(asyncVault.maxMint(alice), 0);
     }
 
     /*//////////////////////////////////////////////////////////////
                         REDEEM REQUEST TESTS
     //////////////////////////////////////////////////////////////*/
 
-    function testRequestRedeem() public {
-        uint256 redeemAmount = 100e18;
+    function testRequestRedeemBelowMin() public virtual {
+        vm.prank(owner);
+        asyncVault.setLimits(
+            Limits({depositLimit: type(uint256).max, minAmount: 1e18})
+        );
         testMint();
-
-        vm.startPrank(alice);
-        vault.approve(address(vault), redeemAmount);
-
-        vault.requestRedeem(redeemAmount, alice, alice);
-
-        RequestBalance memory balance = vault.getRequestBalance(alice);
-        assertEq(balance.pendingShares, redeemAmount);
-        assertEq(balance.requestTime, block.timestamp);
-        assertEq(balance.claimableShares, 0);
-        assertEq(balance.claimableAssets, 0);
-        vm.stopPrank();
-    }
-
-    function testRequestRedeemBelowMin() public {
         uint256 redeemAmount = 0.5e18;
-        testMint();
 
         vm.startPrank(alice);
-        vault.approve(address(vault), redeemAmount);
+        asyncVault.approve(address(asyncVault), redeemAmount);
 
         vm.expectRevert("ERC7540Vault/min-amount");
-        vault.requestRedeem(redeemAmount, alice, alice);
+        asyncVault.requestRedeem(redeemAmount, alice, alice);
         vm.stopPrank();
     }
 
-    function testFulfillRedeem() public {
-        uint256 redeemAmount = 100e18;
-        testMint();
-        asset.mint(owner, redeemAmount);
+    /*//////////////////////////////////////////////////////////////
+                        FULFILL REDEEM TESTS
+    //////////////////////////////////////////////////////////////*/
 
-        // Setup redeem request
-        vm.startPrank(alice);
-        vault.approve(address(vault), redeemAmount);
-        uint256 requestId = vault.requestRedeem(redeemAmount, alice, alice);
-        vm.stopPrank();
-
-        // Fulfill request
-        vm.startPrank(owner);
-        asset.approve(address(vault), redeemAmount);
-        uint256 assets = vault.fulfillRedeem(redeemAmount, alice);
-        assertGt(assets, 0);
-        vm.stopPrank();
-    }
-
-    function testFulfillMultipleRedeems() public {
+    function testFulfillMultipleRedeems() public virtual {
         uint256 redeemAmount = 100e18;
         asset.mint(alice, redeemAmount * 2);
         asset.mint(owner, redeemAmount * 2);
 
         vm.startPrank(alice);
-        asset.approve(address(vault), redeemAmount * 2);
-        vault.deposit(redeemAmount * 2, alice);
+        asset.approve(address(asyncVault), redeemAmount * 2);
+        asyncVault.deposit(redeemAmount * 2, alice);
         vm.stopPrank();
 
         // Setup redeem requests
         vm.startPrank(alice);
-        vault.approve(address(vault), redeemAmount * 2);
-        uint256 request1 = vault.requestRedeem(redeemAmount, alice, alice);
-        uint256 request2 = vault.requestRedeem(redeemAmount, alice, alice);
+        asyncVault.approve(address(asyncVault), redeemAmount * 2);
+        uint256 request1 = asyncVault.requestRedeem(redeemAmount, alice, alice);
+        uint256 request2 = asyncVault.requestRedeem(redeemAmount, alice, alice);
         vm.stopPrank();
 
         uint256[] memory shares = new uint256[](2);
@@ -247,30 +212,70 @@ contract AsyncVaultTest is Test {
         controllers[1] = alice;
 
         vm.startPrank(owner);
-        asset.approve(address(vault), redeemAmount * 2);
-        uint256 totalAssets = vault.fulfillMultipleRedeems(shares, controllers);
+        asset.approve(address(asyncVault), redeemAmount * 2);
+        uint256 totalAssets = asyncVault.fulfillMultipleRedeems(
+            shares,
+            controllers
+        );
         assertEq(totalAssets, redeemAmount * 2);
         vm.stopPrank();
 
-        assertEq(asset.balanceOf(address(vault)), redeemAmount * 2);
-        assertEq(vault.totalAssets(), redeemAmount * 2);
+        assertEq(asset.balanceOf(assetReceiver), redeemAmount * 3);
+        assertEq(asyncVault.totalAssets(), redeemAmount * 3);
+    }
+
+    function testFulfillRedeemWithWithdrawalFee() public virtual {
+        uint256 redeemAmount = INITIAL_DEPOSIT;
+
+        // Set 1% withdrawal fee
+        Fees memory newFees = Fees({
+            performanceFee: 0,
+            managementFee: 0,
+            withdrawalIncentive: 0.01e18, // 1%
+            feesUpdatedAt: uint64(block.timestamp),
+            highWaterMark: ONE,
+            feeRecipient: feeRecipient
+        });
+        vm.prank(owner);
+        asyncVault.setFees(newFees);
+
+        // Setup redeem request
+        vm.startPrank(alice);
+        asyncVault.approve(address(asyncVault), redeemAmount);
+        asyncVault.requestRedeem(redeemAmount, alice, alice);
+        vm.stopPrank();
+
+        // Fulfill request
+        vm.startPrank(owner);
+        uint256 assets = asyncVault.fulfillRedeem(redeemAmount, alice);
+
+        RequestBalance memory balance = asyncVault.getRequestBalance(alice);
+        assertEq(balance.pendingShares, 0);
+        assertEq(balance.claimableShares, redeemAmount);
+        assertEq(
+            balance.claimableAssets,
+            (redeemAmount * (1e18 - 0.01e18)) / 1e18
+        );
+        vm.stopPrank();
+
+        // Check that assets received is 99% of redeemed amount (1% fee)
+        assertEq(assets, redeemAmount);
+        assertEq(
+            asset.balanceOf(assetReceiver),
+            (redeemAmount * (1e18 - 0.01e18)) / 1e18
+        );
+        assertEq(
+            asyncVault.totalAssets(),
+            (redeemAmount * (1e18 - 0.01e18)) / 1e18
+        );
+        assertEq(asset.balanceOf(feeRecipient), 1e18);
     }
 
     /*//////////////////////////////////////////////////////////////
                             FEE TESTS
     //////////////////////////////////////////////////////////////*/
 
-    function testAccruedFees() public {
-        // Simulate some yield
-        asset.mint(address(vault), 100e18);
-
-        vm.warp(block.timestamp + 365 days);
-
-        uint256 fees = vault.accruedFees();
-        assertGt(fees, 0);
-    }
-
-    function testSetFees() public {
+    function testSetFees() public virtual {
         Fees memory newFees = Fees({
             performanceFee: 0.15e18, // 15%
             managementFee: 0.02e18, // 2%
@@ -281,19 +286,19 @@ contract AsyncVaultTest is Test {
         });
 
         vm.prank(owner);
-        vault.setFees(newFees);
+        asyncVault.setFees(newFees);
 
-        Fees memory currentFees = vault.getFees();
+        Fees memory currentFees = asyncVault.getFees();
         assertEq(currentFees.performanceFee, newFees.performanceFee);
         assertEq(currentFees.managementFee, newFees.managementFee);
         assertEq(currentFees.withdrawalIncentive, newFees.withdrawalIncentive);
     }
 
-    function testSetFeesRevertsTooHigh() public {
+    function testSetFeesRevertsTooHigh() public virtual {
         Fees memory newFees = Fees({
-            performanceFee: 0.3e18, // 30% - too high
-            managementFee: 0.02e18,
-            withdrawalIncentive: 0.02e18,
+            performanceFee: 0.21e18, // 21% - too high
+            managementFee: 0,
+            withdrawalIncentive: 0,
             feesUpdatedAt: uint64(block.timestamp),
             highWaterMark: ONE,
             feeRecipient: feeRecipient
@@ -301,37 +306,168 @@ contract AsyncVaultTest is Test {
 
         vm.prank(owner);
         vm.expectRevert(AsyncVault.Misconfigured.selector);
-        vault.setFees(newFees);
-    }
+        asyncVault.setFees(newFees);
 
-    function testTakeFees() public {
-        // Simulate some yield
-        asset.mint(address(vault), 100e18);
-
-        vm.warp(block.timestamp + 365 days);
-
-        uint256 feeRecipientBalanceBefore = vault.balanceOf(feeRecipient);
+        newFees.performanceFee = 0.0; // reset
+        newFees.managementFee = 0.06e18; // 6% - too high
 
         vm.prank(owner);
-        vault.takeFees();
+        vm.expectRevert(AsyncVault.Misconfigured.selector);
+        asyncVault.setFees(newFees);
 
-        assertGt(vault.balanceOf(feeRecipient), feeRecipientBalanceBefore);
+        newFees.managementFee = 0; // reset
+        newFees.withdrawalIncentive = 0.06e18; // 6% - too high
+
+        vm.prank(owner);
+        vm.expectRevert(AsyncVault.Misconfigured.selector);
+        asyncVault.setFees(newFees);
+    }
+
+    function testAccruedFees() public virtual {
+        // Set management fee to 5%
+        Fees memory newFees = Fees({
+            performanceFee: 0.15e18, // 15%
+            managementFee: 0.05e18, // 5%
+            withdrawalIncentive: 0,
+            feesUpdatedAt: uint64(block.timestamp),
+            highWaterMark: ONE,
+            feeRecipient: feeRecipient
+        });
+
+        vm.prank(owner);
+        asyncVault.setFees(newFees);
+
+        // Test management fee over one year
+        vm.warp(block.timestamp + 365.25 days);
+        uint256 managementFees = asyncVault.accruedFees();
+        assertEq(managementFees, 5e18); // Should be 5% of 100e18 after 1 year
+
+        // Double total assets to test performance fee
+        asset.mint(address(asyncVault), 100e18);
+        uint256 totalFees = asyncVault.accruedFees();
+        // Should be management fee (5e18) plus performance fee (15% of 100e18 profit = 15e18)
+        assertEq(totalFees, 25e18);
+    }
+
+    function testTakeFees() public virtual {
+        testSetFees();
+
+        // Simulate some yield
+        asset.mint(address(asyncVault), 100e18);
+
+        vm.warp(block.timestamp + 365.25 days);
+
+        vm.prank(owner);
+        asyncVault.takeFees();
+
+        assertGt(asyncVault.balanceOf(feeRecipient), 0);
+    }
+
+    function testTakeFeesOnDeposit() public virtual {
+        // Set management fee to 5%
+        Fees memory newFees = Fees({
+            performanceFee: 0,
+            managementFee: 0.05e18,
+            withdrawalIncentive: 0,
+            feesUpdatedAt: uint64(block.timestamp),
+            highWaterMark: ONE,
+            feeRecipient: feeRecipient
+        });
+
+        vm.prank(owner);
+        asyncVault.setFees(newFees);
+
+        // Warp forward so fees can accrue
+        vm.warp(block.timestamp + 365.25 days);
+
+        // Make a deposit which should trigger fee taking
+        vm.startPrank(alice);
+        asset.mint(alice, 100e18);
+        asset.approve(address(asyncVault), 100e18);
+        asyncVault.deposit(100e18, alice);
+        vm.stopPrank();
+
+        // Check that fees were taken and sent to fee recipient
+        assertGt(asyncVault.balanceOf(feeRecipient), 0);
+    }
+
+    function testTakeFeesOnWithdraw() public virtual {
+        // Set management fee to 5%
+        Fees memory newFees = Fees({
+            performanceFee: 0,
+            managementFee: 0.05e18,
+            withdrawalIncentive: 0,
+            feesUpdatedAt: uint64(block.timestamp),
+            highWaterMark: ONE,
+            feeRecipient: feeRecipient
+        });
+
+        vm.prank(owner);
+        asyncVault.setFees(newFees);
+
+        // Warp forward so fees can accrue
+        vm.warp(block.timestamp + 365.25 days);
+
+        // Make a withdrawal which should trigger fee taking
+        vm.startPrank(alice);
+        asyncVault.approve(address(asyncVault), 50e18);
+        asyncVault.requestRedeem(50e18, alice, alice);
+        asyncVault.fulfillRedeem(50e18, alice);
+        asyncVault.withdraw(50e18, alice, alice);
+        vm.stopPrank();
+
+        // Check that fees were taken and sent to fee recipient
+        assertGt(asyncVault.balanceOf(feeRecipient), 0);
+    }
+
+    function testTakeFeesOnSetFees() public virtual {
+        // Set initial management fee to 5%
+        Fees memory initialFees = Fees({
+            performanceFee: 0,
+            managementFee: 0.05e18,
+            withdrawalIncentive: 0,
+            feesUpdatedAt: uint64(block.timestamp),
+            highWaterMark: ONE,
+            feeRecipient: feeRecipient
+        });
+
+        vm.prank(owner);
+        asyncVault.setFees(initialFees);
+
+        // Warp forward so fees can accrue
+        vm.warp(block.timestamp + 365.25 days);
+
+        // Set new fees which should trigger fee taking
+        Fees memory newFees = Fees({
+            performanceFee: 0,
+            managementFee: 0.05e18, // Change fee to 5%
+            withdrawalIncentive: 0,
+            feesUpdatedAt: uint64(block.timestamp),
+            highWaterMark: ONE,
+            feeRecipient: feeRecipient
+        });
+
+        vm.prank(owner);
+        asyncVault.setFees(newFees);
+
+        // Check that fees were taken and sent to fee recipient
+        assertGt(asyncVault.balanceOf(feeRecipient), 0);
     }
 
     /*//////////////////////////////////////////////////////////////
                             LIMIT TESTS
     //////////////////////////////////////////////////////////////*/
 
-    function testSetLimits() public {
+    function testSetLimits() public virtual {
         Limits memory newLimits = Limits({
             depositLimit: 20000e18,
             minAmount: 2e18
         });
 
         vm.prank(owner);
-        vault.setLimits(newLimits);
+        asyncVault.setLimits(newLimits);
 
-        (uint256 depositLimit, uint256 minAmount) = vault.limits();
+        (uint256 depositLimit, uint256 minAmount) = asyncVault.limits();
         assertEq(depositLimit, newLimits.depositLimit);
         assertEq(minAmount, newLimits.minAmount);
     }
@@ -340,21 +476,21 @@ contract AsyncVaultTest is Test {
                             BOUNDS TESTS
     //////////////////////////////////////////////////////////////*/
 
-    function testSetBounds() public {
+    function testSetBounds() public virtual {
         Bounds memory newBounds = Bounds({
             upper: 0.2e18, // 120%
             lower: 0.1e18 // 90%
         });
 
         vm.prank(owner);
-        vault.setBounds(newBounds);
+        asyncVault.setBounds(newBounds);
 
-        (uint256 upper, uint256 lower) = vault.bounds();
+        (uint256 upper, uint256 lower) = asyncVault.bounds();
         assertEq(upper, newBounds.upper);
         assertEq(lower, newBounds.lower);
     }
 
-    function testSetBoundsRevertsNotOwner() public {
+    function testSetBoundsRevertsNotOwner() public virtual {
         Bounds memory newBounds = Bounds({
             upper: 1.2e18, // 120%
             lower: 0.8e18 // 80%
@@ -362,10 +498,10 @@ contract AsyncVaultTest is Test {
 
         vm.prank(alice);
         vm.expectRevert("Owned/not-owner");
-        vault.setBounds(newBounds);
+        asyncVault.setBounds(newBounds);
     }
 
-    function testSetBoundsRevertsUpperTooHigh() public {
+    function testSetBoundsRevertsUpperTooHigh() public virtual {
         Bounds memory newBounds = Bounds({
             upper: 1e18, // 100% - too high
             lower: 0.2e18 // 80%
@@ -373,11 +509,11 @@ contract AsyncVaultTest is Test {
 
         vm.startPrank(owner);
         vm.expectRevert(AsyncVault.Misconfigured.selector);
-        vault.setBounds(newBounds);
+        asyncVault.setBounds(newBounds);
         vm.stopPrank();
     }
 
-    function testSetBoundsRevertsLowerTooLow() public {
+    function testSetBoundsRevertsLowerTooLow() public virtual {
         Bounds memory newBounds = Bounds({
             upper: 0.2e18, // 120%
             lower: 1e18 // 100% - too high
@@ -385,7 +521,7 @@ contract AsyncVaultTest is Test {
 
         vm.startPrank(owner);
         vm.expectRevert(AsyncVault.Misconfigured.selector);
-        vault.setBounds(newBounds);
+        asyncVault.setBounds(newBounds);
         vm.stopPrank();
     }
 }

@@ -8,7 +8,7 @@ import {Owned} from "src/utils/Owned.sol";
 import {OwnerManager} from "safe-smart-account/base/OwnerManager.sol";
 import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
 import {TakeOverSafeLib} from "src/peripheral/gnosis/controllerModule/TakeOverSafeLib.sol";
-import {OracleVaultController, Limit} from "src/peripheral/OracleVaultController.sol";
+import {OracleVaultController} from "src/peripheral/oracles/OracleVaultController.sol";
 
 
 contract DrawdownModule is Owned {

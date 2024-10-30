@@ -16,7 +16,8 @@ contract OracleVault is AsyncVault {
         address oracle_,
         address multisig_
     ) AsyncVault(params) {
-        if (multisig_ == address(0)) revert Misconfigured();
+        if (multisig_ == address(0) || oracle_ == address(0))
+            revert Misconfigured();
 
         multisig = multisig_;
         oracle = IPriceOracle(oracle_);
@@ -38,7 +39,8 @@ contract OracleVault is AsyncVault {
     //////////////////////////////////////////////////////////////*/
 
     function afterDeposit(uint256 assets, uint256) internal override {
-        if (!paused) _takeFees();
+        // deposit and mint already have the `whenNotPaused` modifier so we don't need to check it here
+        _takeFees();
 
         SafeTransferLib.safeTransfer(asset, multisig, assets);
     }
@@ -54,5 +56,22 @@ contract OracleVault is AsyncVault {
             address(this),
             assets
         );
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                    AsyncVault OVERRIDES
+    //////////////////////////////////////////////////////////////*/
+
+    function handleWithdrawalIncentive(
+        uint256 fee,
+        address feeRecipient
+    ) internal override {
+        if (fee > 0)
+            SafeTransferLib.safeTransferFrom(
+                asset,
+                multisig,
+                feeRecipient,
+                fee
+            );
     }
 }

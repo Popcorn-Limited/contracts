@@ -3,7 +3,7 @@ pragma solidity ^0.8.25;
 
 import {Test, console} from "forge-std/Test.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
-import {OracleVaultController, Limit} from "src/peripheral/OracleVaultController.sol";
+import {OracleVaultController, Limit} from "src/peripheral/oracles/OracleVaultController.sol";
 import {PushOracle} from "src/peripheral/oracles/adapter/pushOracle/PushOracle.sol";
 import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
 import {MockERC4626} from "test/mocks/MockERC4626.sol";
