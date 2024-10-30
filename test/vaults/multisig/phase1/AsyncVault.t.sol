@@ -28,7 +28,7 @@ contract AsyncVaultTest is BaseControlledAsyncRedeemTest {
     event FeesUpdated(Fees prev, Fees next);
     event LimitsUpdated(Limits prev, Limits next);
 
-    function setUp() public override virtual {
+    function setUp() public virtual override {
         vm.label(owner, "owner");
         vm.label(alice, "alice");
         vm.label(bob, "bob");
@@ -269,6 +269,39 @@ contract AsyncVaultTest is BaseControlledAsyncRedeemTest {
             (redeemAmount * (1e18 - 0.01e18)) / 1e18
         );
         assertEq(asset.balanceOf(feeRecipient), 1e18);
+    }
+
+    function testFulfillRedeemWithLowerBound() public virtual {
+        uint256 redeemAmount = INITIAL_DEPOSIT;
+        uint256 expectedAssets = (redeemAmount * (1e18 - 0.01e18)) / 1e18;
+
+        // Set 1% lower bound
+        vm.prank(owner);
+        asyncVault.setBounds(
+            Bounds({
+                upper: 0,
+                lower: 0.01e18 // 1%
+            })
+        );
+
+        // Setup redeem request
+        vm.startPrank(alice);
+        asyncVault.approve(address(asyncVault), redeemAmount);
+        asyncVault.requestRedeem(redeemAmount, alice, alice);
+        vm.stopPrank();
+
+        // Fulfill request
+        uint256 assets = asyncVault.fulfillRedeem(redeemAmount, alice);
+
+        RequestBalance memory balance = asyncVault.getRequestBalance(alice);
+        assertEq(balance.pendingShares, 0);
+        assertEq(balance.claimableShares, redeemAmount);
+        assertEq(balance.claimableAssets, expectedAssets);
+        vm.stopPrank();
+
+        // Check that assets received is 99% of redeemed amount (1% lower bound)
+        assertEq(assets, expectedAssets);
+        assertEq(asyncVault.totalAssets(), INITIAL_DEPOSIT);
     }
 
     /*//////////////////////////////////////////////////////////////
