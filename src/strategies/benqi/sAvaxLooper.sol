@@ -21,7 +21,7 @@ contract sAVAXLooper is BaseCompoundV2LeverageStrategy {
     IBalancerVault public balancerVault;
     bytes32 public balancerPoolId;
     IAvaxStaking public sAVAX;
-    IERC20 public rewardToken;
+    IERC20 public rewardToken; // usually qi token
 
     function initialize(
         address asset_,
@@ -45,6 +45,17 @@ contract sAVAXLooper is BaseCompoundV2LeverageStrategy {
         balancerPoolId = strategyValues.poolId;
         balancerVault = IBalancerVault(strategyValues.balancerVault);
         IERC20(asset_).approve(address(balancerVault), type(uint256).max);
+    }
+    
+    function rewardTokens()
+        external
+        view
+        override
+        returns (address[] memory rewAddr)
+    {
+        // native AVAX is distributed as well but not added here
+        rewAddr = new address[](1);
+        rewAddr[0] = address(rewardToken);
     }
 
     function claim() internal override returns (bool success) {

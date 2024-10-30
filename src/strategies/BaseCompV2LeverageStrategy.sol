@@ -40,8 +40,6 @@ abstract contract BaseCompoundV2LeverageStrategy is
     string internal _name;
     string internal _symbol;
 
-    address constant COMP = address(0xc00e94Cb662C3520282E6f5717214004A7f26888);
-
     IComptroller public comptroller; // Comp router
 
     IERC20 public borrowAsset; // asset to borrow
@@ -282,34 +280,14 @@ abstract contract BaseCompoundV2LeverageStrategy is
         external
         view
         override
+        virtual
         returns (address[] memory rewAddr)
-    {
-        rewAddr = new address[](1);
-        rewAddr[0] = COMP;
-    }
+    {}
 
     /// @notice Claim additional rewards given that it's active.
-    function claim() internal override virtual returns (bool success) {
-        comptroller.claimComp(address(this));
-        return true;
-    }
+    function claim() internal override virtual returns (bool success) {}
 
-    function harvest(bytes memory data) external override virtual onlyKeeperOrOwner {
-        claim();
-
-        uint256 balance = IERC20(COMP).balanceOf(address(this));
-        if (balance > 0) IERC20(COMP).transfer(msg.sender, balance);
-
-        uint256 assetAmount = abi.decode(data, (uint256));
-
-        if (assetAmount == 0) revert ZeroAmount();
-
-        IERC20(asset()).transferFrom(msg.sender, address(this), assetAmount);
-
-        _protocolDeposit(assetAmount, 0, bytes(""));
-
-        emit Harvested();
-    }
+    function harvest(bytes memory data) external override virtual {}
 
     function setHarvestValues(bytes memory harvestValues) external onlyOwner {
         _setHarvestValues(harvestValues);
