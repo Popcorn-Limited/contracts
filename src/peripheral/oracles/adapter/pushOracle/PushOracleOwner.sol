@@ -1,22 +1,7 @@
 pragma solidity ^0.8.13;
 
 import {Owned} from "src/utils/Owned.sol";
-
-interface IPushOracle {
-    function setPrice(
-        address base,
-        address quote,
-        uint256 bqPrice,
-        uint256 qbPrice
-    ) external;
-
-    function setPrices(
-        address[] memory bases,
-        address[] memory quotes,
-        uint256[] memory bqPrices,
-        uint256[] memory qbPrices
-    ) external;
-}
+import {IPushOracle} from "src/interfaces/IPushOracle.sol";
 
 contract PushOracleOwner is Owned {
     IPushOracle public oracle;

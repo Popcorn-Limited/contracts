@@ -8,6 +8,12 @@ import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
 import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
 import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
 
+/**
+ * @title   OracleVault
+ * @author  RedVeil
+ * @notice  ERC-7540 (https://eips.ethereum.org/EIPS/eip-7540) compliant async redeem vault using a PushOracle for pricing and a Safe for managing assets
+ * @dev     Oracle and safe security is handled in other contracts. We simply assume they are secure and don't implement any further checks in this contract
+ */
 contract OracleVault is AsyncVault {
     address public safe;
 

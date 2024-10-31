@@ -3,7 +3,7 @@ pragma solidity ^0.8.25;
 
 import {Test, console} from "forge-std/Test.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
-import {OracleVaultController, Limit} from "src/peripheral/oracles/OracleVaultController.sol";
+import {OracleVaultController, Limit, PriceUpdate} from "src/peripheral/oracles/OracleVaultController.sol";
 import {PushOracle} from "src/peripheral/oracles/adapter/pushOracle/PushOracle.sol";
 import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
 import {MockERC4626} from "test/mocks/MockERC4626.sol";
@@ -74,7 +74,7 @@ contract OracleVaultControllerTest is Test {
         // Update price as keeper
         vm.prank(keeper);
         controller.updatePrice(
-            OracleVaultController.PriceUpdate({
+            PriceUpdate({
                 vault: address(vault),
                 asset: address(asset),
                 shareValueInAssets: INITIAL_PRICE,
@@ -161,7 +161,7 @@ contract OracleVaultControllerTest is Test {
 
         vm.prank(owner);
         controller.updatePrice(
-            OracleVaultController.PriceUpdate({
+            PriceUpdate({
                 vault: address(vault),
                 asset: address(asset),
                 shareValueInAssets: INITIAL_PRICE,
@@ -188,7 +188,7 @@ contract OracleVaultControllerTest is Test {
 
         vm.prank(owner);
         controller.updatePrice(
-            OracleVaultController.PriceUpdate({
+            PriceUpdate({
                 vault: address(vault),
                 asset: address(asset),
                 shareValueInAssets: newPrice,
@@ -215,7 +215,7 @@ contract OracleVaultControllerTest is Test {
 
         vm.prank(owner);
         controller.updatePrice(
-            OracleVaultController.PriceUpdate({
+            PriceUpdate({
                 vault: address(vault),
                 asset: address(asset),
                 shareValueInAssets: newPrice,
@@ -239,7 +239,7 @@ contract OracleVaultControllerTest is Test {
 
         // Set initial price and HWM
         controller.updatePrice(
-            OracleVaultController.PriceUpdate({
+            PriceUpdate({
                 vault: address(vault),
                 asset: address(asset),
                 shareValueInAssets: INITIAL_PRICE,
@@ -253,7 +253,7 @@ contract OracleVaultControllerTest is Test {
 
         vm.prank(owner);
         controller.updatePrice(
-            OracleVaultController.PriceUpdate({
+            PriceUpdate({
                 vault: address(vault),
                 asset: address(asset),
                 shareValueInAssets: newPrice,
@@ -270,17 +270,17 @@ contract OracleVaultControllerTest is Test {
         vm.prank(owner);
         controller.addVault(address(vault2));
 
-        OracleVaultController.PriceUpdate[]
-            memory updates = new OracleVaultController.PriceUpdate[](2);
+        PriceUpdate[]
+            memory updates = new PriceUpdate[](2);
 
-        updates[0] = OracleVaultController.PriceUpdate({
+        updates[0] = PriceUpdate({
             vault: address(vault),
             asset: address(asset),
             shareValueInAssets: INITIAL_PRICE,
             assetValueInShares: ONE
         });
 
-        updates[1] = OracleVaultController.PriceUpdate({
+        updates[1] = PriceUpdate({
             vault: address(vault2),
             asset: address(asset),
             shareValueInAssets: INITIAL_PRICE,

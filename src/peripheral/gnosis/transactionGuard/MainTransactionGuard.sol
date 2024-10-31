@@ -5,6 +5,12 @@ import {BaseGuard, ITransactionGuard, IModuleGuard} from "safe-smart-account/exa
 import {Enum} from "safe-smart-account/libraries/Enum.sol";
 import {Owned} from "src/utils/Owned.sol";
 
+/**
+ * @title   MainTransactionGuard
+ * @author  RedVeil
+ * @notice  This contract is the entry point for all transactions to the Safe smart account.
+ * @notice  It is responsible for calling the appropriate guards for transaction validation
+ */
 contract MainTransactionGuard is BaseGuard, Owned {
     constructor(address owner_) Owned(owner_) {}
 
@@ -15,7 +21,7 @@ contract MainTransactionGuard is BaseGuard, Owned {
     }
 
     /*//////////////////////////////////////////////////////////////
-                        GUARD LOGIC
+                        TRANSACTION LOGIC
     //////////////////////////////////////////////////////////////*/
 
     /**
@@ -136,9 +142,12 @@ contract MainTransactionGuard is BaseGuard, Owned {
     event AddedHook(address hook);
     event RemovedHook(address hook);
 
+    /// @dev the original hook address used to identify the start of the linked list
     address internal constant SENTINEL_HOOK = address(0x1);
 
+    /// @dev hook => next hook
     mapping(address => address) internal hooks;
+    /// @dev Number of hooks
     uint256 internal hookCount;
 
     /**

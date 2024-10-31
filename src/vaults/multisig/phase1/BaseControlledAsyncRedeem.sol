@@ -21,6 +21,12 @@ struct RequestBalance {
     uint256 claimableAssets;
 }
 
+/**
+ * @title   BaseControlledAsyncRedeem
+ * @author  RedVeil
+ * @notice  Abstract contract containing reusable logic for controlled async redeem flows
+ * @dev     Based on https://github.com/ERC4626-Alliance/ERC-7540-Reference/blob/main/src/BaseControlledAsyncRedeem.sol
+ */
 abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
     using FixedPointMathLib for uint256;
 

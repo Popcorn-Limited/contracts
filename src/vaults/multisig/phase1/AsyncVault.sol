@@ -56,6 +56,13 @@ struct Fees {
     address feeRecipient;
 }
 
+/**
+ * @title   AsyncVault
+ * @author  RedVeil
+ * @notice  Abstract contract containing reusable logic that are the basis of ERC-7540 compliant async redeem vauls
+ * @notice  Besides the basic logic for ERC-7540 this contract contains most other logic to manage a modern DeFi vault
+ * @dev     Logic to account and manage assets must be implemented by inheriting contracts
+ */
 abstract contract AsyncVault is BaseControlledAsyncRedeem {
     using FixedPointMathLib for uint256;
 

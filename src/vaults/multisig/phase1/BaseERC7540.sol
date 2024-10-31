@@ -13,6 +13,12 @@ import {IERC7540Operator} from "ERC-7540/interfaces/IERC7540.sol";
 import {IERC7575} from "ERC-7540/interfaces/IERC7575.sol";
 import {IERC165} from "ERC-7540/interfaces/IERC7575.sol";
 
+/**
+ * @title   BaseERC7540
+ * @author  RedVeil
+ * @notice  Abstract contract containing reusable logic for ERC-7540 - https://eips.ethereum.org/EIPS/eip-7540
+ * @notice  Based on https://github.com/ERC4626-Alliance/ERC-7540-Reference/blob/main/src/BaseERC7540.sol
+ */
 abstract contract BaseERC7540 is
     ERC4626,
     Owned,
