@@ -102,8 +102,6 @@ contract AnyLBTManagerTest is BaseStrategyTest {
         }
         _strategy.setDepositIds(depositIds);
 
-        // TODO: Set up liquidity bins
-
         return IBaseStrategy(address(_strategy));
     }
 

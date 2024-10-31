@@ -49,7 +49,6 @@ contract ETHXLooper is BaseAaveLeverageStrategy {
     function maxDeposit(address) public view override returns (uint256) {
         if (paused()) return 0;
 
-        // TODO borrow cap - asset decimals
         (uint256 borrowCap, uint256 supplyCap) = protocolDataProvider
             .getReserveCaps(asset());
 
