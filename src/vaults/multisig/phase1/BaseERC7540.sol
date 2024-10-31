@@ -23,8 +23,16 @@ abstract contract BaseERC7540 is
     /// @dev Assume requests are non-fungible and all have ID = 0
     uint256 internal constant REQUEST_ID = 0;
 
+    /// @dev Required for IERC7575
     address public share = address(this);
 
+    /**
+     * @notice Constructor for BaseERC7540
+     * @param _owner The permissioned owner of the vault (controls all management functions)
+     * @param _asset The address of the underlying asset
+     * @param _name The name of the vault
+     * @param _symbol The symbol of the vault
+     */
     constructor(
         address _owner,
         address _asset,
@@ -36,10 +44,17 @@ abstract contract BaseERC7540 is
                             ROLE LOGIC
     //////////////////////////////////////////////////////////////*/
 
+    /// @dev role => account => approved
     mapping(bytes32 => mapping(address => bool)) public hasRole;
 
     event RoleUpdated(bytes32 role, address account, bool approved);
 
+    /**
+     * @notice Update the role for an account
+     * @param role The role to update
+     * @param account The account to update
+     * @param approved The approval status to set
+     */
     function updateRole(
         bytes32 role,
         address account,
@@ -50,6 +65,10 @@ abstract contract BaseERC7540 is
         emit RoleUpdated(role, account, approved);
     }
 
+    /**
+     * @notice Modifier to check if the caller has the specified role or is the owner
+     * @param role The role to check
+     */
     modifier onlyRoleOrOwner(bytes32 role) {
         require(
             hasRole[role][msg.sender] || msg.sender == owner,
@@ -64,12 +83,12 @@ abstract contract BaseERC7540 is
 
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
 
-    /// @notice Pause Deposits. Caller must be owner.
+    /// @notice Pause Deposits. Caller must be owner or have the PAUSER_ROLE
     function pause() external override onlyRoleOrOwner(PAUSER_ROLE) {
         _pause();
     }
 
-    /// @notice Unpause Deposits. Caller must be owner.
+    /// @notice Unpause Deposits. Caller must be owner
     function unpause() external override onlyOwner {
         _unpause();
     }
@@ -78,8 +97,15 @@ abstract contract BaseERC7540 is
                         ERC7540 LOGIC
     //////////////////////////////////////////////////////////////*/
 
+    /// @dev controller => operator => approved
     mapping(address => mapping(address => bool)) public isOperator;
 
+    /**
+     * @notice Set the approval status for an operator
+     * @param operator The operator to set
+     * @param approved The approval status to set
+     * @dev Operators are approved to requestRedeem,withdraw and redeem for the msg.sender using the balance of msg.sender
+     */
     function setOperator(
         address operator,
         bool approved
@@ -100,6 +126,16 @@ abstract contract BaseERC7540 is
     mapping(address controller => mapping(bytes32 nonce => bool used))
         public authorizations;
 
+    /**
+     * @notice Authorize an operator for a controller
+     * @param controller The controller to authorize the operator for
+     * @param operator The operator to authorize
+     * @param approved The approval status to set
+     * @param nonce The nonce to use for the authorization
+     * @param deadline The deadline for the authorization
+     * @param signature The signature to verify the authorization
+     * @dev Operators are approved to requestRedeem,withdraw and redeem for the msg.sender using the balance of msg.sender
+     */
     function authorizeOperator(
         address controller,
         address operator,
@@ -169,6 +205,11 @@ abstract contract BaseERC7540 is
                         ERC165 LOGIC
     //////////////////////////////////////////////////////////////*/
 
+    /**
+     * @notice Check if the contract supports an interface
+     * @param interfaceId The interface ID to check
+     * @return True if the contract supports the interface, false otherwise
+     */
     function supportsInterface(
         bytes4 interfaceId
     ) public pure virtual returns (bool) {

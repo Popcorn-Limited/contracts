@@ -15,13 +15,13 @@ contract OracleVaultTest is AsyncVaultTest {
     OracleVault vault;
     MockOracle oracle;
 
-    address multisig = address(0x6);
+    address safe = address(0x6);
 
     function setUp() public override {
         vm.label(owner, "owner");
         vm.label(alice, "alice");
         vm.label(bob, "bob");
-        vm.label(multisig, "multisig");
+        vm.label(safe, "safe");
 
         asset = new MockERC20("Test Token", "TEST", 18);
         oracle = new MockOracle();
@@ -42,12 +42,12 @@ contract OracleVaultTest is AsyncVaultTest {
             })
         });
 
-        vault = new OracleVault(params, address(oracle), multisig);
+        vault = new OracleVault(params, address(oracle), safe);
 
         // For inherited tests
         asyncVault = MockAsyncVault(address(vault));
         baseVault = MockControlledAsyncRedeem(address(asyncVault));
-        assetReceiver = multisig;
+        assetReceiver = safe;
 
         // Setup initial state
         oracle.setPrice(address(vault), address(asset), 1e18);
@@ -59,7 +59,7 @@ contract OracleVaultTest is AsyncVaultTest {
         vault.deposit(INITIAL_DEPOSIT, alice);
         vm.stopPrank();
 
-        vm.prank(multisig);
+        vm.prank(safe);
         asset.approve(address(vault), type(uint256).max);
     }
 
@@ -69,7 +69,7 @@ contract OracleVaultTest is AsyncVaultTest {
 
     function testConstruction() public {
         assertEq(address(vault.oracle()), address(oracle));
-        assertEq(vault.multisig(), multisig);
+        assertEq(vault.safe(), safe);
     }
 
     function testConstructionWithZeroMultisig() public {
@@ -111,7 +111,7 @@ contract OracleVaultTest is AsyncVaultTest {
         });
 
         vm.expectRevert(AsyncVault.Misconfigured.selector);
-        new OracleVault(params, address(0), multisig);
+        new OracleVault(params, address(0), safe);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -409,7 +409,7 @@ contract OracleVaultTest is AsyncVaultTest {
         oracle.setPrice(address(vault), address(asset), 2e18); // 2 assets per share
 
         // Fulfill redemption
-        asset.mint(multisig, amount);
+        asset.mint(safe, amount);
         vm.prank(owner);
         uint256 assets = vault.fulfillRedeem(amount, alice);
 

@@ -9,17 +9,23 @@ import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
 import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
 
 contract OracleVault is AsyncVault {
-    address public multisig;
+    address public safe;
 
+    /**
+     * @notice Constructor for the OracleVault
+     * @param params The parameters to initialize the vault with
+     * @param oracle_ The oracle to use for pricing
+     * @param safe_ The safe which will manage the assets
+     */
     constructor(
         InitializeParams memory params,
         address oracle_,
-        address multisig_
+        address safe_
     ) AsyncVault(params) {
-        if (multisig_ == address(0) || oracle_ == address(0))
+        if (safe_ == address(0) || oracle_ == address(0))
             revert Misconfigured();
 
-        multisig = multisig_;
+        safe = safe_;
         oracle = IPriceOracle(oracle_);
     }
 
@@ -29,7 +35,7 @@ contract OracleVault is AsyncVault {
 
     IPriceOracle public oracle;
 
-    /// @return Total amount of underlying `asset` token managed by vault. Delegates to adapter.
+    /// @notice Total amount of underlying `asset` token managed by the safe.
     function totalAssets() public view override returns (uint256) {
         return oracle.getQuote(totalSupply, share, address(asset));
     }
@@ -38,21 +44,24 @@ contract OracleVault is AsyncVault {
                             ERC-4626 OVERRIDES
     //////////////////////////////////////////////////////////////*/
 
+    /// @dev Internal function to handle the deposit and mint
     function afterDeposit(uint256 assets, uint256) internal override {
-        // deposit and mint already have the `whenNotPaused` modifier so we don't need to check it here
+        // Deposit and mint already have the `whenNotPaused` modifier so we don't need to check it here
         _takeFees();
 
-        SafeTransferLib.safeTransfer(asset, multisig, assets);
+        // Transfer assets to the safe
+        SafeTransferLib.safeTransfer(asset, safe, assets);
     }
 
     /*//////////////////////////////////////////////////////////////
                     BaseControlledAsyncRedeem OVERRIDES
     //////////////////////////////////////////////////////////////*/
 
+    /// @dev Internal function to transfer assets from the safe to the vault before fulfilling a redeem
     function beforeFulfillRedeem(uint256 assets, uint256) internal override {
         SafeTransferLib.safeTransferFrom(
             asset,
-            multisig,
+            safe,
             address(this),
             assets
         );
@@ -62,14 +71,16 @@ contract OracleVault is AsyncVault {
                     AsyncVault OVERRIDES
     //////////////////////////////////////////////////////////////*/
 
+    /// @dev Internal function to handle the withdrawal incentive
     function handleWithdrawalIncentive(
         uint256 fee,
         address feeRecipient
     ) internal override {
         if (fee > 0)
+            // Transfer the fee from the safe to the fee recipient
             SafeTransferLib.safeTransferFrom(
                 asset,
-                multisig,
+                safe,
                 feeRecipient,
                 fee
             );
