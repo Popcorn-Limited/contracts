@@ -1,73 +1,103 @@
-All things Gnosis vault
+To faciliate the fast changing needs of DeFi we create a vault that can grow with us into any direction we require. The goal is to create a vault that has absolute flexibility of what protocols to interact with and how but still remains easy to manage and save us on developing new strategies for each protocol out there.
 
+For users the vault abstracts away the complexity of interacting with multiple protocols and allows them to deposit and withdraw with a single interface. They wont need to chase new protocols or rebalance as all this complexity is abstracted away.
 
-### Abstract:
-Create a Vault that allocates into multiple management multisigs. There must be guarantees for withdrawal and reasonable decentralalisation / permissionlessness.
+## Architecture
 
-Iteration 1 should have trust assumptions but the core infra should be build to replace these trust assumptions later via better modules.
+The main contract is the `OracleVault` which uses a Gnosis-`Safe` to hold and manage assets. We use a `PushOracle` to keep track of the value of the assets held in the `Safe` and set the price of the vault shares.
+
+The `OracleVault` follows the [ERC7540](https://eips.ethereum.org/EIPS/eip-7540) standard. Deposits are instantaneous but withdrawals are processed asynchronously.
+
+The `PushOracle` is controlled by the `OracleVaultController` which has permissioned `keepers` to update the price of the `PushOracle`. Price updates are expected to happen in regular intervals. If a price update is significantly larger/smaller than the previous price we will update the price but pause the vault immediately to prevent any losses. The same goes for a drawdown from the latest high water mark. This ensures that price manipulations or temporary issues wont lead to a loss of funds for the vault or user.
+
+The `Safe` is controlled by `managers` which can either be bots, ai agents or humans. All transactions are verified by a `TransactionGuard`-module and we have a seprate `SafeController`-module to remove malicious or inactive managers and even liquidate the `Safe` if needed. The `TransactionGuard` allows us to allow which contracts and functions `managers` can call. Later we will also add limits and decode and sanitize calls to increase security further.
+
+`TransactionGuard` and `SafeController` both use a hook pattern to allow us to update and add additional functionality later.
 
 ![alt text](schema.png)
 
+## Sequence Diagrams
 
-### Useful Links:
-- Solv Audit - https://github.com/solv-finance/Audit/tree/main/Solv-Yield-Market
-- Solv Guardian - https://github.com/solv-finance/solv-vault-guardian/blob/main/src/common/SolvVaultGuardianBase.sol
-- Solv Markets - https://github.com/solv-finance/solv-contracts-v3/tree/main/markets
-- Scope Guard - https://github.com/gnosisguild/zodiac-guard-scope/blob/main/contracts/ScopeGuard.sol
+### Deposit Flow
 
-- Veda Decode And Sanitize - https://github.com/Se7en-Seas/boring-vault/tree/main/src/base/DecodersAndSanitizers
+```mermaid
+sequenceDiagram
+    participant User
+    participant Vault
+    participant Safe
 
+    User->>+Vault: deposit(assets)
 
-### TODO:
-1. Vault
-   1. Function to update multisigs and debt ceiling [x]
-      1. (What happens if a multisig is used by multiple vaults?) <--- should be fine [x]
-      2. (What happens if new debt ceiling is lower than current?) [x]
-      3. (How to remove a multisig?) [x]
-      4. (Linked list as withdrawalQueue) [x]
-   2. Function for multisig to pull funds from vault [x]
-   3. Deposit
-      1. (Add autodeposit?) <--- managers should just pull funds [x]
-      2. Add minDeposit [x]
-   4. Withdrawal
-      1. Cleanup functions
-      2. Add withdrawal incentive [x]
-      3. Add minWithdrawal [x]
-      4. (Should we allow normal 4626 for instant withdrawals?) <--- managers should just push funds [x]
-      5. (What happens if multiple manager react to a request? Race conditions bad?) [x]
-      6. Add withdrawalQueue [x]
-   5. Explore need for Pause state
-      1. Do we also pause withdrawals?
-      2. When does it get triggered?
-      3. How does the withdrawal flow work when paused?
-   6. Fees
-      1. How to pay out managementFee / performanceFee to managers?
-   7. Security Deposit
-      1. How to raise the security deposit?
-   8. Interest rate
-      1. How to pay out interest rate?
-      2. How to liquidate?
-   9. Optional:
-      1. Add time based redeem windows? (Solv)
-      2. Add compliance hooks for tradFi?
-      3. Since Multisigs take debt from the vault couldnt they pay interest on that? Which will be used as yield
-2. Transaction Guard
-   1. Add basic Scope Guard
-      1. Whitelist only - Address + func selector [x]
-      2. No native transfers [x]
-      3. No change on guard or module
-   2. Allow muliple guards to be added to the MainGuard based on target addres (or smth else) [x]
-   3. (Add sample post-transaction-guard that checks TVL before and after)
-   4. (Add sample sanitise transaction-guard (check input values))
-3. Controller Module
-   1. Modulerise Module (You should be able to add checks that can trigger the multisig takeover) [x]
-   2. Add Checker contract to trigger when withdrawals arent honored
-   3. Add Checker based on drawdown
-   4. Add incentive for bots to call the takeover
-   5. Add fallback manager
-   6. How to liquidiate a multisig?
-4. Oracle
-   1. (Add oracle on expected yield, deposits/withdrawals and debt)
-5. Additional
-   1. Add safety deposit for managers
-   2. Add V3-style logic for permissionless managers
+    Vault->>Vault: takeFees()
+
+    Vault->>Safe: transfer(assets)
+
+    Vault-->>User: mint(shares)
+
+    deactivate Vault
+```
+
+### Withdraw Flow
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Vault
+    participant Safe
+
+    User->>+Vault: requestRedeem(shares)
+
+    Safe->>Vault: fulfillRedeem(assets)
+
+    User->>+Vault: withdraw()
+    Vault->>Vault: takeFees()
+    Vault->>Vault: burn(shares)
+    Vault-->>User: transfer(assets)
+    deactivate Vault
+```
+
+## Scope
+
+```
+├── src
+│   ├── vaults
+│   │   └── multisig
+│   │       └── phase1
+│   │            ├── AsyncVault.sol
+│   │            ├── BaseControlledAsyncRedeem.sol
+│   │            ├── BaseERC7540.sol
+│   │            └── OracleVault.sol
+│   └── peripheral
+|        └── oracles
+|             ├── adapter
+│             │   └── pushOracle
+│             │       └── PushOracle.sol
+│             └── OracleVaultController.sol
+├── test
+│   ├── vaults
+│   │   └── multisig
+│   │       └── phase1
+│   │            ├── AsyncVault.t.sol
+│   │            ├── BaseControlledAsyncRedeem.sol
+│   │            ├── BaseERC7540.t.sol
+│   │            └── OracleVault.t.sol
+│   └── peripheral
+│       ├── PushOracle.t.sol
+│       └── OracleVaultController.t.sol
+```
+
+At this point we expect the manager to be a trusted permissioned actor which is why we wont include any contracts of the `SafeController`-module just yet.
+
+For `TransactionGuard` we use the `ScopeGuard`-module by zodiac which has been extensively tested and is battle tested. https://github.com/gnosisguild/zodiac-guard-scope/tree/main
+
+## Known Issues / Security Considerations
+
+A lot of the security assumptions come down to proper configuration and key management / operational security.
+
+A malicious owner of the `OracleVaultController` or `TransactionGuard` can rug the vault and the users funds. So we need to ensure the highest level of security to keep access to the keys as limited and safe as possible.
+
+Additionally a poorly set up `TransactionGuard` can lead to a rug pull of the vault. Verifiying and maybe even auditing the deployment is crucial here.
+
+Idle `managers` can also stale the withdrawal process since they will need to process and fulfill withdrawals. To incentivise fulfilling we can configure a `withdrawalIncentive` which will be paid out to the manager that fulfills the withdrawal.
+
+Lastly `setLimits` on the `AsyncVault` can lock user deposits if set too high. This can lead to a situation where a user cannot withdraw their funds even though they deposited successfully. E.g. If there wasnt a `minAmount` initially and we set the `minAmount` to a value lower than the deposit amount of certain users they wont be able to withdraw without adding more funds to the vault which might not be possible.
