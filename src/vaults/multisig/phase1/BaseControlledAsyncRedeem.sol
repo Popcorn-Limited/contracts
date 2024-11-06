@@ -397,6 +397,15 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
                         REQUEST REDEEM LOGIC
     //////////////////////////////////////////////////////////////*/
 
+    event RedeemRequested(
+        address indexed controller,
+        address indexed owner,
+        uint256 requestId,
+        uint256 timestamp,
+        address sender,
+        uint256 assets
+    );
+
     /**
      * @notice Requests a redeem of shares from the vault
      * @param shares The amount of shares to redeem
@@ -437,7 +446,14 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
         currentBalance.pendingShares += shares;
         currentBalance.requestTime = block.timestamp;
 
-        emit RedeemRequest(controller, owner, REQUEST_ID, msg.sender, shares);
+        emit RedeemRequested(
+            controller,
+            owner,
+            REQUEST_ID,
+            block.timestamp,
+            msg.sender,
+            shares
+        );
         return REQUEST_ID;
     }
 
@@ -448,6 +464,7 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
     event RedeemRequestCanceled(
         address indexed controller,
         address indexed receiver,
+        uint256 timestamp,
         uint256 shares
     );
 
@@ -496,12 +513,25 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
         currentBalance.pendingShares = 0;
         currentBalance.requestTime = 0;
 
-        emit RedeemRequestCanceled(controller, receiver, shares);
+        emit RedeemRequestCanceled(
+            controller,
+            receiver,
+            block.timestamp,
+            shares
+        );
     }
 
     /*//////////////////////////////////////////////////////////////
                         DEPOSIT FULFILLMENT LOGIC
     //////////////////////////////////////////////////////////////*/
+
+    event RedeemRequestFulfilled(
+        address indexed controller,
+        address indexed fulfiller,
+        uint256 timestamp,
+        uint256 shares,
+        uint256 assets
+    );
 
     /**
      * @notice Fulfills a redeem request of the controller to allow the controller to withdraw their assets
@@ -545,6 +575,14 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
 
         // Reset the requestTime if there are no more pending shares
         if (currentBalance.pendingShares == 0) currentBalance.requestTime = 0;
+
+        emit RedeemRequestFulfilled(
+            controller,
+            msg.sender,
+            block.timestamp,
+            shares,
+            assets
+        );
 
         return assets;
     }
