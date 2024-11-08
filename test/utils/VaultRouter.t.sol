@@ -5,6 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {VaultRouter} from "src/utils/VaultRouter.sol";
 import {MockERC20, ERC20} from "../mocks/MockERC20.sol";
 import {MockERC4626} from "../mocks/MockERC4626.sol";
+import {MockERC7540} from "../mocks/MockERC7540.sol";
 import {MockGauge} from "../mocks/MockGauge.sol";
 
 contract MaliciousGauge is ERC20 {
@@ -22,14 +23,14 @@ contract MaliciousGauge is ERC20 {
 contract VaultRouterTest is Test {
     VaultRouter public router;
     MockERC20 public asset;
-    MockERC4626 public vault;
+    MockERC7540 public vault;
     MockGauge public gauge;
     address public user = address(0x1);
 
     function setUp() public {
         router = new VaultRouter();
         asset = new MockERC20("Test Asset", "TAST", 18);
-        vault = new MockERC4626();
+        vault = new MockERC7540();
         vault.initialize(asset, "Test Vault", "vTAST");
         gauge = new MockGauge(address(vault));
 
@@ -148,12 +149,26 @@ contract VaultRouterTest is Test {
         vm.startPrank(user);
         asset.approve(address(vault), amount);
         vault.deposit(amount, user);
-
         vault.approve(address(router), amount);
         router.requestWithdrawal(address(vault), user, amount);
         vm.stopPrank();
 
         assertEq(router.requestShares(address(vault), user), amount);
+    }
+
+    function test__requestWithdrawal_different_receiver() public {
+        uint256 amount = 100e18;
+        address receiver = address(0x1234);
+
+        vm.startPrank(user);
+        asset.approve(address(vault), amount);
+        vault.deposit(amount, user);
+        vault.approve(address(router), amount);
+        router.requestWithdrawal(address(vault), receiver, amount);
+        vm.stopPrank();
+
+        assertEq(router.requestShares(address(vault), receiver), amount);
+        assertEq(router.requestShares(address(vault), user), 0);
     }
 
     function test__unstakeAndRequestWithdrawal() public {
@@ -185,12 +200,12 @@ contract VaultRouterTest is Test {
         test__requestWithdrawal();
 
         uint256 amount = 100e18;
-
+        
         router.fullfillWithdrawal(address(vault), user, amount);
 
         assertEq(router.requestShares(address(vault), user), 0);
-        assertEq(asset.balanceOf(address(router)), 100e18);
-        assertEq(router.claimableAssets(address(asset), user), 100e18);
+        // assertEq(asset.balanceOf(address(router)), 100e18, "lil");
+        assertEq(router.claimableAssets(address(vault), user), 100e18);
     }
 
     function test__fullfillWithdrawals_MultipleReceivers() public {
@@ -245,11 +260,11 @@ contract VaultRouterTest is Test {
         assertEq(router.requestShares(address(vault), user2), 0);
         assertEq(router.requestShares(address(vault), user3), 0);
 
-        assertEq(asset.balanceOf(address(router)), 450e18);
+        assertEq(asset.balanceOf(address(vault)), 450e18);
 
-        assertEq(router.claimableAssets(address(asset), user), 100e18);
-        assertEq(router.claimableAssets(address(asset), user2), 150e18);
-        assertEq(router.claimableAssets(address(asset), user3), 200e18);
+        assertEq(router.claimableAssets(address(vault), user), 100e18);
+        assertEq(router.claimableAssets(address(vault), user2), 150e18);
+        assertEq(router.claimableAssets(address(vault), user3), 200e18);
     }
 
     function test__fullfillWithdrawals_array_mismatch() public {
@@ -264,19 +279,43 @@ contract VaultRouterTest is Test {
         router.fullfillWithdrawals(address(vault), receivers, amounts);
     }
 
-    /*//////////////////////////////////////////////////////////////
-                           CLAIM WITHDRAWAL
-    //////////////////////////////////////////////////////////////*/
+    // /*//////////////////////////////////////////////////////////////
+    //                        CLAIM WITHDRAWAL
+    // //////////////////////////////////////////////////////////////*/
+    function test__claimWithdrawal_different_receiver() public {
+        test__requestWithdrawal_different_receiver();
+        
+        address receiver = address(0x1234);
+        uint256 amount = 100e18;
+
+        // fulfill 
+        router.fullfillWithdrawal(address(vault), receiver, amount);
+        
+        assertEq(router.claimableAssets(address(vault), user), 0);
+        assertEq(router.claimableAssets(address(vault), receiver), amount);
+        
+        // claim
+        vm.prank(user);
+        router.claimWithdrawal(address(vault), receiver);
+
+        assertEq(asset.balanceOf(receiver), amount);
+        assertEq(asset.balanceOf(user), 0);
+        
+        assertEq(router.claimableAssets(address(vault), receiver), 0);
+        assertEq(router.claimableAssets(address(vault), user), 0);
+
+        assertEq(asset.balanceOf(address(router)), 0);
+    }
 
     function test__claimWithdrawal() public {
         // First, request and fulfill withdrawal
         test__fullfillWithdrawal();
 
         vm.prank(user);
-        router.claimWithdrawal(address(asset), user);
+        router.claimWithdrawal(address(vault), user);
 
         assertEq(asset.balanceOf(user), 100e18);
-        assertEq(router.claimableAssets(address(asset), user), 0);
+        assertEq(router.claimableAssets(address(vault), user), 0);
         assertEq(asset.balanceOf(address(router)), 0);
     }
 
@@ -284,37 +323,59 @@ contract VaultRouterTest is Test {
         // First, request and fulfill withdrawal
         test__fullfillWithdrawal();
 
-        router.claimWithdrawal(address(asset), user);
+        router.claimWithdrawal(address(vault), user);
 
         assertEq(asset.balanceOf(user), 100e18);
-        assertEq(router.claimableAssets(address(asset), user), 0);
+        assertEq(router.claimableAssets(address(vault), user), 0);
         assertEq(asset.balanceOf(address(router)), 0);
     }
 
-    /*//////////////////////////////////////////////////////////////
-                           CANCEL REQUEST
-    //////////////////////////////////////////////////////////////*/
+    // /*//////////////////////////////////////////////////////////////
+    //                        CANCEL REQUEST
+    // //////////////////////////////////////////////////////////////*/
 
     function test__cancelRequest() public {
         // First, request withdrawal
         test__requestWithdrawal();
-
-        uint256 amount = 100e18;
+        assertEq(ERC20(address(vault)).balanceOf(user), 0);
 
         vm.prank(user);
-        router.cancelRequest(address(vault), amount);
+        router.cancelRequest(address(vault));
 
+        assertEq(ERC20(address(vault)).balanceOf(user), 100e18);
         assertEq(router.requestShares(address(vault), user), 0);
     }
 
-    function test__cancelRequest_insufficient_shares() public {
-        test__requestWithdrawal();
-
-        uint256 cancelAmount = 1000e18;
+    function test__cancelRequest_fail() public {
+        // First, request withdrawal
+        test__requestWithdrawal_different_receiver();
 
         vm.startPrank(user);
+        vm.expectRevert(); // Zero request shares
+        router.cancelRequest(address(vault));
+        vm.stopPrank();
+    }
+
+    function test__cancelRequest_different_receiver() public {
+        // First, request withdrawal
+        test__requestWithdrawal_different_receiver();
+
+        address receiver = address(0x1234);
+
+        assertEq(ERC20(address(vault)).balanceOf(receiver), 0);
+
+        vm.prank(receiver);
+        router.cancelRequest(address(vault));
+
+        assertEq(ERC20(address(vault)).balanceOf(receiver), 100e18);
+        assertEq(router.requestShares(address(vault), receiver), 0);
+    }
+
+
+    function test__cancelRequest_insufficient_shares() public {
+        vm.startPrank(user);
         vm.expectRevert(); // panic: underflow
-        router.cancelRequest(address(vault), cancelAmount);
+        router.cancelRequest(address(vault));
         vm.stopPrank();
     }
 }

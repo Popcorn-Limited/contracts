@@ -6,6 +6,7 @@ pragma solidity ^0.8.25;
 import {IERC4626, IERC20} from "openzeppelin-contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 import {ICurveGauge} from "src/interfaces/external/curve/ICurveGauge.sol";
+import {IERC7540Redeem} from "ERC-7540/interfaces/IERC7540.sol";
 
 /**
  * @title   VaultRouter
@@ -97,7 +98,7 @@ contract VaultRouter {
     error ArrayMismatch();
     //      Vault              Receiver   Amount
     mapping(address => mapping(address => uint256)) public requestShares;
-    //      Asset              Receiver   Amount
+    //      Vault              Receiver   Amount
     mapping(address => mapping(address => uint256)) public claimableAssets;
 
     function unstakeAndRequestWithdrawal(
@@ -119,6 +120,7 @@ contract VaultRouter {
         uint256 shares
     ) external {
         IERC20(vault).safeTransferFrom(msg.sender, address(this), shares);
+
         _requestWithdrawal(vault, receiver, shares);
     }
 
@@ -128,6 +130,12 @@ contract VaultRouter {
         uint256 shares
     ) internal {
         requestShares[vault][receiver] += shares;
+        
+        // allow vault to pull shares
+        IERC20(vault).safeIncreaseAllowance(vault, shares);
+
+        // request redeem - send shares to vault
+        IERC7540Redeem(vault).requestRedeem(shares, receiver, address(this));
 
         emit WithdrawalRequested(
             vault,
@@ -138,15 +146,18 @@ contract VaultRouter {
         );
     }
 
-    function claimWithdrawal(address asset, address receiver) external {
-        uint256 amount = claimableAssets[asset][receiver];
-        claimableAssets[asset][receiver] = 0;
+    // anyone can claim for a receiver
+    function claimWithdrawal(address vault, address receiver) external {
+        uint256 amount = claimableAssets[vault][receiver];
+        claimableAssets[vault][receiver] = 0;
 
-        IERC20(asset).safeTransfer(receiver, amount);
+        // claim asset with receiver shares
+        IERC4626(vault).withdraw(amount, receiver, receiver);
 
-        emit WithdrawalClaimed(asset, receiver, amount);
+        emit WithdrawalClaimed(vault, receiver, amount);
     }
 
+    // anyone can fullfil a withdrawal for a receiver
     function fullfillWithdrawal(
         address vault,
         address receiver,
@@ -180,22 +191,29 @@ contract VaultRouter {
     ) internal {
         requestShares[vault][receiver] -= shares;
 
-        uint256 assetAmount = IERC4626(vault).redeem(
-            shares,
-            address(this),
-            address(this)
-        );
+        // fulfill redeem of pending shares for receiver
+        uint256 assetAmount = IERC7540Redeem(vault).fulfillRedeem(shares, receiver);
 
-        claimableAssets[address(asset)][receiver] += assetAmount;
+        // assets are claimable now
+        claimableAssets[vault][receiver] += assetAmount;
 
         emit WithdrawalFullfilled(vault, address(asset), receiver, shares);
     }
 
-    function cancelRequest(address vault, uint256 shares) external {
-        requestShares[vault][msg.sender] -= shares;
+    error ZeroRequestShares();
 
-        IERC20(vault).safeTransfer(msg.sender, shares);
+    // only receiver is able to cancel a request
+    function cancelRequest(address vault) external {
+        uint256 sharesCancelled = requestShares[vault][msg.sender];
 
-        emit WithdrawalCancelled(vault, msg.sender, shares);
+        if(sharesCancelled == 0)
+            revert ZeroRequestShares();
+
+        requestShares[vault][msg.sender] = 0;
+
+        // cancel request and receive pending shares back
+        IERC7540Redeem(vault).cancelRedeemRequest(msg.sender);
+
+        emit WithdrawalCancelled(vault, msg.sender, sharesCancelled);
     }
 }
