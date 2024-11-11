@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.25;
 
-import {AsyncVaultTest, MockAsyncVault, MockControlledAsyncRedeem} from "./AsyncVault.t.sol";
+import {AsyncVaultTest, MockERC7540, MockControlledAsyncRedeem} from "./AsyncVault.t.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 import {MockOracle} from "test/mocks/MockOracle.sol";
 import {OracleVault} from "src/vaults/multisig/phase1/OracleVault.sol";
@@ -45,7 +45,7 @@ contract OracleVaultTest is AsyncVaultTest {
         vault = new OracleVault(params, address(oracle), safe);
 
         // For inherited tests
-        asyncVault = MockAsyncVault(address(vault));
+        asyncVault = MockERC7540(address(vault));
         baseVault = MockControlledAsyncRedeem(address(asyncVault));
         assetReceiver = safe;
 
