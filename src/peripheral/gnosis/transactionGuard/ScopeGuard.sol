@@ -19,6 +19,16 @@ struct Target {
     bool valueAllowed;
     /// @notice Mapping of allowed function signatures for scoped targets
     mapping(bytes4 => bool) allowedFunctions;
+    /// @notice allowed function sigs to param rules to sanitise input data // TODO merge with allowedFunctions? 
+    mapping(bytes4 => ParamRule[]) callParamRules;
+}
+
+struct ParamRule {
+    uint256 offset; // offset in the tx calldata to check param
+    uint256 paramLength; // length of the param
+    uint256 internalOffset; // offset in dynamic/bytes param
+    uint256 internalLength; // length of the param in the dynamic param
+    bytes comparedValue; // ie permitted value to check against // TODO array of values allowed?
 }
 
 /**
@@ -116,6 +126,48 @@ contract ScopeGuard is BaseGuard, Owned {
                 "Fallback not allowed for this address"
             );
         }
+
+        // verify sensible input values in tx calldata
+        verifyTxData(data, allowedTargets[to].callParamRules[bytes4(data)]);
+    }
+
+
+    function verifyTxData(bytes calldata data, ParamRule[] memory paramRules) internal view {
+        // TODO refactor to support multiple allowed rules - pass if one rule is satisfied
+        for(uint i=0; i<paramRules.length; i++) {
+            ParamRule memory rule = paramRules[i];
+
+            // load the param to verify
+            // TODO if data is not calldata we need to use assembly here as well
+            bytes memory param = data[rule.offset:rule.offset + rule.paramLength]; 
+        
+            if(rule.internalOffset > 0)
+                // dynamic param - get the actual value inside
+                param = extractDynamicParam(param, rule.internalLength, rule.internalOffset);
+
+            // compare
+            require(keccak256(param) == keccak256(rule.comparedValue), "Value is not valid");
+        }
+    }
+
+    // this doesn't work if the bytes array encodes at least one element with a variable length as the offset is dynamic itself 
+    function extractDynamicParam(bytes memory dynamicParam, uint256 paramLength, uint256 offset) internal view returns (bytes memory) {
+        assembly {            
+            // Allocate memory 
+            let result := mload(0x40)
+            
+            // store length at the start
+            mstore(result, paramLength)
+
+            // update memory pointer
+            mstore(result, add(result, add(paramLength, 0x20)))
+
+            // copy bytes
+            let start := add(dynamicParam, add(0x20, offset))
+            calldatacopy(add(result, 0x20), start, paramLength)
+        }
+
+        return result;
     }
 
     /// @dev Empty implementation
