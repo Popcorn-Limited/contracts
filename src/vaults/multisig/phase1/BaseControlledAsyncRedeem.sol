@@ -403,7 +403,7 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
         uint256 requestId,
         uint256 timestamp,
         address sender,
-        uint256 assets
+        uint256 shares
     );
 
     /**
