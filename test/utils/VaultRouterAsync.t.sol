@@ -123,7 +123,7 @@ contract VaultRouterTest is Test {
 
         // Verify final balances
         assertEq(vault.balanceOf(user), 0, "Vault balance should not change");
-        assertGt(
+        assertEq(
             asset.balanceOf(user),
             100e18,
             "Asset balance not increased"
@@ -134,6 +134,9 @@ contract VaultRouterTest is Test {
 
     function test__requestFulfillWithdraw_for_receiver() public {
         // Test Preparation
+        vm.prank(user2);
+        vault.setOperator(address(router), true);
+
         vm.startPrank(user);
         vault.approve(address(router), type(uint256).max);
         vault.setOperator(address(router), true);
@@ -147,7 +150,7 @@ contract VaultRouterTest is Test {
 
         // Verify final balances
         assertEq(vault.balanceOf(user), 0, "Vault balance should not change");
-        assertGt(
+        assertEq(
             asset.balanceOf(user2),
             100e18,
             "Asset balance not increased"
@@ -192,7 +195,7 @@ contract VaultRouterTest is Test {
         // Verify final balances
         assertEq(gauge.balanceOf(user), 0, "Gauge balance not decreased");
         assertEq(vault.balanceOf(user), 0, "Vault balance should not change");
-        assertGt(
+        assertEq(
             asset.balanceOf(user),
             100e18,
             "Asset balance not increased"
@@ -203,6 +206,9 @@ contract VaultRouterTest is Test {
 
     function test__unstakeRequestFulfillWithdraw_for_receiver() public {
         // Test Preparation
+        vm.prank(user2);
+        vault.setOperator(address(router), true);
+
         vm.startPrank(user);
         gauge.deposit(100e18, user);
         gauge.approve(address(router), type(uint256).max);
@@ -219,7 +225,7 @@ contract VaultRouterTest is Test {
         // Verify final balances
         assertEq(gauge.balanceOf(user), 0, "Gauge balance not decreased");
         assertEq(vault.balanceOf(user), 0, "Vault balance should not change");
-        assertGt(
+        assertEq(
             asset.balanceOf(user2),
             100e18,
             "Asset balance not increased"

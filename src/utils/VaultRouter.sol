@@ -145,6 +145,8 @@ contract VaultRouter {
         address receiver,
         uint256 shares
     ) external {
+        IERC20(vault).safeTransferFrom(msg.sender, address(this), shares);
+
         _requestFulfillWithdraw(vault, receiver, shares);
     }
 
@@ -177,8 +179,6 @@ contract VaultRouter {
         address receiver,
         uint256 shares
     ) internal {
-        IERC20(vault).safeTransferFrom(msg.sender, address(this), shares);
-
         // allow vault to pull shares
         IERC20(vault).safeIncreaseAllowance(vault, shares);
 
