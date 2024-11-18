@@ -8,6 +8,7 @@ import {ERC20} from "solmate/tokens/ERC20.sol";
 import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
 import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
 import {IERC7540Redeem} from "ERC-7540/interfaces/IERC7540.sol";
+import "forge-std/console.sol";
 
 /// @notice Stores the requestBalance of a controller
 struct RequestBalance {
@@ -52,6 +53,8 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
         // Utilise claimable balance first
         uint256 assetsToTransfer = assets;
         RequestBalance storage currentBalance = requestBalances[msg.sender];
+        uint256 pendingShares = currentBalance.claimableShares;
+
         if (currentBalance.claimableAssets > 0) {
             // Ensures we cant underflow when subtracting from assetsToTransfer
             uint256 claimableAssets = assetsToTransfer >
@@ -76,8 +79,7 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
             );
         }
 
-        // Mint shares to the receiver
-        _mint(receiver, shares);
+        _mintWithClaimableBalance(pendingShares, shares, receiver);
 
         emit Deposit(msg.sender, receiver, assets, shares);
 
@@ -103,6 +105,8 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
         // Utilise claimable balance first
         uint256 assetsToTransfer = assets;
         RequestBalance storage currentBalance = requestBalances[msg.sender];
+        uint256 pendingShares = currentBalance.claimableShares;
+
         if (currentBalance.claimableAssets > 0) {
             // Ensures we cant underflow when subtracting from assetsToTransfer
             uint256 claimableAssets = assetsToTransfer >
@@ -127,13 +131,44 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
             );
         }
 
-        // Mint shares to the receiver
-        _mint(receiver, shares);
+        _mintWithClaimableBalance(pendingShares, shares, receiver);
 
         emit Deposit(msg.sender, receiver, assets, shares);
 
         // Additional logic for inheriting contracts
         afterDeposit(assets, shares);
+    }
+
+    /**
+     * @notice Transfer shares to user using claimable shares prior to minting new ones
+     * @param pendingShares The amount of claimableShares following a withdraw/redeem request
+     * @param shares The user's entitled shares
+     * @param receiver The user receiving shares
+     */
+    function _mintWithClaimableBalance(
+        uint256 pendingShares,
+        uint256 shares,
+        address receiver
+    ) internal {
+        if (pendingShares >= shares) {
+            // transfer exclusively pending shares
+            SafeTransferLib.safeTransfer(
+                ERC20(address(this)),
+                receiver,
+                shares
+            );
+        } else {
+            // transfer eventual pending shares
+            if (pendingShares > 0)
+                SafeTransferLib.safeTransfer(
+                    ERC20(address(this)),
+                    receiver,
+                    pendingShares
+                );
+
+            // mint the remaining
+            _mint(receiver, shares - pendingShares);
+        }
     }
 
     /**

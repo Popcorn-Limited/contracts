@@ -6,6 +6,7 @@ import {MockERC20} from "test/mocks/MockERC20.sol";
 import {BaseControlledAsyncRedeem, BaseERC7540} from "src/vaults/multisig/phase1/BaseControlledAsyncRedeem.sol";
 import {RequestBalance} from "src/vaults/multisig/phase1/BaseControlledAsyncRedeem.sol";
 import {AsyncVault, InitializeParams, Limits, Fees, Bounds} from "src/vaults/multisig/phase1/AsyncVault.sol";
+import "forge-std/console.sol";
 
 contract MockControlledAsyncRedeem is BaseControlledAsyncRedeem {
     constructor(
@@ -15,7 +16,7 @@ contract MockControlledAsyncRedeem is BaseControlledAsyncRedeem {
         string memory _symbol
     ) BaseERC7540(_owner, _asset, _name, _symbol) {}
 
-    function totalAssets() public virtual view override returns (uint256) {
+    function totalAssets() public view virtual override returns (uint256) {
         return asset.balanceOf(address(this));
     }
 }
@@ -114,6 +115,7 @@ contract BaseControlledAsyncRedeemTest is Test {
         uint256 depositAmount = 30e18;
 
         // Setup and fulfill redeem request
+        uint256 totalSupplyBefore = baseVault.totalSupply();
         vm.startPrank(alice);
         baseVault.approve(address(baseVault), redeemAmount);
         baseVault.requestRedeem(redeemAmount, alice, alice);
@@ -128,6 +130,8 @@ contract BaseControlledAsyncRedeemTest is Test {
         uint256 shares = baseVault.deposit(depositAmount, alice);
         vm.stopPrank();
 
+        uint256 totalSupplyAfter = baseVault.totalSupply();
+
         assertEq(shares, depositAmount);
         assertEq(
             baseVault.balanceOf(alice),
@@ -138,6 +142,48 @@ contract BaseControlledAsyncRedeemTest is Test {
         RequestBalance memory balance = baseVault.getRequestBalance(alice);
         assertEq(balance.claimableAssets, redeemAmount - depositAmount);
         assertEq(balance.claimableShares, redeemAmount - depositAmount);
+        assertEq(totalSupplyBefore, totalSupplyAfter, "total supply inflated");
+    }
+
+    function testDepositWithPartialClaimableAssets() public virtual {
+        uint256 redeemAmount = 50e18;
+        uint256 depositAmount = 60e18;
+
+        // Setup and fulfill redeem request
+        uint256 totalSupplyBefore = baseVault.totalSupply();
+        vm.startPrank(alice);
+        baseVault.approve(address(baseVault), redeemAmount);
+        baseVault.requestRedeem(redeemAmount, alice, alice);
+        vm.stopPrank();
+
+        vm.startPrank(owner);
+        baseVault.fulfillRedeem(redeemAmount, alice);
+        vm.stopPrank();
+
+        // Deposit using claimable assets
+        asset.mint(alice, 10e18);
+        vm.startPrank(alice);
+        asset.approve(address(baseVault), depositAmount);
+        uint256 shares = baseVault.deposit(depositAmount, alice);
+        vm.stopPrank();
+
+        uint256 totalSupplyAfter = baseVault.totalSupply();
+
+        assertEq(shares, depositAmount);
+        assertEq(
+            baseVault.balanceOf(alice),
+            INITIAL_DEPOSIT - redeemAmount + depositAmount
+        );
+
+        // Check that claimable assets were reduced
+        RequestBalance memory balance = baseVault.getRequestBalance(alice);
+        assertEq(balance.claimableAssets, 0);
+        assertEq(balance.claimableShares, 0);
+        assertEq(
+            totalSupplyAfter,
+            totalSupplyBefore + 10e18,
+            "total supply inflated"
+        );
     }
 
     function testFailDepositZero() public virtual {
@@ -188,6 +234,8 @@ contract BaseControlledAsyncRedeemTest is Test {
         uint256 redeemAmount = 50e18;
         uint256 mintAmount = 30e18;
 
+        uint256 totalSupplyBefore = baseVault.totalSupply();
+
         // Setup and fulfill redeem request
         vm.startPrank(alice);
         baseVault.approve(address(baseVault), redeemAmount);
@@ -197,6 +245,8 @@ contract BaseControlledAsyncRedeemTest is Test {
         vm.startPrank(owner);
         baseVault.fulfillRedeem(redeemAmount, alice);
         vm.stopPrank();
+
+        uint256 totalSupplyAfter = baseVault.totalSupply();
 
         // Deposit using claimable assets
         vm.startPrank(alice);
@@ -213,6 +263,7 @@ contract BaseControlledAsyncRedeemTest is Test {
         RequestBalance memory balance = baseVault.getRequestBalance(alice);
         assertEq(balance.claimableAssets, redeemAmount - mintAmount);
         assertEq(balance.claimableShares, redeemAmount - mintAmount);
+        assertEq(totalSupplyBefore, totalSupplyAfter, "total supply inflated");
     }
 
     function testFailMintZero() public virtual {
