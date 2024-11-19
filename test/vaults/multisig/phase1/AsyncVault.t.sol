@@ -487,6 +487,47 @@ contract AsyncVaultTest is BaseControlledAsyncRedeemTest {
         assertGt(asyncVault.balanceOf(feeRecipient), 0);
     }
 
+    // test fees calculation on assets with 6 decimals
+    function testPerformanceFeeDecimals() public {
+        asset = new MockERC20("Test Token", "TEST", 6);
+
+        InitializeParams memory params = InitializeParams({
+            asset: address(asset),
+            name: "Vault Token",
+            symbol: "vTEST",
+            owner: owner,
+            limits: Limits({depositLimit: type(uint256).max, minAmount: 0}),
+            fees: Fees({
+                performanceFee: 1e17, // 10%
+                managementFee: 0,
+                withdrawalIncentive: 0,
+                feesUpdatedAt: uint64(block.timestamp),
+                highWaterMark: 0,
+                feeRecipient: feeRecipient
+            })
+        });
+
+        asyncVault = new MockAsyncVault(params);
+
+        // Alice deposits 100 USDC
+        asset.mint(alice, 100e6);
+        vm.startPrank(alice);
+        asset.approve(address(asyncVault), 100e6);
+        asyncVault.deposit(100e6, alice);
+        vm.stopPrank();
+
+        // Simulate some yield
+        asset.mint(address(asyncVault), 100e6);
+
+        // no shares before
+        assertEq(asyncVault.balanceOf(feeRecipient), 0);
+
+        // take fees
+        asyncVault.takeFees();
+
+        assertGt(asyncVault.balanceOf(feeRecipient), 0);
+    }
+
     /*//////////////////////////////////////////////////////////////
                             LIMIT TESTS
     //////////////////////////////////////////////////////////////*/
