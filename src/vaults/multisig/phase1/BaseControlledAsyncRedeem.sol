@@ -8,7 +8,6 @@ import {ERC20} from "solmate/tokens/ERC20.sol";
 import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
 import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
 import {IERC7540Redeem} from "ERC-7540/interfaces/IERC7540.sol";
-import "forge-std/console.sol";
 
 /// @notice Stores the requestBalance of a controller
 struct RequestBalance {

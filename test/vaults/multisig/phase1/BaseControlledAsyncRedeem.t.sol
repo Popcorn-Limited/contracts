@@ -21,7 +21,7 @@ contract MockControlledAsyncRedeem is BaseControlledAsyncRedeem {
     }
 }
 
-contract BaseControlledAsyncRedeemTest is Test {
+contract BaseControlledAsyncRedeemTest is Test {    
     MockControlledAsyncRedeem baseVault;
     address assetReceiver;
     MockERC20 asset;
@@ -354,6 +354,52 @@ contract BaseControlledAsyncRedeemTest is Test {
 
         assertEq(asset.balanceOf(alice), assets);
         assertEq(assets, redeemAmount);
+    }
+
+    function testRedeem_issueM01() public virtual {
+        uint256 mintAmount = 100e18;
+
+        asset.mint(bob, mintAmount);
+
+        vm.startPrank(bob);
+        asset.approve(address(baseVault), mintAmount);
+        uint256 assets = baseVault.mint(mintAmount, bob);
+        vm.stopPrank();
+
+        uint256 redeemAmount = 100e18;
+
+        // Setup and redeem request with full balance
+        vm.startPrank(alice);
+        baseVault.approve(address(baseVault), redeemAmount);
+        baseVault.requestRedeem(redeemAmount, alice, alice);
+        vm.stopPrank();
+
+        // fulfill but leave the assets idle
+        vm.prank(owner);
+        baseVault.fulfillRedeem(redeemAmount, alice);
+
+        // mint as "yield"
+        asset.mint(address(baseVault), 10e18);
+
+        // Setup and fulfill redeem request
+        vm.startPrank(bob);
+        baseVault.approve(address(baseVault), redeemAmount);
+        baseVault.requestRedeem(redeemAmount, bob, bob);
+        vm.stopPrank();
+
+        baseVault.fulfillRedeem(redeemAmount, bob);
+
+        // Redeem
+        vm.prank(bob);
+        uint256 bobAssets = baseVault.redeem(redeemAmount, bob, bob);
+        assertEq(bobAssets, 110e18, "BOB"); // fails
+
+        // alice redeem - should have 0 yield 
+        // this is correct, issue is that bob receives less and 
+        // the remaining yield stays in the contract
+        vm.prank(alice);
+        uint256 aliceAssets = baseVault.redeem(redeemAmount, alice, alice);
+        assertEq(aliceAssets, 100e18, "ALICE");
     }
 
     function testRedeemWithOperator() public virtual {
