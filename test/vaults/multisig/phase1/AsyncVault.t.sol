@@ -232,6 +232,82 @@ contract AsyncVaultTest is BaseControlledAsyncRedeemTest {
         assertEq(asyncVault.totalAssets(), redeemAmount * 3);
     }
 
+    function testFulfillMultipleRedeemsWithFees() public virtual {
+        uint256 redeemAmount = 100e18;
+        asset.mint(alice, redeemAmount);
+        asset.mint(bob, redeemAmount);
+
+        // alice deposits 
+        vm.startPrank(alice);
+        asset.approve(address(asyncVault), redeemAmount);
+        asyncVault.deposit(redeemAmount, alice);
+        vm.stopPrank();
+
+        // bob deposits 
+        vm.startPrank(bob);
+        asset.approve(address(asyncVault), redeemAmount);
+        asyncVault.deposit(redeemAmount, bob);
+        vm.stopPrank();
+
+         // Set 1% withdrawal fee
+        Fees memory newFees = Fees({
+            performanceFee: 0,
+            managementFee: 0,
+            withdrawalIncentive: 0.01e18, // 1%
+            feesUpdatedAt: uint64(block.timestamp),
+            highWaterMark: ONE,
+            feeRecipient: feeRecipient
+        });
+        vm.prank(owner);
+        asyncVault.setFees(newFees);
+
+        // Setup redeem requests
+        vm.startPrank(alice);
+        asyncVault.approve(address(asyncVault), redeemAmount);
+        uint256 request1 = asyncVault.requestRedeem(redeemAmount, alice, alice);
+        vm.stopPrank();
+        
+        // bob 
+        vm.startPrank(bob);
+        asyncVault.approve(address(asyncVault), redeemAmount);
+        uint256 request2 = asyncVault.requestRedeem(redeemAmount, bob, bob);
+        vm.stopPrank();
+
+        // fulfill both requests at once
+        uint256[] memory shares = new uint256[](2);
+        shares[0] = redeemAmount;
+        shares[1] = redeemAmount;
+
+        address[] memory controllers = new address[](2);
+        controllers[0] = alice;
+        controllers[1] = bob;
+
+        vm.startPrank(owner);
+        uint256 totalAssets = asyncVault.fulfillMultipleRedeems(
+            shares,
+            controllers
+        );
+
+        assertEq(totalAssets, redeemAmount * 2, "return ta");
+        vm.stopPrank();
+
+        // alice withdraw 
+        vm.prank(alice);
+        asyncVault.redeem(redeemAmount, alice, alice);
+
+        // bob withdraw 
+        vm.prank(bob);
+        asyncVault.redeem(redeemAmount, bob, bob);
+
+        uint256 withdrawFee = redeemAmount / 100; // 1% fee
+
+        assertEq(asset.balanceOf(alice), redeemAmount - withdrawFee, "alice");
+        assertEq(asset.balanceOf(bob), redeemAmount - withdrawFee, "bob");
+        assertEq(asset.balanceOf(feeRecipient), withdrawFee * 2, "recipient");
+
+        assertEq(asyncVault.totalAssets(), INITIAL_DEPOSIT);
+    }
+
     function testFulfillRedeemWithWithdrawalFee() public virtual {
         uint256 redeemAmount = INITIAL_DEPOSIT;
 
