@@ -33,7 +33,7 @@ contract Deploy is Script {
         symbol = "oVault";
 
         limits = Limits(type(uint256).max, 0);
-        fees = Fees(0, 0, 0, 0, 0, msg.sender);
+        fees = Fees(0, 0, 0, 0, msg.sender);
 
         oracle = 0xf7C42Db8bdD563539861de0ef2520Aa80c28e8c4;
 
