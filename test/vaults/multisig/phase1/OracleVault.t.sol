@@ -37,6 +37,7 @@ contract OracleVaultTest is AsyncVaultTest {
                 managementFee: 0,
                 withdrawalIncentive: 0,
                 feesUpdatedAt: uint64(block.timestamp),
+                highWaterMark: ONE,
                 feeRecipient: feeRecipient
             })
         });
@@ -83,6 +84,7 @@ contract OracleVaultTest is AsyncVaultTest {
                 managementFee: 1e16,
                 withdrawalIncentive: 1e16,
                 feesUpdatedAt: uint64(block.timestamp),
+                highWaterMark: ONE,
                 feeRecipient: feeRecipient
             })
         });
@@ -103,6 +105,7 @@ contract OracleVaultTest is AsyncVaultTest {
                 managementFee: 1e16,
                 withdrawalIncentive: 1e16,
                 feesUpdatedAt: uint64(block.timestamp),
+                highWaterMark: ONE,
                 feeRecipient: feeRecipient
             })
         });
@@ -283,7 +286,8 @@ contract OracleVaultTest is AsyncVaultTest {
             managementFee: 0,
             withdrawalIncentive: 0.01e18, // 1%
             feesUpdatedAt: uint64(block.timestamp),
-            feeRecipient: feeRecipient
+            feeRecipient: feeRecipient,
+            highWaterMark: ONE
         });
         vm.prank(owner);
         asyncVault.setFees(newFees);
@@ -328,7 +332,8 @@ contract OracleVaultTest is AsyncVaultTest {
             managementFee: 0.05e18, // 5%
             withdrawalIncentive: 0,
             feesUpdatedAt: uint64(block.timestamp),
-            feeRecipient: feeRecipient
+            feeRecipient: feeRecipient,
+            highWaterMark: ONE
         });
 
         vm.prank(owner);

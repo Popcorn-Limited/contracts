@@ -47,6 +47,7 @@ contract AsyncVaultTest is BaseControlledAsyncRedeemTest {
                 managementFee: 0,
                 withdrawalIncentive: 0,
                 feesUpdatedAt: uint64(block.timestamp),
+                highWaterMark: ONE,
                 feeRecipient: feeRecipient
             })
         });
@@ -163,9 +164,11 @@ contract AsyncVaultTest is BaseControlledAsyncRedeemTest {
 
     function testMaxMintMaxUint() public virtual {
         vm.prank(owner);
-        asyncVault.setLimits(Limits({depositLimit: type(uint256).max, minAmount: 0}));
+        asyncVault.setLimits(
+            Limits({depositLimit: type(uint256).max, minAmount: 0})
+        );
 
-        uint256 expectedShares =  type(uint256).max - asyncVault.totalSupply();
+        uint256 expectedShares = type(uint256).max - asyncVault.totalSupply();
         assertEq(asyncVault.maxMint(alice), expectedShares);
     }
 
@@ -236,25 +239,26 @@ contract AsyncVaultTest is BaseControlledAsyncRedeemTest {
         asset.mint(alice, redeemAmount);
         asset.mint(bob, redeemAmount);
 
-        // alice deposits 
+        // alice deposits
         vm.startPrank(alice);
         asset.approve(address(asyncVault), redeemAmount);
         asyncVault.deposit(redeemAmount, alice);
         vm.stopPrank();
 
-        // bob deposits 
+        // bob deposits
         vm.startPrank(bob);
         asset.approve(address(asyncVault), redeemAmount);
         asyncVault.deposit(redeemAmount, bob);
         vm.stopPrank();
 
-         // Set 1% withdrawal fee
+        // Set 1% withdrawal fee
         Fees memory newFees = Fees({
             performanceFee: 0,
             managementFee: 0,
             withdrawalIncentive: 0.01e18, // 1%
             feesUpdatedAt: uint64(block.timestamp),
-            feeRecipient: feeRecipient
+            feeRecipient: feeRecipient,
+            highWaterMark: ONE
         });
         vm.prank(owner);
         asyncVault.setFees(newFees);
@@ -264,8 +268,8 @@ contract AsyncVaultTest is BaseControlledAsyncRedeemTest {
         asyncVault.approve(address(asyncVault), redeemAmount);
         uint256 request1 = asyncVault.requestRedeem(redeemAmount, alice, alice);
         vm.stopPrank();
-        
-        // bob 
+
+        // bob
         vm.startPrank(bob);
         asyncVault.approve(address(asyncVault), redeemAmount);
         uint256 request2 = asyncVault.requestRedeem(redeemAmount, bob, bob);
@@ -289,11 +293,11 @@ contract AsyncVaultTest is BaseControlledAsyncRedeemTest {
         assertEq(totalAssets, redeemAmount * 2, "return ta");
         vm.stopPrank();
 
-        // alice withdraw 
+        // alice withdraw
         vm.prank(alice);
         asyncVault.redeem(redeemAmount, alice, alice);
 
-        // bob withdraw 
+        // bob withdraw
         vm.prank(bob);
         asyncVault.redeem(redeemAmount, bob, bob);
 
@@ -315,7 +319,8 @@ contract AsyncVaultTest is BaseControlledAsyncRedeemTest {
             managementFee: 0,
             withdrawalIncentive: 0.01e18, // 1%
             feesUpdatedAt: uint64(block.timestamp),
-            feeRecipient: feeRecipient
+            feeRecipient: feeRecipient,
+            highWaterMark: ONE
         });
         vm.prank(owner);
         asyncVault.setFees(newFees);
@@ -395,7 +400,8 @@ contract AsyncVaultTest is BaseControlledAsyncRedeemTest {
             managementFee: 0.02e18, // 2%
             withdrawalIncentive: 0.02e18, // 2%
             feesUpdatedAt: uint64(block.timestamp),
-            feeRecipient: feeRecipient
+            feeRecipient: feeRecipient,
+            highWaterMark: ONE
         });
 
         vm.prank(owner);
@@ -413,7 +419,8 @@ contract AsyncVaultTest is BaseControlledAsyncRedeemTest {
             managementFee: 0,
             withdrawalIncentive: 0,
             feesUpdatedAt: uint64(block.timestamp),
-            feeRecipient: feeRecipient
+            feeRecipient: feeRecipient,
+            highWaterMark: ONE
         });
 
         vm.prank(owner);
@@ -442,7 +449,8 @@ contract AsyncVaultTest is BaseControlledAsyncRedeemTest {
             managementFee: 0.05e18, // 5%
             withdrawalIncentive: 0,
             feesUpdatedAt: uint64(block.timestamp),
-            feeRecipient: feeRecipient
+            feeRecipient: feeRecipient,
+            highWaterMark: ONE
         });
 
         vm.prank(owner);
@@ -481,7 +489,8 @@ contract AsyncVaultTest is BaseControlledAsyncRedeemTest {
             managementFee: 0.05e18,
             withdrawalIncentive: 0,
             feesUpdatedAt: uint64(block.timestamp),
-            feeRecipient: feeRecipient
+            feeRecipient: feeRecipient,
+            highWaterMark: ONE
         });
 
         vm.prank(owner);
@@ -508,7 +517,8 @@ contract AsyncVaultTest is BaseControlledAsyncRedeemTest {
             managementFee: 0.05e18,
             withdrawalIncentive: 0,
             feesUpdatedAt: uint64(block.timestamp),
-            feeRecipient: feeRecipient
+            feeRecipient: feeRecipient,
+            highWaterMark: ONE
         });
 
         vm.prank(owner);
@@ -536,7 +546,8 @@ contract AsyncVaultTest is BaseControlledAsyncRedeemTest {
             managementFee: 0.05e18,
             withdrawalIncentive: 0,
             feesUpdatedAt: uint64(block.timestamp),
-            feeRecipient: feeRecipient
+            feeRecipient: feeRecipient,
+            highWaterMark: ONE
         });
 
         vm.prank(owner);
@@ -551,7 +562,8 @@ contract AsyncVaultTest is BaseControlledAsyncRedeemTest {
             managementFee: 0.05e18, // Change fee to 5%
             withdrawalIncentive: 0,
             feesUpdatedAt: uint64(block.timestamp),
-            feeRecipient: feeRecipient
+            feeRecipient: feeRecipient,
+            highWaterMark: ONE
         });
 
         vm.prank(owner);
@@ -568,7 +580,8 @@ contract AsyncVaultTest is BaseControlledAsyncRedeemTest {
             managementFee: 0.05e18,
             withdrawalIncentive: 0,
             feesUpdatedAt: uint64(block.timestamp),
-            feeRecipient: feeRecipient
+            feeRecipient: feeRecipient,
+            highWaterMark: ONE
         });
 
         vm.prank(owner);
@@ -581,7 +594,7 @@ contract AsyncVaultTest is BaseControlledAsyncRedeemTest {
         asyncVault.takeFees();
 
         Fees memory currentFees = asyncVault.getFees();
-        uint256 currentHighWaterMark = asyncVault.highWaterMark();
+        uint256 currentHighWaterMark = currentFees.highWaterMark;
 
         // high watermark should be higher than share value after fee is taken
         assertGt(currentHighWaterMark, asyncVault.convertToAssets(1e18));
@@ -597,7 +610,8 @@ contract AsyncVaultTest is BaseControlledAsyncRedeemTest {
             managementFee: 0.05e18,
             withdrawalIncentive: 0,
             feesUpdatedAt: uint64(block.timestamp),
-            feeRecipient: feeRecipient
+            feeRecipient: feeRecipient,
+            highWaterMark: ONE
         });
 
         vm.prank(owner);
@@ -605,10 +619,10 @@ contract AsyncVaultTest is BaseControlledAsyncRedeemTest {
 
         // no new fees should be taken
         assertEq(feeRecBalance, asyncVault.balanceOf(feeRecipient));
-        
+
         // high watermark should be the same as before
         Fees memory afterFees = asyncVault.getFees();
-        uint256 afterFeesHighWaterMark = asyncVault.highWaterMark();
+        uint256 afterFeesHighWaterMark = afterFees.highWaterMark;
 
         assertEq(currentHighWaterMark, afterFeesHighWaterMark);
 
@@ -621,9 +635,9 @@ contract AsyncVaultTest is BaseControlledAsyncRedeemTest {
 
         // high watermark should be greater now
         afterFees = asyncVault.getFees();
-        afterFeesHighWaterMark = asyncVault.highWaterMark();
+        afterFeesHighWaterMark = afterFees.highWaterMark;
         assertGt(afterFeesHighWaterMark, currentHighWaterMark, "aft");
-        
+
         // new fees should be taken
         assertLt(feeRecBalance, asyncVault.balanceOf(feeRecipient), "bal");
     }
@@ -643,6 +657,7 @@ contract AsyncVaultTest is BaseControlledAsyncRedeemTest {
                 managementFee: 0,
                 withdrawalIncentive: 0,
                 feesUpdatedAt: uint64(block.timestamp),
+                highWaterMark: ONE,
                 feeRecipient: feeRecipient
             })
         });
@@ -682,6 +697,7 @@ contract AsyncVaultTest is BaseControlledAsyncRedeemTest {
                 managementFee: 0.1e17,
                 withdrawalIncentive: 0,
                 feesUpdatedAt: uint64(block.timestamp),
+                highWaterMark: ONE,
                 feeRecipient: feeRecipient
             })
         });

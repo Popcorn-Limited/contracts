@@ -50,6 +50,8 @@ struct Fees {
     uint64 withdrawalIncentive;
     /// @notice Timestamp of the last time the fees were updated (used for management fee calculations)
     uint64 feesUpdatedAt;
+    /// @notice High water mark of the vault (used for performance fee calculations)
+    uint256 highWaterMark;
     /// @notice Address of the fee recipient
     address feeRecipient;
 }
@@ -76,8 +78,6 @@ abstract contract AsyncVault is BaseControlledAsyncRedeem {
     ) BaseERC7540(params.owner, params.asset, params.name, params.symbol) {
         _setLimits(params.limits);
         _setFees(params.fees);
-
-        highWaterMark = convertToAssets(10 ** asset.decimals());
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -386,9 +386,6 @@ abstract contract AsyncVault is BaseControlledAsyncRedeem {
 
     Fees public fees;
 
-    /// @notice High water mark of the vault (used for performance fee calculations)
-    uint256 public highWaterMark;
-
     event FeesUpdated(Fees prev, Fees next);
 
     error InvalidFee(uint256 fee);
@@ -423,9 +420,9 @@ abstract contract AsyncVault is BaseControlledAsyncRedeem {
         uint256 performanceFee = uint256(fees_.performanceFee);
 
         return
-            performanceFee > 0 && shareValue > highWaterMark
+            performanceFee > 0 && shareValue > fees_.highWaterMark
                 ? performanceFee.mulDivUp(
-                    (shareValue - highWaterMark) * totalSupply,
+                    (shareValue - fees_.highWaterMark) * totalSupply,
                     (10 ** (18 + asset.decimals()))
                 )
                 : 0;
@@ -477,6 +474,12 @@ abstract contract AsyncVault is BaseControlledAsyncRedeem {
         // Dont rely on user input here
         fees_.feesUpdatedAt = uint64(block.timestamp);
 
+        // initialise or copy current HWM
+        if(fees.highWaterMark == 0)
+            fees_.highWaterMark = convertToAssets(10 ** asset.decimals()); // from constructor
+        else 
+            fees_.highWaterMark = fees.highWaterMark; // from setFees
+
         emit FeesUpdated(fees, fees_);
 
         fees = fees_;
@@ -496,7 +499,7 @@ abstract contract AsyncVault is BaseControlledAsyncRedeem {
         uint256 fee = _accruedFees(fees_);
         uint256 shareValue = convertToAssets(10 ** asset.decimals());
 
-        if (shareValue > highWaterMark) highWaterMark = shareValue;
+        if (shareValue > fees_.highWaterMark) fees.highWaterMark = shareValue;
 
         if (fee > 0) _mint(fees_.feeRecipient, convertToShares(fee));
 
