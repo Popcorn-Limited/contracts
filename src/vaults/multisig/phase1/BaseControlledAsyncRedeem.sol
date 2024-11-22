@@ -203,9 +203,6 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
         // Additional logic for inheriting contracts
         beforeWithdraw(assets, shares);
 
-        // Burn controller's shares
-        _burn(address(this), shares);
-
         // Transfer assets to the receiver
         SafeTransferLib.safeTransfer(asset, receiver, assets);
 
@@ -267,9 +264,6 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
 
         // Additional logic for inheriting contracts
         beforeWithdraw(assets, shares);
-
-        // Burn controller's shares
-        _burn(address(this), shares);
 
         // Transfer assets to the receiver
         SafeTransferLib.safeTransfer(asset, receiver, assets);
@@ -435,7 +429,6 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
         address indexed controller,
         address indexed owner,
         uint256 requestId,
-        uint256 timestamp,
         address sender,
         uint256 shares
     );
@@ -484,7 +477,6 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
             controller,
             owner,
             REQUEST_ID,
-            block.timestamp,
             msg.sender,
             shares
         );
@@ -498,7 +490,6 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
     event RedeemRequestCanceled(
         address indexed controller,
         address indexed receiver,
-        uint256 timestamp,
         uint256 shares
     );
 
@@ -550,7 +541,6 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
         emit RedeemRequestCanceled(
             controller,
             receiver,
-            block.timestamp,
             shares
         );
     }
@@ -562,7 +552,6 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
     event RedeemRequestFulfilled(
         address indexed controller,
         address indexed fulfiller,
-        uint256 timestamp,
         uint256 shares,
         uint256 assets
     );
@@ -607,13 +596,15 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
         currentBalance.claimableAssets += assets;
         currentBalance.pendingShares -= shares;
 
+        // Burn controller's shares
+        _burn(address(this), shares);
+
         // Reset the requestTime if there are no more pending shares
         if (currentBalance.pendingShares == 0) currentBalance.requestTime = 0;
 
         emit RedeemRequestFulfilled(
             controller,
             msg.sender,
-            block.timestamp,
             shares,
             assets
         );

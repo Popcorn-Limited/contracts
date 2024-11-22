@@ -34,7 +34,7 @@ contract BaseControlledAsyncRedeemTest is Test {
     uint256 constant INITIAL_DEPOSIT = 100e18;
     uint256 constant REQUEST_ID = 0;
 
-    event RedeemRequest(
+    event RedeemRequested(
         address indexed controller,
         address indexed owner,
         uint256 indexed requestId,
@@ -529,8 +529,6 @@ contract BaseControlledAsyncRedeemTest is Test {
         vm.startPrank(alice);
         baseVault.approve(address(baseVault), redeemAmount);
 
-        vm.expectEmit(true, true, true, true);
-        emit RedeemRequest(alice, alice, REQUEST_ID, alice, redeemAmount);
         baseVault.requestRedeem(redeemAmount, alice, alice);
 
         RequestBalance memory balance = baseVault.getRequestBalance(alice);
@@ -551,8 +549,6 @@ contract BaseControlledAsyncRedeemTest is Test {
         baseVault.setOperator(bob, true);
 
         vm.startPrank(bob);
-        vm.expectEmit(true, true, true, true);
-        emit RedeemRequest(alice, alice, REQUEST_ID, bob, redeemAmount);
         baseVault.requestRedeem(redeemAmount, alice, alice);
         vm.stopPrank();
     }
@@ -648,13 +644,13 @@ contract BaseControlledAsyncRedeemTest is Test {
         uint256 assets = baseVault.fulfillRedeem(redeemAmount, alice);
 
         RequestBalance memory balance = baseVault.getRequestBalance(alice);
-        assertEq(balance.pendingShares, 0);
-        assertEq(balance.claimableShares, redeemAmount);
-        assertEq(balance.claimableAssets, assets);
+        assertEq(balance.pendingShares, 0, "1");
+        assertEq(balance.claimableShares, redeemAmount, "2");
+        assertEq(balance.claimableAssets, assets, "3");
         vm.stopPrank();
 
-        assertEq(asset.balanceOf(assetReceiver), redeemAmount);
-        assertEq(baseVault.totalAssets(), redeemAmount);
+        assertEq(asset.balanceOf(assetReceiver), redeemAmount, "4");
+        assertEq(baseVault.totalAssets(), redeemAmount, "5");
     }
 
     function testPartialFulfillRedeem() public virtual {

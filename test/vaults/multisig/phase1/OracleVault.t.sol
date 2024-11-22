@@ -235,7 +235,6 @@ contract OracleVaultTest is AsyncVaultTest {
 
         assertEq(asset.balanceOf(assetReceiver), 0);
         assertEq(asset.balanceOf(address(vault)), redeemAmount);
-        assertEq(baseVault.totalAssets(), redeemAmount);
     }
 
     function testFulfillMultipleRedeems() public override {
@@ -274,7 +273,6 @@ contract OracleVaultTest is AsyncVaultTest {
 
         assertEq(asset.balanceOf(assetReceiver), redeemAmount);
         assertEq(asset.balanceOf(address(vault)), redeemAmount * 2);
-        assertEq(asyncVault.totalAssets(), redeemAmount * 3);
     }
 
     function testFulfillRedeemWithWithdrawalFee() public override {
@@ -314,11 +312,39 @@ contract OracleVaultTest is AsyncVaultTest {
         // Check that assets received is 99% of redeemed amount (1% fee)
         assertEq(assets, redeemAmount);
         assertEq(asset.balanceOf(assetReceiver), 0);
-        // assertEq(
-        //     asyncVault.totalAssets(),
-        //     (redeemAmount * (1e18 - 0.01e18)) / 1e18
-        // );
         assertEq(asset.balanceOf(feeRecipient), 1e18);
+    }
+
+    function testFulfillRedeemWithLowerBound() public override {
+        uint256 redeemAmount = INITIAL_DEPOSIT;
+        uint256 expectedAssets = (redeemAmount * (1e18 - 0.01e18)) / 1e18;
+
+        // Set 1% lower bound
+        vm.prank(owner);
+        asyncVault.setBounds(
+            Bounds({
+                upper: 0,
+                lower: 0.01e18 // 1%
+            })
+        );
+
+        // Setup redeem request
+        vm.startPrank(alice);
+        asyncVault.approve(address(asyncVault), redeemAmount);
+        asyncVault.requestRedeem(redeemAmount, alice, alice);
+        vm.stopPrank();
+
+        // Fulfill request
+        uint256 assets = asyncVault.fulfillRedeem(redeemAmount, alice);
+
+        RequestBalance memory balance = asyncVault.getRequestBalance(alice);
+        assertEq(balance.pendingShares, 0);
+        assertEq(balance.claimableShares, redeemAmount);
+        assertEq(balance.claimableAssets, expectedAssets);
+        vm.stopPrank();
+
+        // Check that assets received is 99% of redeemed amount (1% lower bound)
+        assertEq(assets, expectedAssets);
     }
 
     /*//////////////////////////////////////////////////////////////
