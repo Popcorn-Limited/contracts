@@ -50,35 +50,37 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
         require((shares = previewDeposit(assets)) != 0, "ZERO_SHARES");
 
         // Utilise claimable balance first
-        uint256 assetsToTransfer = assets;
-        RequestBalance storage currentBalance = requestBalances[msg.sender];
-        uint256 pendingShares = currentBalance.claimableShares;
+        // uint256 assetsToTransfer = assets;
+        // RequestBalance storage currentBalance = requestBalances[msg.sender];
+        // uint256 pendingShares = currentBalance.claimableShares;
 
-        if (currentBalance.claimableAssets > 0) {
-            // Ensures we cant underflow when subtracting from assetsToTransfer
-            uint256 claimableAssets = assetsToTransfer >
-                currentBalance.claimableAssets
-                ? currentBalance.claimableAssets
-                : assetsToTransfer;
+        // if (currentBalance.claimableAssets > 0) {
+        //     // Ensures we cant underflow when subtracting from assetsToTransfer
+        //     uint256 claimableAssets = assetsToTransfer >
+        //         currentBalance.claimableAssets
+        //         ? currentBalance.claimableAssets
+        //         : assetsToTransfer;
 
-            // Modify the currentBalance state accordingly
-            _withdrawClaimableBalance(claimableAssets, currentBalance);
+        //     // Modify the currentBalance state accordingly
+        //     _withdrawClaimableBalance(claimableAssets, currentBalance);
 
-            assetsToTransfer -= claimableAssets;
-        }
+        //     assetsToTransfer -= claimableAssets;
+        // }
 
-        // Transfer the remaining assets from the sender
-        if (assetsToTransfer > 0) {
-            // Need to transfer before minting or ERC777s could reenter.
-            SafeTransferLib.safeTransferFrom(
-                asset,
-                msg.sender,
-                address(this),
-                assetsToTransfer
-            );
-        }
+        // // Transfer the remaining assets from the sender
+        // if (assetsToTransfer > 0) {
 
-        _mintWithClaimableBalance(pendingShares, shares, receiver);
+        // }
+
+        // Need to transfer before minting or ERC777s could reenter.
+        SafeTransferLib.safeTransferFrom(
+            asset,
+            msg.sender,
+            address(this),
+            assets
+        );
+
+        _mint(receiver, shares);
 
         emit Deposit(msg.sender, receiver, assets, shares);
 
@@ -102,72 +104,42 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
         assets = previewMint(shares); // No need to check for rounding error, previewMint rounds up.
 
         // Utilise claimable balance first
-        uint256 assetsToTransfer = assets;
-        RequestBalance storage currentBalance = requestBalances[msg.sender];
-        uint256 pendingShares = currentBalance.claimableShares;
+        // uint256 assetsToTransfer = assets;
+        // RequestBalance storage currentBalance = requestBalances[msg.sender];
+        // uint256 pendingShares = currentBalance.claimableShares;
 
-        if (currentBalance.claimableAssets > 0) {
-            // Ensures we cant underflow when subtracting from assetsToTransfer
-            uint256 claimableAssets = assetsToTransfer >
-                currentBalance.claimableAssets
-                ? currentBalance.claimableAssets
-                : assetsToTransfer;
+        // if (currentBalance.claimableAssets > 0) {
+        //     // Ensures we cant underflow when subtracting from assetsToTransfer
+        //     uint256 claimableAssets = assetsToTransfer >
+        //         currentBalance.claimableAssets
+        //         ? currentBalance.claimableAssets
+        //         : assetsToTransfer;
 
-            // Modify the currentBalance state accordingly
-            _withdrawClaimableBalance(claimableAssets, currentBalance);
+        //     // Modify the currentBalance state accordingly
+        //     _withdrawClaimableBalance(claimableAssets, currentBalance);
 
-            assetsToTransfer -= claimableAssets;
-        }
+        //     assetsToTransfer -= claimableAssets;
+        // }
 
-        // Transfer the remaining assets from the sender
-        if (assetsToTransfer > 0) {
-            // Need to transfer before minting or ERC777s could reenter.
-            SafeTransferLib.safeTransferFrom(
-                asset,
-                msg.sender,
-                address(this),
-                assetsToTransfer
-            );
-        }
+        // // Transfer the remaining assets from the sender
+        // if (assetsToTransfer > 0) {
 
-        _mintWithClaimableBalance(pendingShares, shares, receiver);
+        // }
+
+        // Need to transfer before minting or ERC777s could reenter.
+        SafeTransferLib.safeTransferFrom(
+            asset,
+            msg.sender,
+            address(this),
+            assets
+        );
+
+        _mint(receiver, shares);
 
         emit Deposit(msg.sender, receiver, assets, shares);
 
         // Additional logic for inheriting contracts
         afterDeposit(assets, shares);
-    }
-
-    /**
-     * @notice Transfer shares to user using claimable shares prior to minting new ones
-     * @param pendingShares The amount of claimableShares following a withdraw/redeem request
-     * @param shares The user's entitled shares
-     * @param receiver The user receiving shares
-     */
-    function _mintWithClaimableBalance(
-        uint256 pendingShares,
-        uint256 shares,
-        address receiver
-    ) internal {
-        if (pendingShares >= shares) {
-            // transfer exclusively pending shares
-            SafeTransferLib.safeTransfer(
-                ERC20(address(this)),
-                receiver,
-                shares
-            );
-        } else {
-            // transfer eventual pending shares
-            if (pendingShares > 0)
-                SafeTransferLib.safeTransfer(
-                    ERC20(address(this)),
-                    receiver,
-                    pendingShares
-                );
-
-            // mint the remaining
-            _mint(receiver, shares - pendingShares);
-        }
     }
 
     /**
@@ -473,13 +445,7 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
         currentBalance.pendingShares += shares;
         currentBalance.requestTime = block.timestamp;
 
-        emit RedeemRequested(
-            controller,
-            owner,
-            REQUEST_ID,
-            msg.sender,
-            shares
-        );
+        emit RedeemRequested(controller, owner, REQUEST_ID, msg.sender, shares);
         return REQUEST_ID;
     }
 
@@ -538,11 +504,7 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
         currentBalance.pendingShares = 0;
         currentBalance.requestTime = 0;
 
-        emit RedeemRequestCanceled(
-            controller,
-            receiver,
-            shares
-        );
+        emit RedeemRequestCanceled(controller, receiver, shares);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -602,12 +564,7 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
         // Reset the requestTime if there are no more pending shares
         if (currentBalance.pendingShares == 0) currentBalance.requestTime = 0;
 
-        emit RedeemRequestFulfilled(
-            controller,
-            msg.sender,
-            shares,
-            assets
-        );
+        emit RedeemRequestFulfilled(controller, msg.sender, shares, assets);
 
         return assets;
     }

@@ -236,14 +236,7 @@ contract AsyncVaultTest is BaseControlledAsyncRedeemTest {
 
     function testFulfillMultipleRedeemsWithFees() public virtual {
         uint256 redeemAmount = 100e18;
-        asset.mint(alice, redeemAmount);
         asset.mint(bob, redeemAmount);
-
-        // alice deposits
-        vm.startPrank(alice);
-        asset.approve(address(asyncVault), redeemAmount);
-        asyncVault.deposit(redeemAmount, alice);
-        vm.stopPrank();
 
         // bob deposits
         vm.startPrank(bob);

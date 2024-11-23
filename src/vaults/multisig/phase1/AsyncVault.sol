@@ -207,7 +207,8 @@ abstract contract AsyncVault is BaseControlledAsyncRedeem {
         uint256 depositLimit_ = limits.depositLimit;
 
         if (paused || assets >= depositLimit_) return 0;
-        if (depositLimit_ == type(uint256).max) return depositLimit_ - totalSupply;
+        if (depositLimit_ == type(uint256).max)
+            return depositLimit_ - totalSupply;
 
         return convertToShares(depositLimit_ - assets);
     }
@@ -475,10 +476,11 @@ abstract contract AsyncVault is BaseControlledAsyncRedeem {
         fees_.feesUpdatedAt = uint64(block.timestamp);
 
         // initialise or copy current HWM
-        if(fees.highWaterMark == 0)
+        if (fees.highWaterMark == 0) {
             fees_.highWaterMark = convertToAssets(10 ** asset.decimals()); // from constructor
-        else 
+        } else {
             fees_.highWaterMark = fees.highWaterMark; // from setFees
+        }
 
         emit FeesUpdated(fees, fees_);
 
