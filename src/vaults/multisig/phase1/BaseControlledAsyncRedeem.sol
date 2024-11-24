@@ -49,29 +49,6 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
         // Check for rounding error since we round down in previewDeposit.
         require((shares = previewDeposit(assets)) != 0, "ZERO_SHARES");
 
-        // Utilise claimable balance first
-        // uint256 assetsToTransfer = assets;
-        // RequestBalance storage currentBalance = requestBalances[msg.sender];
-        // uint256 pendingShares = currentBalance.claimableShares;
-
-        // if (currentBalance.claimableAssets > 0) {
-        //     // Ensures we cant underflow when subtracting from assetsToTransfer
-        //     uint256 claimableAssets = assetsToTransfer >
-        //         currentBalance.claimableAssets
-        //         ? currentBalance.claimableAssets
-        //         : assetsToTransfer;
-
-        //     // Modify the currentBalance state accordingly
-        //     _withdrawClaimableBalance(claimableAssets, currentBalance);
-
-        //     assetsToTransfer -= claimableAssets;
-        // }
-
-        // // Transfer the remaining assets from the sender
-        // if (assetsToTransfer > 0) {
-
-        // }
-
         // Need to transfer before minting or ERC777s could reenter.
         SafeTransferLib.safeTransferFrom(
             asset,
@@ -102,29 +79,6 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
     ) public override whenNotPaused returns (uint256 assets) {
         require(shares != 0, "ZERO_SHARES");
         assets = previewMint(shares); // No need to check for rounding error, previewMint rounds up.
-
-        // Utilise claimable balance first
-        // uint256 assetsToTransfer = assets;
-        // RequestBalance storage currentBalance = requestBalances[msg.sender];
-        // uint256 pendingShares = currentBalance.claimableShares;
-
-        // if (currentBalance.claimableAssets > 0) {
-        //     // Ensures we cant underflow when subtracting from assetsToTransfer
-        //     uint256 claimableAssets = assetsToTransfer >
-        //         currentBalance.claimableAssets
-        //         ? currentBalance.claimableAssets
-        //         : assetsToTransfer;
-
-        //     // Modify the currentBalance state accordingly
-        //     _withdrawClaimableBalance(claimableAssets, currentBalance);
-
-        //     assetsToTransfer -= claimableAssets;
-        // }
-
-        // // Transfer the remaining assets from the sender
-        // if (assetsToTransfer > 0) {
-
-        // }
 
         // Need to transfer before minting or ERC777s could reenter.
         SafeTransferLib.safeTransferFrom(
