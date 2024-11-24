@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.25;
 
+import {console, console2} from "forge-std/Test.sol";
 import {AsyncVaultTest, MockAsyncVault, MockControlledAsyncRedeem} from "./AsyncVault.t.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 import {MockOracle} from "test/mocks/MockOracle.sol";
@@ -208,6 +209,53 @@ contract OracleVaultTest is AsyncVaultTest {
         assertEq(asset.balanceOf(bob), assets);
     }
 
+    function testRedeem_issueM01() public override {
+        uint256 mintAmount = 100e18;
+
+        asset.mint(bob, mintAmount);
+
+        vm.startPrank(bob);
+        asset.approve(address(baseVault), mintAmount);
+        uint256 assets = baseVault.mint(mintAmount, bob);
+        vm.stopPrank();
+
+        uint256 redeemAmount = 100e18;
+
+        // Setup and redeem request with full balance
+        vm.startPrank(alice);
+        baseVault.approve(address(baseVault), redeemAmount);
+        baseVault.requestRedeem(redeemAmount, alice, alice);
+        vm.stopPrank();
+
+        // fulfill but leave the assets idle
+        vm.prank(owner);
+        baseVault.fulfillRedeem(redeemAmount, alice);
+
+        // mint as "yield"
+        oracle.setPrice(address(baseVault), address(asset), 1.1e18);
+        asset.mint(address(assetReceiver), 10e18);
+
+        // Setup and fulfill redeem request
+        vm.startPrank(bob);
+        baseVault.approve(address(baseVault), redeemAmount);
+        baseVault.requestRedeem(redeemAmount, bob, bob);
+        vm.stopPrank();
+
+        baseVault.fulfillRedeem(redeemAmount, bob);
+
+        // Redeem
+        vm.prank(bob);
+        uint256 bobAssets = baseVault.redeem(redeemAmount, bob, bob);
+        assertEq(bobAssets, 110e18, "BOB"); // fails
+
+        // alice redeem - should have 0 yield
+        // this is correct, issue is that bob receives less and
+        // the remaining yield stays in the contract
+        vm.prank(alice);
+        uint256 aliceAssets = baseVault.redeem(redeemAmount, alice, alice);
+        assertEq(aliceAssets, 100e18, "ALICE");
+    }
+
     /*//////////////////////////////////////////////////////////////
                         FULFILL REDEEM TESTS
     //////////////////////////////////////////////////////////////*/
@@ -284,8 +332,8 @@ contract OracleVaultTest is AsyncVaultTest {
             managementFee: 0,
             withdrawalIncentive: 0.01e18, // 1%
             feesUpdatedAt: uint64(block.timestamp),
-            highWaterMark: ONE,
-            feeRecipient: feeRecipient
+            feeRecipient: feeRecipient,
+            highWaterMark: ONE
         });
         vm.prank(owner);
         asyncVault.setFees(newFees);
@@ -358,8 +406,8 @@ contract OracleVaultTest is AsyncVaultTest {
             managementFee: 0.05e18, // 5%
             withdrawalIncentive: 0,
             feesUpdatedAt: uint64(block.timestamp),
-            highWaterMark: ONE,
-            feeRecipient: feeRecipient
+            feeRecipient: feeRecipient,
+            highWaterMark: ONE
         });
 
         vm.prank(owner);
@@ -446,5 +494,77 @@ contract OracleVaultTest is AsyncVaultTest {
         // Verify final state
         assertEq(vault.balanceOf(alice), 0);
         assertEq(asset.balanceOf(bob), amount * 2); // Should get more assets due to price increase
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        FEE TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function testUpdateFeesHighWatermark() public override {
+        // Set initial management fee to 5%
+        Fees memory initialFees = Fees({
+            performanceFee: 0,
+            managementFee: 0.05e18,
+            withdrawalIncentive: 0,
+            feesUpdatedAt: uint64(block.timestamp),
+            feeRecipient: feeRecipient,
+            highWaterMark: ONE
+        });
+
+        vm.prank(owner);
+        asyncVault.setFees(initialFees);
+
+        // Warp forward so fees can accrue
+        vm.warp(block.timestamp + 365.25 days);
+
+        vm.prank(owner);
+        asyncVault.takeFees();
+
+        Fees memory currentFees = asyncVault.getFees();
+        uint256 currentHighWaterMark = currentFees.highWaterMark;
+
+        assertEq(currentHighWaterMark, asyncVault.convertToAssets(1e18));
+        assertEq(currentHighWaterMark, ONE);
+
+        // fee recipient should have received from management fee
+        uint256 feeRecBalance = asyncVault.balanceOf(feeRecipient);
+        assertGt(feeRecBalance, 0);
+
+        // Change performance fee to 5%
+        initialFees = Fees({
+            performanceFee: 0.05e18,
+            managementFee: 0.05e18,
+            withdrawalIncentive: 0,
+            feesUpdatedAt: uint64(block.timestamp),
+            feeRecipient: feeRecipient,
+            highWaterMark: ONE
+        });
+
+        vm.prank(owner);
+        asyncVault.setFees(initialFees);
+
+        // no new fees should be taken
+        assertEq(feeRecBalance, asyncVault.balanceOf(feeRecipient));
+
+        // high watermark should be the same as before
+        Fees memory afterFees = asyncVault.getFees();
+        uint256 afterFeesHighWaterMark = afterFees.highWaterMark;
+
+        assertEq(currentHighWaterMark, afterFeesHighWaterMark);
+
+        // Simulate some yield
+        oracle.setPrice(address(vault), address(asset), 1.1e18);
+
+        // Set new fees which should trigger fee taking
+        vm.prank(owner);
+        asyncVault.setFees(initialFees);
+
+        // high watermark should be greater now
+        afterFees = asyncVault.getFees();
+        afterFeesHighWaterMark = afterFees.highWaterMark;
+        assertGt(afterFeesHighWaterMark, currentHighWaterMark, "aft");
+
+        // new fees should be taken
+        assertLt(feeRecBalance, asyncVault.balanceOf(feeRecipient), "bal");
     }
 }

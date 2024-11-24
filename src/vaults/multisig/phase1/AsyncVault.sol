@@ -4,7 +4,7 @@
 pragma solidity ^0.8.25;
 
 import {BaseControlledAsyncRedeem} from "./BaseControlledAsyncRedeem.sol";
-import {BaseERC7540} from "./BaseERC7540.sol";
+import {BaseERC7540, ERC20} from "./BaseERC7540.sol";
 import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
 import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
 
@@ -207,7 +207,8 @@ abstract contract AsyncVault is BaseControlledAsyncRedeem {
         uint256 depositLimit_ = limits.depositLimit;
 
         if (paused || assets >= depositLimit_) return 0;
-        if (depositLimit_ == type(uint256).max) return depositLimit_;
+        if (depositLimit_ == type(uint256).max)
+            return depositLimit_ - totalSupply;
 
         return convertToShares(depositLimit_ - assets);
     }
@@ -294,6 +295,7 @@ abstract contract AsyncVault is BaseControlledAsyncRedeem {
         // cache the fees
         Fees memory fees_ = fees;
 
+        uint256 totalShares;
         uint256 totalFees;
         for (uint256 i; i < shares.length; i++) {
             // Using the lower bound totalAssets ensures that even with volatile strategies and market conditions we will have sufficient assets to cover the redeem
@@ -311,7 +313,11 @@ abstract contract AsyncVault is BaseControlledAsyncRedeem {
             // Add to the total assets and fees
             total += assets;
             totalFees += fees;
+            totalShares += shares[i];
         }
+
+        // Burn controller's shares
+        _burn(address(this), totalShares);
 
         // Send the withdrawal incentive fee to the fee recipient
         handleWithdrawalIncentive(totalFees, fees_.feeRecipient);
@@ -416,15 +422,14 @@ abstract contract AsyncVault is BaseControlledAsyncRedeem {
     function _accruedPerformanceFee(
         Fees memory fees_
     ) internal view returns (uint256) {
-        uint256 shareValue = convertToAssets(1e18);
+        uint256 shareValue = convertToAssets(10 ** asset.decimals());
         uint256 performanceFee = uint256(fees_.performanceFee);
-        uint256 highWaterMark = fees_.highWaterMark;
 
         return
-            performanceFee > 0 && shareValue > highWaterMark
+            performanceFee > 0 && shareValue > fees_.highWaterMark
                 ? performanceFee.mulDivUp(
-                    (shareValue - highWaterMark) * totalSupply,
-                    1e36
+                    (shareValue - fees_.highWaterMark) * totalSupply,
+                    (10 ** (18 + asset.decimals()))
                 )
                 : 0;
     }
@@ -474,7 +479,13 @@ abstract contract AsyncVault is BaseControlledAsyncRedeem {
 
         // Dont rely on user input here
         fees_.feesUpdatedAt = uint64(block.timestamp);
-        fees_.highWaterMark = convertToAssets(1e18);
+
+        // initialise or copy current HWM
+        if (fees.highWaterMark == 0) {
+            fees_.highWaterMark = convertToAssets(10 ** asset.decimals()); // from constructor
+        } else {
+            fees_.highWaterMark = fees.highWaterMark; // from setFees
+        }
 
         emit FeesUpdated(fees, fees_);
 
@@ -493,7 +504,7 @@ abstract contract AsyncVault is BaseControlledAsyncRedeem {
     function _takeFees() internal {
         Fees memory fees_ = fees;
         uint256 fee = _accruedFees(fees_);
-        uint256 shareValue = convertToAssets(1e18);
+        uint256 shareValue = convertToAssets(10 ** asset.decimals());
 
         if (shareValue > fees_.highWaterMark) fees.highWaterMark = shareValue;
 
