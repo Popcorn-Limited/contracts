@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.25;
 
-import {Test} from "forge-std/Test.sol";
+import {Test, console, console2} from "forge-std/Test.sol";
 import {BaseControlledAsyncRedeemTest, MockControlledAsyncRedeem} from "./BaseControlledAsyncRedeem.t.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 import {AsyncVault, InitializeParams, Limits, Fees, Bounds} from "src/vaults/multisig/phase1/AsyncVault.sol";
@@ -296,11 +296,15 @@ contract AsyncVaultTest is BaseControlledAsyncRedeemTest {
 
         uint256 withdrawFee = redeemAmount / 100; // 1% fee
 
-        assertEq(asset.balanceOf(alice), redeemAmount - withdrawFee, "alice");
+        assertEq(
+            asset.balanceOf(alice),
+            INITIAL_DEPOSIT + redeemAmount - withdrawFee,
+            "alice"
+        );
         assertEq(asset.balanceOf(bob), redeemAmount - withdrawFee, "bob");
         assertEq(asset.balanceOf(feeRecipient), withdrawFee * 2, "recipient");
 
-        assertEq(asyncVault.totalAssets(), INITIAL_DEPOSIT);
+        assertEq(asyncVault.totalAssets(), 0);
     }
 
     function testFulfillRedeemWithWithdrawalFee() public virtual {

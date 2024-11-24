@@ -495,4 +495,76 @@ contract OracleVaultTest is AsyncVaultTest {
         assertEq(vault.balanceOf(alice), 0);
         assertEq(asset.balanceOf(bob), amount * 2); // Should get more assets due to price increase
     }
+
+    /*//////////////////////////////////////////////////////////////
+                        FEE TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function testUpdateFeesHighWatermark() public override {
+        // Set initial management fee to 5%
+        Fees memory initialFees = Fees({
+            performanceFee: 0,
+            managementFee: 0.05e18,
+            withdrawalIncentive: 0,
+            feesUpdatedAt: uint64(block.timestamp),
+            feeRecipient: feeRecipient,
+            highWaterMark: ONE
+        });
+
+        vm.prank(owner);
+        asyncVault.setFees(initialFees);
+
+        // Warp forward so fees can accrue
+        vm.warp(block.timestamp + 365.25 days);
+
+        vm.prank(owner);
+        asyncVault.takeFees();
+
+        Fees memory currentFees = asyncVault.getFees();
+        uint256 currentHighWaterMark = currentFees.highWaterMark;
+
+        assertEq(currentHighWaterMark, asyncVault.convertToAssets(1e18));
+        assertEq(currentHighWaterMark, ONE);
+
+        // fee recipient should have received from management fee
+        uint256 feeRecBalance = asyncVault.balanceOf(feeRecipient);
+        assertGt(feeRecBalance, 0);
+
+        // Change performance fee to 5%
+        initialFees = Fees({
+            performanceFee: 0.05e18,
+            managementFee: 0.05e18,
+            withdrawalIncentive: 0,
+            feesUpdatedAt: uint64(block.timestamp),
+            feeRecipient: feeRecipient,
+            highWaterMark: ONE
+        });
+
+        vm.prank(owner);
+        asyncVault.setFees(initialFees);
+
+        // no new fees should be taken
+        assertEq(feeRecBalance, asyncVault.balanceOf(feeRecipient));
+
+        // high watermark should be the same as before
+        Fees memory afterFees = asyncVault.getFees();
+        uint256 afterFeesHighWaterMark = afterFees.highWaterMark;
+
+        assertEq(currentHighWaterMark, afterFeesHighWaterMark);
+
+        // Simulate some yield
+        oracle.setPrice(address(vault), address(asset), 1.1e18);
+
+        // Set new fees which should trigger fee taking
+        vm.prank(owner);
+        asyncVault.setFees(initialFees);
+
+        // high watermark should be greater now
+        afterFees = asyncVault.getFees();
+        afterFeesHighWaterMark = afterFees.highWaterMark;
+        assertGt(afterFeesHighWaterMark, currentHighWaterMark, "aft");
+
+        // new fees should be taken
+        assertLt(feeRecBalance, asyncVault.balanceOf(feeRecipient), "bal");
+    }
 }

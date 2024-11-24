@@ -530,6 +530,9 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
     ) external virtual returns (uint256) {
         uint256 assets = convertToAssets(shares);
 
+        // Burn controller's shares
+        _burn(address(this), shares);
+
         return _fulfillRedeem(assets, shares, controller);
     }
 
@@ -557,9 +560,6 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
         currentBalance.claimableShares += shares;
         currentBalance.claimableAssets += assets;
         currentBalance.pendingShares -= shares;
-
-        // Burn controller's shares
-        _burn(address(this), shares);
 
         // Reset the requestTime if there are no more pending shares
         if (currentBalance.pendingShares == 0) currentBalance.requestTime = 0;

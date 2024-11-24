@@ -295,6 +295,7 @@ abstract contract AsyncVault is BaseControlledAsyncRedeem {
         // cache the fees
         Fees memory fees_ = fees;
 
+        uint256 totalShares;
         uint256 totalFees;
         for (uint256 i; i < shares.length; i++) {
             // Using the lower bound totalAssets ensures that even with volatile strategies and market conditions we will have sufficient assets to cover the redeem
@@ -312,7 +313,11 @@ abstract contract AsyncVault is BaseControlledAsyncRedeem {
             // Add to the total assets and fees
             total += assets;
             totalFees += fees;
+            totalShares += shares[i];
         }
+
+        // Burn controller's shares
+        _burn(address(this), totalShares);
 
         // Send the withdrawal incentive fee to the fee recipient
         handleWithdrawalIncentive(totalFees, fees_.feeRecipient);
