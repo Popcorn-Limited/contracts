@@ -367,7 +367,7 @@ abstract contract AsyncVault is BaseControlledAsyncRedeem {
      * @notice Takes fees before a deposit
      * @dev This function is expected to be overriden in inheriting contracts
      */
-    function afterDeposit(uint256 assets, uint256) internal virtual override {
+    function beforeDeposit(uint256 assets, uint256) internal virtual override {
         // deposit and mint already have the `whenNotPaused` modifier so we don't need to check it here
         _takeFees();
     }

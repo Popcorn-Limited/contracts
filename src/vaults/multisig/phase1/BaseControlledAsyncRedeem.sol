@@ -46,6 +46,9 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
         uint256 assets,
         address receiver
     ) public override whenNotPaused returns (uint256 shares) {
+        // Additional logic for inheriting contracts
+        beforeDeposit(assets, shares);
+
         // Check for rounding error since we round down in previewDeposit.
         require((shares = previewDeposit(assets)) != 0, "ZERO_SHARES");
 
@@ -77,7 +80,11 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
         uint256 shares,
         address receiver
     ) public override whenNotPaused returns (uint256 assets) {
+        // Additional logic for inheriting contracts
+        beforeDeposit(assets, shares);
+
         require(shares != 0, "ZERO_SHARES");
+
         assets = previewMint(shares); // No need to check for rounding error, previewMint rounds up.
 
         // Need to transfer before minting or ERC777s could reenter.
@@ -95,6 +102,9 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
         // Additional logic for inheriting contracts
         afterDeposit(assets, shares);
     }
+
+    /// @dev Additional logic for inheriting contracts before depositing
+    function beforeDeposit(uint256 assets, uint256 shares) internal virtual {}
 
     /**
      * @notice Withdraws assets from the vault which have beenpreviously freed up by a fulfilled redeem request
@@ -133,6 +143,9 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
         SafeTransferLib.safeTransfer(asset, receiver, assets);
 
         emit Withdraw(msg.sender, receiver, controller, assets, shares);
+
+        // Additional logic for inheriting contracts
+        afterWithdraw(assets, shares);
     }
 
     /**
@@ -195,6 +208,9 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
         SafeTransferLib.safeTransfer(asset, receiver, assets);
 
         emit Withdraw(msg.sender, receiver, controller, assets, shares);
+
+        // Additional logic for inheriting contracts
+        afterWithdraw(assets, shares);
     }
 
     /**
@@ -219,6 +235,9 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
             : 0;
         currentBalance.claimableShares -= shares;
     }
+
+    /// @dev Additional logic for inheriting contracts after withdrawing
+    function afterWithdraw(uint256 assets, uint256 shares) internal virtual {}
 
     /*//////////////////////////////////////////////////////////////
                         ACCOUNTNG LOGIC
@@ -520,11 +539,20 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
 
         emit RedeemRequestFulfilled(controller, msg.sender, shares, assets);
 
+        // Additional logic for inheriting contracts
+        afterFulfillRedeem(assets, shares);
+
         return assets;
     }
 
     /// @dev Additional logic for inheriting contracts before fulfilling a redeem request
     function beforeFulfillRedeem(
+        uint256 assets,
+        uint256 shares
+    ) internal virtual {}
+
+    /// @dev Additional logic for inheriting contracts after fulfilling a redeem request
+    function afterFulfillRedeem(
         uint256 assets,
         uint256 shares
     ) internal virtual {}
