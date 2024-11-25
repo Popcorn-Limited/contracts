@@ -168,8 +168,7 @@ contract AsyncVaultTest is BaseControlledAsyncRedeemTest {
             Limits({depositLimit: type(uint256).max, minAmount: 0})
         );
 
-        uint256 expectedShares = type(uint256).max - asyncVault.totalSupply();
-        assertEq(asyncVault.maxMint(alice), expectedShares);
+        assertEq(asyncVault.maxMint(alice), type(uint256).max);
     }
 
     /*//////////////////////////////////////////////////////////////

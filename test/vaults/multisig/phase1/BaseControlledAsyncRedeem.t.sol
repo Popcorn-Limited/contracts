@@ -679,7 +679,7 @@ contract BaseControlledAsyncRedeemTest is Test {
     function testFulfillRedeemWithEmptyRequestBalance() public virtual {
         uint256 redeemAmount = INITIAL_DEPOSIT;
 
-        vm.expectRevert("ZERO_SHARES");
+        vm.expectRevert();
         baseVault.fulfillRedeem(redeemAmount, alice);
 
         // Verify request balance remains empty

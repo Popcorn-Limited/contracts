@@ -194,6 +194,9 @@ abstract contract AsyncVault is BaseControlledAsyncRedeem {
     function maxDeposit(address) public view override returns (uint256) {
         uint256 assets = totalAssets();
         uint256 depositLimit_ = limits.depositLimit;
+
+        if (depositLimit_ == type(uint256).max) return depositLimit_;
+
         return (paused || assets >= depositLimit_) ? 0 : depositLimit_ - assets;
     }
     /**
@@ -206,11 +209,12 @@ abstract contract AsyncVault is BaseControlledAsyncRedeem {
         uint256 assets = totalAssets();
         uint256 depositLimit_ = limits.depositLimit;
 
-        if (paused || assets >= depositLimit_) return 0;
-        if (depositLimit_ == type(uint256).max)
-            return depositLimit_ - totalSupply;
+        if (depositLimit_ == type(uint256).max) return depositLimit_;
 
-        return convertToShares(depositLimit_ - assets);
+        return
+            (paused || assets >= depositLimit_)
+                ? 0
+                : convertToShares(depositLimit_ - assets);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -261,6 +265,9 @@ abstract contract AsyncVault is BaseControlledAsyncRedeem {
         uint256 shares,
         address controller
     ) external override returns (uint256 assets) {
+        // Take fees before fulfilling the redeem
+        _takeFees();
+
         // Using the lower bound totalAssets ensures that even with volatile strategies and market conditions we will have sufficient assets to cover the redeem
         assets = convertToLowBoundAssets(shares);
 
@@ -270,6 +277,9 @@ abstract contract AsyncVault is BaseControlledAsyncRedeem {
             uint256(fees_.withdrawalIncentive),
             1e18
         );
+
+        // Burn controller's shares
+        _burn(address(this), shares);
 
         // Fulfill the redeem request
         _fulfillRedeem(assets - fees, shares, controller);
@@ -291,6 +301,9 @@ abstract contract AsyncVault is BaseControlledAsyncRedeem {
         address[] memory controllers
     ) external returns (uint256 total) {
         if (shares.length != controllers.length) revert Misconfigured();
+
+        // Take fees before fulfilling the redeem
+        _takeFees();
 
         // cache the fees
         Fees memory fees_ = fees;
