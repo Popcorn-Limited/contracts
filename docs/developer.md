@@ -84,17 +84,6 @@ sequenceDiagram
 │             │   └── pushOracle
 │             │       └── PushOracle.sol
 │             └── OracleVaultController.sol
-├── test
-│   ├── vaults
-│   │   └── multisig
-│   │       └── phase1
-│   │            ├── AsyncVault.t.sol
-│   │            ├── BaseControlledAsyncRedeem.sol
-│   │            ├── BaseERC7540.t.sol
-│   │            └── OracleVault.t.sol
-│   └── peripheral
-│       ├── PushOracle.t.sol
-│       └── OracleVaultController.t.sol
 ```
 
 At this point we expect the manager to be a trusted permissioned actor which is why we wont include any contracts of the `SafeController`-module just yet.
