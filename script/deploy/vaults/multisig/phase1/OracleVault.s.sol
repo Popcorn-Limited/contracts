@@ -35,9 +35,9 @@ contract Deploy is Script {
         limits = Limits(type(uint256).max, 0);
         fees = Fees(0, 0, 0, 0, 0, msg.sender);
 
-        oracle = 0xa7df2Ff7a6E1FAEb480617A01aD80b99CE39Bcc3;
+        oracle = 0xDcC09A3984C6C3D6D349af3bc01C129d26609B42;
 
-        // Lido arb,opt
+        // edge arb,eth
         multisig = 0x158a006d5FBA167C8c439e010343e0603DC44847;
 
         owner = msg.sender;
@@ -50,12 +50,12 @@ contract Deploy is Script {
         );
 
         // Oracle Vault Controller setup
-        address controller = IOwned(oracle).owner();
-        OracleVaultController(controller).addVault(address(vault));
-        OracleVaultController(controller).setKeeper(
-            address(vault),
-            0xE015c099a3E731757dC33491eFb1E8Eb883aCA8B
-        ); // Set Gelato as Keeper
+        // address controller = IOwned(oracle).owner();
+        // OracleVaultController(controller).addVault(address(vault));
+        // OracleVaultController(controller).setKeeper(
+        //     address(vault),
+        //     0xE015c099a3E731757dC33491eFb1E8Eb883aCA8B
+        // ); // Set Gelato as Keeper
 
         vm.stopBroadcast();
     }
