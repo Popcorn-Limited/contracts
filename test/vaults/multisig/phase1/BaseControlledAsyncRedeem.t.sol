@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.25;
 
-import {Test} from "forge-std/Test.sol";
+import {Test, console} from "forge-std/Test.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 import {BaseControlledAsyncRedeem, BaseERC7540} from "src/vaults/multisig/phase1/BaseControlledAsyncRedeem.sol";
 import {RequestBalance} from "src/vaults/multisig/phase1/BaseControlledAsyncRedeem.sol";
@@ -398,7 +398,9 @@ contract BaseControlledAsyncRedeemTest is Test {
         assertEq(asset.balanceOf(bob), assets);
     }
 
-    function testFuzz_WithdrawWithOperator(uint256 redeemAmount) public virtual {
+    function testFuzz_WithdrawWithOperator(
+        uint256 redeemAmount
+    ) public virtual {
         uint256 mintAmount = 1e38;
 
         asset.mint(alice, mintAmount);
@@ -591,7 +593,7 @@ contract BaseControlledAsyncRedeemTest is Test {
         uint256 assets = baseVault.mint(mintAmount, alice);
 
         vm.assume(redeemAmount <= mintAmount && redeemAmount > 0);
-        
+
         // Setup operator
         baseVault.setOperator(bob, true);
 

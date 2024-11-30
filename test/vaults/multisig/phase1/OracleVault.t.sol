@@ -32,7 +32,7 @@ contract OracleVaultTest is AsyncVaultTest {
             name: "Vault Token",
             symbol: "vTEST",
             owner: owner,
-            limits: Limits({depositLimit: 10000e18, minAmount: 1e18}),
+            limits: Limits({depositLimit: type(uint256).max, minAmount: 0}),
             fees: Fees({
                 performanceFee: 0,
                 managementFee: 0,
@@ -454,6 +454,9 @@ contract OracleVaultTest is AsyncVaultTest {
     }
 
     function testPriceImpactOnMaxOperations() public {
+        vm.prank(owner);
+        vault.setLimits(Limits({depositLimit: 10000e18, minAmount: 1e18}));
+
         oracle.setPrice(address(vault), address(asset), 2e18); // 2 assets per share
 
         (uint256 depositLimit, uint256 minAmount) = vault.limits();

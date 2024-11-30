@@ -195,9 +195,10 @@ abstract contract AsyncVault is BaseControlledAsyncRedeem {
         uint256 assets = totalAssets();
         uint256 depositLimit_ = limits.depositLimit;
 
+        if (paused) return 0;
         if (depositLimit_ == type(uint256).max) return depositLimit_;
 
-        return (paused || assets >= depositLimit_) ? 0 : depositLimit_ - assets;
+        return assets >= depositLimit_ ? 0 : depositLimit_ - assets;
     }
     /**
      * @notice Returns the maximum amount of shares that can be minted into the vault
@@ -209,10 +210,11 @@ abstract contract AsyncVault is BaseControlledAsyncRedeem {
         uint256 assets = totalAssets();
         uint256 depositLimit_ = limits.depositLimit;
 
+        if (paused) return 0;
         if (depositLimit_ == type(uint256).max) return depositLimit_;
 
         return
-            (paused || assets >= depositLimit_)
+            assets >= depositLimit_
                 ? 0
                 : convertToShares(depositLimit_ - assets);
     }
