@@ -115,19 +115,11 @@ contract VaultRouterTest is Test {
         vault.setOperator(address(router), true);
 
         // Main call
-        router.requestFulfillWithdraw(
-            address(vault),
-            user,
-            100e18
-        );
+        router.requestFulfillWithdraw(address(vault), user, 100e18);
 
         // Verify final balances
         assertEq(vault.balanceOf(user), 0, "Vault balance should not change");
-        assertEq(
-            asset.balanceOf(user),
-            100e18,
-            "Asset balance not increased"
-        );
+        assertEq(asset.balanceOf(user), 100e18, "Asset balance not increased");
 
         vm.stopPrank();
     }
@@ -142,19 +134,11 @@ contract VaultRouterTest is Test {
         vault.setOperator(address(router), true);
 
         // Main call
-        router.requestFulfillWithdraw(
-            address(vault),
-            user2,
-            100e18
-        );
+        router.requestFulfillWithdraw(address(vault), user2, 100e18);
 
         // Verify final balances
         assertEq(vault.balanceOf(user), 0, "Vault balance should not change");
-        assertEq(
-            asset.balanceOf(user2),
-            100e18,
-            "Asset balance not increased"
-        );
+        assertEq(asset.balanceOf(user2), 100e18, "Asset balance not increased");
 
         vm.stopPrank();
     }
@@ -165,11 +149,7 @@ contract VaultRouterTest is Test {
         vault.approve(address(router), type(uint256).max);
 
         // Main call
-        router.requestFulfillWithdraw(
-            address(vault),
-            user,
-            100e18
-        );
+        router.requestFulfillWithdraw(address(vault), user, 100e18);
         vm.stopPrank();
     }
 
@@ -195,11 +175,7 @@ contract VaultRouterTest is Test {
         // Verify final balances
         assertEq(gauge.balanceOf(user), 0, "Gauge balance not decreased");
         assertEq(vault.balanceOf(user), 0, "Vault balance should not change");
-        assertEq(
-            asset.balanceOf(user),
-            100e18,
-            "Asset balance not increased"
-        );
+        assertEq(asset.balanceOf(user), 100e18, "Asset balance not increased");
 
         vm.stopPrank();
     }
@@ -225,11 +201,7 @@ contract VaultRouterTest is Test {
         // Verify final balances
         assertEq(gauge.balanceOf(user), 0, "Gauge balance not decreased");
         assertEq(vault.balanceOf(user), 0, "Vault balance should not change");
-        assertEq(
-            asset.balanceOf(user2),
-            100e18,
-            "Asset balance not increased"
-        );
+        assertEq(asset.balanceOf(user2), 100e18, "Asset balance not increased");
 
         vm.stopPrank();
     }
@@ -249,4 +221,56 @@ contract VaultRouterTest is Test {
         );
         vm.stopPrank();
     }
+
+    // /*//////////////////////////////////////////////////////////////
+    //                     FULFILL AND REDEEM
+    // //////////////////////////////////////////////////////////////*/
+
+    // function test__fulfillAndRedeem() public {
+    //     // Test Preparation
+    //     vm.startPrank(user);
+    //     vault.approve(address(router), type(uint256).max);
+    //     vault.setOperator(address(router), true);
+    //     vault.requestRedeem(100e18, user, address(router));
+
+    //     // Main call
+    //     router.fulfillAndRedeem(address(vault), user, 100e18);
+
+    //     // Verify final balances
+    //     assertEq(vault.balanceOf(user), 0, "Vault balance should not change");
+    //     assertEq(asset.balanceOf(user), 100e18, "Asset balance not increased");
+
+    //     vm.stopPrank();
+    // }
+
+    // function test__fulfillAndRedeem_for_receiver() public {
+    //     // Test Preparation
+    //     vm.prank(user2);
+    //     vault.setOperator(address(router), true);
+
+    //     vm.startPrank(user);
+    //     vault.approve(address(router), type(uint256).max);
+    //     vault.setOperator(address(router), true);
+    //     vault.requestRedeem(100e18, user, address(router));
+
+    //     // Main call
+    //     router.fulfillAndRedeem(address(vault), user2, 100e18);
+
+    //     // Verify final balances
+    //     assertEq(vault.balanceOf(user), 0, "Vault balance should not change");
+    //     assertEq(asset.balanceOf(user2), 100e18, "Asset balance not increased");
+
+    //     vm.stopPrank();
+    // }
+
+    // function testFail__fulfillAndRedeem_not_operator() public {
+    //     // Test Preparation
+    //     vm.startPrank(user);
+    //     vault.approve(address(router), type(uint256).max);
+    //     vault.requestRedeem(100e18, user, address(router));
+
+    //     // Main call
+    //     router.fulfillAndRedeem(address(vault), user, 100e18);
+    //     vm.stopPrank();
+    // }
 }

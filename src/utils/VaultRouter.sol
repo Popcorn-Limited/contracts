@@ -149,6 +149,23 @@ contract VaultRouter {
 
         _requestFulfillWithdraw(vault, receiver, shares);
     }
+    
+    // @dev Since the user must request a withdrawal with the router in mind and than cant withdraw on their own we are not gonna implement this at this moment
+    // /**
+    //  * @notice Fulfill a pending withdrawal and withdraw your assets from a vault (ONLY works for ERC7540 vaults)
+    //  * @param vault The vault to request withdrawal from
+    //  * @param receiver The receiver of the shares
+    //  * @param shares The amount of shares to unstake
+    //  * @dev This function will fulfill the withdrawal before redeeming the shares making the vault effectivly instant and synchronous
+    //  * @dev This router must be enabled as `controller` on the vault by the `receiver`
+    //  */
+    // function fulfillAndRedeem(
+    //     address vault,
+    //     address receiver,
+    //     uint256 shares
+    // ) external {
+    //     _fulfillAndRedeem(vault, receiver, shares);
+    // }
 
     /// @notice Internal function to request and fulfill and execute a withdrawal from a vault
     function _requestFulfillWithdraw(
@@ -157,20 +174,7 @@ contract VaultRouter {
         uint256 shares
     ) internal {
         _requestWithdrawal(vault, receiver, shares);
-
-        IAsyncVault(vault).fulfillRedeem(shares, receiver);
-
-        IERC4626(vault).redeem(shares, receiver, receiver);
-    }
-
-    /// @notice Internal function to fulfill a withdrawal from a vault
-    function _fulfillWithdrawal(
-        address vault,
-        address receiver,
-        uint256 shares
-    ) internal {
-        IAsyncVault(vault).fulfillRedeem(shares, receiver);
-        IERC4626(vault).redeem(shares, receiver, receiver);
+        _fulfillAndRedeem(vault, receiver, shares);
     }
 
     /// @notice Internal function to request a withdrawal from a vault
@@ -184,5 +188,15 @@ contract VaultRouter {
 
         // request redeem - send shares to vault
         IAsyncVault(vault).requestRedeem(shares, receiver, address(this));
+    }
+
+    /// @notice Internal function to fulfill a withdrawal from a vault
+    function _fulfillAndRedeem(
+        address vault,
+        address receiver,
+        uint256 shares
+    ) internal {
+        IAsyncVault(vault).fulfillRedeem(shares, receiver);
+        IERC4626(vault).redeem(shares, receiver, receiver);
     }
 }
