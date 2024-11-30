@@ -7,19 +7,12 @@ import {MockERC20} from "test/mocks/MockERC20.sol";
 import {AsyncVault, InitializeParams, Limits, Fees, Bounds} from "src/vaults/multisig/phase1/AsyncVault.sol";
 import {RequestBalance} from "src/vaults/multisig/phase1/BaseControlledAsyncRedeem.sol";
 import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
-
-contract MockAsyncVault is AsyncVault {
-    constructor(InitializeParams memory params) AsyncVault(params) {}
-
-    function totalAssets() public view override returns (uint256) {
-        return asset.balanceOf(address(this));
-    }
-}
+import {MockERC7540} from "test/mocks/MockERC7540.sol";
 
 contract AsyncVaultTest is BaseControlledAsyncRedeemTest {
     using FixedPointMathLib for uint256;
 
-    MockAsyncVault asyncVault;
+    MockERC7540 asyncVault;
 
     address feeRecipient = address(0x5);
 
@@ -52,7 +45,7 @@ contract AsyncVaultTest is BaseControlledAsyncRedeemTest {
             })
         });
 
-        asyncVault = new MockAsyncVault(params);
+        asyncVault = new MockERC7540(params);
 
         // For inherited tests
         baseVault = MockControlledAsyncRedeem(address(asyncVault));
@@ -658,7 +651,7 @@ contract AsyncVaultTest is BaseControlledAsyncRedeemTest {
             })
         });
 
-        asyncVault = new MockAsyncVault(params);
+        asyncVault = new MockERC7540(params);
 
         // Alice deposits 100 USDC
         asset.mint(alice, 100e6);
@@ -698,7 +691,7 @@ contract AsyncVaultTest is BaseControlledAsyncRedeemTest {
             })
         });
 
-        asyncVault = new MockAsyncVault(params);
+        asyncVault = new MockERC7540(params);
 
         // Alice deposits 100 USDC
         asset.mint(alice, 100e6);

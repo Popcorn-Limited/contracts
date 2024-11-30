@@ -2,7 +2,7 @@
 pragma solidity ^0.8.25;
 
 import {console, console2} from "forge-std/Test.sol";
-import {AsyncVaultTest, MockAsyncVault, MockControlledAsyncRedeem} from "./AsyncVault.t.sol";
+import {AsyncVaultTest, MockControlledAsyncRedeem, MockERC7540} from "./AsyncVault.t.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 import {MockOracle} from "test/mocks/MockOracle.sol";
 import {OracleVault} from "src/vaults/multisig/phase1/OracleVault.sol";
@@ -46,7 +46,7 @@ contract OracleVaultTest is AsyncVaultTest {
         vault = new OracleVault(params, address(oracle), safe);
 
         // For inherited tests
-        asyncVault = MockAsyncVault(address(vault));
+        asyncVault = MockERC7540(address(vault));
         baseVault = MockControlledAsyncRedeem(address(asyncVault));
         assetReceiver = safe;
 
