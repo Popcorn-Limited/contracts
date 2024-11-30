@@ -14,11 +14,13 @@ The `Safe` is controlled by `managers` which can either be bots, ai agents or hu
 
 `TransactionGuard` and `SafeController` both use a hook pattern to allow us to update and add additional functionality later.
 
-![alt text](schema.png)
+![schema](images/schema.png)
 
 ## Sequence Diagrams
 
-### Deposit Flow
+### Deposit
+
+Deposits only have one state. On deposit the user sends funds to the `Vault` which in turn sends it to the `Safe`. The `Vault` than mints shares to the user.
 
 ```mermaid
 sequenceDiagram
@@ -37,7 +39,16 @@ sequenceDiagram
     deactivate Vault
 ```
 
-### Withdraw Flow
+### Withdraw
+
+Withdrawals are processed asynchronously. Thefore we have multiple states of a withdrawal. 
+
+First a user requests a withdrawal by sending shares to the `Vault`. This is the `pending`-state. In which a withdrawal was started but not yet completed.
+
+In the second step that request has to get fulfilled. By sending assets to the `Vault` and burning the users shares. Now the user has `claimable assets`. This is the `fulfilled`-state. The user has their shares burned but their assets reserved though these still need to be claimed.
+
+Lastly the user can call `withdraw()` on the `Vault` to get their funds. This is the `completed`-state. Here the user simply claims and receives their assets.
+
 
 ```mermaid
 sequenceDiagram
@@ -73,17 +84,6 @@ sequenceDiagram
 │             │   └── pushOracle
 │             │       └── PushOracle.sol
 │             └── OracleVaultController.sol
-├── test
-│   ├── vaults
-│   │   └── multisig
-│   │       └── phase1
-│   │            ├── AsyncVault.t.sol
-│   │            ├── BaseControlledAsyncRedeem.sol
-│   │            ├── BaseERC7540.t.sol
-│   │            └── OracleVault.t.sol
-│   └── peripheral
-│       ├── PushOracle.t.sol
-│       └── OracleVaultController.t.sol
 ```
 
 At this point we expect the manager to be a trusted permissioned actor which is why we wont include any contracts of the `SafeController`-module just yet.
@@ -101,3 +101,32 @@ Additionally a poorly set up `TransactionGuard` can lead to a rug pull of the va
 Idle `managers` can also stale the withdrawal process since they will need to process and fulfill withdrawals. To incentivise fulfilling we can configure a `withdrawalIncentive` which will be paid out to the manager that fulfills the withdrawal.
 
 Lastly `setLimits` on the `AsyncVault` can lock user deposits if set too high. This can lead to a situation where a user cannot withdraw their funds even though they deposited successfully. E.g. If there wasnt a `minAmount` initially and we set the `minAmount` to a value lower than the deposit amount of certain users they wont be able to withdraw without adding more funds to the vault which might not be possible.
+
+
+## Deployment
+
+To deploy a new OracleVault we need to set up an `PushOracle` and an `OracleVaultController`. The `PushOracle` needs to be nominated and the owner accepted by the `OracleVaultController`. This can be done using `VaultOracle.s.sol`.
+
+Set up a Gnosis Safe via its app and add the agreed manager as a signer.
+
+Now its time to deploy the `OracleVault`. The `OracleVault` needs to be added to the `OracleVaultController` and we should probably add a `keeper` on it aswell to update the price of the vault regularly. This can be done using `OracleVault.s.sol`.
+
+To ensure the `VaultRouter` can pull funds from the Safe max-approve the `asset` to the `OracleVault`.
+
+Lastly its recommended to set limits on the `OracleVaultController` after the vault gets deployed. To ensure that the vault wont get paused with every little price fluctuation. Simply use the script `SetVaultOracleLimits.s.sol` for it.
+
+### Frontend Integration
+
+To add the vault to the frontend add a new entry in `vaults/[chainId].json`. Make sure it has the the type `safe-vault-v1` and the `safe` address is correct. Than add it aswell to `vaults/tokens/[chainId].json`.
+
+For the oracle to work you need to configure `vaults/safe/[chainId].json` and add all the assets we want to track with their price spreading. (Look at `vaults/safe/42161.json` for an example)
+
+In `strategies/safe/[chainId].json` add the vault with all the strategies its allowed to use and their agreed allocations. (Look at `strategies/safe/42161.json` for an example)
+
+
+## Further Improvements
+
+- Add transaction verification and sanitization for all messages and transactions of the `Safe`. Managers should only be able to call previously whitelisted functions with appropriate parameters. This safeguards against rug pulls and allocations into assets that users didnt agree to.
+- Futher improve and decentralie the Oracle. This could be done via zkTLS and the DeBank API to allow anyone to post the price of the vault via zkProofs.
+- Add a liquidation mechanism for the `Safe` in case of drawdowns or problematic managers.
+- Allow anyone to become a manager permissionlessly by simply providing a higher rate to the users and posting a certain security bond.

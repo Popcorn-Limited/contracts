@@ -46,37 +46,20 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
         uint256 assets,
         address receiver
     ) public override whenNotPaused returns (uint256 shares) {
+        // Additional logic for inheriting contracts
+        beforeDeposit(assets, shares);
+
         // Check for rounding error since we round down in previewDeposit.
         require((shares = previewDeposit(assets)) != 0, "ZERO_SHARES");
 
-        // Utilise claimable balance first
-        uint256 assetsToTransfer = assets;
-        RequestBalance storage currentBalance = requestBalances[msg.sender];
-        if (currentBalance.claimableAssets > 0) {
-            // Ensures we cant underflow when subtracting from assetsToTransfer
-            uint256 claimableAssets = assetsToTransfer >
-                currentBalance.claimableAssets
-                ? currentBalance.claimableAssets
-                : assetsToTransfer;
+        // Need to transfer before minting or ERC777s could reenter.
+        SafeTransferLib.safeTransferFrom(
+            asset,
+            msg.sender,
+            address(this),
+            assets
+        );
 
-            // Modify the currentBalance state accordingly
-            _withdrawClaimableBalance(claimableAssets, currentBalance);
-
-            assetsToTransfer -= claimableAssets;
-        }
-
-        // Transfer the remaining assets from the sender
-        if (assetsToTransfer > 0) {
-            // Need to transfer before minting or ERC777s could reenter.
-            SafeTransferLib.safeTransferFrom(
-                asset,
-                msg.sender,
-                address(this),
-                assetsToTransfer
-            );
-        }
-
-        // Mint shares to the receiver
         _mint(receiver, shares);
 
         emit Deposit(msg.sender, receiver, assets, shares);
@@ -97,37 +80,21 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
         uint256 shares,
         address receiver
     ) public override whenNotPaused returns (uint256 assets) {
+        // Additional logic for inheriting contracts
+        beforeDeposit(assets, shares);
+
         require(shares != 0, "ZERO_SHARES");
+
         assets = previewMint(shares); // No need to check for rounding error, previewMint rounds up.
 
-        // Utilise claimable balance first
-        uint256 assetsToTransfer = assets;
-        RequestBalance storage currentBalance = requestBalances[msg.sender];
-        if (currentBalance.claimableAssets > 0) {
-            // Ensures we cant underflow when subtracting from assetsToTransfer
-            uint256 claimableAssets = assetsToTransfer >
-                currentBalance.claimableAssets
-                ? currentBalance.claimableAssets
-                : assetsToTransfer;
+        // Need to transfer before minting or ERC777s could reenter.
+        SafeTransferLib.safeTransferFrom(
+            asset,
+            msg.sender,
+            address(this),
+            assets
+        );
 
-            // Modify the currentBalance state accordingly
-            _withdrawClaimableBalance(claimableAssets, currentBalance);
-
-            assetsToTransfer -= claimableAssets;
-        }
-
-        // Transfer the remaining assets from the sender
-        if (assetsToTransfer > 0) {
-            // Need to transfer before minting or ERC777s could reenter.
-            SafeTransferLib.safeTransferFrom(
-                asset,
-                msg.sender,
-                address(this),
-                assetsToTransfer
-            );
-        }
-
-        // Mint shares to the receiver
         _mint(receiver, shares);
 
         emit Deposit(msg.sender, receiver, assets, shares);
@@ -135,6 +102,9 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
         // Additional logic for inheriting contracts
         afterDeposit(assets, shares);
     }
+
+    /// @dev Additional logic for inheriting contracts before depositing
+    function beforeDeposit(uint256 assets, uint256 shares) internal virtual {}
 
     /**
      * @notice Withdraws assets from the vault which have beenpreviously freed up by a fulfilled redeem request
@@ -169,13 +139,13 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
         // Additional logic for inheriting contracts
         beforeWithdraw(assets, shares);
 
-        // Burn controller's shares
-        _burn(address(this), shares);
-
         // Transfer assets to the receiver
         SafeTransferLib.safeTransfer(asset, receiver, assets);
 
         emit Withdraw(msg.sender, receiver, controller, assets, shares);
+
+        // Additional logic for inheriting contracts
+        afterWithdraw(assets, shares);
     }
 
     /**
@@ -234,13 +204,13 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
         // Additional logic for inheriting contracts
         beforeWithdraw(assets, shares);
 
-        // Burn controller's shares
-        _burn(address(this), shares);
-
         // Transfer assets to the receiver
         SafeTransferLib.safeTransfer(asset, receiver, assets);
 
         emit Withdraw(msg.sender, receiver, controller, assets, shares);
+
+        // Additional logic for inheriting contracts
+        afterWithdraw(assets, shares);
     }
 
     /**
@@ -265,6 +235,9 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
             : 0;
         currentBalance.claimableShares -= shares;
     }
+
+    /// @dev Additional logic for inheriting contracts after withdrawing
+    function afterWithdraw(uint256 assets, uint256 shares) internal virtual {}
 
     /*//////////////////////////////////////////////////////////////
                         ACCOUNTNG LOGIC
@@ -397,6 +370,14 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
                         REQUEST REDEEM LOGIC
     //////////////////////////////////////////////////////////////*/
 
+    event RedeemRequested(
+        address indexed controller,
+        address indexed owner,
+        uint256 requestId,
+        address sender,
+        uint256 shares
+    );
+
     /**
      * @notice Requests a redeem of shares from the vault
      * @param shares The amount of shares to redeem
@@ -437,7 +418,7 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
         currentBalance.pendingShares += shares;
         currentBalance.requestTime = block.timestamp;
 
-        emit RedeemRequest(controller, owner, REQUEST_ID, msg.sender, shares);
+        emit RedeemRequested(controller, owner, REQUEST_ID, msg.sender, shares);
         return REQUEST_ID;
     }
 
@@ -503,6 +484,13 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
                         DEPOSIT FULFILLMENT LOGIC
     //////////////////////////////////////////////////////////////*/
 
+    event RedeemRequestFulfilled(
+        address indexed controller,
+        address indexed fulfiller,
+        uint256 shares,
+        uint256 assets
+    );
+
     /**
      * @notice Fulfills a redeem request of the controller to allow the controller to withdraw their assets
      * @param shares The amount of shares to redeem
@@ -514,6 +502,9 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
         address controller
     ) external virtual returns (uint256) {
         uint256 assets = convertToAssets(shares);
+
+        // Burn controller's shares
+        _burn(address(this), shares);
 
         return _fulfillRedeem(assets, shares, controller);
     }
@@ -546,11 +537,22 @@ abstract contract BaseControlledAsyncRedeem is BaseERC7540, IERC7540Redeem {
         // Reset the requestTime if there are no more pending shares
         if (currentBalance.pendingShares == 0) currentBalance.requestTime = 0;
 
+        emit RedeemRequestFulfilled(controller, msg.sender, shares, assets);
+
+        // Additional logic for inheriting contracts
+        afterFulfillRedeem(assets, shares);
+
         return assets;
     }
 
     /// @dev Additional logic for inheriting contracts before fulfilling a redeem request
     function beforeFulfillRedeem(
+        uint256 assets,
+        uint256 shares
+    ) internal virtual {}
+
+    /// @dev Additional logic for inheriting contracts after fulfilling a redeem request
+    function afterFulfillRedeem(
         uint256 assets,
         uint256 shares
     ) internal virtual {}

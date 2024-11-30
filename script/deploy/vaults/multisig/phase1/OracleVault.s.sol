@@ -5,6 +5,8 @@ pragma solidity ^0.8.25;
 import {Script, console} from "forge-std/Script.sol";
 import {OracleVault} from "src/vaults/multisig/phase1/OracleVault.sol";
 import {InitializeParams, Limits, Fees} from "src/vaults/multisig/phase1/AsyncVault.sol";
+import {OracleVaultController} from "src/peripheral/oracles/OracleVaultController.sol";
+import {IOwned} from "src/interfaces/IOwned.sol";
 
 contract Deploy is Script {
     address internal asset;
@@ -24,18 +26,19 @@ contract Deploy is Script {
         vm.startBroadcast();
         console.log("msg.sender:", msg.sender);
 
-        // @dev edit this values below
-        asset = 0xaf88d065e77c8cC2239327C5EDb3A432268e5831;
+        name = "Safe Vault";
+        symbol = "sVault";
 
-        name = "Oracle Vault";
-        symbol = "oVault";
+        // @dev edit the values below
+        asset = 0x4200000000000000000000000000000000000006;
 
         limits = Limits(type(uint256).max, 0);
         fees = Fees(0, 0, 0, 0, 0, msg.sender);
 
-        oracle = 0xf7C42Db8bdD563539861de0ef2520Aa80c28e8c4;
+        oracle = 0xDcC09A3984C6C3D6D349af3bc01C129d26609B42;
 
-        multisig = 0x3C99dEa58119DE3962253aea656e61E5fBE21613;
+        // edge arb,eth
+        multisig = 0x158a006d5FBA167C8c439e010343e0603DC44847;
 
         owner = msg.sender;
 
@@ -45,6 +48,14 @@ contract Deploy is Script {
             oracle,
             multisig
         );
+
+        // Oracle Vault Controller setup
+        // address controller = IOwned(oracle).owner();
+        // OracleVaultController(controller).addVault(address(vault));
+        // OracleVaultController(controller).setKeeper(
+        //     address(vault),
+        //     0xE015c099a3E731757dC33491eFb1E8Eb883aCA8B
+        // ); // Set Gelato as Keeper
 
         vm.stopBroadcast();
     }

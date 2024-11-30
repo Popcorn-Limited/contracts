@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.25;
 
-import {Test} from "forge-std/Test.sol";
+import {Test, console, console2} from "forge-std/Test.sol";
 import {BaseControlledAsyncRedeemTest, MockControlledAsyncRedeem} from "./BaseControlledAsyncRedeem.t.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 import {AsyncVault, InitializeParams, Limits, Fees, Bounds} from "src/vaults/multisig/phase1/AsyncVault.sol";
@@ -155,6 +155,15 @@ contract AsyncVaultTest is BaseControlledAsyncRedeemTest {
         assertEq(asyncVault.maxMint(alice), 0);
     }
 
+    function testMaxMintMaxUint() public virtual {
+        vm.prank(owner);
+        asyncVault.setLimits(
+            Limits({depositLimit: type(uint256).max, minAmount: 0})
+        );
+
+        assertEq(asyncVault.maxMint(alice), type(uint256).max);
+    }
+
     /*//////////////////////////////////////////////////////////////
                         REDEEM REQUEST TESTS
     //////////////////////////////////////////////////////////////*/
@@ -217,6 +226,79 @@ contract AsyncVaultTest is BaseControlledAsyncRedeemTest {
         assertEq(asyncVault.totalAssets(), redeemAmount * 3);
     }
 
+    function testFulfillMultipleRedeemsWithFees() public virtual {
+        uint256 redeemAmount = 100e18;
+        asset.mint(bob, redeemAmount);
+
+        // bob deposits
+        vm.startPrank(bob);
+        asset.approve(address(asyncVault), redeemAmount);
+        asyncVault.deposit(redeemAmount, bob);
+        vm.stopPrank();
+
+        // Set 1% withdrawal fee
+        Fees memory newFees = Fees({
+            performanceFee: 0,
+            managementFee: 0,
+            withdrawalIncentive: 0.01e18, // 1%
+            feesUpdatedAt: uint64(block.timestamp),
+            feeRecipient: feeRecipient,
+            highWaterMark: ONE
+        });
+        vm.prank(owner);
+        asyncVault.setFees(newFees);
+
+        // Setup redeem requests
+        vm.startPrank(alice);
+        asyncVault.approve(address(asyncVault), redeemAmount);
+        uint256 request1 = asyncVault.requestRedeem(redeemAmount, alice, alice);
+        vm.stopPrank();
+
+        // bob
+        vm.startPrank(bob);
+        asyncVault.approve(address(asyncVault), redeemAmount);
+        uint256 request2 = asyncVault.requestRedeem(redeemAmount, bob, bob);
+        vm.stopPrank();
+
+        // fulfill both requests at once
+        uint256[] memory shares = new uint256[](2);
+        shares[0] = redeemAmount;
+        shares[1] = redeemAmount;
+
+        address[] memory controllers = new address[](2);
+        controllers[0] = alice;
+        controllers[1] = bob;
+
+        vm.startPrank(owner);
+        uint256 totalAssets = asyncVault.fulfillMultipleRedeems(
+            shares,
+            controllers
+        );
+
+        assertEq(totalAssets, redeemAmount * 2, "return ta");
+        vm.stopPrank();
+
+        // alice withdraw
+        vm.prank(alice);
+        asyncVault.redeem(redeemAmount, alice, alice);
+
+        // bob withdraw
+        vm.prank(bob);
+        asyncVault.redeem(redeemAmount, bob, bob);
+
+        uint256 withdrawFee = redeemAmount / 100; // 1% fee
+
+        assertEq(
+            asset.balanceOf(alice),
+            INITIAL_DEPOSIT + redeemAmount - withdrawFee,
+            "alice"
+        );
+        assertEq(asset.balanceOf(bob), redeemAmount - withdrawFee, "bob");
+        assertEq(asset.balanceOf(feeRecipient), withdrawFee * 2, "recipient");
+
+        assertEq(asyncVault.totalAssets(), 0);
+    }
+
     function testFulfillRedeemWithWithdrawalFee() public virtual {
         uint256 redeemAmount = INITIAL_DEPOSIT;
 
@@ -226,8 +308,8 @@ contract AsyncVaultTest is BaseControlledAsyncRedeemTest {
             managementFee: 0,
             withdrawalIncentive: 0.01e18, // 1%
             feesUpdatedAt: uint64(block.timestamp),
-            highWaterMark: ONE,
-            feeRecipient: feeRecipient
+            feeRecipient: feeRecipient,
+            highWaterMark: ONE
         });
         vm.prank(owner);
         asyncVault.setFees(newFees);
@@ -307,8 +389,8 @@ contract AsyncVaultTest is BaseControlledAsyncRedeemTest {
             managementFee: 0.02e18, // 2%
             withdrawalIncentive: 0.02e18, // 2%
             feesUpdatedAt: uint64(block.timestamp),
-            highWaterMark: ONE,
-            feeRecipient: feeRecipient
+            feeRecipient: feeRecipient,
+            highWaterMark: ONE
         });
 
         vm.prank(owner);
@@ -326,8 +408,8 @@ contract AsyncVaultTest is BaseControlledAsyncRedeemTest {
             managementFee: 0,
             withdrawalIncentive: 0,
             feesUpdatedAt: uint64(block.timestamp),
-            highWaterMark: ONE,
-            feeRecipient: feeRecipient
+            feeRecipient: feeRecipient,
+            highWaterMark: ONE
         });
 
         vm.prank(owner);
@@ -356,8 +438,8 @@ contract AsyncVaultTest is BaseControlledAsyncRedeemTest {
             managementFee: 0.05e18, // 5%
             withdrawalIncentive: 0,
             feesUpdatedAt: uint64(block.timestamp),
-            highWaterMark: ONE,
-            feeRecipient: feeRecipient
+            feeRecipient: feeRecipient,
+            highWaterMark: ONE
         });
 
         vm.prank(owner);
@@ -396,8 +478,8 @@ contract AsyncVaultTest is BaseControlledAsyncRedeemTest {
             managementFee: 0.05e18,
             withdrawalIncentive: 0,
             feesUpdatedAt: uint64(block.timestamp),
-            highWaterMark: ONE,
-            feeRecipient: feeRecipient
+            feeRecipient: feeRecipient,
+            highWaterMark: ONE
         });
 
         vm.prank(owner);
@@ -424,8 +506,8 @@ contract AsyncVaultTest is BaseControlledAsyncRedeemTest {
             managementFee: 0.05e18,
             withdrawalIncentive: 0,
             feesUpdatedAt: uint64(block.timestamp),
-            highWaterMark: ONE,
-            feeRecipient: feeRecipient
+            feeRecipient: feeRecipient,
+            highWaterMark: ONE
         });
 
         vm.prank(owner);
@@ -453,8 +535,8 @@ contract AsyncVaultTest is BaseControlledAsyncRedeemTest {
             managementFee: 0.05e18,
             withdrawalIncentive: 0,
             feesUpdatedAt: uint64(block.timestamp),
-            highWaterMark: ONE,
-            feeRecipient: feeRecipient
+            feeRecipient: feeRecipient,
+            highWaterMark: ONE
         });
 
         vm.prank(owner);
@@ -469,8 +551,8 @@ contract AsyncVaultTest is BaseControlledAsyncRedeemTest {
             managementFee: 0.05e18, // Change fee to 5%
             withdrawalIncentive: 0,
             feesUpdatedAt: uint64(block.timestamp),
-            highWaterMark: ONE,
-            feeRecipient: feeRecipient
+            feeRecipient: feeRecipient,
+            highWaterMark: ONE
         });
 
         vm.prank(owner);
@@ -478,6 +560,157 @@ contract AsyncVaultTest is BaseControlledAsyncRedeemTest {
 
         // Check that fees were taken and sent to fee recipient
         assertGt(asyncVault.balanceOf(feeRecipient), 0);
+    }
+
+    function testUpdateFeesHighWatermark() public virtual {
+        // Set initial management fee to 5%
+        Fees memory initialFees = Fees({
+            performanceFee: 0,
+            managementFee: 0.05e18,
+            withdrawalIncentive: 0,
+            feesUpdatedAt: uint64(block.timestamp),
+            feeRecipient: feeRecipient,
+            highWaterMark: ONE
+        });
+
+        vm.prank(owner);
+        asyncVault.setFees(initialFees);
+
+        // Warp forward so fees can accrue
+        vm.warp(block.timestamp + 365.25 days);
+
+        vm.prank(owner);
+        asyncVault.takeFees();
+
+        Fees memory currentFees = asyncVault.getFees();
+        uint256 currentHighWaterMark = currentFees.highWaterMark;
+
+        // high watermark should be higher than share value after fee is taken
+        assertGt(currentHighWaterMark, asyncVault.convertToAssets(1e18));
+        assertEq(currentHighWaterMark, ONE);
+
+        // fee recipient should have received from management fee
+        uint256 feeRecBalance = asyncVault.balanceOf(feeRecipient);
+        assertGt(feeRecBalance, 0);
+
+        // Change performance fee to 5%
+        initialFees = Fees({
+            performanceFee: 0.05e18,
+            managementFee: 0.05e18,
+            withdrawalIncentive: 0,
+            feesUpdatedAt: uint64(block.timestamp),
+            feeRecipient: feeRecipient,
+            highWaterMark: ONE
+        });
+
+        vm.prank(owner);
+        asyncVault.setFees(initialFees);
+
+        // no new fees should be taken
+        assertEq(feeRecBalance, asyncVault.balanceOf(feeRecipient));
+
+        // high watermark should be the same as before
+        Fees memory afterFees = asyncVault.getFees();
+        uint256 afterFeesHighWaterMark = afterFees.highWaterMark;
+
+        assertEq(currentHighWaterMark, afterFeesHighWaterMark);
+
+        // Simulate some yield
+        asset.mint(address(asyncVault), 100e18);
+
+        // Set new fees which should trigger fee taking
+        vm.prank(owner);
+        asyncVault.setFees(initialFees);
+
+        // high watermark should be greater now
+        afterFees = asyncVault.getFees();
+        afterFeesHighWaterMark = afterFees.highWaterMark;
+        assertGt(afterFeesHighWaterMark, currentHighWaterMark, "aft");
+
+        // new fees should be taken
+        assertLt(feeRecBalance, asyncVault.balanceOf(feeRecipient), "bal");
+    }
+
+    // test fees calculation on assets with 6 decimals
+    function testPerformanceFeeDecimals() public {
+        asset = new MockERC20("Test Token", "TEST", 6);
+
+        InitializeParams memory params = InitializeParams({
+            asset: address(asset),
+            name: "Vault Token",
+            symbol: "vTEST",
+            owner: owner,
+            limits: Limits({depositLimit: type(uint256).max, minAmount: 0}),
+            fees: Fees({
+                performanceFee: 1e17, // 10%
+                managementFee: 0,
+                withdrawalIncentive: 0,
+                feesUpdatedAt: uint64(block.timestamp),
+                highWaterMark: ONE,
+                feeRecipient: feeRecipient
+            })
+        });
+
+        asyncVault = new MockERC7540(params);
+
+        // Alice deposits 100 USDC
+        asset.mint(alice, 100e6);
+        vm.startPrank(alice);
+        asset.approve(address(asyncVault), 100e6);
+        asyncVault.deposit(100e6, alice);
+        vm.stopPrank();
+
+        // Simulate some yield
+        asset.mint(address(asyncVault), 100e6);
+
+        // no shares before
+        assertEq(asyncVault.balanceOf(feeRecipient), 0, "before");
+
+        // take fees
+        asyncVault.takeFees();
+
+        assertGt(asyncVault.balanceOf(feeRecipient), 0, "after");
+    }
+
+    function testManagementFeeDecimals() public {
+        asset = new MockERC20("Test Token", "TEST", 6);
+
+        InitializeParams memory params = InitializeParams({
+            asset: address(asset),
+            name: "Vault Token",
+            symbol: "vTEST",
+            owner: owner,
+            limits: Limits({depositLimit: type(uint256).max, minAmount: 0}),
+            fees: Fees({
+                performanceFee: 0,
+                managementFee: 0.1e17,
+                withdrawalIncentive: 0,
+                feesUpdatedAt: uint64(block.timestamp),
+                highWaterMark: ONE,
+                feeRecipient: feeRecipient
+            })
+        });
+
+        asyncVault = new MockERC7540(params);
+
+        // Alice deposits 100 USDC
+        asset.mint(alice, 100e6);
+        vm.startPrank(alice);
+        asset.approve(address(asyncVault), 100e6);
+        asyncVault.deposit(100e6, alice);
+        vm.stopPrank();
+
+        // no fees before
+        assertEq(asyncVault.balanceOf(feeRecipient), 0, "before");
+
+        // Warp forward so fees can accrue
+        vm.warp(block.timestamp + 365.25 days);
+
+        // take fees
+        asyncVault.takeFees();
+
+        // some fees after
+        assertGt(asyncVault.balanceOf(feeRecipient), 0, "after");
     }
 
     /*//////////////////////////////////////////////////////////////
