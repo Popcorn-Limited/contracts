@@ -160,7 +160,7 @@ sequenceDiagram
 
 ## 2. Displaying the vaults
 
-1. Use the asset and chain id to fetch icons to display the vault and network
+1. Use the `assetToken` to fetch icons to display the vault and `chainId` to fetch the network icon.
 2. You can simply use the `vault.balance` entry to read a users balance and deposit value. If a vault uses a gauge add the `gauge.balance` to it.
 Alternatively read a users vault balance like any other ERC-20 token and multiply it by the `assetsPerShare` to get the total assets the user has in the vault. You can further multiply that by the assets price to get the USD value of the users deposit. In case a vault uses a gauge and the user stakes in that gauge you need to read the users gauge balance instead of the vault balance.
 3. Display the vaults tvl simply with the tvl value.
