@@ -103,6 +103,10 @@ Idle `managers` can also stale the withdrawal process since they will need to pr
 Lastly `setLimits` on the `AsyncVault` can lock user deposits if set too high. This can lead to a situation where a user cannot withdraw their funds even though they deposited successfully. E.g. If there wasnt a `minAmount` initially and we set the `minAmount` to a value lower than the deposit amount of certain users they wont be able to withdraw without adding more funds to the vault which might not be possible.
 
 
+## Audit Reports
+You can find all our previous audits [here](https://docs.vaultcraft.io/security/audits).
+
+
 ## Deployment
 
 To deploy a new OracleVault we need to set up an `PushOracle` and an `OracleVaultController`. The `PushOracle` needs to be nominated and the owner accepted by the `OracleVaultController`. This can be done using `VaultOracle.s.sol`.
