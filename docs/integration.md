@@ -164,7 +164,7 @@ sequenceDiagram
 2. You can simply use the `vault.balance` entry to read a users balance and deposit value. If a vault uses a gauge add the `gauge.balance` to it.
 Alternatively read a users vault balance like any other ERC-20 token and multiply it by the `assetsPerShare` to get the total assets the user has in the vault. You can further multiply that by the assets price to get the USD value of the users deposit. In case a vault uses a gauge and the user stakes in that gauge you need to read the users gauge balance instead of the vault balance.
 3. Display the vaults tvl simply with the tvl value.
-4. Display the vaults apy with the `baseApy` and add `minBoost` to it if the vault has a gauge. Its important to note that the user must stake their vault shares in the gauge to get the boost.
+4. Display the vaults apy with the `baseApy` and add `minBoost` to it if the vault has a gauge. Its important to note that the user must stake their vault shares in the gauge to get the boost. (To display oVCX and its value use `https://app.vaultcraft.io/api/ovcx` endpoint. To convert oVCX into VCX send them to this page: `https://app.vaultcraft.io/boost`)
 5. Deposits will fail if the are lower than the `minLimit` or higher than the `depositLimit`.
 6. Withdrawals will fail if the are higher than the `withdrawalLimit`.
 
