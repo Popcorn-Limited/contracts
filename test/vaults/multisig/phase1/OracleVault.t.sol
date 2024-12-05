@@ -5,7 +5,7 @@ import {console, console2} from "forge-std/Test.sol";
 import {AsyncVaultTest, MockControlledAsyncRedeem, MockERC7540} from "./AsyncVault.t.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 import {MockOracle} from "test/mocks/MockOracle.sol";
-import {OracleVault} from "src/vaults/multisig/phase1/OracleVault.sol";
+import {OracleVault, IPriceOracle} from "src/vaults/multisig/phase1/OracleVault.sol";
 import {AsyncVault, InitializeParams, Limits, Fees, Bounds} from "src/vaults/multisig/phase1/AsyncVault.sol";
 import {RequestBalance} from "src/vaults/multisig/phase1/BaseControlledAsyncRedeem.sol";
 import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
@@ -17,6 +17,11 @@ contract OracleVaultTest is AsyncVaultTest {
     MockOracle oracle;
 
     address safe = address(0x6);
+
+    event SafeProposed(address indexed proposedSafe);
+    event SafeChanged(address indexed oldSafe, address indexed newSafe);
+    event OracleProposed(address indexed proposedOracle);
+    event OracleChanged(address indexed oldOracle, address indexed newOracle);
 
     function setUp() public override {
         vm.label(owner, "owner");
@@ -569,5 +574,183 @@ contract OracleVaultTest is AsyncVaultTest {
 
         // new fees should be taken
         assertLt(feeRecBalance, asyncVault.balanceOf(feeRecipient), "bal");
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        SAFE SWITCH TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_proposeSafe() public {
+        // Setup
+        address newSafe = address(0xBEEF);
+
+        // Test proposal by owner
+        vm.prank(owner);
+        vm.expectEmit(true, false, false, false);
+        emit SafeProposed(newSafe);
+        vault.proposeSafe(newSafe);
+
+        // Verify proposal was stored correctly
+        (address proposedSafe, uint256 timestamp) = vault.proposedSafe();
+        assertEq(proposedSafe, newSafe);
+        assertEq(timestamp, block.timestamp);
+    }
+
+    function test_proposeSafe_revertNonOwner() public {
+        vm.prank(alice);
+        vm.expectRevert("Owned/not-owner");
+        vault.proposeSafe(address(0xBEEF));
+    }
+
+    function test_proposeSafe_revertZeroAddress() public {
+        vm.prank(owner);
+        vm.expectRevert("SafeVault/invalid-safe");
+        vault.proposeSafe(address(0));
+    }
+
+    function test_acceptSafe() public {
+        // Setup
+        address newSafe = address(0xBEEF);
+        address oldSafe = vault.safe();
+
+        // Propose new safe
+        vm.prank(owner);
+        vault.proposeSafe(newSafe);
+
+        // Warp forward past the 3 day delay
+        vm.warp(block.timestamp + 3 days + 1);
+
+        // Accept the proposal
+        vm.prank(owner);
+        vm.expectEmit(true, true, false, false);
+        emit SafeChanged(oldSafe, newSafe);
+        vault.acceptSafe();
+
+        // Verify changes
+        assertEq(vault.safe(), newSafe);
+        (address proposedSafe, uint256 timestamp) = vault.proposedSafe();
+        assertEq(proposedSafe, address(0)); // Proposal should be cleared
+        assertEq(timestamp, 0);
+        assertTrue(vault.paused()); // Vault should be paused
+    }
+
+    function test_acceptSafe_revertNonOwner() public {
+        // Setup proposal
+        vm.prank(owner);
+        vault.proposeSafe(address(0xBEEF));
+        vm.warp(block.timestamp + 3 days + 1);
+
+        // Try to accept as non-owner
+        vm.prank(alice);
+        vm.expectRevert("Owned/not-owner");
+        vault.acceptSafe();
+    }
+
+    function test_acceptSafe_revertNoProposal() public {
+        vm.prank(owner);
+        vm.expectRevert("SafeVault/no-safe-proposed");
+        vault.acceptSafe();
+    }
+
+    function test_acceptSafe_revertTooEarly() public {
+        // Setup proposal
+        vm.prank(owner);
+        vault.proposeSafe(address(0xBEEF));
+
+        // Try to accept before delay
+        vm.warp(block.timestamp + 3 days - 1); // Just before the delay expires
+        vm.prank(owner);
+        vm.expectRevert("SafeVault/safe-not-yet-acceptable");
+        vault.acceptSafe();
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        ORACLE SWITCH TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_proposeOracle() public {
+        // Setup
+        address newOracle = address(0xBEEF);
+
+        // Test proposal by owner
+        vm.prank(owner);
+        vm.expectEmit(true, false, false, false);
+        emit OracleProposed(newOracle);
+        vault.proposeOracle(newOracle);
+
+        // Verify proposal was stored correctly
+        (address proposedOracle, uint256 timestamp) = vault.proposedOracle();
+        assertEq(proposedOracle, newOracle);
+        assertEq(timestamp, block.timestamp);
+    }
+
+    function test_proposeOracle_revertNonOwner() public {
+        vm.prank(alice);
+        vm.expectRevert("Owned/not-owner");
+        vault.proposeOracle(address(0xBEEF));
+    }
+
+    function test_proposeOracle_revertZeroAddress() public {
+        vm.prank(owner);
+        vm.expectRevert("SafeVault/invalid-oracle");
+        vault.proposeOracle(address(0));
+    }
+
+    function test_acceptOracle() public {
+        // Setup
+        MockOracle newOracle = new MockOracle();
+        newOracle.setPrice(address(vault), address(asset), 2e18);
+        address oldOracle = address(vault.oracle());
+
+        // Propose new safe
+        vm.prank(owner);
+        vault.proposeOracle(address(newOracle));
+
+        // Warp forward past the 3 day delay
+        vm.warp(block.timestamp + 3 days + 1);
+
+        // Accept the proposal
+        vm.prank(owner);
+        vm.expectEmit(true, true, false, false);
+        emit OracleChanged(oldOracle, address(newOracle));
+        vault.acceptOracle();
+
+        // Verify changes
+        assertEq(address(vault.oracle()), address(newOracle));
+        (address proposedOracle, uint256 timestamp) = vault.proposedOracle();
+        assertEq(proposedOracle, address(0)); // Proposal should be cleared
+        assertEq(timestamp, 0);
+        assertTrue(vault.paused()); // Vault should be paused
+        assertEq(vault.totalAssets(), INITIAL_DEPOSIT * 2); // Price should be 2e18
+    }
+
+    function test_acceptOracle_revertNonOwner() public {
+        // Setup proposal
+        vm.prank(owner);
+        vault.proposeOracle(address(0xBEEF));
+        vm.warp(block.timestamp + 3 days + 1);
+
+        // Try to accept as non-owner
+        vm.prank(alice);
+        vm.expectRevert("Owned/not-owner");
+        vault.acceptOracle();
+    }
+
+    function test_acceptOracle_revertNoProposal() public {
+        vm.prank(owner);
+        vm.expectRevert("SafeVault/no-oracle-proposed");
+        vault.acceptOracle();
+    }
+
+    function test_acceptOracle_revertTooEarly() public {
+        // Setup proposal
+        vm.prank(owner);
+        vault.proposeOracle(address(0xBEEF));
+
+        // Try to accept before delay
+        vm.warp(block.timestamp + 3 days - 1); // Just before the delay expires
+        vm.prank(owner);
+        vm.expectRevert("SafeVault/oracle-not-yet-acceptable");
+        vault.acceptOracle();
     }
 }
