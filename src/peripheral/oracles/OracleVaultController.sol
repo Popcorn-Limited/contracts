@@ -136,20 +136,20 @@ contract OracleVaultController is Owned {
                         KEEPER LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev vault => keeper
-    mapping(address => address) public keepers;
+    /// @dev vault => keeper => isKeeper
+    mapping(address => mapping(address => bool)) public isKeeper;
 
-    event KeeperUpdated(address vault, address previous, address current);
+    event KeeperUpdated(address vault, address keeper, bool isKeeper);
 
     /**
      * @notice Set the keeper for a vault
      * @param _vault The vault to set the keeper for
      * @param _keeper The keeper to set for the vault
      */
-    function setKeeper(address _vault, address _keeper) external onlyOwner {
-        emit KeeperUpdated(_vault, keepers[_vault], _keeper);
+    function setKeeper(address _vault, address _keeper, bool _isKeeper) external onlyOwner {
+        emit KeeperUpdated(_vault, _keeper, _isKeeper);
 
-        keepers[_vault] = _keeper;
+        isKeeper[_vault][_keeper] = _isKeeper;
     }
 
     /**
@@ -157,7 +157,7 @@ contract OracleVaultController is Owned {
      * @param _vault The vault to check the keeper for
      */
     modifier onlyKeeperOrOwner(address _vault) {
-        if (msg.sender != owner && msg.sender != keepers[_vault])
+        if (msg.sender != owner && !isKeeper[_vault][msg.sender])
             revert NotKeeperNorOwner();
         _;
     }

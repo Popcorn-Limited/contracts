@@ -54,7 +54,8 @@ contract Deploy is Script {
         OracleVaultController(controller).addVault(address(vault));
         OracleVaultController(controller).setKeeper(
             address(vault),
-            0xE015c099a3E731757dC33491eFb1E8Eb883aCA8B
+            0xE015c099a3E731757dC33491eFb1E8Eb883aCA8B,
+            true
         ); // Set Gelato as Keeper
 
         vm.stopBroadcast();

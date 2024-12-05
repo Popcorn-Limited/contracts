@@ -23,7 +23,7 @@ contract OracleVaultControllerTest is Test {
     uint256 constant ONE = 1e18;
     uint256 constant INITIAL_PRICE = 1e18;
 
-    event KeeperUpdated(address vault, address previous, address current);
+    event KeeperUpdated(address vault, address keeper, bool isKeeper);
     event LimitUpdated(address vault, Limit previous, Limit current);
 
     function setUp() public {
@@ -53,23 +53,23 @@ contract OracleVaultControllerTest is Test {
         vm.startPrank(owner);
 
         vm.expectEmit(true, true, true, true);
-        emit KeeperUpdated(address(vault), address(0), keeper);
-        controller.setKeeper(address(vault), keeper);
+        emit KeeperUpdated(address(vault), keeper, true);
+        controller.setKeeper(address(vault), keeper, true);
 
-        assertEq(controller.keepers(address(vault)), keeper);
+        assertTrue(controller.isKeeper(address(vault), keeper));
         vm.stopPrank();
     }
 
     function testSetKeeperUnauthorized() public {
         vm.prank(alice);
         vm.expectRevert("Owned/not-owner");
-        controller.setKeeper(address(vault), keeper);
+        controller.setKeeper(address(vault), keeper, true);
     }
 
     function testUpdatePriceAsKeeper() public {
         // Setup keeper
         vm.prank(owner);
-        controller.setKeeper(address(vault), keeper);
+        controller.setKeeper(address(vault), keeper, true);
 
         // Update price as keeper
         vm.prank(keeper);
@@ -270,8 +270,7 @@ contract OracleVaultControllerTest is Test {
         vm.prank(owner);
         controller.addVault(address(vault2));
 
-        PriceUpdate[]
-            memory updates = new PriceUpdate[](2);
+        PriceUpdate[] memory updates = new PriceUpdate[](2);
 
         updates[0] = PriceUpdate({
             vault: address(vault),
