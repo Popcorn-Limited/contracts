@@ -437,14 +437,14 @@ abstract contract AsyncVault is BaseControlledAsyncRedeem {
     function _accruedPerformanceFee(
         Fees memory fees_
     ) internal view returns (uint256) {
-        uint256 shareValue = convertToAssets(10 ** asset.decimals());
+        uint256 shareValue = convertToAssets(10 ** decimals);
         uint256 performanceFee = uint256(fees_.performanceFee);
 
         return
             performanceFee > 0 && shareValue > fees_.highWaterMark
                 ? performanceFee.mulDivUp(
                     (shareValue - fees_.highWaterMark) * totalSupply,
-                    (10 ** (18 + asset.decimals()))
+                    (10 ** (18 + decimals))
                 )
                 : 0;
     }
@@ -497,7 +497,7 @@ abstract contract AsyncVault is BaseControlledAsyncRedeem {
 
         // initialise or copy current HWM
         if (fees.highWaterMark == 0) {
-            fees_.highWaterMark = convertToAssets(10 ** asset.decimals()); // from constructor
+            fees_.highWaterMark = convertToAssets(10 ** decimals); // from constructor
         } else {
             fees_.highWaterMark = fees.highWaterMark; // from setFees
         }
@@ -519,7 +519,7 @@ abstract contract AsyncVault is BaseControlledAsyncRedeem {
     function _takeFees() internal {
         Fees memory fees_ = fees;
         uint256 fee = _accruedFees(fees_);
-        uint256 shareValue = convertToAssets(10 ** asset.decimals());
+        uint256 shareValue = convertToAssets(10 ** decimals);
 
         if (shareValue > fees_.highWaterMark) fees.highWaterMark = shareValue;
 
