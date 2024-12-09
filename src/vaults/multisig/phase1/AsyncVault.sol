@@ -394,7 +394,8 @@ abstract contract AsyncVault is BaseControlledAsyncRedeem {
      */
     function setBounds(Bounds memory bounds_) external onlyOwner {
         // Bounds shouldnt be larger than 20%
-        if (bounds_.lower > 2e17 || bounds_.upper > 2e17) revert Misconfigured();
+        if (bounds_.lower > 2e17 || bounds_.upper > 2e17)
+            revert Misconfigured();
 
         emit BoundsUpdated(bounds, bounds_);
 
@@ -518,14 +519,19 @@ abstract contract AsyncVault is BaseControlledAsyncRedeem {
     /// @dev Internal function to take the fees
     function _takeFees() internal {
         Fees memory fees_ = fees;
-        uint256 fee = _accruedFees(fees_);
+        uint256 perfFee = _accruedPerformanceFee(fees_);
+        uint256 mgmtFee = _accruedManagementFee(fees_);
         uint256 shareValue = convertToAssets(10 ** decimals);
 
+        // Mint fees to the fee recipient
+        if (perfFee + mgmtFee > 0)
+            _mint(fees_.feeRecipient, convertToShares(perfFee + mgmtFee));
+
+        // Update the high water mark (used by performance fee)
         if (shareValue > fees_.highWaterMark) fees.highWaterMark = shareValue;
 
-        if (fee > 0) _mint(fees_.feeRecipient, convertToShares(fee));
-
-        fees.feesUpdatedAt = uint64(block.timestamp);
+        // Update the fees updated at timestamp (used by management fee)
+        if (mgmtFee > 0) fees.feesUpdatedAt = uint64(block.timestamp);
     }
 
     /*//////////////////////////////////////////////////////////////
