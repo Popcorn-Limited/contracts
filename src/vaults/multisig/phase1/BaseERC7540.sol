@@ -171,6 +171,12 @@ abstract contract BaseERC7540 is
             v := byte(0, mload(add(signature, 0x60)))
         }
 
+        require(
+            uint256(s) <=
+                0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0,
+            "ERC7540Vault/invalid-signature-s"
+        );
+
         address recoveredAddress = ecrecover(
             keccak256(
                 abi.encodePacked(
