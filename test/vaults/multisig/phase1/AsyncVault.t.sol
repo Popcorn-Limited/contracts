@@ -101,7 +101,7 @@ contract AsyncVaultTest is BaseControlledAsyncRedeemTest {
         // Set bounds
         Bounds memory bounds = Bounds({
             upper: 0.1e18, // 110%
-            lower: 0.9e18 // 90%
+            lower: 0.2e18 // 80%
         });
         vm.prank(owner);
         asyncVault.setBounds(bounds);
@@ -751,8 +751,8 @@ contract AsyncVaultTest is BaseControlledAsyncRedeemTest {
 
     function testSetBoundsRevertsNotOwner() public virtual {
         Bounds memory newBounds = Bounds({
-            upper: 1.2e18, // 120%
-            lower: 0.8e18 // 80%
+            upper: 0.2e18, // 120%
+            lower: 0.2e18 // 80%
         });
 
         vm.prank(alice);
@@ -762,7 +762,7 @@ contract AsyncVaultTest is BaseControlledAsyncRedeemTest {
 
     function testSetBoundsRevertsUpperTooHigh() public virtual {
         Bounds memory newBounds = Bounds({
-            upper: 1e18, // 100% - too high
+            upper: 0.21e18, // 100% - too high
             lower: 0.2e18 // 80%
         });
 
@@ -775,7 +775,7 @@ contract AsyncVaultTest is BaseControlledAsyncRedeemTest {
     function testSetBoundsRevertsLowerTooLow() public virtual {
         Bounds memory newBounds = Bounds({
             upper: 0.2e18, // 120%
-            lower: 1e18 // 100% - too high
+            lower: 0.21e18 // 100% - too high
         });
 
         vm.startPrank(owner);

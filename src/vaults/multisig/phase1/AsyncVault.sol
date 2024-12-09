@@ -393,8 +393,8 @@ abstract contract AsyncVault is BaseControlledAsyncRedeem {
      * @dev This function will revert if the bounds are greater than or equal to 1e18
      */
     function setBounds(Bounds memory bounds_) external onlyOwner {
-        if (bounds_.lower >= 1e18 || bounds_.upper >= 1e18)
-            revert Misconfigured();
+        // Bounds shouldnt be larger than 20%
+        if (bounds_.lower > 2e17 || bounds_.upper > 2e17) revert Misconfigured();
 
         emit BoundsUpdated(bounds, bounds_);
 
