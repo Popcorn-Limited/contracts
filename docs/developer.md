@@ -113,7 +113,7 @@ To deploy a new OracleVault we need to set up an `PushOracle` and an `OracleVaul
 
 Set up a Gnosis Safe via its app and add the agreed manager as a signer.
 
-Now its time to deploy the `OracleVault`. The `OracleVault` needs to be added to the `OracleVaultController` and we should probably add a `keeper` on it aswell to update the price of the vault regularly. This can be done using `OracleVault.s.sol`.
+Now its time to deploy the `OracleVault`. The `OracleVault` needs to be added to the `OracleVaultController`. Additionally give the `OracleVaultController` the `PAUSER_ROLE` on the vault. (This should all be done via the deploy script)Usually one should also add a `keeper` for the vault on the `OracleVaultController` aswell to update the price of the vault regularly. This can be done using `OracleVault.s.sol`.
 
 To ensure the `VaultRouter` can pull funds from the Safe max-approve the `asset` to the `OracleVault`.
 
