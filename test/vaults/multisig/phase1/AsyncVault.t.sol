@@ -720,7 +720,7 @@ contract AsyncVaultTest is BaseControlledAsyncRedeemTest {
     function testSetLimits() public virtual {
         Limits memory newLimits = Limits({
             depositLimit: 20000e18,
-            minAmount: 2e18
+            minAmount: 1e18
         });
 
         vm.prank(owner);
@@ -729,6 +729,29 @@ contract AsyncVaultTest is BaseControlledAsyncRedeemTest {
         (uint256 depositLimit, uint256 minAmount) = asyncVault.limits();
         assertEq(depositLimit, newLimits.depositLimit);
         assertEq(minAmount, newLimits.minAmount);
+    }
+
+    function testSetLimitsRevertsDepositLimitTooLow() public virtual {
+        testDeposit();
+
+        Limits memory newLimits = Limits({depositLimit: 1e18, minAmount: 1e18});
+
+        vm.prank(owner);
+        vm.expectRevert(AsyncVault.Misconfigured.selector);
+        asyncVault.setLimits(newLimits);
+    }
+
+    function testSetLimitsRevertsMintAmountTooHigh() public virtual {
+        testDeposit();
+
+        Limits memory newLimits = Limits({
+            depositLimit: type(uint256).max,
+            minAmount: 2e18
+        });
+
+        vm.prank(owner);
+        vm.expectRevert(AsyncVault.Misconfigured.selector);
+        asyncVault.setLimits(newLimits);
     }
 
     /*//////////////////////////////////////////////////////////////

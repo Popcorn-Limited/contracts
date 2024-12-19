@@ -552,7 +552,12 @@ abstract contract AsyncVault is BaseControlledAsyncRedeem {
 
     /// @dev Internal function to set the limits
     function _setLimits(Limits memory limits_) internal {
-        // TODO this can lock user deposits if lowered too much
+        // cache
+        uint256 totalSupply_ = totalSupply;
+        if (totalSupply_ > 0 && limits_.depositLimit < totalAssets())
+            revert Misconfigured();
+        if (limits_.minAmount > (10 ** decimals)) revert Misconfigured();
+
         emit LimitsUpdated(limits, limits_);
 
         limits = limits_;
