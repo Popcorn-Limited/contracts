@@ -1,0 +1,22 @@
+{
+  "baseInit": {
+    "asset": "0x8236a87084f8B84306f72007F36F2618A5634494",
+    "owner": "0x2C3B135cd7dc6C673b358BEF214843DAb3464278",
+    "autoDeposit": false
+  },
+  "strategyInit": {
+    "yieldAsset": "0x70B70Ac0445C3eF04E314DFdA6caafd825428221",
+    "oracle": "0xb3404F101F11A14988c4111E30006972EdbB99aB",
+    "slippage": 10,
+    "targets": {
+      "address": [],
+      "selector": []
+    },
+    "pendingAllowances": {
+      "address": [],
+      "data": []
+    },
+    "rewardTokens": ["0x808507121B80c02388fAd14726482e061B8da827"]
+  },
+  "harvest": {}
+}

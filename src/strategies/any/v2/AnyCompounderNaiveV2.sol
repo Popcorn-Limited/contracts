@@ -4,7 +4,7 @@
 pragma solidity ^0.8.25;
 
 import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
-import {AnyConverterV2, IERC20Metadata, ERC20, IERC20, Math, CallStruct, PendingCallAllowance} from "./AnyConverterV2.sol";
+import {AnyConverterV2, IERC20Metadata, ERC20, IERC20, Math, CallStruct, PendingTarget} from "./AnyConverterV2.sol";
 
 /**
  * @title   BaseStrategy

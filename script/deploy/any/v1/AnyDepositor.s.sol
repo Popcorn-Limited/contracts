@@ -5,23 +5,23 @@ pragma solidity ^0.8.25;
 
 import {Script, console} from "forge-std/Script.sol";
 import {stdJson} from "forge-std/StdJson.sol";
-import {AnyCompounder, IERC20} from "src/strategies/any/v1/AnyCompounder.sol";
+import {AnyDepositor, IERC20} from "src/strategies/any/v1/AnyDepositor.sol";
 
 contract Deploy is Script {
     using stdJson for string;
 
-    function run() public returns (AnyCompounder strategy) {
+    function run() public returns (AnyDepositor strategy) {
         string memory json = vm.readFile(
             string.concat(
                 vm.projectRoot(),
-                "/script/deploy/any/AnyCompounderDeployConfig.json"
+                "/script/deploy/any/v1/AnyDepositorDeployConfig.json"
             )
         );
 
         vm.startBroadcast();
         console.log("msg.sender:", msg.sender);
 
-        strategy = new AnyCompounder();
+        strategy = new AnyDepositor();
 
         strategy.initialize(
             json.readAddress(".baseInit.asset"),
@@ -33,10 +33,6 @@ contract Deploy is Script {
                 json.readUint(".strategyInit.slippage"),
                 json.readUint(".strategyInit.floatRatio")
             )
-        );
-
-        strategy.setRewardTokens(
-            json.readAddressArray(".strategyInit.rewardTokens")
         );
 
         vm.stopBroadcast();

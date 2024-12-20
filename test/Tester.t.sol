@@ -17,6 +17,7 @@ struct CallStruct {
 
 event LogBytes4(bytes4);
 event LogBytes(bytes);
+event LogBytes32(bytes32);
 
 contract Tester is Test {
     using FixedPointMathLib for uint256;
