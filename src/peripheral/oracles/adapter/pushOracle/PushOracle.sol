@@ -8,10 +8,17 @@ import {Owned} from "src/utils/Owned.sol";
 import {ScaleUtils, Scale} from "src/lib/euler/ScaleUtils.sol";
 import {BaseAdapter, Errors, IPriceOracle} from "../BaseAdapter.sol";
 
+/**
+ * @title   PushOracle
+ * @author  RedVeil
+ * @notice  A simple oracle that allows for setting prices for base/quote pairs by permissioned entities
+ * @dev     The safety and reliability of these prices must be handled by other contracts/infrastructure
+ */
 contract PushOracle is BaseAdapter, Owned {
     /// @inheritdoc IPriceOracle
     string public constant name = "PushOracle";
 
+    /// @dev base => quote => price
     mapping(address => mapping(address => uint256)) public prices;
 
     event PriceUpdated(
@@ -29,6 +36,13 @@ contract PushOracle is BaseAdapter, Owned {
                         SET PRICE LOGIC
     //////////////////////////////////////////////////////////////*/
 
+    /**
+     * @notice Set the price of a base/quote pair
+     * @param base The base asset
+     * @param quote The quote asset
+     * @param bqPrice The price of the base in terms of the quote
+     * @param qbPrice The price of the quote in terms of the base
+     */
     function setPrice(
         address base,
         address quote,
@@ -38,6 +52,14 @@ contract PushOracle is BaseAdapter, Owned {
         _setPrice(base, quote, bqPrice, qbPrice);
     }
 
+    /**
+     * @notice Set the prices of multiple base/quote pairs
+     * @param bases The base assets
+     * @param quotes The quote assets
+     * @param bqPrices The prices of the bases in terms of the quotes
+     * @param qbPrices The prices of the quotes in terms of the bases
+     * @dev The lengths of the arrays must be the same
+     */
     function setPrices(
         address[] memory bases,
         address[] memory quotes,
@@ -52,6 +74,7 @@ contract PushOracle is BaseAdapter, Owned {
         }
     }
 
+    /// @dev Internal function to set the price of a base/quote pair
     function _setPrice(
         address base,
         address quote,
@@ -72,6 +95,7 @@ contract PushOracle is BaseAdapter, Owned {
                             QUOTE LOGIC
     //////////////////////////////////////////////////////////////*/
 
+    /// @dev Internal function to get the quote amount for a given base amount 
     function _getQuote(
         uint256 inAmount,
         address base,
@@ -98,11 +122,13 @@ contract PushOracle is BaseAdapter, Owned {
                             UTILS
     //////////////////////////////////////////////////////////////*/
 
+    /// @dev Modifier to check the lengths of two arrays
     modifier checkLength(uint256 lengthA, uint256 lengthB) {
         _checkLength(lengthA, lengthB);
         _;
     }
 
+    /// @dev Internal function to check the lengths of two arrays
     function _checkLength(uint256 lengthA, uint256 lengthB) internal pure {
         if (lengthA != lengthB) revert Misconfigured();
     }

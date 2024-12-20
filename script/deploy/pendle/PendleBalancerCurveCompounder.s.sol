@@ -13,7 +13,7 @@ import {
     IERC20,
     PendleDepositor
 } from "src/strategies/pendle/PendleBalancerCurveCompounder.sol";
-import {TradePath, IAsset, BatchSwapStep} from "src/peripheral/BaseBalancerCompounder.sol";
+import {TradePath, IAsset, BatchSwapStep} from "src/peripheral/compounder/balancer/BaseBalancerCompounder.sol";
 
 contract Deploy is Script {
     using stdJson for string;

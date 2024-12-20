@@ -343,7 +343,6 @@ abstract contract AnyBaseTest is BaseStrategyTest {
             expectedAmountOut
         );
 
-        // TODO reduce by slippage
         assertApproxEqAbs(
             strategy.totalAssets(),
             500567815567176224 + expectedAmountOut,

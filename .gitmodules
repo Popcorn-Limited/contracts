@@ -10,6 +10,9 @@
 [submodule "lib/openzeppelin-contracts-upgradeable"]
 	path = lib/openzeppelin-contracts-upgradeable
 	url = https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable
+[submodule "lib/safe-smart-account"]
+	path = lib/safe-smart-account
+	url = https://github.com/safe-global/safe-smart-account
 [submodule "lib/solady"]
 	path = lib/solady
 	url = https://github.com/vectorized/solady
@@ -19,3 +22,6 @@
 [submodule "lib/weiroll"]
 	path = lib/weiroll
 	url = https://github.com/weiroll/weiroll
+[submodule "lib/ERC-7540-Reference"]
+	path = lib/ERC-7540-Reference
+	url = https://github.com/ERC4626-Alliance/ERC-7540-Reference

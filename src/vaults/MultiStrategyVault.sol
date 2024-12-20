@@ -762,7 +762,6 @@ contract MultiStrategyVault is
         uint256 performanceFee_,
         uint256 managementFee_
     ) public onlyOwner {
-        // TODO check these values
         // Dont take more than 20% performanceFee
         if (performanceFee_ > 2e17) revert InvalidFee(performanceFee_);
         // Dont take more than 10% managementFee

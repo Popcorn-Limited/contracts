@@ -1,0 +1,509 @@
+// SPDX-License-Identifier: GPL-3.0
+// Docgen-SOLC: 0.8.25
+
+pragma solidity ^0.8.25;
+
+import {AsyncVault, InitializeParams} from "./AsyncVault.sol";
+import {ERC4626} from "solmate/tokens/ERC4626.sol";
+
+struct Allocation {
+    uint256 index;
+    uint256 amount;
+}
+
+struct Strategy {
+    address addr;
+    bool isAsync;
+}
+
+/**
+ * @title   MultiStrategyVault
+ * @author  RedVeil
+ * @notice  See the following for the full EIP-4626 specification https://eips.ethereum.org/EIPS/eip-4626.
+ *
+ * A simple ERC4626-Implementation of a MultiStrategyVault.
+ * The vault delegates any actual protocol interaction to a selection of strategies.
+ * It allows for multiple type of fees which are taken by issuing new vault shares.
+ * Strategies and fees can be changed by the owner after a ragequit time.
+ */
+contract MultiStrategyVault is AsyncVault {
+    uint256 public constant quitPeriod = 1 days;
+
+    error InvalidAsset();
+    error Duplicate();
+
+    /**
+     * @notice Initialize a new Vault.
+     * @param params InitializeParams struct containing all necessary parameters.
+     * @dev This function is called by the factory contract when deploying a new vault.
+     * @dev Usually the adapter should already be pre configured. Otherwise a new one can only be added after a ragequit time.
+     * @dev overflows if depositLimit is close to maxUint (convertToShares multiplies depositLimit with totalSupply)
+     */
+    constructor(
+        InitializeParams memory params,
+        Strategy[] memory strategies_,
+        uint256 depositIndex_,
+        uint256[] memory withdrawalQueue_
+    ) AsyncVault(params) {
+        // Cache
+        uint256 len = strategies_.length;
+
+        // Verify WithdrawalQueue length
+        if (withdrawalQueue_.length != len) {
+            revert InvalidWithdrawalQueue();
+        }
+
+        if (len > 0) {
+            // Verify strategies and withdrawal queue + approve asset for strategies
+            for (uint256 i; i < len; i++) {
+                _verifyStrategyAndWithdrawalQueue(
+                    i,
+                    len,
+                    params.asset,
+                    strategies_,
+                    withdrawalQueue_
+                );
+
+                // Approve asset for strategy
+                // Doing this inside this loop instead of its own loop for gas savings
+                ERC20(params.asset).approve(
+                    strategies[i].addr,
+                    type(uint256).max
+                );
+            }
+
+            // Validate depositIndex
+            if (depositIndex_ >= len && depositIndex_ != type(uint256).max) {
+                revert InvalidIndex();
+            }
+
+            // Set withdrawalQueue and strategies
+            strategies = strategies_;
+            withdrawalQueue = withdrawalQueue_;
+        } else {
+            // Validate depositIndex
+            if (depositIndex_ != type(uint256).max) {
+                revert InvalidIndex();
+            }
+        }
+
+        depositIndex = depositIndex_;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            ACCOUNTING LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    /// @return Total amount of underlying `asset` token managed by vault. Delegates to adapter.
+    function totalAssets() public view override returns (uint256) {
+        uint256 assets = IERC20(asset()).balanceOf(address(this));
+
+        for (uint8 i; i < strategies.length; i++) {
+            assets += ERC4626(strategies[i].addr).convertToAssets(
+                ERC4626(strategies[i].addr).balanceOf(address(this))
+            );
+        }
+        return assets;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            ERC-4626 OVERRIDES
+    //////////////////////////////////////////////////////////////*/
+
+    function afterDeposit(uint256 assets, uint256) internal override {
+        if (!paused) _takeFees();
+
+        if (depositIndex != type(uint256).max) {
+            ERC4626(strategies[depositIndex].addr).deposit(
+                assets,
+                address(this)
+            );
+        }
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        REQUEST REDEEM LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    function requestRedeem(
+        uint256 shares,
+        address controller,
+        address owner
+    ) external virtual returns (uint256 requestId) {
+        uint256 expectedAssets = convertToAssets(shares);
+
+        for (uint256 i; i < withdrawalQueue.length; i++) {
+            uint256 neededShares = ERC4626(strategies[withdrawalQueue[i]].addr)
+                .convertToShares(expectedAssets);
+            uint256 availableShares = ERC4626(
+                strategies[withdrawalQueue[i]].addr
+            ).balanceOf(address(this));
+
+            if(strategies[withdrawalQueue[i]].isAsync){
+            (uint256 , uint256 minAmount) = AsyncVault(strategies[withdrawalQueue[i]].addr).limits();
+            
+            // At this point we should only have gas left
+            // TODO test expectation
+            if(neededShares < minAmount) {
+                expectedAssets = 0;
+                break;
+            }
+            }
+       
+            if (neededShares <= availableShares) {
+                expectedAssets = 0;
+                break;
+            } else {
+                expectedAssets -= ERC4626(strategies[withdrawalQueue[i]].addr)
+                .convertToAssets(availableShares);  
+            }
+
+            if(strategies[withdrawalQueue[i]].isAsync) {
+                AsyncVault(strategies[withdrawalQueue[i]].addr).requestRedeem(neededShares, address(this), address(this));
+            } else {
+                ERC4626(strategies[withdrawalQueue[i]].addr).redeem(neededShares, address(this), address(this));
+            }
+        }
+
+        return _requestRedeem(shares, controller, owner);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        FULLFILL REDEEM LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    function fulfillRedeem(
+        uint256 shares,
+        address controller
+    ) external override returns (uint256) {
+        uint256 assets = convertToLowBoundAssets(shares);
+
+        _fulfillRedeem(
+            shares,
+            assets.mulDivDown(1e18 - uint256(fees.withdrawalIncentive), 1e18),
+            controller
+        );
+
+        return assets;
+    }
+
+    function fulfillMultipleRedeems(
+        uint256[] memory shares,
+        address[] memory controllers
+    ) external returns (uint256) {
+        if (shares.length != controllers.length) revert Misconfigured();
+        uint256 withdrawalIncentive = uint256(fees.withdrawalIncentive);
+
+        uint256 total;
+        for (uint256 i; i < shares.length; i++) {
+            uint256 assets = convertToLowBoundAssets(shares[i]);
+            total += assets;
+
+            _fulfillRedeem(
+                shares[i],
+                assets.mulDivDown(1e18 - withdrawalIncentive, 1e18),
+                controllers[i]
+            );
+        }
+        return total;
+    }
+
+    function _fulfillRedeem(
+        uint256 shares,
+        uint256 assets,
+        address controller
+    ) internal virtual returns (uint256) {
+        RequestBalance storage currentBalance = requestBalances[controller];
+        require(
+            currentBalance.pendingShares != 0 &&
+                shares <= currentBalance.pendingShares,
+            "ZERO_SHARES"
+        );
+
+        // TODO replace with withdrawal
+        SafeTransferLib.safeTransferFrom(
+            asset,
+            msg.sender,
+            address(this),
+            assets
+        );
+
+        currentBalance.claimableShares += shares;
+        currentBalance.claimableAssets += assets;
+        currentBalance.pendingShares -= shares;
+
+        if (currentBalance.pendingShares == 0) currentBalance.requestTime = 0;
+
+        return assets;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        PUSH/PULL LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice Push idle funds into strategies. Caller must be Owner.
+     * @param allocations An array of structs each including the strategyIndex to deposit into and the amount of assets
+     */
+    function pushFunds(Allocation[] calldata allocations) external onlyOwner {
+        uint256 len = allocations.length;
+        for (uint256 i; i < len; i++) {
+            strategies[allocations[i].index].deposit(
+                allocations[i].amount,
+                address(this)
+            );
+        }
+    }
+
+    /**
+     * @notice Pull funds out of strategies to be reallocated into different strategies. Caller must be Owner.
+     * @param allocations An array of structs each including the strategyIndex to withdraw from and the amount of assets
+     */
+    function pullFunds(Allocation[] calldata allocations) external onlyOwner {
+        _pullFunds(allocations);
+    }
+
+    function _pullFunds(Allocation[] calldata allocations) internal {
+        uint256 len = allocations.length;
+        for (uint256 i; i < len; i++) {
+            if (allocations[i].amount > 0) {
+                strategies[allocations[i].index].withdraw(
+                    allocations[i].amount,
+                    address(this),
+                    address(this)
+                );
+            }
+        }
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        STRATEGY LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    Strategy[] public strategies;
+    Strategy[] public proposedStrategies;
+
+    uint256 public proposedStrategyTime;
+
+    uint256 public depositIndex; // index of the strategy to deposit funds by default - if uint.max, leave funds idle
+    uint256 public proposedDepositIndex; // index of the strategy to deposit funds by default - if uint.max, leave funds idle
+
+    uint256[] public withdrawalQueue; // indexes of the strategy order in the withdrawal queue
+    uint256[] public proposedWithdrawalQueue;
+
+    event NewStrategiesProposed();
+    event ChangedStrategies();
+
+    error VaultAssetMismatchNewAdapterAsset();
+    error InvalidIndex();
+    error InvalidWithdrawalQueue();
+    error NotPassedQuitPeriod(uint256 quitPeriod_);
+
+    function getStrategies() external view returns (Strategy[] memory) {
+        return strategies;
+    }
+
+    function getProposedStrategies() external view returns (Strategy[] memory) {
+        return proposedStrategies;
+    }
+
+    function getWithdrawalQueue() external view returns (uint256[] memory) {
+        return withdrawalQueue;
+    }
+
+    function getProposedWithdrawalQueue()
+        external
+        view
+        returns (uint256[] memory)
+    {
+        return proposedWithdrawalQueue;
+    }
+
+    /**
+     * @notice Sets a new depositIndex. Caller must be Owner.
+     * @param index The index controls which strategy will be used on user deposits.
+     * @dev To simply transfer user assets into the vault without using a strategy set the index to `type(uint256).max`
+     */
+    function setDepositIndex(uint256 index) external onlyOwner {
+        if (index > strategies.length - 1 && index != type(uint256).max) {
+            revert InvalidIndex();
+        }
+
+        depositIndex = index;
+    }
+
+    /**
+     * @notice Sets a new withdrawal queue. Caller must be Owner.
+     * @param newQueue The order in which the vault should withdraw from the `strategies`
+     * @dev Verifies that now index is out of bounds or duplicate. Each strategy index must be included exactly once.
+     */
+    function setWithdrawalQueue(uint256[] memory newQueue) external onlyOwner {
+        uint256 len = newQueue.length;
+        if (len != strategies.length) {
+            revert InvalidWithdrawalQueue();
+        }
+
+        for (uint256 i; i < len; i++) {
+            uint256 index = newQueue[i];
+
+            // Verify index not out of bound
+            if (index > len - 1) {
+                revert InvalidIndex();
+            }
+
+            // Check for duplicates
+            for (uint256 n; n < len; n++) {
+                if (n != i) {
+                    if (index == newQueue[n]) {
+                        revert Duplicate();
+                    }
+                }
+            }
+        }
+
+        withdrawalQueue = newQueue;
+    }
+
+    /**
+     * @notice Propose new strategies for this vault. Caller must be Owner.
+     * @param strategies_ New ERC4626s that should be used as a strategy for this asset.
+     * @param withdrawalQueue_ The order in which the vault should withdraw from the `strategies`
+     * @param depositIndex_ Index of the strategy to be used on user deposits
+     */
+    function proposeStrategies(
+        Strategy[] calldata strategies_,
+        uint256[] calldata withdrawalQueue_,
+        uint256 depositIndex_
+    ) external onlyOwner {
+        // Cache
+        address asset_ = asset();
+        uint256 len = strategies_.length;
+
+        // Verify WithdrawalQueue length
+        if (withdrawalQueue_.length != len) {
+            revert InvalidWithdrawalQueue();
+        }
+
+        if (len > 0) {
+            // Validate depositIndex
+            if (depositIndex_ >= len && depositIndex_ != type(uint256).max) {
+                revert InvalidIndex();
+            }
+
+            // Verify strategies and withdrawal queue
+            for (uint256 i; i < len; i++) {
+                _verifyStrategyAndWithdrawalQueue(
+                    i,
+                    len,
+                    asset_,
+                    strategies_,
+                    withdrawalQueue_
+                );
+            }
+        } else {
+            // Validate depositIndex
+            if (depositIndex_ != type(uint256).max) {
+                revert InvalidIndex();
+            }
+        }
+
+        // Set proposed state
+        proposedStrategies = strategies_;
+        proposedWithdrawalQueue = withdrawalQueue_;
+        proposedDepositIndex = depositIndex_;
+        proposedStrategyTime = block.timestamp;
+
+        emit NewStrategiesProposed();
+    }
+
+    /**
+     * @notice Set new strategies for this Vault after the quit period has passed.
+     * @dev This migration function will remove all assets from the old strategies and move them into the new strategies
+     * @dev Additionally it will zero old allowances and set new ones
+     */
+    function changeStrategies() external {
+        if (
+            proposedStrategyTime == 0 ||
+            block.timestamp < proposedStrategyTime + quitPeriod
+        ) {
+            revert NotPassedQuitPeriod(quitPeriod);
+        }
+
+        address asset_ = asset();
+        uint256 len = strategies.length;
+        if (len > 0) {
+            for (uint256 i; i < len; i++) {
+                uint256 stratBal = strategies[i].balanceOf(address(this));
+                if (stratBal > 0) {
+                    // TODO deal with async strategies
+                    strategies[i].redeem(
+                        stratBal,
+                        address(this),
+                        address(this)
+                    );
+                }
+                IERC20(asset_).approve(address(strategies[i]), 0);
+            }
+        }
+
+        len = proposedStrategies.length;
+        if (len > 0) {
+            for (uint256 i; i < len; i++) {
+                IERC20(asset_).approve(
+                    proposedStrategies[i].addr,
+                    type(uint256).max
+                );
+            }
+        }
+
+        strategies = proposedStrategies;
+        withdrawalQueue = proposedWithdrawalQueue;
+        depositIndex = proposedDepositIndex;
+
+        delete proposedStrategies;
+        delete proposedWithdrawalQueue;
+        delete proposedDepositIndex;
+        delete proposedStrategyTime;
+
+        emit ChangedStrategies();
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                          OTHER LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    /// Helper function to verify strategies and withdrawal queue and prevent stack-too-deep
+    function _verifyStrategyAndWithdrawalQueue(
+        uint256 i,
+        uint256 len,
+        address asset_,
+        ERC4626[] memory strategies_,
+        uint256[] memory withdrawalQueue_
+    ) internal view {
+        // Cache
+        uint256 index = withdrawalQueue_[i];
+        ERC4626 strategy = strategies_[i];
+
+        // Verify asset matching
+        if (strategy.asset() != asset_) {
+            revert VaultAssetMismatchNewAdapterAsset();
+        }
+
+        // Verify index not out of bound
+        if (index > len - 1) {
+            revert InvalidIndex();
+        }
+
+        // Check for duplicates
+        for (uint256 n; n < len; n++) {
+            if (n != i) {
+                if (
+                    address(strategy) == address(strategies_[n]) ||
+                    index == withdrawalQueue_[n]
+                ) {
+                    revert Duplicate();
+                }
+            }
+        }
+    }
+}

@@ -3,7 +3,7 @@
 
 pragma solidity ^0.8.25;
 
-import {ICurveLp, ICurveRouter, CurveSwap} from "../strategies/curve/ICurve.sol";
+import {ICurveLp, ICurveRouter, CurveSwap} from "src/strategies/curve/ICurve.sol";
 
 library CurveTradeLibrary {
     function trade(ICurveRouter router, CurveSwap memory swap, uint256 amount, uint256 minOut) internal {

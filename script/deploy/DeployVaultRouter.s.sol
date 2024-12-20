@@ -10,7 +10,7 @@ contract Deploy is Script {
         vm.startBroadcast();
         console.log("msg.sender:", msg.sender);
 
-        router = new VaultRouter{salt: bytes32("VaultRouter")}();
+        router = new VaultRouter{salt: bytes32("AsyncVaultRouter")}();
 
         vm.stopBroadcast();
     }
